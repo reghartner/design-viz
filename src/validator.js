@@ -411,6 +411,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings, notes){
           var value=f.cells[key];
           if(gridColumns.indexOf(key)<0)warnings.push(FP+'.cells.'+key+': not a declared column — cell ignored');
           else if(typeof value!=='string' && !(typeof value==='number' && isFinite(value)))warnings.push(FP+'.cells.'+key+': use text or a number — shown as text');
+          else if(typeof value==='string' && value.length>CONTRACT_GRID_CELL_CHARS)warnings.push(FP+'.cells.'+key+': grid cells are for short values ('+CONTRACT_GRID_CELL_CHARS+' characters or fewer) — shown in full; use the block note for longer text');
         });
       });
     }

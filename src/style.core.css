@@ -553,10 +553,10 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-aurora .cttitle{color:#5E7396;}
 .sk-daylight .cttitle{color:#8A8474;}
 .cttable{border-collapse:collapse; width:100%; font-size:11.5px;}
-.ctrow td{padding:4px 10px 4px 6px; vertical-align:top; border-top:1px solid;}
-.sk-aurora .ctrow td{border-top-color:#1A2740;}
-.sk-daylight .ctrow td{border-top-color:#EFEDE6;}
-.ctrow:first-child td{border-top:none;}
+.ctrow :is(td,th){padding:4px 10px 4px 6px; vertical-align:top; border-top:1px solid;}
+.sk-aurora .ctrow :is(td,th){border-top-color:#1A2740;}
+.sk-daylight .ctrow :is(td,th){border-top-color:#EFEDE6;}
+.ctrow:first-child :is(td,th){border-top:none;}
 .ctk{font:600 11px 'IBM Plex Mono',monospace; white-space:nowrap;}
 .sk-aurora .ctk{color:#8AE8FF;}
 .sk-daylight .ctk{color:#4956C9;}
@@ -566,15 +566,15 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .ctg{font:400 11.5px 'IBM Plex Sans',sans-serif;}
 .sk-aurora .ctg{color:#7E93B8;}
 .sk-daylight .ctg{color:#79808B;}
-.ctrow.hot td{border-top-color:transparent;}
-.sk-aurora .ctrow.hot td{background:rgba(255,180,84,.08);}
-.sk-daylight .ctrow.hot td{background:#FFF6E4;}
+.ctrow.hot :is(td,th){border-top-color:transparent;}
+.sk-aurora .ctrow.hot :is(td,th){background:rgba(255,180,84,.08);}
+.sk-daylight .ctrow.hot :is(td,th){background:#FFF6E4;}
 .sk-aurora .ctrow.hot .ctk{color:#FFB454;}
 .sk-daylight .ctrow.hot .ctk{color:#B45309;}
 .ctrow.hot .ctv{font-weight:700;}
-.sk-aurora .ctrow.dv-hash-target td,.sk-aurora .ctrow:focus td{background:rgba(56,225,255,.14);}
-.sk-daylight .ctrow.dv-hash-target td,.sk-daylight .ctrow:focus td{background:#E8F7FB;}
-.ctrow.dv-hash-target td:first-child,.ctrow:focus td:first-child{box-shadow:inset 3px 0 currentColor;}
+.sk-aurora .ctrow.dv-hash-target :is(td,th),.sk-aurora .ctrow:focus :is(td,th){background:rgba(56,225,255,.14);}
+.sk-daylight .ctrow.dv-hash-target :is(td,th),.sk-daylight .ctrow:focus :is(td,th){background:#E8F7FB;}
+.ctrow.dv-hash-target :is(td,th):first-child,.ctrow:focus :is(td,th):first-child{box-shadow:inset 3px 0 currentColor;}
 .ctrow:focus{outline:none;}
 .ctdelta{display:inline-block;margin-left:6px;padding:1px 5px;border:1px solid currentColor;border-radius:999px;
   font:700 8px/1.25 'IBM Plex Mono',monospace;letter-spacing:.03em;text-transform:uppercase;vertical-align:1px;}
@@ -592,16 +592,18 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-aurora .ctnote{color:#5E7396;}
 .sk-daylight .ctnote{color:#8A8474;}
 /* #1304 grid contract blocks: the shared column/cell table scrolls sideways inside its block. Rows reuse
-   the classic .ctrow/.ctk/.ctv styles, so skins apply unchanged. */
+   the classic .ctrow/.ctk/.ctv classes (the skin row rules cover td and th); headers, the focus ring and
+   missing-cell dashes take the skin's --dtext / --dink text colours. */
 .ctgrid-scroll{max-width:100%; overflow-x:auto; scrollbar-width:thin;}
-.ctgrid-scroll:focus-visible{outline:2px solid currentColor; outline-offset:2px;}
+.ctgrid-scroll:focus-visible{outline:2px solid var(--dink,#23272E); outline-offset:2px;}
 .cttable.ctgrid{table-layout:fixed; min-width:100%;}
-.ctgrid-caption{position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap;}
-.ctgrid thead th{padding:2px 10px 6px 6px; text-align:left; vertical-align:bottom; font:600 10px 'IBM Plex Mono',monospace;
-  letter-spacing:.06em; text-transform:uppercase; opacity:.7; overflow-wrap:anywhere;}
-.ctgrid td{white-space:normal; overflow-wrap:anywhere;}
+.ctgrid-sr{position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap;}
+.ctgrid .cthead{padding:2px 10px 6px 6px; text-align:left; vertical-align:bottom; color:var(--dtext,#4A4F58);
+  font:600 10px 'IBM Plex Mono',monospace; letter-spacing:.06em; text-transform:uppercase; overflow-wrap:anywhere;}
+.ctgrid :is(td,th){white-space:normal; overflow-wrap:anywhere;}
+.ctgrid th.ctk{text-align:left; font-weight:600;}
 .contract-grid .ctgrid .ctk,.contract-grid .ctgrid .ctv{width:auto;}
-.ctmissing{opacity:.45;}
+.ctmissing{color:var(--dtext,#4A4F58);}
 /* lane pill on the caption line */
 .lanepill{font:700 9.5px 'IBM Plex Mono',monospace; letter-spacing:.08em; padding:2px 7px;
   border-radius:999px; border:1px solid currentColor; margin-right:8px;}
@@ -881,10 +883,10 @@ body.sk-aurora:not(.sk-pastel):not(.sk-editorial) .delta-popover-label,body.sk-t
   .ctg, .ctnote{color:#555555;}
 }
 @media print{
-  .sk-aurora .ctrow td, .sk-daylight .ctrow td{border-top-color:#DDDDDD;}
+  .sk-aurora .ctrow :is(td,th), .sk-daylight .ctrow :is(td,th){border-top-color:#DDDDDD;}
 }
 @media print{
-  .sk-aurora .ctrow.hot td, .sk-daylight .ctrow.hot td{background:#F2F2F2;}
+  .sk-aurora .ctrow.hot :is(td,th), .sk-daylight .ctrow.hot :is(td,th){background:#F2F2F2;}
 }
 @media print{
   .printsteps{display:block; font:500 11px/1.6 'IBM Plex Mono',monospace; color:#333333;
@@ -1336,16 +1338,16 @@ body.sk-editorial .sk-daylight .ctcard{
 }
 body.sk-editorial .sk-aurora .cttitle,
 body.sk-editorial .sk-daylight .cttitle{color:var(--ed-accent);}
-body.sk-editorial .sk-aurora .ctrow td,
-body.sk-editorial .sk-daylight .ctrow td{border-top-color:var(--ed-rule);}
+body.sk-editorial .sk-aurora .ctrow :is(td,th),
+body.sk-editorial .sk-daylight .ctrow :is(td,th){border-top-color:var(--ed-rule);}
 body.sk-editorial .sk-aurora .ctk,
 body.sk-editorial .sk-daylight .ctk{color:var(--ed-accent-deep);}
 body.sk-editorial .sk-aurora .ctv,
 body.sk-editorial .sk-daylight .ctv{color:var(--ed-ink);}
 body.sk-editorial .sk-aurora .ctg,
 body.sk-editorial .sk-daylight .ctg{color:#59615E; font-family:'Source Sans 3', sans-serif;}
-body.sk-editorial .sk-aurora .ctrow.hot td,
-body.sk-editorial .sk-daylight .ctrow.hot td{background:#F3E7CF;}
+body.sk-editorial .sk-aurora .ctrow.hot :is(td,th),
+body.sk-editorial .sk-daylight .ctrow.hot :is(td,th){background:#F3E7CF;}
 body.sk-editorial .sk-aurora .ctrow.hot .ctk,
 body.sk-editorial .sk-daylight .ctrow.hot .ctk{color:var(--ed-warn);}
 body.sk-editorial .sk-aurora .ctnote,
@@ -1953,7 +1955,7 @@ body.sk-editorial .errbox{
   body.sk-terminal .sk-aurora .ctcard{background:var(--tm-ground); border:1px solid var(--tm-line); border-radius:0;}
 }
 @media screen {
-  body.sk-terminal .sk-aurora .ctrow td{border-top-color:var(--tm-line-dim);}
+  body.sk-terminal .sk-aurora .ctrow :is(td,th){border-top-color:var(--tm-line-dim);}
 }
 @media screen {
   body.sk-terminal .sk-aurora .ctk{color:var(--tm-good);}
@@ -1966,7 +1968,7 @@ body.sk-editorial .errbox{
   body.sk-terminal .sk-aurora .ctnote{color:var(--tm-muted);}
 }
 @media screen {
-  body.sk-terminal .sk-aurora .ctrow.hot td{background:rgba(255,107,94,.07);}
+  body.sk-terminal .sk-aurora .ctrow.hot :is(td,th){background:rgba(255,107,94,.07);}
 }
 @media screen {
   body.sk-terminal .sk-aurora .ctrow.hot .ctk{color:var(--tm-alert);}
@@ -2613,8 +2615,8 @@ body.sk-editorial .errbox{
   body.sk-pastel .sk-daylight .cttitle { color:#68758A; }
 }
 @media screen {
-  body.sk-pastel .sk-aurora .ctrow td,
-  body.sk-pastel .sk-daylight .ctrow td { border-top-color:#E2E8F0; }
+  body.sk-pastel .sk-aurora .ctrow :is(td,th),
+  body.sk-pastel .sk-daylight .ctrow :is(td,th) { border-top-color:#E2E8F0; }
 }
 @media screen {
   body.sk-pastel .sk-aurora .ctk,
@@ -2633,8 +2635,8 @@ body.sk-editorial .errbox{
   body.sk-pastel .sk-daylight .ctnote { color:#6D798D; }
 }
 @media screen {
-  body.sk-pastel .sk-aurora .ctrow.hot td,
-  body.sk-pastel .sk-daylight .ctrow.hot td { background:#FFF5E4; }
+  body.sk-pastel .sk-aurora .ctrow.hot :is(td,th),
+  body.sk-pastel .sk-daylight .ctrow.hot :is(td,th) { background:#FFF5E4; }
 }
 @media screen {
   body.sk-pastel .sk-aurora .ctrow.hot .ctk,
@@ -3273,7 +3275,7 @@ body.sk-editorial .errbox{
   body.sk-blueprint .docview .cttitle{color:#A8D8E9;font-size:10px;margin-bottom:4px;}
 }
 @media screen {
-  body.sk-blueprint .ctrow td{padding:3px 8px 3px 5px;border-top-color:#276485;}
+  body.sk-blueprint .ctrow :is(td,th){padding:3px 8px 3px 5px;border-top-color:#276485;}
 }
 @media screen {
   body.sk-blueprint .docview .ctk{color:#A9F0FF;}
@@ -3285,7 +3287,7 @@ body.sk-editorial .errbox{
   body.sk-blueprint .docview .ctg,body.sk-blueprint .docview .ctnote{color:#B2D2E1;}
 }
 @media screen {
-  body.sk-blueprint .docview .ctrow.hot td{background:#463614;}
+  body.sk-blueprint .docview .ctrow.hot :is(td,th){background:#463614;}
 }
 @media screen {
   body.sk-blueprint .docview .ctrow.hot .ctk{color:#FFD166;}

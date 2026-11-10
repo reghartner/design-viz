@@ -80,7 +80,7 @@ function edgeJsonContracts(diagram,step){
 /* #1304: the column and cell shape shared by the data-contract panel and grid
    contract blocks (`columns` plus per-row `cells`). Each host supplies its own
    classes and row headers; the table structure, widths and cell text are here. */
-var CONTRACT_GRID_MAX_COLUMNS=12;
+var CONTRACT_GRID_MAX_COLUMNS=12,CONTRACT_GRID_CELL_CHARS=120;
 function contractGridWidth(value,fallback){return typeof value==='number' && isFinite(value) && value>=40?value:fallback;}
 function contractGridColumns(value){return panelCollectionItems(value,'columns',CONTRACT_GRID_MAX_COLUMNS);}
 function contractGridCellText(value){return value===undefined?'':value===null?'null':typeof value==='object'?JSON.stringify(value):String(value);}
@@ -91,16 +91,16 @@ function contractGridColumnWarnings(value,path,warnings){
   });
 }
 /* o: {tableClass, caption, captionClass, firstWidth, fieldLabel, columns, rows:[{attrs, head, cells}],
-   rowHead?, cellAttrs?(column), missing, empty?}. Strings in head/attrs/missing/empty are HTML. rowHead
-   opens each row header: default '<th scope="row">'; a host whose row styles target td can pass
-   '<td … role="rowheader">'. */
+   rowHead?, colHeadAttrs?, cellAttrs?(column), missing, empty?}. Strings in head/attrs/missing/empty are HTML.
+   rowHead opens each row header (default '<th scope="row">'). */
 function contractGridTableHTML(o){
   var total=o.columns.reduce(function(sum,col){return sum+contractGridWidth(col.width,160);},o.firstWidth);
   var h='<table class="'+o.tableClass+'" style="width:'+total+'px"><caption class="'+o.captionClass+'">'+esc(o.caption)+
     '</caption><colgroup><col style="width:'+o.firstWidth+'px">';
   o.columns.forEach(function(col){h+='<col style="width:'+contractGridWidth(col.width,160)+'px">';});
-  h+='</colgroup><thead><tr><th scope="col">'+esc(o.fieldLabel)+'</th>';
-  o.columns.forEach(function(col){h+='<th scope="col">'+esc(col.label || col.id)+'</th>';});
+  var colHead='<th scope="col"'+(o.colHeadAttrs || '')+'>';
+  h+='</colgroup><thead><tr>'+colHead+esc(o.fieldLabel)+'</th>';
+  o.columns.forEach(function(col){h+=colHead+esc(col.label || col.id)+'</th>';});
   h+='</tr></thead><tbody>';
   o.rows.forEach(function(row){
     var open=o.rowHead || '<th scope="row">',tag=open.slice(1,3);

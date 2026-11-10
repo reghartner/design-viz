@@ -56,7 +56,8 @@ existing block into a grid: `v` becomes a Value column and `g` a Notes column.
   `label` (default: the id) and an optional `width` in px (at least 40; default
   160). At most 12 columns render.
 - `fieldLabel` heads the first column (default "Field"); `k` is each row's header.
-- `cells` maps a column id to text or a number. A missing cell shows a dash.
+- `cells` maps a column id to short text (120 characters or fewer; longer text
+  warns and is shown in full) or a number. A missing cell shows a dash.
 - `hot`, `link`, `delta`, `revealAt`/`hideAt` and the block `note` work as above.
   `v` and `g` are not shown in a grid.
 - Without `columns`, a block renders exactly as before.
@@ -64,12 +65,12 @@ existing block into a grid: `v` becomes a Value column and `g` a Notes column.
   named by the block title for screen readers.
 
 Warnings: a duplicate column id, more than 12 columns, a width under 40, a cell
-for an undeclared column, a cell that is not text or a number, `v`/`g` beside
-`columns`, and `cells` without `columns`.
+for an undeclared column, a cell that is not text or a number, a cell over 120
+characters, `v`/`g` beside `columns`, and `cells` without `columns`.
 
 In the Workbench (desktop), the block inspector has **First column name**,
 **Columns** (add, rename, reorder, remove, width) and **Rows** (one input per
-column). Removing a column removes its cells and says how many. Selecting a row
+column; **+ Add row**). Removing a column removes its cells and says how many. Selecting a row
 edits its cells one per column. Each edit is one Undo step. The compatibility
 feature is `content.contract-grids`.
 

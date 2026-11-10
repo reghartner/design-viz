@@ -41,11 +41,12 @@ function contractCardHTML(contract, sectionReference, record){
   if (grid){
     var gridTitle = contract.title || 'On the wire';
     h += '<div class="ctgrid-scroll" tabindex="0" role="region" aria-label="' + esc(gridTitle) + '">' +
-      contractGridTableHTML({tableClass:'cttable ctgrid', caption:gridTitle, captionClass:'ctgrid-caption', firstWidth:180,
+      contractGridTableHTML({tableClass:'cttable ctgrid', caption:gridTitle, captionClass:'ctgrid-sr', firstWidth:180,
         fieldLabel:contractGridFieldLabel(contract.fieldLabel, 'Field'), columns:contractGridColumns(contract), rows:gridRows,
-        // Row headers and cells reuse the classic row classes, so every skin's row, hot and focus styles apply.
-        rowHead:'<td class="ctk" role="rowheader">', cellAttrs:function(col){ return ' class="ctv ctcell" data-contract-cell="' + esc(col.id) + '"'; },
-        missing:'<span class="ctmissing" aria-label="No value">—</span>'}) + '</div>';
+        // Rows reuse the classic .ctrow/.ctk/.ctv classes, so every skin's row, hot and focus styles apply.
+        rowHead:'<th scope="row" class="ctk">', colHeadAttrs:' class="cthead"',
+        cellAttrs:function(col){ return ' class="ctv ctcell" data-contract-cell="' + esc(col.id) + '"'; },
+        missing:'<span class="ctmissing" aria-hidden="true">—</span><span class="ctgrid-sr">No value</span>'}) + '</div>';
   }
   else if (body) h += '<table class="cttable">' + body + '</table>';
   if (contract.note) h += '<div class="ctnote">' + proseMarkup(contract.note) + '</div>';

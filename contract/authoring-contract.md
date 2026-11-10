@@ -367,7 +367,7 @@ flow moves:
 ### Multiple contract blocks and widths
 
 Use `section.contracts` for independent field tables. Each block has the fields
-above plus optional `id` and `span`; with `columns` it is a grid table (recipe):
+above plus optional `id` and `span`; with `columns` it is a grid table (recipe below):
 
 ```json
 "contracts": [

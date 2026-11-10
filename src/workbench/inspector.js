@@ -2464,18 +2464,22 @@ function contractGridRows(val){
     if(original.some(function(col){return !specObject(col) || typeof col.id!=='string' || !col.id;})){
       var broken=document.createElement('p');broken.className='fnote';broken.textContent='Some columns are not {id, label?, width?} objects; fix them in JSON to edit columns here.';out.push(broken);return out;
     }
+    // raw:false — these rows are projections (_sourceIndex, cell0..N), not source; a raw JSON box would write them back.
     var columns=rowsFieldControl('columns',contractGridColumnRows(original),{cols:[{k:'label',label:'Column name',req:true},{k:'width',label:'Width (px)',kind:'num'}],wide:true,max:CONTRACT_GRID_MAX_COLUMNS},{
+      raw:false,
       collect:function(items){return contractGridCollectColumns(original,items);},
       commitValue:function(items){return commitGrid({op:'columns',columns:items || []});}
     });
     columns.querySelector('.rowadd').textContent='+ Add column';columns.setAttribute('data-contract-editor','columns');
     var colsHelp=document.createElement('p');colsHelp.className='fnote';colsHelp.textContent='Up to '+CONTRACT_GRID_MAX_COLUMNS+' columns. Blank widths use 160 px; a wide grid scrolls inside its block. Removing a column removes its cells.';
+    out=out.concat(formNotice());
     out.push(frowBlock('Columns',columns),colsHelp);
     var fields=Array.isArray(val.fields)?val.fields:[];
     if(fields.some(function(f){return !specObject(f) || (f.cells!=null && !specObject(f.cells));})){
       var rowsBroken=document.createElement('p');rowsBroken.className='fnote';rowsBroken.textContent='Some rows are malformed; fix them in JSON to edit all rows here. Select a row to edit its cells.';out.push(rowsBroken);return out;
     }
     var rows=rowsFieldControl('fields',contractGridRowItems(fields,cols),{cols:[{k:'k',label:fieldLabel,req:true}].concat(cols.map(function(col,i){return {k:'cell'+i,label:col.label || col.id};})),wide:true,max:64},{
+      raw:false,
       collect:function(items){return contractGridCollectRows(fields,cols,items);},
       commitValue:function(items){return commitGrid({op:'rows',rows:items || []});}
     });
@@ -2494,17 +2498,20 @@ function contractForm(val,ctx){
       convert.title='Turn this block into a grid table: v becomes a Value column and g a Notes column. Undo restores it.';
       gridRows=[frowBlock('Grid',convert)];
     }
-    return formNotice().concat([
+    return [].concat([
       frow('title',textControl(val.title,function(v){return commitSimple('title',v==null?null:JSON.stringify(v));})),
       frow('Width',widthControl),
       frowBlock('Step wires',contractWireControl(val,ctx))
     ],gridRows,[
       frow('source',textControl(val.source,function(v){return commitSimple('source',v==null?null:JSON.stringify(v));},{placeholder:'permalink URL'})),
-      frowBlock('note',proseControl(val.note,function(v){return commitSimple('note',v==null?null:JSON.stringify(v));})),
+      frowBlock('note',proseControl(val.note,function(v){return commitSimple('note',v==null?null:JSON.stringify(v));}))
+    ],grid?[]:[
+      // A grid adds rows in its Rows editor (+ Add row).
       frowBlock('Fields',actionButton('+ Add field',function(){
         commitCascade(function(raw){return planAddContractField(session.text(),raw,t);},
           {after:function(plan){selectContract(t.section,t.card,'crow',plan.index);}});
-      })),
+      }))
+    ],[
       frowBlock('Section',actionButton('All contract blocks',function(){selectTarget({kind:'section',section:t.section,el:findTargetEl({kind:'section',section:t.section})},false);}))
     ]);
   }

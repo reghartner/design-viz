@@ -1215,7 +1215,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function traceSnapshot(){
     var source=traceSources(),entries=source.entries,evidence=source.evidence,hasMappings=false;
-    eachDiagram(function(d){if((d.steps || []).some(function(step){return !!step.traceMatch;}))hasMappings=true;});
+    // #1290: spans declared on nodes and edges map a loaded trace too.
+    eachDiagram(function(d){if((d.steps || []).some(function(step){return !!step.traceMatch;}) || Object.keys(d.nodes || {}).some(function(id){return !!(d.nodes[id] && d.nodes[id].trace);}) || (d.edges || []).some(function(e){return !!(e && e.trace);}))hasMappings=true;});
     var hasBindings=evidence.carriers.some(function(binding){return Object.keys(binding.signals).some(function(name){return proofVerdicts.isTraceSignal(binding.signals[name]);});});
     var traceStatus=telemetryOptions && typeof telemetryOptions.traceStatus==='function'?telemetryOptions.traceStatus():{available:evidence.available,note:''};
     var selected=traceSelection && entries.find(function(e){return e.key===traceSelection.key && e.exemplar.traceId===traceSelection.traceId;});

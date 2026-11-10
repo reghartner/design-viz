@@ -440,6 +440,13 @@ declare without giving a full declaration, is an error at the overlay
 (`topologyImports[i].nodeTracking.<id>.trace.spans.<name>`), and that span is left out.
 Honeycomb number or boolean attribute values warn, as for step `traceMatch`.
 
+**In a loaded trace.** A declared node shows the union time of the spans its declarations
+match, with each declaration in the label's title; see
+[Live status trace labels](live-status.md). A declaration matches spans of its
+`serviceName` by exact `operation`, by `operationPrefix`, or by `attributes` alone, and one
+span may match several carriers. Connection hand-off timing from `send` and `receive` comes
+in a later change.
+
 ## Honeycomb lookback
 
 The Load trace form says under the trace ID field which time window a load

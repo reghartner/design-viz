@@ -38,10 +38,10 @@ function telemetryTraceDuration(ms){
   return durationMsRounded(ms).toLocaleString('en-US')+' ms';
 }
 function telemetryTraceModel(diagram,pathId,exemplar){
-  var mapping=null,warning='';
+  var mapping=null,warning='',normalized=null;
   try{
     if(!exemplar.spans.length)throw new Error('Trace timeline unavailable.');
-    var normalized={spans:exemplar.spans.map(function(s){return {id:s.id,parentId:s.parentId,serviceName:s.service,operation:s.name,startMs:s.startMs,durationMs:s.ms,error:s.error,statusCode:s.attributes['http.response.status_code'] || s.attributes['http.status_code'],attributes:s.attributes,links:s.links.filter(function(l){return l.traceId===exemplar.traceId;}).map(function(l){return l.spanId;})};}),warnings:exemplar.warnings};
+    normalized={spans:exemplar.spans.map(function(s){return {id:s.id,parentId:s.parentId,serviceName:s.service,operation:s.name,startMs:s.startMs,durationMs:s.ms,error:s.error,statusCode:s.attributes['http.response.status_code'] || s.attributes['http.status_code'],attributes:s.attributes,links:s.links.filter(function(l){return l.traceId===exemplar.traceId;}).map(function(l){return l.spanId;})};}),warnings:exemplar.warnings};
     mapping=FlowTraceMatch.mapTrace(diagram,normalized,diagram.paths && diagram.paths.length?pathId:undefined);
   }catch(ex){warning=ex.message;}
   var nodes=Object.create(null),edges=Object.create(null),rows=[];
@@ -63,6 +63,27 @@ function telemetryTraceModel(diagram,pathId,exemplar){
     // the canvas. A service name or display title is never a join key.
     if(match.nodeId && diagram.nodes[match.nodeId]){if(!nodes[match.nodeId])nodes[match.nodeId]=[];nodes[match.nodeId].push(row);}
     if(match.status==='matched' && exact.length===1){var key=exact[0].from+'->'+exact[0].to;if(!edges[key])edges[key]=[];edges[key].push(row);}
+  });
+  // #1290: a node that declares trace spans gets one carrier row from its matched spans, even
+  // when no step lights it (D16). Without a matched span it gets no row, so no label (Chuck
+  // 2026-11-10). Connection declarations are matched but not drawn until their hand-off timing.
+  var carriers=null;
+  try{if(normalized && typeof FlowTraceMatch.carrierSpans==='function')carriers=FlowTraceMatch.carrierSpans(diagram,normalized);}catch(ex){carriers=null;}
+  if(carriers)Object.keys(carriers.nodes).forEach(function(id){
+    if(!diagram.nodes || !diagram.nodes[id])return;
+    var list=carriers.nodes[id],seen=Object.create(null),spans=[];
+    function interval(s){return {id:s.id,startMs:s.startMs,durationMs:s.durationMs};}
+    list.forEach(function(x){x.spans.forEach(function(s){if(!seen[s.id]){seen[s.id]=true;spans.push(s);}});});
+    if(!spans.length)return;
+    var parts=list.map(function(x){
+      var name=x.key===x.role?x.key:x.key+' ('+x.role+')';
+      if(x.spans.length)return name+' '+telemetryTraceSpanTime([{status:'matched',intervals:x.spans.map(interval)}]);
+      return name+': '+(x.notRecorded.length?'attribute '+x.notRecorded.join(', ')+' not recorded':'not in this trace');
+    });
+    var row={id:'carrier:'+id,kind:'carrier',nodeId:id,edgeIndex:null,status:'matched',tone:spans.some(function(s){return s.error;})?'error':'observed',duration:null,budget:undefined,
+      label:'',operation:'',service:'',alternative:null,optional:false,otherAlternatives:[],conditions:[],declarations:parts,
+      spanIds:spans.map(function(s){return s.id;}),intervals:spans.map(interval)};
+    (nodes[id]=nodes[id] || []).push(row);
   });
   // Multiple authored steps claiming one edge cannot supply one exact duration.
   Object.keys(edges).forEach(function(key){if(edges[key].length!==1)delete edges[key];});
@@ -203,6 +224,7 @@ function telemetryTraceLabel(listed){
   var name=one && one.service+' '+one.operation,text=one && one.status!=='matched'?one.label:one?[one.alternative!=null?'Matched: '+(name.length>40?name.slice(0,39)+'…':name):'',time || one.label].filter(Boolean).join(' · '):
     [rows.length+' operations',count('missing','unknown'),count('ambiguous','ambiguous'),time].filter(Boolean).join(' · ');
   var title=listed.map(function(r){
+    if(r.kind==='carrier')return 'Declared spans: '+r.declarations.join('; ');
     var others=r.otherAlternatives || [],absent=others.filter(function(a){return !a.seen;}),unused=others.filter(function(a){return a.seen;});
     return [r.optional?'optional, not in this trace: '+r.service+' '+r.operation:named(r)+': '+(r.duration!=null?r.duration+' ms':r.label)+(r.budget!=null?' / '+r.budget+' ms budget':'')].concat(r.conditions.map(function(c){return c.label;}),
       absent.length?['not in this trace: '+absent.map(function(a){return a.name;}).join(', ')]:[],unused.length?['in this trace, not matched: '+unused.map(function(a){return a.name;}).join(', ')]:[]).join('; ');

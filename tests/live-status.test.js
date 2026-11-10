@@ -4723,3 +4723,14 @@ test('#1253 item 15 Remove and Clear Missing work return focus to the edited car
   b.h.ctl.liveStatus.destroy();
  }finally{focus.restore();}
 });
+test('#1253 item 15 a first change that leaves no carrier button hands focus to Save 1 change',async()=>{
+ const focus=trackFocus();try{
+  const b=await editBoard();b.control('edit').dispatchEvent({type:'click'});
+  carrierClick(b.h,b.h.view.querySelector('text.lbl'));
+  const pop=b.h.view.querySelector('.dv-live-popover');pop.querySelector('button.dv-live-remove').dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});b.runTimers();
+  assert.equal(b.editor.state().pending,1);
+  assert.ok(focus.el===b.control('save'),'focus is on Save, not on Done, which the first change hides');
+  assert.equal(b.control('save').hidden,false);assert.equal(b.control('save').textContent,'Save 1 change');
+  b.h.ctl.liveStatus.destroy();
+ }finally{focus.restore();}
+});

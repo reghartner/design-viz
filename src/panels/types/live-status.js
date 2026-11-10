@@ -68,7 +68,8 @@
       var over=value && value.overTime,loading=!!(over && over.loading),controls=host._liveFocusControls || {};
       if(host._liveOverLoading && !loading && over && over.active){var slider=host.querySelector('input.dv-live-over-time-slider');if(slider && activeElement()===controls.overTime)slider.focus({preventScroll:true});}
       host._liveOverLoading=loading;
-      var names=api && typeof api.takeFocus==='function'?api.takeFocus():null;
+      // A panel not in the page yet (a re-render still building) leaves the hand-off to the next paint.
+      var names=api && typeof api.takeFocus==='function' && host.isConnected!==false?api.takeFocus():null;
       var next=(names || []).map(function(name){return controls[name];}).filter(shown)[0];
       if(next)next.focus({preventScroll:true});
     }

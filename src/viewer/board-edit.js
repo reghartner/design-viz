@@ -175,14 +175,16 @@ function createBoardEditor(options){
     if(op==='clear-missing-work'){var m=marker(t);if(!m || !m.clearable)return false;}
     var next=splice(text,t,op,ticket,match),before=text;
     if(next==null || next===text)return false;
-    if(!render(next))return false;
-    var entry=record(t,op,ticket,match),chain=boardEditChain(t.raw,t.path);
+    // The pending list changes before the render, so the re-rendered board shows the new count at once (#1253);
+    // a refused render puts it back.
+    var entry=record(t,op,ticket,match),chain=boardEditChain(t.raw,t.path),kept=ops.slice(),befores=ops.map(function(o){return o.before;});
     // An add or remove that undoes a pending remove or add of the same ticket on the same carrier cancels it
     // (#1253). A clear or a span mapping has no inverse here. undoMap restores a mapping's exact `before`
     // text only while that text holds no cancelled op, so a mapping made after the cancelled op forgets it.
     var inverse=op!=='add' && op!=='remove'?-1:ops.findIndex(function(o){return (o.entry.op==='add' || o.entry.op==='remove') && o.entry.op!==op && o.entry.ticket===ticket && JSON.stringify(o.entry.path)===JSON.stringify(entry.path);});
     if(inverse>=0){ops.splice(inverse,1);ops.slice(inverse).forEach(function(o){o.before=undefined;});}
     else ops.push({entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,previous:op==='trace-match'?t.previous:undefined,before:op==='trace-match'?before:undefined});
+    if(!render(next)){ops=kept;kept.forEach(function(o,i){o.before=befores[i];});return false;}
     question=ask || null;
     changed();return true;
   }

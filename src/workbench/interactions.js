@@ -1860,12 +1860,13 @@ function createBuilderInteractions(opts){
     if (ev.key === 'Escape'){
       if(ev.defaultPrevented)return; /* an owned importer consumed Escape */
       if (drag){drag.lbl.removeAttribute('transform');drag=null;ev.preventDefault();return;}
-      if (rowDrag){ cancelRowDrag(); return; }
-      if (nodeDrag){ cancelNodeDrag(); return; }
-      if (groupDrag){ cancelGroupDrag(); return; }
-      if(opts.dismissOverlay())return;
-      if (addToStep){ cancelAddToStep('add-to-step ended'); return; }
-      if (connect){ cancelConnect('connect cancelled'); return; }
+      /* A cancel consumes this Esc (#1243: later listeners such as the Links highlight skip it). */
+      if (rowDrag){ cancelRowDrag(); ev.preventDefault(); return; }
+      if (nodeDrag){ cancelNodeDrag(); ev.preventDefault(); return; }
+      if (groupDrag){ cancelGroupDrag(); ev.preventDefault(); return; }
+      if(opts.dismissOverlay()){ev.preventDefault();return;}
+      if (addToStep){ cancelAddToStep('add-to-step ended'); ev.preventDefault(); return; }
+      if (connect){ cancelConnect('connect cancelled'); ev.preventDefault(); return; }
       if (multiSel.length){ clearMultiSelect(); dropMultiUI(); return; }
       if (session.target){
         session.target = null;

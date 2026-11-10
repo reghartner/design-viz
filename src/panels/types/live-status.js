@@ -268,7 +268,7 @@
               // #1280 review c8: the line's span was focused and revealed by this Load; scrolling back up to the request
               // line would push it off screen. Only without a focused span does the Load reveal its request line.
               var focused=host.querySelector('.dv-trace-selected .dv-trace-span[aria-pressed="true"]'),item=focused && focused.closest('.dv-trace-span-item');
-              if(item && item.getClientRects().length)revealInView(item,false);else revealLoadedTrace();
+              if(item && item.getClientRects().length)revealInView(item,false,focusBox(item));else revealLoadedTrace();
             });
           };load.addEventListener('click',load._logClick);}
         });
@@ -526,7 +526,7 @@
       }
       stopFocusWatch();host._traceFocusPending=null;list._traceFocusShown=pending.key;
       // The row with its opened detail, so a click shows the detail too; the row itself never leaves the window.
-      revealInView(pending.item,pending.auto);
+      revealInView(pending.item,pending.auto,focusBox(pending.item));
     }
     /* #1280: bring `node` into view by the least scroll. Already fully visible: nothing moves. Below the edge: its bottom
        comes to the edge (8 px margin). Above the edge, or taller than the view less the margins: its top comes to the top
@@ -546,8 +546,17 @@
       var style=view && view.getComputedStyle?view.getComputedStyle(host):null,value=style && style.getPropertyValue?parseFloat(style.getPropertyValue('--flowview-navigation-bottom')):NaN;
       return isFinite(value)?Math.max(0,value-8):0;
     }
-    function revealInView(node,pageOff){
-      var holder=scrollHolder(node),ib=node.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement,delta;
+    /* What a span focus shows: from the item's top (its row) to the opened detail's own bottom. The item's trailing space
+       (the detail's bottom margin, the item's border) is not content (CI run 42899309527). The detail's rect is used as it is,
+       so a last item, whose margin collapses out of it, is right too; it counts only when it lies inside the item's box. */
+    function focusBox(item){
+      var box=item.getBoundingClientRect(),detail=item.querySelector('.dv-trace-span-detail'),bottom=box.bottom;
+      if(detail && detail.getBoundingClientRect){var d=detail.getBoundingClientRect();if(d.height>0 && d.bottom>box.top && d.bottom<=box.bottom+0.5)bottom=d.bottom;}
+      return {top:box.top,bottom:bottom};
+    }
+    // box: the part of `node` to show ({top, bottom} in viewport px); default its whole rect.
+    function revealInView(node,pageOff,box){
+      var holder=scrollHolder(node),ib=box || node.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement,delta;
       // A holder scrolled up under the bar shows rows only below it.
       if(holder){var hb=holder.getBoundingClientRect();delta=revealDelta(ib.top,ib.bottom,Math.max(hb.top,pageTop(view)),hb.bottom);if(delta)holder.scrollTop+=delta;return;}
       if(pageOff)return;

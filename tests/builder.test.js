@@ -919,7 +919,8 @@ function diffWorkbench(storage = new Map(), options = {}){
     lines(){ return ids.diffbox.children.map(c => c.textContent); },
     diff(){ ids['spec-diff'].click(); return this.lines(); },
     flush(){ const fns = [...timers.values()]; timers.clear(); fns.forEach(fn => fn()); },
-    key(key){ for (const {fn} of listeners.get('keydown') || []) fn({key}); },
+    // One event object per key press, as in a browser: a listener's preventDefault is seen by the next.
+    key(key){ const ev={key,defaultPrevented:false,preventDefault(){ this.defaultPrevented=true; }}; for (const {fn} of listeners.get('keydown') || []) fn(ev); },
     render(){builder.beforePreviewReplace({origin:'manual'});builder.previewRendered({ok:true,replaced:true,text:ids.src.value});}
   };
 }

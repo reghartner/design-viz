@@ -107,3 +107,77 @@ test('W3 a snapshot next to the board in the working folder is offered, not turn
  await expect(snapshotToggle(page)).toBeVisible();await expect(snapshotToggle(page)).not.toBeChecked();await expect(node(view,'mcu')).not.toHaveClass(/dv-live-blocked/);
  await snapshotToggle(page).check();await expect(node(view,'mcu')).toHaveClass(/dv-live-blocked/);
 });
+
+/* #1272 review minors (follow-up).
+| row | fixture | assertion | rejects |
+|---|---|---|---|
+| W5 a refusal stays | a file that is not a snapshot, then Demo live status checked | the "Snapshot not loaded: …" line is still there after the Demo change | a refusal wiped by an unrelated toggle |
+| W6 coverage follows edits | the snapshot loaded, then a ticket the snapshot lacks added to the board in the JSON | the status line says 7 of this board's 8 tickets are in it | a count from before the edit | */
+test('W5 the snapshot status line keeps a refusal through a Demo change',async({page,server},info)=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
+ const text=JSON.stringify(raw,null,2);await paste(page,text);await prepareEditorSurface(page);
+ const status=page.locator('#live-snapshot-status'),bad=info.outputPath('not-a-snapshot.json');
+ await mkdir(path.dirname(bad),{recursive:true});await writeFile(bad,JSON.stringify({version:1,days:[]}));
+ await loadSnapshot(page,bad);await expect(status).toContainText('Snapshot not loaded: The file is not a Flowview live snapshot');
+ await demoToggle(page).check();await expect(page.locator('#docview .pt-live-status .dv-live-connection')).toHaveAttribute('data-state','demo');
+ await expect(status).toContainText('Snapshot not loaded: The file is not a Flowview live snapshot');await expect(status).toHaveAttribute('data-kind','error');
+ await demoToggle(page).uncheck();
+});
+test('W6 the snapshot status line follows the board through an edit',async({page,server},info)=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
+ const text=JSON.stringify(raw,null,2);await paste(page,text);await prepareEditorSurface(page);
+ const status=page.locator('#live-snapshot-status'),good=info.outputPath('doorbell.snapshot.json');
+ await mkdir(path.dirname(good),{recursive:true});await writeFile(good,JSON.stringify(snapshotFile()));
+ // Contrasting precondition: every board ticket is in the snapshot, so no coverage count shows.
+ await loadSnapshot(page,good);await expect(status).toContainText('Showing Snapshot from');await expect(status).not.toContainText('of this board');
+ const edited=JSON.parse(text),nodes=edited.page.sections.map(s=>s.diagram && s.diagram.nodes).find(n=>n && n.ingest);nodes.ingest.tickets=nodes.ingest.tickets.concat(['NEW-1']);
+ await page.locator('#editor-tab-json').click();await page.locator('#src').fill(JSON.stringify(edited,null,2));await page.locator('#go').click();
+ await expect(status).toContainText('7 of this board\'s 8 tickets are in it');
+});
+
+/* #1279 review: a snapshot that cannot be read for the board when the preview draws.
+| row | fixture | assertion | rejects |
+|---|---|---|---|
+| W7 a render-time read failure is named | a snapshot whose HW-123 carries a pull-request link marked W7-THROW; it loads normally, then the page's JSON.stringify throws only for output holding the marker, and the preview redraws with Snapshot still wanted (Update preview) | the line says "Snapshot not shown: doorbell.snapshot.json could not be read for this board.", data-kind error, no exception text; the Snapshot box is unticked; the throw fired at least once and only inside liveStatusDemoMap (the reader's per-render copy of prs.links) | a silent untick |
+No file reaches this path (every ticket is read once at load), so the test makes the render-time copy throw. The reader
+names are local to the page script, so the test patches only JSON.stringify, which it restores in a finally. */
+test('W7 a snapshot that cannot be read when the preview draws is named in plain words and left unticked',async({page,server},info)=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
+ await paste(page,JSON.stringify(raw,null,2));await prepareEditorSurface(page);
+ const data=snapshotFile();data.days[0].issues['HW-123'].prs={count:1,state:'open',links:[{url:'W7-THROW'}]};
+ const file=info.outputPath('doorbell.snapshot.json');await mkdir(path.dirname(file),{recursive:true});await writeFile(file,JSON.stringify(data));
+ await loadSnapshot(page,file);await expect(snapshotToggle(page)).toBeChecked();
+ const status=page.locator('#live-snapshot-status');await expect(status).toContainText('Showing Snapshot from');
+ try{
+  await page.evaluate(()=>{
+   const original=JSON.stringify;window.__w7={original,stacks:[]};
+   JSON.stringify=function(){const out=original.apply(this,arguments);
+    if(typeof out==='string' && out.includes('W7-THROW')){const failure=new TypeError('W7 marker copy refused');window.__w7.stacks.push(String(failure.stack));throw failure;}
+    return out;};
+  });
+  // Redraw with Snapshot still wanted: Update preview, never an untick and re-tick.
+  await page.locator('#editor-tab-json').click();await page.locator('#go').click();
+  await expect(status).toHaveText('Snapshot not shown: doorbell.snapshot.json could not be read for this board.');await expect(status).toHaveAttribute('data-kind','error');
+  await expect(snapshotToggle(page)).not.toBeChecked();
+  const stacks=await page.evaluate(()=>window.__w7.stacks);
+  expect(stacks.length).toBeGreaterThan(0);
+  for(const stack of stacks)expect(stack).toContain('liveStatusDemoMap');
+ }finally{
+  if(!page.isClosed())await page.evaluate(()=>{if(window.__w7)JSON.stringify=window.__w7.original;});
+ }
+});
+
+/* #1275 review cycle 3: a ticket no answered Jira search covered is written `unknown`.
+| row | fixture | assertion | rejects |
+|---|---|---|---|
+| W8 unknown tickets are counted apart | W1's snapshot with UX-89 written `unknown` | the status line reads "6 tickets, 1 unknown," and "6 of this board's 7 tickets are in it." | a ticket count that silently includes tickets with no state |
+*/
+test('W8 the snapshot status line counts unknown tickets apart from the tickets with a state',async({page,server},info)=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
+ await paste(page,JSON.stringify(raw,null,2));await prepareEditorSurface(page);
+ const data=snapshotFile();data.days[0].issues['UX-89']={state:'unknown'};
+ const file=info.outputPath('doorbell.snapshot.json');await mkdir(path.dirname(file),{recursive:true});await writeFile(file,JSON.stringify(data));
+ await loadSnapshot(page,file);
+ const status=page.locator('#live-snapshot-status');await expect(status).toContainText('Showing Snapshot from');
+ await expect(status).toContainText('6 tickets, 1 unknown, 2 carriers with metrics.');await expect(status).toContainText('6 of this board\'s 7 tickets are in it.');
+});

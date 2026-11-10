@@ -183,6 +183,7 @@ document.documentElement.classList.add('workbench-booting');
       <button type="button" role="tab" id="editor-tab-brief" aria-controls="editor-brief" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▧</span>Brief</button>
       <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true" tabindex="0"><span class="editor-tool-icon" aria-hidden="true">↖</span>Inspect</button>
       <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">≡</span>Steps</button>
+      <button type="button" role="tab" id="editor-tab-links" aria-controls="editor-links" aria-selected="false" tabindex="-1" title="Links: see, highlight and reassign tickets on nodes, connections and steps"><span class="editor-tool-icon" aria-hidden="true">⇄</span>Links</button>
       <button type="button" role="tab" id="editor-tab-outline" aria-controls="editor-outline" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▤</span>Find objects</button>
       <button type="button" role="tab" id="editor-tab-json" aria-controls="editor-json" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">{}</span>JSON</button>
       <button type="button" role="tab" id="editor-tab-file" aria-controls="editor-file" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▯</span>File</button>
@@ -286,6 +287,9 @@ document.documentElement.classList.add('workbench-booting');
           </details>
         </div>
       </details>
+      </div>
+      <div class="editor-pane" id="editor-links" role="tabpanel" aria-labelledby="editor-tab-links" hidden>
+        <div class="links-view" id="links-view"></div>
       </div>
       <div class="editor-pane" id="editor-outline" role="tabpanel" aria-labelledby="editor-tab-outline" hidden>
         <div class="editor-pane-heading"><h2>Find objects</h2><p>Search names or IDs across all tabs and sections, then Inspect selection. Contents navigates sections and Views.</p><button class="bbtn" id="outline-document-settings" type="button">Document settings</button> <button class="bbtn" id="outline-status-board-settings" type="button" aria-label="Status board settings" title="Status board settings">Board settings</button> <button class="bbtn" id="outline-inspect" type="button">Inspect selection</button></div>

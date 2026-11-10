@@ -1410,6 +1410,67 @@ the Day 10 firmware 2.4.1 deploy, the route queue lagging on Day 11, and the pus
 silent after its tickets turn Done on Day 9. Its silence is authored as explicit
 zero samples, so it is distinguishable from unavailable telemetry.
 
+## Agent snapshot (#1265)
+
+The Workbench never calls Jira or a metrics provider. To look at real data without publishing,
+ask your agent for a snapshot, for example "take a live snapshot of examples/live-status/live-status.spec.json".
+The agent runs one command:
+
+```
+node tools/live-snapshot.js <board.spec.json> [--out <file>] [--timeout <seconds>]
+```
+
+The script runs the viewer's own Jira and Grafana adapters on a headless copy of the board, so
+it makes the calls a published board makes, and sends each call to the provider's REST API:
+Jira search and issue reads (`POST /rest/api/3/search/jql`, `GET /rest/api/3/issue/{key}`),
+and Grafana Prometheus and Loki range queries through the board's datasource uids
+(`/api/datasources/proxy/uid/{uid}/…`) plus `/api/annotations`. Grafana SQL and CloudWatch
+signals, Honeycomb, traces and log searches are not read yet: each such signal is one recorded
+error (carrier id and signal name) and the run goes on. Pull request states are not read either
+(no GitHub transport yet): each authored PR is one recorded error. A board that imports shared
+topology (`topologyImports`) is refused, because the script does not resolve imported carriers
+yet. It takes today's state only (no Over time history). Every request ends after 30 s or at
+`--timeout` (default 60 s), and the process exits once its line is printed.
+
+Credentials come from the environment and are never written to the snapshot:
+`JIRA_EMAIL` and `JIRA_API_TOKEN` (an Atlassian API token), and `GRAFANA_URL` with
+`GRAFANA_TOKEN` (a service account token). A provider whose variables are missing is skipped and
+its variables are named. Credentials go only to a host the environment names: `JIRA_SITE` and
+`GRAFANA_URL`, which must use https and hold no user name or password. There is no opt-in for
+plain http: an internal Grafana or Jira served over http is refused. Without `JIRA_SITE`, the
+Jira host is the board's `tracking.jira.site` only when it is an https `*.atlassian.net` site; a
+board authored elsewhere cannot send the agent's token to another host. Every printed and
+recorded message is scrubbed of the credential values.
+
+Provider responses never reach the agent: the script prints exactly one line, for example
+`snapshot examples/live-status/live-status.snapshot.json at 2026-11-10T11:02:00.000Z: 7 tickets (0 missing) ·
+6 carriers, 11 of 14 signals · no errors`. It exits 1 without writing a file when neither
+provider could run, and when Jira answered no search for the board's tickets (the Flagged search
+and the epic lookup do not count): the tickets are then unknown, and a snapshot showing them all as
+missing would be wrong. A rate-limited call (HTTP 429) is retried once after its Retry-After (at most
+10 s) and recorded only if it still fails; a datasource uid that is not one path segment is refused.
+
+The snapshot is written next to the board as `<board>.snapshot.json` (`--out` chooses another
+path). `*.snapshot.json` is ignored by git, so real ticket titles, assignees and metric values
+are never committed, and the file is never part of a published board. Inside a git work tree the
+script writes only a path git ignores (`git check-ignore`); any other path is refused before a
+provider is called. Its format is one day of
+the [demo story](#demo-mode) plus `snapshotAt` and the recorded `errors`:
+`{"version": 1, "kind": "flowview-live-snapshot", "snapshotAt", "board", "epics", "days": [{"label":
+"Snapshot from …", "issues": {…}, "telemetry": {"start", "stepSeconds", "carriers"}}], "errors": [{"source",
+"tool", "message"}]}`. A ticket Jira did not return is left out of `issues`, so the board shows
+it as missing.
+
+REST credentials and this script are the zero-token route: no provider response reaches the
+agent. An agent with only MCP connectors cannot avoid that, because every tool result enters its
+context. Its low-token recipe: one `getAccessibleAtlassianResources`, one
+`searchJiraIssuesUsingJql` for `key in (<the board's tickets>) OR parent in (<its epics>)` asking
+only for `summary, status, assignee, updated, issuelinks, parent, issuetype` (one more page per
+100 issues), the same search with `AND Flagged = Impediment` added (the viewer reads a flagged
+ticket as blocked), and one Grafana query per bound signal over the board's window. For a board
+with seven tickets, one epic and 14 signals that is 17 calls; the agent then writes the file in
+the format above.
+
 ## Over time
 
 Over time lets a reader move through past days on a board. It overlays each

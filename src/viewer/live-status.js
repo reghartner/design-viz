@@ -792,7 +792,8 @@ function liveStatusPoller(call,delay,hooks){
   return {
     pause:function(){paused=true;stopTimer();},
     resume:function(){paused=false;if(running)run();else this.start();},
-    start:function(){if(running)return;running=true;paused=false;abort=new AbortController();document.addEventListener('visibilitychange',visibility);run(true);},
+    // wait > 0 (#1289): start without a call and arm the first one that much later.
+    start:function(wait){if(running)return;running=true;paused=false;abort=new AbortController();document.addEventListener('visibilitychange',visibility);if(wait>0)arm(wait);else run(true);},
     stop:function(){if(!running)return;running=false;generation++;pending=catchUp=false;stopTimer();document.removeEventListener('visibilitychange',visibility);abort.abort();}
   };
 }

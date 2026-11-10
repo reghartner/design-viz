@@ -194,7 +194,8 @@ export interface NativeViewerOptions {
   /** Host-owned telemetry transport behind the Live status panel's Metrics button,
    * which is off by default. The provider runs only while Metrics is on, every
    * max(refreshMs, 300000) ms (#1287), paused while the document is hidden; a return
-   * to visible or closing Over time waits out the rest of that interval.
+   * to visible or closing Over time waits out the rest of that interval. Turning Metrics on, or
+   * returning to an environment, within that interval reuses its last clean answer without a call.
    * false suppresses telemetry, including demo fallback. Page
    * tracking.telemetry.enabled:false also wins and preserves bindings. */
   telemetry?: false | {

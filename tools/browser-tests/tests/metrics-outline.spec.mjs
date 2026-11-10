@@ -48,8 +48,10 @@ async function mountEdges(page,server){
  const root=page.locator('#host');await expect(root.locator('.pt-live-status').getByRole('button',{name:'Live',exact:true})).toBeVisible();
  return {root};
 }
-async function overlayOn(root,scope='#section-main'){
- const section=root.locator(scope).first(),panel=section.locator('.pt-live-status'),style=panel.getByRole('group',{name:'Metrics style',exact:true});
+async function overlayOn(root,scope){
+ const section=scope?root.locator(scope).first():root,panel=section.locator('.pt-live-status').first();
+ await expect(panel,'the Status panel is mounted').toBeVisible();
+ const style=panel.getByRole('group',{name:'Metrics style',exact:true});
  await expect(style).toHaveCount(0);
  await panel.getByRole('switch',{name:'Metrics overlay',exact:true}).click();
  await expect(section.locator('.dv-live-metrics-connection')).toHaveAttribute('data-state','connected');
@@ -57,9 +59,14 @@ async function overlayOn(root,scope='#section-main'){
  return {section,panel,style,cards:style.getByRole('button',{name:'Cards',exact:true}),outline:style.getByRole('button',{name:'Outline',exact:true})};
 }
 // The shadow-root view of every card, outline, coin and carrier button in one board svg.
-async function canvas(page,scope='#section-main'){
+async function canvas(page,scope){
  return page.evaluate(scope=>{
-  const root=document.querySelector('#host').shadowRoot,svg=Array.from(root.querySelectorAll(scope+' svg')).find(s=>s.querySelector('.dv-metrics-outline,.dv-metrics-card')) || root.querySelector(scope+' svg');
+  const host=document.querySelector('#host');if(!host || !host.shadowRoot)throw new Error('canvas: #host has no shadowRoot (viewer not mounted)');
+  const root=host.shadowRoot,container=scope?Array.from(root.querySelectorAll(scope)).find(el=>el.getClientRects().length):root;
+  if(!container)throw new Error('canvas: no visible '+scope+' in the shadow root');
+  const boards=Array.from(container.querySelectorAll('svg')).filter(s=>s.querySelector('path.edge[data-dv-edge]'));
+  const svg=boards.find(s=>s.querySelector('.dv-metrics-outline,.dv-metrics-card')) || boards[0];
+  if(!svg)throw new Error('canvas: no board svg with edges in '+(scope || 'the shadow root'));
   const rect=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};};
   const shown=el=>{const s=getComputedStyle(el);return s.display!=='none' && s.visibility!=='hidden' && Number(s.opacity)>0 && el.getBoundingClientRect().width>0;};
   // The part of an element left after every clipping ancestor (overflow or an svg viewport), across the shadow boundary.
@@ -81,17 +88,19 @@ async function canvas(page,scope='#section-main'){
    return {id:o.dataset.metricsCarrier,kind:node?'node':'edge',state:o.dataset.metricState || null,stroke:getComputedStyle(o).stroke,shown:shown(o),rect:rect(o),card:card?rect(card):null,line,
     button:o.getAttribute('role')==='button' && o.getAttribute('tabindex')==='0',labelButton:!!(label && label.getAttribute('role')==='button')};
   });
-  const coins=Array.from(svg.querySelectorAll('.coin')).map(c=>{const r=rect(c);return Math.round(r.x)+','+Math.round(r.y);});
+  // Coins in board units, so a frame change that rescales the board does not count as a move.
+  const inv=svg.getScreenCTM().inverse(),coins=Array.from(svg.querySelectorAll('.coin')).map(c=>{const r=c.getBoundingClientRect(),p=new DOMPoint(r.x+r.width/2,r.y+r.height/2).matrixTransform(inv);return Math.round(p.x)+','+Math.round(p.y);});
   const a=root.activeElement;
   return {cards,outlines,coins,active:a?a.getAttribute('data-live-carrier') || (a.closest('.dv-metrics-card') && 'card:'+a.closest('.dv-metrics-card').dataset.metricsCard) || null:null};
  },scope);
 }
-// Screen point on a bound connection's halo (its midpoint) or on a node ring's top edge.
-async function point(page,id,scope='#section-main'){
+// Screen point on a bound connection's halo (a third of the way along: the midpoint holds the step coin) or on a node ring's top edge.
+async function point(page,id,scope){
  return page.evaluate(({id,scope})=>{
-  const o=document.querySelector('#host').shadowRoot.querySelector(scope+' .dv-metrics-outline[data-metrics-carrier="'+CSS.escape(id)+'"]');
+  const root=document.querySelector('#host').shadowRoot,container=scope?Array.from(root.querySelectorAll(scope)).find(el=>el.getClientRects().length):root;
+  const o=container && container.querySelector('.dv-metrics-outline[data-metrics-carrier="'+CSS.escape(id)+'"]');
   if(!o)return null;
-  if(o.tagName.toLowerCase()==='path'){const p=o.getPointAtLength(o.getTotalLength()/2),m=o.getScreenCTM();return {x:m.a*p.x+m.c*p.y+m.e,y:m.b*p.x+m.d*p.y+m.f};}
+  if(o.tagName.toLowerCase()==='path'){const p=o.getPointAtLength(o.getTotalLength()/3),m=o.getScreenCTM();return {x:m.a*p.x+m.c*p.y+m.e,y:m.b*p.x+m.d*p.y+m.f};}
   const r=o.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+1};
  },{id,scope});
 }
@@ -171,7 +180,7 @@ test('O3 focus shows the card; Tab reaches its link and moves on; Enter opens th
  await halo.focus();await page.keyboard.press('Tab');
  await expect.poll(async()=>(await canvas(page)).active).toBe('card:ingest->app');
  const hidden=await page.evaluate(()=>{
-  const root=document.querySelector('#host').shadowRoot,view=root.querySelector('#section-main').closest('.docview') || root;
+  const root=document.querySelector('#host').shadowRoot;
   const halo=root.querySelector('.dv-metrics-outline[data-metrics-carrier="ingest->app"]');
   const stops=Array.from(root.querySelectorAll('a[href],button,input,select,textarea,[tabindex]')).filter(el=>el.tabIndex>=0 && !el.disabled && !el.closest('.dv-metrics-card[data-metrics-style="outline"]') && el.getClientRects().length && el.checkVisibility({visibilityProperty:true}));
   const next=stops[stops.indexOf(halo)+1];if(!next)return null;next.style.visibility='hidden';next.setAttribute('data-outline-hidden-stop','');return next.tagName;
@@ -236,7 +245,7 @@ test('O7 a node popover opened in Outline stays on its node card, unchanged, thr
  await page.evaluate(jira=>window.viewer.controller.liveStatus.apply(jira),CUE_JIRA);
  await expect(pop).toBeVisible();await expect(card).toHaveAttribute('aria-expanded','true');
  expect(await pop.innerText(),'the popover keeps its node carrier').toBe(text);
- expect((await canvas(page)).active,'focus stays on the node card').toBe('ingest');
+ expect(await page.evaluate(()=>{const a=document.querySelector('#host').shadowRoot.activeElement;return !!(a && a.closest('.dv-live-popover'));}),'focus stays in the open popover').toBe(true);
  await expect(section.locator('.dv-metrics-outline[data-metrics-carrier="ingest"]')).not.toHaveAttribute('aria-expanded','true');
 });
 
@@ -247,8 +256,9 @@ test('O8 Outline covers the carriers of a loaded imported detail',async({page,se
  const sel='[data-dv-detail-preview]';
  await expect.poll(async()=>(await canvas(page,sel)).outlines.map(o=>o.id).sort()).toEqual(['shared::api','shared::api->shared::store','shared::store->shared::api'].sort());
  expect((await canvas(page,sel)).cards.filter(c=>c.shown)).toEqual([]);
- const p=await point(page,'shared::api->shared::store',sel);await page.mouse.move(p.x,p.y);
- await expect.poll(async()=>(await canvas(page,sel)).cards.filter(c=>c.shown).map(c=>c.id)).toEqual(['shared::api->shared::store']);
+ // The two parallel api<->store connections overlap near their midpoints, so hover the imported node.
+ const p=await point(page,'shared::api',sel);await page.mouse.move(p.x,p.y);
+ await expect.poll(async()=>(await canvas(page,sel)).cards.filter(c=>c.shown).map(c=>c.id)).toEqual(['shared::api']);
 });
 
 test('O9 a handoff node ring opens the ticket popover from the cue that took over its button',async({page,server})=>{

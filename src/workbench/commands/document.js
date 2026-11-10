@@ -39,14 +39,15 @@ function planDocumentSource(text,raw,key,value){
 }
 
 /* #1236 Status board settings. What a document still needs to be a status board:
-   a page wrapper, a page `tracking` object and a Live status panel. */
+   a page wrapper, a page `tracking` member and a Live status panel. An authored
+   `tracking` that is not an object is left for the author; the validator warns. */
 function statusBoardMissing(raw){
   var doc=builderDocumentPage(raw),paths=specSectionPaths(raw);
   var panel=paths.some(function(rec){
     var d=specValueAt(raw,rec.diagram);
     return specObject(d) && Array.isArray(d.panels) && d.panels.some(function(p){return specObject(p) && p.type==='live-status';});
   });
-  return {page:!doc,tracking:!doc || !specObject(doc.page.tracking),panel:!panel};
+  return {page:!doc,tracking:!doc || !Object.prototype.hasOwnProperty.call(doc.page,'tracking'),panel:!panel};
 }
 /* One plan, so one Undo step: wrap a bare diagram, add `tracking: {}`, then a Live
    status panel in the first section that has a diagram (a detail-only section last). */

@@ -2229,7 +2229,7 @@ function boardSettingsLink(){
   }
 function boardForm(){
     var parsed=parseEditor(),raw=parsed.raw,doc=builderDocumentPage(raw),rows=[],missing=statusBoardMissing(raw);
-    function note(parent,text,cls){var p=document.createElement('p');p.className='fnote'+(cls?' '+cls:'');p.textContent=text;parent.appendChild(p);return p;}
+    function note(parent,text){var p=document.createElement('p');p.className='fnote';p.textContent=text;parent.appendChild(p);return p;}
     function warningList(parent,list,label){
       if(!list.length)return;
       var ul=document.createElement('ul');ul.className='metrics-warnings board-warnings';ul.setAttribute('aria-label',label);

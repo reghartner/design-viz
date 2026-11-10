@@ -678,7 +678,7 @@ function initWorkbenchLinksView(opts){
       var sv=service.querySelector('input').value,op=operation.querySelector('input').value;
       if(!sv.trim()){fieldError(service.querySelector('input'),'Enter the service name of the span this step stands for.');return;}
       if(!op.trim()){fieldError(operation.querySelector('input'),'Enter the operation of the span this step stands for.');return;}
-      var keep={id:linksElementId(e),stepId:e.stepId,serviceName:sv,operation:op};state.traceCreate=null;
+      var keep={id:linksElementId(e),stepId:e.stepId,caption:e.caption,serviceName:sv,operation:op};state.traceCreate=null;
       if(!traceEdit(e,0,{op:'create',serviceName:sv,operation:op})){
         // Keep what was typed; the reason shows beside the service field.
         var msg=error.textContent;state.traceCreate=keep;render();
@@ -769,7 +769,7 @@ function initWorkbenchLinksView(opts){
           e.matches.forEach(function(u){chips.appendChild(traceChip(u,e,false));});
           if(e.form && !e.matches.length){
             var addMatch=button('links-assign','+ Add trace match','Add trace match to '+e.label);
-            rowsLife.listen(addMatch,'click',function(){state.traceCreate={id:linksElementId(e),stepId:e.stepId,serviceName:'',operation:''};state.traceEdit=null;render();var f=list.querySelector('[data-links-field="'+cssEscape(linksElementId(e)+'|new|serviceName')+'"]');if(f)f.focus();});
+            rowsLife.listen(addMatch,'click',function(){state.traceCreate={id:linksElementId(e),stepId:e.stepId,caption:e.caption,serviceName:'',operation:''};state.traceEdit=null;render();var f=list.querySelector('[data-links-field="'+cssEscape(linksElementId(e)+'|new|serviceName')+'"]');if(f)f.focus();});
             chips.appendChild(addMatch);
           }
         }else{
@@ -785,8 +785,9 @@ function initWorkbenchLinksView(opts){
           if(e.matches[state.traceEdit.alternative])row.appendChild(traceEditor(e,state.traceEdit.alternative));else state.traceEdit=null;
         }
         if(e.kind==='step' && state.traceCreate && state.traceCreate.id===linksElementId(e)){
-          // The draft belongs to one step: if steps moved under it (a delete or Undo above), drop it.
-          if(state.traceCreate.stepId===e.stepId && !e.matches.length)row.appendChild(traceCreateForm(e));else state.traceCreate=null;
+          // The draft belongs to one step: if another step moved into its place (a delete or Undo above), drop it.
+          // Its own step gaining a match keeps the typing; Create then refuses with the reason.
+          if(linksTraceSameStep(state.traceCreate,e))row.appendChild(traceCreateForm(e));else state.traceCreate=null;
         }
         if(state.highlight && state.highlight.type==='element' && state.highlight.id===linksElementId(e))row.classList.add('links-row-active');
         list.appendChild(row);

@@ -5,6 +5,13 @@
    step's `traceMatch` the way the Inspect form does, in one source change. */
 
 function linksTraceKey(m){return m.serviceName+' · '+m.operation;}
+/* Whether a draft started on one step still names step element `e`: by step id,
+   or, for a step with no id, by its caption (positions shift on delete or Undo). */
+function linksTraceSameStep(draft,e){
+  if(!draft || !e || e.kind!=='step')return false;
+  if(draft.stepId!=null || e.stepId!=null)return draft.stepId===e.stepId;
+  return (draft.caption || '')===(e.caption || '') && (draft.caption || '')!=='';
+}
 function linksTraceHasKey(list,key){return (list || []).some(function(m){return m && linksTraceKey(m)===key;});}
 /* Why "Add as alternative" cannot be offered for `key` on step element `to`, or null. */
 function linksTraceAlternativeRefusal(to,key){

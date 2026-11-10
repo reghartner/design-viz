@@ -135,11 +135,13 @@ test('#1266 X9 merge overlays validate added signals and orphan limits; field ch
   assert.ok(plain(C.validate(C.normalize(C.FlowTopology.resolveSource(resolved.consumer,resolved.context))).warnings).some(w=>/nodes\.shared::api\.telemetry\.signals\.d/.test(w)),'resolved validation reports the incomplete added signal on the carrier');
 });
 
-// #1266 review c2 (3): a merge overlay carries its kind, so additions survive a provider removing its binding.
-test('#1266 X10 a provider that removes its binding leaves the consumer additions bound by the overlay kind',()=>{
-  const without=PROVIDER_API();
-  const f=fixtures({extends:true,kind:'service',signals:{c:{loki:'qc'}},hide:['b']},null,without);
-  delete diagramOf(f.provider).nodes.api.telemetry;
-  const t=nodeTelemetry(f);assert.deepEqual(t,{kind:'service',signals:{c:{loki:'qc'}}},'the additions remain with the stored kind');
-  assert.equal(plain(C.carrierTelemetry(resolve(f).nodes['shared::api'],{})).signals.c.source,'loki','and they parse');
+// #1266 review (delta): an overlay stores a kind only when it differs from the provider's. If the provider later
+// removes its whole binding, additions without a stored kind are reported, not silently dropped.
+test('#1266 X10 a provider that removes its binding leaves additions without a kind reported by the validator',()=>{
+  const f=fixtures({extends:true,signals:{c:{loki:'qc'}}});delete diagramOf(f.provider).nodes.api.telemetry;
+  const t=nodeTelemetry(f);assert.deepEqual(t,{signals:{c:{loki:'qc'}}},'the additions are kept in the resolved document');
+  const seen=[];assert.equal(C.carrierTelemetry(resolve(f).nodes['shared::api'],{},(path,message)=>seen.push(path+': '+message)),null);
+  assert.ok(seen.some(w=>/^\.kind: /.test(w)),'the missing kind is reported: '+seen.join(' | '));
+  const kept=fixtures({extends:true,kind:'service',signals:{c:{loki:'qc'}}});delete diagramOf(kept.provider).nodes.api.telemetry;
+  assert.deepEqual(nodeTelemetry(kept),{kind:'service',signals:{c:{loki:'qc'}}},'a stored kind keeps them a valid binding');
 });

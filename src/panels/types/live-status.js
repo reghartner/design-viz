@@ -543,7 +543,8 @@
     // the screen by scrolling the list alone wherever the page is scrolled. The listeners exist only while the cap is on.
     function measureListCap(list){
       if(!list.getBoundingClientRect || !list.style || !list.style.setProperty)return;
-      list.style.setProperty('--dv-trace-list-top',Math.max(0,Math.round(list.getBoundingClientRect().top))+'px');
+      var top=Math.max(0,Math.round(list.getBoundingClientRect().top))+'px';if(list._traceCapTop===top)return;
+      list._traceCapTop=top;list.style.setProperty('--dv-trace-list-top',top);
     }
     function watchListCap(list){
       var view=doc.defaultView;if(!list){stopListCap();return;}

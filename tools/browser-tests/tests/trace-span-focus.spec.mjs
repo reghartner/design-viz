@@ -87,7 +87,11 @@ test('desktop native trace focus selects source steps, preserves imported/local 
  await page.evaluate(()=>window.sp.jumpSource(1,'imported'));await expect(root.locator('.dv-trace-focus-overlay[data-trace-level="current"]')).toHaveCount(1);
  await expect(page.locator('#peer [data-trace-focus]')).toHaveCount(0);expect(await page.evaluate(()=>window.peer.controller.sections[0].stepper.current().id)).toBe('local');
  await captureFocus(root,info,'trace-focus-nested-import-hidden-alternate');
- // #1280: repaints never reveal; observed by position (the Load reveal scrolls by the least delta, without scrollIntoView).
+ // #1280: repaints never reveal; observed by position. Review c6: the request line is scrolled off screen first (a spacer
+ // keeps the page scrollable), so a reveal would have to move the page.
+ await page.evaluate(()=>{const spacer=document.createElement('div');spacer.style.height='5000px';document.body.appendChild(spacer);});
+ await root.locator('.dv-trace-span').last().evaluate(el=>el.scrollIntoView({block:'start'}));
+ expect(await root.locator('.dv-trace-selected .dv-trace-request-line').evaluate(el=>el.getBoundingClientRect().bottom<0),'precondition: the request line is off screen').toBe(true);
  const y=await page.evaluate(()=>window.scrollY);
  await page.evaluate(()=>{for(let i=0;i<4;i++)window.api.setTraceShow(true);});
  await expect(root.locator('.dv-trace-focus-overlay[data-trace-level="current"]')).toHaveCount(1);

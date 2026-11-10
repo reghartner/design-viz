@@ -11,7 +11,7 @@
 | M5 | Signals from switches between raw signals and a page template: a template writes `{use}` (card and links kept), one Template parameter input per declared $param, proof limits overlay per signal (back to the template value drops the override); switching back to raw expands the template into raw signals. | page template `kafka-topic` (queue, params topic/group, in/lag, limits, dashboard link) | `{use:'kafka-topic'}`; inputs for topic and group; `proof:{lag:{max:100}}` then no proof; raw expansion deepEquals the substituted template plus card, and `carrierTelemetry` matches the template binding | copying the whole template proof onto the carrier; losing card on a mode switch; writing the draft kind over the template kind |
 | M6 | Link-outs Dashboard link and Query link take absolute http(s) URLs (normalized); invalid refused; empty removes the key, then `links`. | connection with one raw signal | `links` deepEquals the normalized URLs; refusals leave the text unchanged; clearing both removes `links` | storing raw text; accepting `javascript:` or relative URLs; leaving `links:{}` |
 | M7 | Card side (right/left/above/below) and Card offset (-1000..1000) only for connections; invalid refused; empty removes the key, then `card`. | same connection; node ingest | Card side options are exactly `['',right,left,above,below]`; offset 2000 refused; node form has no Card side row | showing edge placement on nodes; an unbounded offset |
-| M8 | Imported carriers (node and connection): the inherited binding is read only and names its provider; local edits write the consumer overlay `topologyImports[i].nodeTracking/edgeTracking[key].telemetry` (tickets kept, provider unchanged); removing it restores the inherited binding. | provider with node `api` and edge `api->store` bindings; consumer importing them as `shared` with node overlay tickets | state `inherited` deepEquals the provider binding; the inspector note names `provider / core` and the binding; overlay entries deepEqual the edits; the resolved carrier carries the inherited binding again after Remove metrics; provider JSON unchanged | writing into the provider; dropping overlay tickets; copying the inherited binding into the overlay; showing an inherited carrier as Unbound |
+| M8 | #1266 Imported carriers (node and connection) edit the provider binding merged with this document's changes: Add signal adds, inherited signals can be hidden (and shown again) or have single fields changed (Revert to inherited), card and link edits store only the changed field; the consumer overlay `topologyImports[i].nodeTracking/edgeTracking[key].telemetry` is `{extends:true,…}` (tickets kept, provider unchanged); Revert all removes it; an older replacing overlay keeps its meaning and Merge with provider converts it. | provider with bindings; consumer importing it | overlay shapes after each edit; resolved bindings; one Undo per step | a consumer binding that replaces (drops) the provider's signals; card edits that copy the whole binding |
 | M9 | Inline validation lists the #937 parser warnings for the carrier, the same text the validator emits at that carrier, including provider bindings the resolver dropped. | connection with a two-source signal, an unknown limit, a non-http link; provider node with an unexpandable `use` | the `Metrics warnings` list deepEquals the validator warnings at that carrier with the carrier prefix removed | hand-written messages that drift from the validator; missing provider drops |
 | M10 | Status board settings → Metrics (#1236; was Document settings → Tracking → Metrics) edits page `tracking.telemetry`: Grafana Prometheus/Loki/Tempo/SQL UIDs, Honeycomb environment/dataset, window (duration) and refresh (≥ 60000 ms). Empty values remove keys; an empty block removes `tracking.telemetry`; Jira settings are untouched. Page warnings are listed. | page with `tracking.jira`; a page with an invalid window and UID | each field lands at its key and `tracking.jira` is deepEqual-unchanged; bad window/refresh refused; clearing all leaves `tracking` deepEqual `{jira}`; warnings deepEqual the validator's `tracking.telemetry` warnings | rewriting `tracking.jira`; leaving `telemetry:{}`; accepting `refreshMs:1000` |
 | M11 | Templates editor: add (name, kind, parameters, first signal); rename a template signal (its limit follows), change its source and query; edit kind/parameters/proof/links; remove a signal (never the last); remove a template (refused while a carrier uses it). Every edit is undoable and preserved by export. | document target on `board()` | the template deepEquals the expected object after each step; export `templates` deepEquals the source; the last-signal and in-use removals are refused with messages | orphaned limits after a rename; a source change that drops the query; templates the parser would drop; orphaning carriers |
@@ -233,7 +233,7 @@ test('M8 M9 #1266 imported carriers merge consumer additions, filters and overri
   const state=C.telemetryCarrierState(f.consumer,node,f.context);
   assert.equal(state.imported,true);assert.equal(state.provider,'provider / core','the inherited binding names its provider');
   assert.deepEqual(plain(state.inherited),UP);assert.deepEqual(plain(state.binding),UP,'the editor starts from the inherited binding');
-  assert.deepEqual(plain(state.merge),{overlay:null,inheritedNames:['up'],hidden:[],overridden:[]});
+  assert.deepEqual(plain(state.merge),{overlay:null,inheritedNames:['up'],hidden:[],staleHidden:[],overridden:[],allHidden:false});
   let text=JSON.stringify(f.consumer,null,2),raw=JSON.parse(text);
   const apply=(target,edit)=>{const plan=C.planCarrierTelemetry(text,raw,target,edit,f.context);assert.equal(plan.error,undefined,plan.error);text=plan.text;raw=JSON.parse(text);};
   const overlay=()=>diagramOf(raw).topologyImports[0].nodeTracking.api;
@@ -765,4 +765,39 @@ test('#1266 Merge with provider converts a replacing overlay into an extends ove
     const overlay=C.telemetryDiffImported(inherited,effective);assert.equal(overlay.extends,true);
     assert.equal(JSON.stringify(plain(C.FlowTopology.mergeTelemetry(inherited,overlay))),JSON.stringify(plain(effective)),'merge(inherited, diff(inherited, effective)) reproduces '+JSON.stringify(effective));
   }
+});
+
+// #1266 review c1: always merge on imported carriers; stale hides; Merge with provider effects; all hidden is a quiet state.
+test('#1266 c1 imported carriers merge before the provider has a binding, keep stale hides, name Merge with provider effects and show all-hidden quietly',()=>{
+  const C=api(harness(board()).e.C),f=topologyFixtures();
+  // The provider edge has no binding until later: Add signal still writes an extends overlay.
+  delete diagramOf(f.provider).edges[0].telemetry;
+  let text=JSON.stringify(f.consumer,null,2),raw=JSON.parse(text);
+  const apply=(target,edit,context=f.context)=>{const plan=C.planCarrierTelemetry(text,raw,target,edit,context);assert.equal(plan.error,undefined,plan.error);text=plan.text;raw=JSON.parse(text);};
+  const resolvedEdges=context=>diagramOf(C.FlowTopology.resolveSource(raw,context)).edges;
+  const edge={kind:'edge',section:0,index:resolvedEdges(f.context).findIndex(e=>e.from==='shared::api' && e.to==='shared::store')};
+  assert.equal(C.telemetryCarrierState(raw,edge,f.context).binding,null,'nothing inherited and nothing added: unbound');
+  apply(edge,{op:'addSignal',name:'local',source:'grafana',query:PROM_RATE,kind:'call'});
+  assert.deepEqual(diagramOf(raw).topologyImports[0].edgeTracking['api->store'].telemetry,{extends:true,kind:'call',signals:{local:{grafana:PROM_RATE}}},'always an extends overlay on an imported carrier');
+  const later=structuredClone(f.provider);diagramOf(later).edges[0].telemetry={kind:'call',signals:{rate:{loki:LOKI_IN}}};
+  const laterContext={...f.context,specs:[later,f.consumer]};
+  assert.deepEqual(Object.keys(resolvedEdges(laterContext)[edge.index].telemetry.signals),['rate','local'],'a provider binding added later merges with the addition');
+  // A hide for a signal the provider no longer has is kept through other edits and listed as stale.
+  diagramOf(raw).topologyImports[0].edgeTracking['api->store'].telemetry.hide=['gone'];text=JSON.stringify(raw,null,2);
+  apply(edge,{op:'signal',name:'local',field:'unit',value:'req/h'},laterContext);
+  assert.deepEqual(diagramOf(raw).topologyImports[0].edgeTracking['api->store'].telemetry.hide,['gone'],'the stale hide survives an unrelated edit');
+  assert.deepEqual(plain(C.telemetryCarrierState(raw,edge,laterContext).merge.staleHidden),['gone']);
+  apply(edge,{op:'hide',name:'gone',value:false},laterContext);
+  assert.equal(Object.hasOwn(diagramOf(raw).topologyImports[0].edgeTracking['api->store'].telemetry,'hide'),false,'a stale hide can be removed');
+  // Hiding every inherited signal is a quiet state: unbound in the resolved document, no warning.
+  apply(edge,{op:'removeSignal',name:'local'},laterContext);apply(edge,{op:'hide',name:'rate',value:true},laterContext);
+  const quiet=C.telemetryCarrierState(raw,edge,laterContext);
+  assert.equal(quiet.merge.allHidden,true);assert.deepEqual(plain(quiet.warnings),[],'no "needs at least one valid signal" warning');
+  assert.equal(Object.hasOwn(resolvedEdges(laterContext)[edge.index],'telemetry'),false,'all hidden: the carrier is unbound in this document');
+  // Merge with provider names what conversion changes: a template is copied, and signal order follows the provider.
+  const g=topologyFixtures();g.consumer.page.tracking={telemetry:{templates:{svcx:{kind:'service',signals:{z:{grafana:'z'},up:{grafana:'up{job="api"}'}}}}}};
+  diagramOf(g.consumer).topologyImports[0].nodeTracking.api.telemetry={use:'svcx'};
+  const effects=C.telemetryCarrierState(g.consumer,{kind:'node',section:0,id:'shared::api'},g.context).mergeEffects;
+  assert.ok(effects.some(e=>/template "svcx" are copied/.test(e)),'the template effect is named: '+effects.join(' | '));
+  assert.ok(effects.some(e=>/provider's order/.test(e)),'the order effect is named');
 });

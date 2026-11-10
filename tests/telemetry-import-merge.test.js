@@ -9,6 +9,7 @@
 | X4 | Old overlays without `extends` keep the replace meaning. | T12 fixture overlay | resolved telemetry equals the overlay | changing the meaning of existing documents |
 | X5 | Nested imports chain: provider → middle `extends` overlay → consumer `extends` overlay. | three specs | consumer sees provider + middle additions − consumer hides | merge applied only one level |
 | X7 | The merge is a generic FlowTopology.mergeOverlay(base, overlay, rules) (replace / fields / entries, hide and drop rules) that other imported kinds can reuse; mergeTelemetry is the metrics rule set on it. | plain objects | merged values; base untouched | metrics-only merge code that other kinds would have to copy |
+| X8 | A signal patch that names a source replaces the inherited source (a later provider switch, or a provider signal of the same name, never yields two sources); hiding every signal leaves the carrier unbound; nested provider drops are still reported under a merge overlay. | provider switches a to loki; provider adds c; nested provider with an unexpandable use | one source each; no telemetry; drop listed | 'use exactly one source' drops; an empty binding warning; silenced provider drops |
 | X6 | Validator: a merge overlay produces no telemetry warnings; a malformed `hide` warns at its overlay path. Compatibility declares `flow.telemetry-merge` only for merge overlays. | consumer docs | warnings; features | warnings on valid merges; silent malformed filters; older runtimes treating merges as replaces |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
@@ -100,4 +101,20 @@ test('#1266 X7 FlowTopology.mergeOverlay is generic: replace, field and entry pa
   assert.equal(dropped,'refs:a','a null entry goes through the kind\'s drop rule');assert.deepEqual(Object.keys(custom.refs),['b']);
   const t=plain(C.FlowTopology.mergeTelemetry(PROVIDER_API(),{extends:true,hide:['b']}));
   assert.deepEqual(t.proof,{a:{min:1},r:{min:2}},'mergeTelemetry is the metrics rule set on mergeOverlay');
+});
+
+test('#1266 X8 one source per merged signal, all hidden unbinds quietly, nested drops survive a merge overlay',()=>{
+  const switched=PROVIDER_API();switched.signals.a={loki:'la_provider',unit:'req'};switched.signals.c={grafana:'provider_c'};
+  const t=nodeTelemetry(fixtures({extends:true,signals:{a:{grafana:'mine'},c:{loki:'qc'}}},null,switched));
+  assert.deepEqual(t.signals.a,{grafana:'mine',unit:'req'},'the consumer source replaces the provider\'s switched source');
+  assert.deepEqual(t.signals.c,{loki:'qc'},'a local signal keeps its source when the provider adds one of the same name');
+  assert.equal(plain(C.carrierTelemetry(resolve(fixtures({extends:true,signals:{a:{grafana:'mine'}}},null,switched)).nodes['shared::api'],{})).signals.a.source,'grafana','the merged signal parses');
+  const hidden=resolve(fixtures({extends:true,hide:['a','b','r']})).nodes['shared::api'];
+  assert.equal(Object.hasOwn(hidden,'telemetry'),false,'hiding every signal leaves the carrier unbound in this document');
+  const f=fixtures(null,null);diagramOf(f.provider).nodes.api.telemetry={use:'missing'};
+  const middle=spec('middle',{nodes:{},rows:[],topologyImports:[{spec:'provider',export:'core',as:'inner'}],topologyExports:{nested:{nodes:['inner::api','inner::store'],edges:['inner::api->inner::store']}}});
+  const consumer=spec('consumer',{nodes:{},rows:[],panels:[{id:'status',type:'live-status'}],
+    topologyImports:[{spec:'middle',export:'nested',as:'outer',nodeTracking:{'inner::api':{telemetry:{extends:true,signals:{m:{grafana:'qm'}}}}}}]});
+  const d=diagramOf(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[f.provider,middle,consumer]}));
+  assert.ok(C.FlowTopology.telemetryDrops(d).some(drop=>drop.id==='outer::inner::api'),'a nested provider drop is still reported under a merge overlay');
 });

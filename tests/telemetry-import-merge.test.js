@@ -8,6 +8,7 @@
 | X3 | A field override stores only that field: `signals:{a:{unit}}` keeps the provider query (and its later changes); `{loki, grafana:null}` switches source; proof/links/card patch per field, null deletes a field. | provider edge with card/links/proof | merged values | whole-entry replace; leftover source keys |
 | X4 | Old overlays without `extends` keep the replace meaning. | T12 fixture overlay | resolved telemetry equals the overlay | changing the meaning of existing documents |
 | X5 | Nested imports chain: provider → middle `extends` overlay → consumer `extends` overlay. | three specs | consumer sees provider + middle additions − consumer hides | merge applied only one level |
+| X7 | The merge is a generic FlowTopology.mergeOverlay(base, overlay, rules) (replace / fields / entries, hide and drop rules) that other imported kinds can reuse; mergeTelemetry is the metrics rule set on it. | plain objects | merged values; base untouched | metrics-only merge code that other kinds would have to copy |
 | X6 | Validator: a merge overlay produces no telemetry warnings; a malformed `hide` warns at its overlay path. Compatibility declares `flow.telemetry-merge` only for merge overlays. | consumer docs | warnings; features | warnings on valid merges; silent malformed filters; older runtimes treating merges as replaces |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
@@ -86,4 +87,17 @@ test('#1266 X6 the validator accepts merge overlays and warns on malformed filte
   const features=doc=>C.FlowviewCompatibility.detect(doc);
   assert.ok(features(ok.consumer).includes('flow.telemetry-merge'),'merge overlays declare flow.telemetry-merge');
   assert.ok(!features(fixtures({kind:'call',signals:{x:{grafana:'x'}}}).consumer).includes('flow.telemetry-merge'),'replace overlays do not');
+});
+
+// #1266 (Chuck: "for imported you should be able to hide or add anything"): the merge is a generic helper with metrics rules on top.
+test('#1266 X7 FlowTopology.mergeOverlay is generic: replace, field and entry patches, hide and drop rules; metrics use it',()=>{
+  const rules={hide:'refs',fields:{title:'replace',style:'fields',refs:'entries'}};
+  const base={title:'Provider',style:{tint:'blue',shape:'round'},refs:{a:{path:'a.js',line:1},b:{path:'b.js'}},other:1};
+  const out=plain(C.FlowTopology.mergeOverlay(base,{title:'Mine',style:{shape:null,size:'l'},refs:{a:{line:2},c:{path:'c.js'}},hide:['b']},rules));
+  assert.deepEqual(out,{title:'Mine',style:{tint:'blue',size:'l'},refs:{a:{path:'a.js',line:2},c:{path:'c.js'}},other:1});
+  assert.deepEqual(base.refs.a,{path:'a.js',line:1},'the inherited value is not modified');
+  let dropped=null;const custom=plain(C.FlowTopology.mergeOverlay(base,{refs:{a:null}},{fields:{refs:'entries'},drop:(o,field,key)=>{dropped=field+':'+key;delete o[field][key];}}));
+  assert.equal(dropped,'refs:a','a null entry goes through the kind\'s drop rule');assert.deepEqual(Object.keys(custom.refs),['b']);
+  const t=plain(C.FlowTopology.mergeTelemetry(PROVIDER_API(),{extends:true,hide:['b']}));
+  assert.deepEqual(t.proof,{a:{min:1},r:{min:2}},'mergeTelemetry is the metrics rule set on mergeOverlay');
 });

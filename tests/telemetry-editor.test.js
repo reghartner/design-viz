@@ -743,3 +743,26 @@ test('#1255 S19 flowMetricsDom.draft stores nothing in the drafts map; only the 
   const kept=dom.keptDraft(parent,'New signal name','text',null,'');kept.value='rate';kept.fire('input');
   assert.deepEqual([...drafts.entries()],[['metrics:New signal name','rate']]);
 });
+
+// #1266 Q3: an older replacing overlay converts in one step into the merge overlay with the same result.
+test('#1266 Merge with provider converts a replacing overlay into an extends overlay with the same resolved binding, one Undo step',()=>{
+  const f=topologyFixtures(),ui=harness(f.consumer);
+  const replacing={kind:'service',signals:{rate:{grafana:PROM_RATE}},proof:{rate:{min:2}}};
+  diagramOf(f.consumer).topologyImports[0].nodeTracking.api.telemetry=replacing;
+  ui.h.session.replaceProject(JSON.stringify(f.consumer,null,2),null,{topologyContext:f.context});
+  const node={kind:'node',section:0,id:'shared::api'},C=ui.e.C,resolved=()=>plain(diagramOf(C.FlowTopology.resolveSource(ui.raw,f.context)).nodes['shared::api'].telemetry);
+  ui.select(node);
+  assert.match(ui.metrics().querySelectorAll('p').map(p=>p.textContent).join(' '),/This document replaces it with its own binding/);
+  const before=resolved();assert.deepEqual(before,replacing);
+  oneStep(ui,()=>ui.click('Merge with provider'),node);
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].nodeTracking.api,{tickets:['API-1'],telemetry:{extends:true,hide:['up'],signals:{rate:{grafana:PROM_RATE}},proof:{rate:{min:2}}}},'the provider signal the old binding dropped is hidden; the rest are additions');
+  assert.deepEqual(resolved(),before,'the resolved binding is unchanged');
+  assert.equal(ui.button('Merge with provider'),null,'a merge overlay offers no conversion');
+  assert.match(C.planCarrierTelemetry(ui.text,ui.raw,node,{op:'mergeWithProvider'},f.context).error || '',/replaces an inherited one/);
+  // Round trip: any edit's stored overlay reproduces the edited merged binding.
+  const inherited={kind:'call',signals:{a:{grafana:'qa',unit:'u'},b:{loki:'qb'}},proof:{a:{min:1},b:{maxRatioOf:'a',max:0.5}},links:{dashboard:'https://d.example'},card:{side:'below'}};
+  for(const effective of [{kind:'queue',signals:{a:{grafana:'qa2'},c:{tempo:'qc'}},proof:{c:{max:3}},card:{side:'below',width:300}},{kind:'call',signals:{b:{grafana:'qb2'}}},{kind:'call',signals:{}}]){
+    const overlay=C.telemetryDiffImported(inherited,effective);assert.equal(overlay.extends,true);
+    assert.equal(JSON.stringify(plain(C.FlowTopology.mergeTelemetry(inherited,overlay))),JSON.stringify(plain(effective)),'merge(inherited, diff(inherited, effective)) reproduces '+JSON.stringify(effective));
+  }
+});

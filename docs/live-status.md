@@ -724,8 +724,8 @@ Telemetry bindings declare `flow.telemetry`, also introduced in Flowview 0.2.0.
 A `telemetry` field on any node or edge, in a `nodeTracking` or `edgeTracking`
 overlay entry, or a page `tracking.telemetry` field declares it automatically,
 even when its content is invalid. An overlay binding with `"extends": true` also declares
-`flow.telemetry-merge`, so a runtime without merging reports it instead of
-treating it as a replacing binding.
+`flow.telemetry-merge`, so a runtime without merging reports it as unavailable when the
+export carries its features.
 
 ## Rendering
 

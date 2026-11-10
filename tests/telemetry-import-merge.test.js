@@ -118,3 +118,19 @@ test('#1266 X8 one source per merged signal, all hidden unbinds quietly, nested 
   const d=diagramOf(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[f.provider,middle,consumer]}));
   assert.ok(C.FlowTopology.telemetryDrops(d).some(drop=>drop.id==='outer::inner::api'),'a nested provider drop is still reported under a merge overlay');
 });
+
+// #1266 review c1 (9): added signals in a merge overlay get the full signal checks.
+test('#1266 X9 merge overlays validate added signals and orphan limits; field changes get field-name checks',()=>{
+  const warningsFor=overlay=>{const f=fixtures(overlay);return plain(C.validate(C.normalize(f.consumer)).warnings).filter(w=>/nodeTracking\.api\.telemetry/.test(w));};
+  assert.ok(warningsFor({extends:true,signals:{c:{loki:''}}}).some(w=>/telemetry\.signals\.c/.test(w)),'an added signal with an empty query warns at its overlay path');
+  assert.ok(warningsFor({extends:true,signals:{c:{grafana:'x',bogus:1}}}).some(w=>/telemetry\.signals\.c\.bogus/.test(w)),'an added signal with an unknown field warns');
+  assert.ok(warningsFor({extends:true,signals:{a:{colour:'red'}}}).some(w=>/telemetry\.signals\.a\.colour/.test(w)),'a field change with an unknown field warns');
+  assert.deepEqual(warningsFor({extends:true,signals:{a:{unit:'msgs'},c:{loki:'qc'}},proof:{a:{max:9}}}),[],'valid additions and changes are quiet');
+  // With the provider's names known (the Workbench and resolved validation), a new name needs a source and a limit needs a signal.
+  const seen=[];C.telemetryMergeOverlayWarnings({extends:true,signals:{d:{unit:'x'}},proof:{q:{max:1},a:{max:2}}},(path,message)=>seen.push(path+': '+message),['a','b']);
+  assert.ok(seen.some(w=>/^\.signals\.d/.test(w)),'a new signal without a source warns: '+seen.join(' | '));
+  assert.ok(seen.some(w=>/^\.proof\.q: names no signal/.test(w)),'a limit for no signal warns');
+  assert.ok(!seen.some(w=>/^\.proof\.a/.test(w)),'a limit on an inherited signal is fine');
+  const resolved=fixtures({extends:true,signals:{d:{unit:'x'}}});
+  assert.ok(plain(C.validate(C.normalize(C.FlowTopology.resolveSource(resolved.consumer,resolved.context))).warnings).some(w=>/nodes\.shared::api\.telemetry\.signals\.d/.test(w)),'resolved validation reports the incomplete added signal on the carrier');
+});

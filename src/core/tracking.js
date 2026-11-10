@@ -465,7 +465,7 @@ function telemetryDropSignal(binding,name){
   if(!Object.keys(binding.proof).length)delete binding.proof;
 }
 /* Shape warnings for a merge overlay as authored; the merged binding is validated where it resolves. */
-function telemetryMergeOverlayWarnings(overlay,invalid){
+function telemetryMergeOverlayWarnings(overlay,invalid,inheritedNames){
   var warn=telemetryWarn(invalid);
   telemetryUnknown(overlay,TELEMETRY_MERGE_FIELDS,warn);
   if(telemetryOwn(overlay,'kind') && TELEMETRY_KINDS.indexOf(overlay.kind)<0)warn('.kind','must be one of '+TELEMETRY_KINDS.join(', ')+' — ignored');
@@ -476,6 +476,25 @@ function telemetryMergeOverlayWarnings(overlay,invalid){
     if(field==='signals' || field==='proof')Object.keys(overlay[field]).forEach(function(name){
       var entry=overlay[field][name];if(entry!==null && !telemetryObject(entry))warn('.'+field+'.'+name,'must be an object of changed fields or null — ignored');
     });
+  });
+  /* #1266 review: the authored document does not know the provider's signal names. An entry that
+     names a source, or any entry when inheritedNames says it is new, is a whole local signal and gets
+     the full signal checks; any other entry is a field change and gets field-name checks. */
+  var signals=telemetryObject(overlay.signals)?overlay.signals:{},kind=TELEMETRY_KINDS.indexOf(overlay.kind)>=0?overlay.kind:'call';
+  Object.keys(signals).forEach(function(name){
+    var entry=signals[name];if(!telemetryObject(entry))return;
+    var added=Array.isArray(inheritedNames)?inheritedNames.indexOf(name)<0:TELEMETRY_SOURCES.some(function(source){return telemetryOwn(entry,source) && entry[source]!==null;});
+    var prefix='.signals.'+name;
+    if(added){
+      var whole={};Object.keys(entry).forEach(function(key){if(entry[key]!==null)whole[key]=entry[key];});
+      var one={};one[name]=whole;
+      carrierTelemetry({telemetry:{kind:kind,signals:one}},{},function(path,message){if(path.indexOf(prefix)===0)warn(path,message);});
+    }else telemetryUnknown(entry,TELEMETRY_SOURCES.concat(['unit','scope','label','showOnCard','role','missingMeansZero','links','window']),warn,prefix);
+  });
+  // A limit needs its signal: an added one here, or (when the provider's names are known) an inherited one.
+  if(telemetryObject(overlay.proof))Object.keys(overlay.proof).forEach(function(name){
+    if(overlay.proof[name]===null || telemetryOwn(signals,name))return;
+    if(Array.isArray(inheritedNames)?inheritedNames.indexOf(name)<0:false)warn('.proof.'+name,'names no signal of this binding or the provider — limit ignored');
   });
 }
 function carrierTelemetry(obj,templates,invalid,environment){

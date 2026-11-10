@@ -435,9 +435,20 @@ and **Log searches**. Sections start closed, with a short status in each
 header; Metrics starts open when the page has a `tracking.telemetry` block. A
 section with validator warnings starts open and its header counts them, and
 each section lists the warnings for its own `tracking` paths. Dependencies,
-dependency link names and no-activity days are edited in JSON for now. Traces and Log searches show **No
-settings yet**; edit `tracking.telemetry.traceConnections` and
-`tracking.telemetry.lookups` in JSON for now. On a document that is not yet a
+dependency link names and no-activity days are edited in JSON for now. Traces shows **No
+settings yet**; edit `tracking.telemetry.traceConnections` in JSON for now.
+**Log searches** (#1233) edits `tracking.telemetry.lookups`: **Offer log searches
+in the Trace view** adds or removes the block (`{}` offers only the typed LogQL
+box), each search is a fold titled by its id with its label, query, suggested
+values (one per line), Loki datasource UID and trace and span ID field names, plus
+Move up, Move down and Remove. **New log search** takes a label and a query (the id
+is made from the label unless typed, accents dropped, and shown before saving) and
+keeps typed text while the form refreshes; Enter in the label adds it, opens the new
+search and moves focus to its label. After Move, focus stays on a usable Move
+button; after Remove, on the next search. While searches exist, the Offer checkbox
+says under it that they must be removed first. Each edit is one Undo step, and a validator warning sits under the
+field it names, such as "has suggested values but no $value slot" under the query.
+The header reads "Not set", "Typed query only" or the number of searches. On a document that is not yet a
 status board, **Make this a status board** adds what is missing (a page wrapper
 for a bare diagram, an empty `tracking` block and a Live status panel) as one
 Undo step.
@@ -2200,7 +2211,11 @@ reader can collapse it to one line naming the connection and environment
 ("Fixture Honeycomb · Production · Change trace"), and it reopens when no trace is
 shown. A load error sits by what was clicked: a log line's report (with **Try the
 next log line**) directly under that line's row, a Load trace or Verify error
-directly under those buttons. The request card (#1173) is one line: "8413cd87a9f1 · partial ·
+directly under those buttons. Enter in **Trace ID or link**, **Trace start** or
+**Trace end** runs Load trace (a held key does not repeat it, nor does Enter while a
+Load runs). Typing in those fields keeps the shown trace and its span focus. A Load
+that fails, or **Cancel request** while it runs, brings the shown trace back with its
+span focus; only a successful Load or **Clear loaded trace** replaces it (#1252). The request card (#1173) is one line: "8413cd87a9f1 · partial ·
 Nov 9 07:19 · 55 spans · 6/7 steps matched". Warning flags (partial, unknown completeness, limit reached) come right after the
 trace ID, and the line wraps rather than clipping (#1186). It holds Returned traces and the request details. Each line opens with
 one click, and an opened section stays open until the shown trace changes. A
@@ -3237,6 +3252,11 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
  "startRfc3339": "now-2h", "endRfc3339": "now", "limit": 10, "direction": "backward", "queryType": "range"}
 ```
 
+- Without that connector the search says so and offers **Check again** (#1252). It
+  looks again on Check again, when the Trace view is entered again, and at most
+  every 30 seconds on a repaint, so a connector added in claude.ai is found without
+  a reload; a failed listing is retried the same way. A look that still finds none
+  says "Still not found (checked 10:42:13)." with the local time.
 - `$env`, `${variable}` and `$account` expand as in signals, from the board's
   active Environment. A missing variable stops the Find with its name.
 - The window is the Load trace lookback: the **Trace start** control, else the
@@ -3265,7 +3285,8 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   "Only lines with a trace ID" to see every line." Unchecked, Find sends the
   query as written and lists every line. Changing the checkbox clears the
   results without a call. It is reader state; nothing is written to the board.
-- The result lists up to 10 lines, newest first: time (UTC), the value (or the
+- The result lists up to 10 lines, newest first: time (local, with seconds; the
+  UTC time is its tooltip, #1252), the value (or the
   line text for a typed query), and the trace ID. The IDs are read from the
   line's structured metadata, then parsed labels, then stream labels, because
   Loki before 3.0 reports every label as a stream label. Unchecked, a line without the

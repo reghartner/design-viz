@@ -7,7 +7,7 @@
 | S2 | Each section lists the validator warnings for its own JSON paths. | tracking.staleDays 0, a bad Jira site, a bad metrics window, a bad environment id, a bad lookup | `Jira warnings` holds the staleDays and site warnings; `Metrics settings warnings` holds only the window warning; `Environments warnings` and `Log searches warnings` hold theirs; the Jira summary counts its warnings | one shared list; warnings missing; the Metrics list repeating environment or lookup warnings |
 | S3 | Make this a status board on a bare diagram wraps it in a page, adds an empty tracking block and a Live status panel as one Undo step; the diagram is otherwise unchanged. Afterwards a status line says so and focus moves to the Jira section header. | bare {nodes,rows,edges} diagram | page.tracking deepEqual {}; diagram deepEqual original plus panels [live-status]; role=status "Status board ready. Undo removes it."; focused element is the Jira summary; one Undo restores the exact bare text; the button is gone after the change | several Undo steps; a lost or rewritten diagram; a panel without tracking |
 | S4 | Make this a status board adds only what is missing, and is not offered on a complete board. | page without tracking; page with tracking but no panel; full board | only the missing part is added; no button on the full board | duplicate panels; overwriting authored tracking |
-| S5 | Traces and Log searches say "No settings yet". | live-status board | the two sections contain the text | empty or missing sections |
+| S5 | Traces says "No settings yet"; Log searches has its editor (#1233, tests/log-searches-editor.test.js). | live-status board | Traces text; Log searches offers New log search | empty or missing sections |
 | S7 | Sections start closed so all five headers fit; Metrics starts open only with a page telemetry block; a section with warnings starts open; closed headers carry a short status. | board without telemetry; board with telemetry; GitHub scope and exclusions only; carrier binding without page telemetry | open states; Jira header names the site host, parent, GitHub scope and exclusion count; Metrics says Not set / No page settings | Jira or Metrics forms that always push the other headers out of view |
 | S8 | On a page with no diagram, Make this a status board is disabled and says why next to it. | page with one text-only section | disabled button; visible note "Add a diagram first" linked by aria-describedby; no "The diagram stays intact" | a button that always fails with an error |
 | S6 | Document settings no longer holds the Tracking controls; it keeps one link that opens Status board settings. The Live status panel's Inspect form links there too. | live-status board | no Jira site / metrics-settings under {kind:'document'}; "Open Status board settings" in Document settings and in the panel form selects {kind:'board'} | Tracking still duplicated in Document settings; no way back to the board area |
@@ -17,7 +17,7 @@ const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
 const repo=path.join(__dirname,'..');
 const names=['canon','validator','compatibility','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology','workbench/commands/telemetry',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/inspector']
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/log-searches-editor','workbench/inspector']
   .filter(name=>['canon','validator'].includes(name) || fs.existsSync(path.join(repo,'src',name+'.js')));
 const plain=v=>JSON.parse(JSON.stringify(v));
 const BOARD={kind:'board'},SECTIONS=['jira','metrics','traces','environments','lookups'],TITLES=['Jira','Metrics','Traces','Environments','Log searches'];
@@ -106,9 +106,10 @@ test('S4 Make this a status board adds only what is missing and is not offered o
   ui=harness(board(),BOARD);assert.equal(ui.button('Make this a status board'),null,'a complete board offers no action');
 });
 
-test('S5 Traces and Log searches say No settings yet',()=>{
+test('S5 Traces says No settings yet; Log searches has its editor',()=>{
   const ui=harness(board(),BOARD);
-  for(const id of ['traces','lookups'])assert.match(ui.text_(ui.section(id)),/No settings yet/,id);
+  assert.match(ui.text_(ui.section('traces')),/No settings yet/);
+  assert.doesNotMatch(ui.text_(ui.section('lookups')),/No settings yet/);assert.ok(ui.button('Add log search',ui.section('lookups')),'Log searches offers Add log search');
 });
 
 test('S6 Document settings keeps one link to Status board settings; the Live status panel form links there too',()=>{

@@ -11,7 +11,7 @@
    The transport supplies logsConnector() → server name | null (tool metadata
    only, no data call) and queryLogs(args, signal) → the decoded tool payload
    (viewer/telemetry-direct-mcp.js). Without them lookups are unavailable. */
-var TELEMETRY_LOG_LIMIT=10,TELEMETRY_LOG_TYPED=':logql';
+var TELEMETRY_LOG_LIMIT=10,TELEMETRY_LOG_TYPED=':logql',TELEMETRY_LOG_RECHECK_MS=30000;
 var TELEMETRY_LOG_ABSENT='Log lookups need a Grafana connector with query_loki_logs. Add it in claude.ai Settings → Connectors.';
 var TELEMETRY_LOG_NOTES={absent:TELEMETRY_LOG_ABSENT,unsupported:'Log lookups need a Grafana connector, which this host does not provide.',checking:'Checking for the Grafana connector…',
   disabled:'Log lookups are unavailable in this view.',account:'Host account changed. Reopen this view to start a new telemetry session.'};
@@ -54,7 +54,7 @@ function telemetryLogRange(start,end,lookback){
 }
 function createTelemetryLogLookup(page,transport,hooks){
   hooks=hooks || {};
-  var holding=false,dead=false,retired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),off=null,serial=0,abort=null,timer=null,busy=false,connector=null,lastIdentity=null,result=null;
+  var holding=false,dead=false,wantedBefore=false,retired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),off=null,serial=0,abort=null,timer=null,busy=false,connector=null,lastIdentity=null,result=null;
   // traced: "Only lines with a trace ID" (#1158), reader state like the rest of the form.
   // form.lookup is the box that ran last (or is about to); form.value is its value; boxValues holds every box's value (#1233).
   var form={lookup:'',value:'',logql:'',traced:true},boxValues=Object.create(null);
@@ -74,13 +74,17 @@ function createTelemetryLogLookup(page,transport,hooks){
   // A closed view and host telemetry off name themselves; without a logs connector the
   // other causes would send the reader to a fix that cannot work here (#1125).
   function state(){var cause=disabled();return retired?'account':cause==='closed' || cause==='host'?'disabled':!supported()?'unsupported':cause?'disabled':connector?connector.state:'checking';}
-  // Tool metadata only, once per controller; Find checks the connector again.
+  /* Tool metadata only. #1252: a missing connector (or a listing error) is looked for again on Check again
+     (recheck), on entering the Trace view, on Find, and at most every 30 s on a repaint, so one added in
+     claude.ai is found without a reload. */
   function discover(){
-    if(connector || dead || retired || !supported() || disabled())return connector && connector.pending;
-    var mine=connector={state:'checking'};
-    mine.pending=Promise.resolve().then(function(){return transport.logsConnector();}).then(function(server){return server?'ready':'absent';},function(){return 'absent';}).then(function(next){if(dead || connector!==mine)return;connector={state:next};changed();});
+    var again=connector && connector.state==='absent' && Date.now()-connector.at>=TELEMETRY_LOG_RECHECK_MS;
+    if(connector && !again || dead || retired || !supported() || disabled())return connector && connector.pending;
+    var mine=connector={state:'checking',again:!!again};
+    mine.pending=Promise.resolve().then(function(){return transport.logsConnector();}).then(function(server){return server?'ready':'absent';},function(){return 'absent';}).then(function(next){if(dead || connector!==mine)return;var now=Date.now();connector={state:next,at:now,checked:mine.again && next==='absent'?now:null};changed();});
     return mine.pending;
   }
+  function recheck(){if(dead || !connector || connector.state!=='absent')return;connector.at=-Infinity;discover();changed();}
   function retire(){if(dead || retired)return;retired=true;cancel();result=null;changed();}
   /* #1141: the selected Over time day {key, today, from, to, label, short} or null in Live. A Trace
      start or end typed under Lookback wins over the day; otherwise Find searches the whole day. */
@@ -88,10 +92,13 @@ function createTelemetryLogLookup(page,transport,hooks){
   function daySearch(back){var d=day();return d && !(back && (back.start || back.end))?d:null;}
   function snapshot(){
     var ls=lookups();if(!ls)return null;sync();
-    if(typeof hooks.wanted!=='function' || hooks.wanted())discover();
+    var want=typeof hooks.wanted!=='function' || !!hooks.wanted();if(want && !wantedBefore && connector && connector.state==='absent')connector.at=-Infinity;wantedBefore=want;
+    if(want)discover();
     var s=state();
     var searched=s==='ready' && daySearch(typeof hooks.lookback==='function'?hooks.lookback():null);
-    return {available:s==='ready',state:s,note:note(s),busy:busy,form:Object.assign({},form,{values:Object.assign(Object.create(null),boxValues)}),typed:TELEMETRY_LOG_TYPED,search:searched?'Loki · '+searched.label:'',
+    // recheck: 'idle' offers Check again; 'busy' while a second look runs, so the button keeps its place and focus.
+    return {available:s==='ready',state:s,note:note(s),busy:busy,recheck:s==='absent'?'idle':s==='checking' && connector && connector.again?'busy':'',
+      checked:s==='absent' && connector && connector.checked?'Still not found (checked '+new Date(connector.checked).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})+').':'',form:Object.assign({},form,{values:Object.assign(Object.create(null),boxValues)}),typed:TELEMETRY_LOG_TYPED,search:searched?'Loki · '+searched.label:'',
       lookups:Object.keys(ls).map(function(id){var l=ls[id];return {id:id,label:l.label,slot:telemetryLookupSlot(l.query),values:(l.values || []).slice()};}),
       result:result?Object.assign(JSON.parse(JSON.stringify(result)),{next:next()}):null};
   }
@@ -127,7 +134,8 @@ function createTelemetryLogLookup(page,transport,hooks){
     var request=Object.assign({},form),typed=request.lookup===TELEMETRY_LOG_TYPED,lookup=typed?null:ls[request.lookup];
     function fail(message){throw {code:'input',message:message};}
     try{
-      if(state()==='checking'){await discover();if(dead || mine!==serial || signal.aborted)return null;}
+      if(state()==='absent')connector.at=-Infinity;
+      if(state()==='absent' || state()==='checking'){await discover();if(dead || mine!==serial || signal.aborted)return null;}
       if(state()!=='ready')fail(note(state()) || 'Log lookups are unavailable.');
       var config=typeof hooks.config==='function'?hooks.config():telemetryEnvironmentConfig(page),query=typed?request.logql.trim():lookup.query,slot=!typed && telemetryLookupSlot(query),value=request.value.trim();
       if(!query)fail('Type a LogQL log query.');
@@ -176,5 +184,5 @@ function createTelemetryLogLookup(page,transport,hooks){
   if(transport && typeof transport.onAccountChanged==='function')off=transport.onAccountChanged(retire);
   // #1145: while a loaded trace moves the view to its own day, the results stay; the reader's own day change still clears them.
   function hold(on){holding=!!on;if(!holding && !dead)sync();}
-  return {snapshot:snapshot,set:set,find:find,row:row,chosen:chosen,next:next,hold:hold,clear:function(){cancel();result=null;changed();},destroy:function(){cancel();dead=true;if(off)off();}};
+  return {snapshot:snapshot,set:set,find:find,recheck:recheck,row:row,chosen:chosen,next:next,hold:hold,clear:function(){cancel();result=null;changed();},destroy:function(){cancel();dead=true;if(off)off();}};
 }

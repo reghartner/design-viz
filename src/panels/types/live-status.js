@@ -265,7 +265,7 @@
             var owner=host._livePanelApi;if(!owner || load.disabled)return;var request=host._directRevealRequest=(host._directRevealRequest || 0)+1;
             Promise.resolve(owner.loadLogTrace(load._logIndex)).then(function(result){
               if(!live || !result || host._livePanelApi!==owner || host._directRevealRequest!==request)return;
-              var target=host.querySelector('.dv-trace-selected');if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
+              var target=traceRevealTarget();if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
             });
           };load.addEventListener('click',load._logClick);}
         });
@@ -333,7 +333,7 @@
           if(!live || !result || host._livePanelApi!==owner || host._directRevealRequest!==request)return;
           var value=owner.snapshot(),selected=value.trace && value.trace.selected;
           if(value.mode!=='trace' || !selected || !selected.manual || selected.exemplar.selectionToken!==result.selectionToken)return;
-          var target=host.querySelector('.dv-trace-selected');if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
+          var target=traceRevealTarget();if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
         });
       };
       if(!load._directLoadClick){load._directLoadClick=function(){load._directLoadAction();};load.addEventListener('click',load._directLoadClick);}
@@ -527,6 +527,9 @@
       else if(page && view && view.innerHeight){if(ib.top<0 || ib.height>view.innerHeight)page.scrollTop+=ib.top-8;else if(ib.bottom>view.innerHeight)page.scrollTop+=ib.bottom-view.innerHeight+8;}
       else if(pending.item.scrollIntoView)pending.item.scrollIntoView({block:'nearest',inline:'nearest'});
     }
+    // #1280: a successful Load reveals the loaded trace's top line (its request line). The trace itself can be taller than the
+    // window now that the Spans list grows, and revealing all of it would align its top to the window's and move the page.
+    function traceRevealTarget(){var selected=host.querySelector('.dv-trace-selected');return selected && (selected.querySelector('.dv-trace-request-line') || selected);}
     // The closest element above `node` (crossing a shadow root) whose content scrolls vertically.
     function scrollHolder(node){
       var view=doc.defaultView || (typeof window!=='undefined'?window:null);if(!view || !view.getComputedStyle)return null;

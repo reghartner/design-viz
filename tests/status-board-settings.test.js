@@ -5,9 +5,11 @@
 |---|---|---|---|---|
 | S1 | Target {kind:'board'} shows five collapsible sections in order: Jira, Metrics, Traces, Environments, Log searches. The moved Jira/GitHub/Metrics controls keep their labels and sit in their section. Editing Jira site writes `tracking.jira.site`; one Undo restores the exact text. | live-status board with tracking.jira and a Live status panel | `details.board-section` ids and summary titles; Jira site / GitHub scope in the jira section; Allow metrics in the metrics section; New environment id in the environments section; Undo text equality and no second undo entry | sections missing or out of order; controls left in Document settings; an edit that takes two Undo steps |
 | S2 | Each section lists the validator warnings for its own JSON paths. | tracking.staleDays 0, a bad Jira site, a bad metrics window, a bad environment id, a bad lookup | `Jira warnings` holds the staleDays and site warnings; `Metrics settings warnings` holds only the window warning; `Environments warnings` and `Log searches warnings` hold theirs; the Jira summary counts its warnings | one shared list; warnings missing; the Metrics list repeating environment or lookup warnings |
-| S3 | Make this a status board on a bare diagram wraps it in a page, adds an empty tracking block and a Live status panel as one Undo step; the diagram is otherwise unchanged. | bare {nodes,rows,edges} diagram | page.tracking deepEqual {}; diagram deepEqual original plus panels [live-status]; one Undo restores the exact bare text; the button is gone after the change | several Undo steps; a lost or rewritten diagram; a panel without tracking |
+| S3 | Make this a status board on a bare diagram wraps it in a page, adds an empty tracking block and a Live status panel as one Undo step; the diagram is otherwise unchanged. Afterwards a status line says so and focus moves to the Jira section header. | bare {nodes,rows,edges} diagram | page.tracking deepEqual {}; diagram deepEqual original plus panels [live-status]; role=status "Status board ready. Undo removes it."; focused element is the Jira summary; one Undo restores the exact bare text; the button is gone after the change | several Undo steps; a lost or rewritten diagram; a panel without tracking |
 | S4 | Make this a status board adds only what is missing, and is not offered on a complete board. | page without tracking; page with tracking but no panel; full board | only the missing part is added; no button on the full board | duplicate panels; overwriting authored tracking |
 | S5 | Traces and Log searches say "No settings yet". | live-status board | the two sections contain the text | empty or missing sections |
+| S7 | Sections start closed so all five headers fit; Metrics starts open only with a page telemetry block; a section with warnings starts open; closed headers carry a short status. | board without telemetry; board with telemetry | open states; Jira header names the site host and parent | Jira or Metrics forms that always push the other headers out of view |
+| S8 | On a page with no diagram, Make this a status board is disabled and says why next to it. | page with one text-only section | disabled button; visible note "Add a diagram first" linked by aria-describedby; no "The diagram stays intact" | a button that always fails with an error |
 | S6 | Document settings no longer holds the Tracking controls; it keeps one link that opens Status board settings. The Live status panel's Inspect form links there too. | live-status board | no Jira site / metrics-settings under {kind:'document'}; "Open Status board settings" in Document settings and in the panel form selects {kind:'board'} | Tracking still duplicated in Document settings; no way back to the board area |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
@@ -64,7 +66,7 @@ test('S2 each section lists the validator warnings for its own paths',()=>{
   assert.ok(jira.some(w=>w.startsWith('tracking.jira.site:')),'Jira site warning in the Jira section');
   assert.equal(ui.section('jira').querySelector('[aria-label="Jira warnings"]')?.closest('details.board-section'),ui.section('jira'));
   assert.match(ui.title(ui.section('jira')),/ · 2 warnings$/,'the Jira summary counts its warnings');
-  assert.equal(ui.section('jira').open,true,'a section with warnings starts open');
+  for(const id of ['jira','environments','lookups'])assert.equal(ui.section(id).open,true,'the '+id+' section has warnings, so it starts open');
   const metrics=ui.warnings('Metrics settings warnings');
   assert.ok(metrics.length>=1 && metrics.every(w=>w.startsWith('tracking.telemetry.window')),'Metrics lists only its own warnings: '+metrics.join(' | '));
   const environments=ui.warnings('Environments warnings'),lookups=ui.warnings('Log searches warnings');
@@ -84,6 +86,9 @@ test('S3 Make this a status board on a bare diagram adds a page wrapper, trackin
   const d=raw.page.sections[0].diagram,panels=d.panels;delete d.panels;
   assert.deepEqual(d,bare,'the diagram is otherwise unchanged');
   assert.deepEqual(panels.map(p=>p.type),['live-status']);
+  const status=ui.h.guide.querySelector('[role="status"]');
+  assert.equal(status?.textContent,'Status board ready. Undo removes it.','a status line confirms the change');
+  assert.equal(ui.e.doc.activeElement,ui.section('jira').querySelector('summary'),'focus moves to the Jira section header');
   assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'one Undo restores the bare diagram');assert.equal(ui.h.session.canUndo(),false);
   assert.equal(ui.h.session.redo(),true);ui.select(BOARD);
   assert.equal(ui.button('Make this a status board'),null,'the action is gone once the board is complete');
@@ -115,4 +120,24 @@ test('S6 Document settings keeps one link to Status board settings; the Live sta
   ui.select({kind:'panel',section:0,index:0});
   ui.click('Open Status board settings');
   assert.deepEqual(plain(ui.h.selected),BOARD,'the Live status panel links to Status board settings');
+});
+
+test('S7 sections start closed except Metrics with a telemetry block; closed headers carry a short status',()=>{
+  let ui=harness(board(),BOARD);
+  assert.deepEqual(ui.sections().map(s=>s.open),[false,false,false,false,false],'no warnings and no telemetry: every section starts closed');
+  assert.equal(ui.title(ui.section('jira')),'Jira · acme.atlassian.net · DOOR-100');
+  assert.equal(ui.title(ui.section('metrics')),'Metrics · Not set');
+  assert.equal(ui.title(ui.section('traces')),'Traces · No settings yet');
+  ui=harness(board({jira:{site:'https://acme.atlassian.net'},telemetry:{grafana:{prometheus:'prom'}}}),BOARD);
+  assert.deepEqual(ui.sections().map(s=>s.open),[false,true,false,false,false],'a page telemetry block opens Metrics');
+  ui=harness(board({}),BOARD);assert.equal(ui.title(ui.section('jira')),'Jira · Not set');
+});
+
+test('S8 on a page with no diagram, Make this a status board is disabled with its reason shown next to it',()=>{
+  const ui=harness({page:{title:'Notes',sections:[{heading:'Intro',text:'No diagram here.'}]}},BOARD),before=ui.text;
+  const make=ui.button('Make this a status board');assert.ok(make);assert.equal(make.disabled,true);
+  const reason=ui.h.guide.querySelectorAll('p').find(p=>p.id && p.id===make.getAttribute('aria-describedby'));
+  assert.equal(reason?.textContent,'Add a diagram first; the Live status panel sits beside a diagram.','the reason is a visible note linked to the button');
+  assert.ok(!ui.text_(ui.h.guide).includes('The diagram stays intact'),'no promise about a diagram that does not exist');
+  assert.equal(ui.text,before);
 });

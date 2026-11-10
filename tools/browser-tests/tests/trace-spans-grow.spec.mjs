@@ -9,7 +9,7 @@ import {repo} from '../helpers/prepare.mjs';
 | G2 | Chuck's case (2026-11-10, "i am always going to use a stretching layout"): in the Standard section layout the Live status tile grows to its content, so the 60-span list grows, the panel body has no inner scroll either, the tile holds every row and the page reaches the last one | 60 spans, panel in a section-layout tile | waterfall and panel body scrollHeight <= clientHeight + 1; tile bottom >= the list's bottom; the last row, scrolled into view, is inside every clipping ancestor and the viewport and is hit by elementFromPoint | a list stretched to the tile and scrolling inside it (flex 1 1 0, contain size) |
 | G1 | The same with no section layout (plain panel): the list has no scroll of its own | 60-span trace, board without a section layout | waterfall scrollHeight <= clientHeight + 1; the last row reachable | a capped list (max-height 240px, overflow auto) |
 | G3 | A short trace adds no empty space under its last row, in both layouts | 3-span trace | waterfall bottom - last row bottom <= its 8px padding + 2 | a fill rule or min-height on the list |
-| G4 | A span focused from the diagram far down the list is brought into view by the scroll that now holds it | 60 spans, tile and plain | the focused row is visible by the all-ancestors check | a reveal that still scrolls only the list |
+| G4 | A span the reader focuses far down the list (selectTraceSpan without auto, as a row, step choice or log line does) is brought into view by the scroll that now holds it | 60 spans, tile and plain | the focused row is visible by the all-ancestors check | a reveal that still scrolls only the list |
 | G5 | An automatic focus (the failed span on load, #1188) never scrolls the page | 60 spans, the last one failed and mapped to a step | the failed row is focused (aria-pressed) and window.scrollY is unchanged | a page scrollIntoView for every focus |
 Desktop only. Page functions start at host.shadowRoot || host and check the counts they find. */
 const PROFILE=JSON.parse(await readFile(path.join(repo,'tests/fixtures/trace-connection-profile.json'),'utf8'));
@@ -92,7 +92,7 @@ for(const tile of [true,false]){
   const m=await measure(panel,-1);expect([m.lists,m.items],'one list of 3 rows').toEqual([1,3]);
   expect(m.gap,'space under the last row: '+m.gap).toBeLessThanOrEqual(10);
  });
- test('#1280 G4 in '+where+' a span focused from the diagram far down the list is brought into view',async({page,server})=>{
+ test('#1280 G4 in '+where+' a span the reader focuses far down the list is brought into view',async({page,server})=>{
   const panel=await open(page,server,{tile,payload:sixty()});
   await panel.locator('.dv-trace-span').nth(1).click();await expect(panel.locator('.dv-trace-span-detail')).toHaveCount(1);
   const far=await page.evaluate(()=>{const t=window.ctl.liveStatus.snapshot().trace.selected,span=t.exemplar.spans[52];window.ctl.liveStatus.selectTraceSpan({context:t.context,spanId:span.id});return span.id;});

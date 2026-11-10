@@ -2335,9 +2335,10 @@ a span to focus it on the diagram", sits above the span list. The list has no
 scroll bar of its own: it is as tall as its spans (#1280). In a section layout the
 Live status tile grows with it, so the page scrolls instead. A focused span's detail
 (duration, service, operation, the matched step or the step choices, **Clear trace
-focus**) opens directly under its row. A span the reader focuses from the diagram is
-scrolled into view by the least page scroll; the failed span focused automatically
-when a trace loads never scrolls the page.
+focus**) opens directly under its row. A span the reader focuses (a row, a step
+choice, or the log line it was loaded from) is scrolled into view by the least page
+scroll. A focus nobody asked for, such as the failed span focused when a trace loads
+or a focus kept across an Edit-mode change, never scrolls the page.
 
 Each annotated node or uniquely matched edge gets one label from its rows: one row per
 step on the current path whose `traceMatch` names it (#1154). Connection timing (#1196):

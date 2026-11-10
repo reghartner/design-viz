@@ -1133,7 +1133,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     requestAnimationFrame(function(){
       if(retired || statusMode!=='trace')return;
       var selected=traceSnapshot().selected;
-      if(carried.spanId && selected && selected.exemplar.spans.some(function(s){return s.id===carried.spanId;}))api.selectTraceSpan({context:selected.context,spanId:carried.spanId});
+      // #1280: a restored focus is not a fresh request, so it never scrolls the page (auto).
+      if(carried.spanId && selected && selected.exemplar.spans.some(function(s){return s.id===carried.spanId;}))api.selectTraceSpan({context:selected.context,spanId:carried.spanId,auto:true});
       // A drop or chooser pick re-rendered the board: focus goes back to the dragged span row (#1180).
       var row=carried.returnSpan && view.querySelector('.dv-trace-span[data-span-id="'+carried.returnSpan+'"]');if(row && row.focus)row.focus({preventScroll:true});
     });

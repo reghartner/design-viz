@@ -4878,19 +4878,42 @@ test('#1280 the Spans list has no height cap or scroll of its own in the panel C
  h.ctl.liveStatus.destroy();
 });
 /* #1280 review: with no scrolling ancestor below the page, a span focus the reader asked for scrolls the page by the least
-   needed (scrollIntoView nearest); an automatic focus (the failed span on load passes auto) never scrolls the page. */
+   needed; an automatic focus (the failed span on load passes auto) never scrolls the page. A reader's later focus of the SAME
+   span still scrolls (review c1 P1). With doc.scrollingElement the page is scrolled by the delta, never via scrollIntoView. */
 test('#1280 an automatic span focus never scrolls the page; a reader\'s focus scrolls it by the least needed',async()=>{
- const {h,api,m}=await stage2Loaded();
+ const {h,api}=await stage2Loaded();
  const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,calls=[];
  proto.getClientRects=function(){return [1];};proto.getBoundingClientRect=function(){return {top:900,bottom:930,left:0,right:100,width:100,height:30};};
  proto.scrollIntoView=function(options){calls.push([this.className,options]);};h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible'})};
+ const page=()=>calls.filter(c=>/dv-trace-span-item/.test(c[0]));
  try{
-  const t=api.snapshot().trace.selected;
-  assert.equal(api.selectTraceSpan({context:t.context,spanId:t.exemplar.spans[41].id,auto:true}),true);h.flush();
-  assert.equal(api.snapshot().trace.selected.focus.auto,true,'the focus says it is automatic');
-  assert.equal(calls.filter(c=>/dv-trace-span-item/.test(c[0])).length,0,'an automatic focus does not scroll the page');
+  const t=api.snapshot().trace.selected,span=t.exemplar.spans[41].id;
+  assert.equal(api.selectTraceSpan({context:t.context,spanId:span,auto:true}),true);h.flush();
+  assert.equal(api.snapshot().trace.selected.focus.auto,true,'the focus says it is automatic');assert.equal(page().length,0,'an automatic focus does not scroll the page');
+  const t1=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t1.context,spanId:span}),true);h.flush();
+  assert.equal(api.snapshot().trace.selected.focus.auto,false);assert.equal(page().length,1,'P1: the reader focusing the same span scrolls the page');
+  assert.deepEqual(plain(page()[0][1]),{block:'nearest',inline:'nearest'});
+  // With the document's scrolling element known, the page is scrolled by the least delta (this document only).
+  const scroller={scrollTop:0};h.doc.scrollingElement=scroller;h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible'}),innerHeight:900};
   const t2=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t2.context,spanId:t2.exemplar.spans[45].id}),true);h.flush();
-  assert.equal(api.snapshot().trace.selected.focus.auto,false);
-  const page=calls.filter(c=>/dv-trace-span-item/.test(c[0]));assert.equal(page.length,1,'a reader\'s focus scrolls the page once');assert.deepEqual(plain(page[0][1]),{block:'nearest',inline:'nearest'});
- }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;h.doc.defaultView=view;api.destroy();}
+  assert.equal(scroller.scrollTop,38,'row bottom 930 - viewport 900 + 8');assert.equal(page().length,1,'no scrollIntoView, so no frame around the board moves');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
+});
+/* #1280 review c1 MAJOR (probe P2): a focus restored after an Edit-mode re-render (carried by the board editor) never
+   scrolls the page, whether it was the reader's or automatic. */
+test('#1280 a span focus restored after an edit re-render never scrolls the page',async()=>{
+ for(const auto of [false,true]){
+  const editor=mapEditor();let b=mapBoard({editor});assert.ok(await b.api.loadDirectTrace(false));
+  const s=b.api.snapshot().trace.selected;assert.equal(b.api.selectTraceSpan({context:s.context,spanId:MAP_SPAN,auto}),true);b.h.flush();b.api.destroy();
+  const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,calls=[];
+  proto.getClientRects=function(){return [1];};proto.getBoundingClientRect=function(){return {top:1900,bottom:1930,left:0,right:100,width:100,height:30};};
+  proto.scrollIntoView=function(){calls.push(this.className);};
+  try{
+   b=mapBoard({editor});const scroller={scrollTop:0};b.h.doc.scrollingElement=scroller;b.h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
+   for(let i=0;i<3;i++){b.h.flush();runTimers(b.h);}b.h.flush();
+   const restored=b.api.snapshot().trace.selected;assert.ok(restored && restored.focus && restored.focus.spanId===MAP_SPAN,(auto?'auto':'reader')+': the focus is restored');
+   assert.equal(restored.focus.auto,true,'a restored focus is marked as nobody\'s new request');
+   assert.equal(scroller.scrollTop,0,(auto?'auto':'reader')+': the page did not scroll');assert.equal(calls.filter(c=>/dv-trace-span-item/.test(c)).length,0,'no scrollIntoView');
+  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;b.api.destroy();}
+ }
 });

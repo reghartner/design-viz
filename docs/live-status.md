@@ -474,10 +474,12 @@ An agent's snapshot of the board's real Jira status and metrics (`tools/live-sna
 is a second preview choice. Load it with **File → Load snapshot…**; a `<board>.snapshot.json`
 beside a board opened with **Choose working folder…** is offered too. A **Snapshot from <time>**
 checkbox then sits beside **Demo live status**: checked after Load snapshot, unchecked when only
-offered, and checking one turns the other off. While it is on, the Epic status connection line
+offered, and checking one turns the other off; unchecking Snapshot brings back what was on before it
+(Demo live status, Preview metrics layout). While it is on, the Epic status connection line
 reads "Snapshot from <time>" (a violet dot), the Metrics line "Metrics: snapshot from <time>", the
 Metrics overlay is on with the snapshot's values, and **Preview metrics layout** is off. Like the
-demo it is preview state only: it is never saved to the spec, exported or published, and opening
+demo it is preview state only: it is never saved to the spec, exported or published (Download and
+Copy SVG, which copy the preview, are refused while it shows), and opening
 another project forgets it. A file that is not a snapshot is refused with its reason under the
 File actions.
 This offline preview treats the configured parent as a direct Epic: an opaque

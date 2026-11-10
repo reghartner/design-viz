@@ -30,7 +30,7 @@ function liveStatusDemoTelemetry(day){
   var map=Object.create(null),block=day && day.telemetry;
   if(!block || typeof block!=='object' || !block.carriers || typeof block.carriers!=='object')return map;
   var start=typeof block.start==='string'?Date.parse(block.start):NaN,step=Number(block.stepSeconds)*1000,end=start;
-  if(!isFinite(start) || !(step>0))return map;
+  if(!isFinite(start) || !(step>0) || !isFinite(step))return map;
   Object.keys(block.carriers).forEach(function(id){
     var signals=block.carriers[id],out=Object.create(null),any=false;
     if(!signals || typeof signals!=='object')return;
@@ -43,6 +43,8 @@ function liveStatusDemoTelemetry(day){
     });
     if(any)map[id]={signals:out};
   });
+  // A time past the Date range (a huge step or start, #1265) is no usable evidence.
+  if(!(Math.abs(end)<=8.64e15))return Object.create(null);
   var observedAt=new Date(end).toISOString();
   Object.keys(map).forEach(function(id){map[id].observedAt=observedAt;});
   return map;

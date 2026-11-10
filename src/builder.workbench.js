@@ -982,6 +982,8 @@ function initWorkbenchBuilder(opts){
     svgExport:function(){
       var snapshot=session.snapshot(),preview=opts.ctl && opts.ctl(),page=opts.page && opts.page();
       if(snapshot.renderedText==null || !preview || !page)return {error:'SVG export is unavailable because there is no usable diagram preview.'};
+      // #1265: the SVG is copied from the preview, so it would carry a snapshot's real ticket states and metric values.
+      if(preview.liveSnapshot)return {error:'SVG export is off while the preview shows a snapshot of real Jira and metrics data. Uncheck “Snapshot from …” beside Preview, then export.'};
       var invalid=!!snapshot.error;
       if(!invalid && snapshot.raw){try{invalid=session.validate(snapshot.raw).errors.length>0;}catch(ex){invalid=true;}}
       if(snapshot.renderedText!==snapshot.text && !invalid)return {error:'SVG export stopped because the rendered preview is stale. Render the current source, then try again.'};

@@ -158,13 +158,16 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   var display=workbenchArrangementPreviewPage(page,lifecycle && lifecycle.arrangementSection);
   var demoMap=lifecycle && lifecycle.demoLiveStatus?workbenchDemoStatus(page):{};
   var hasTickets=Object.keys(demoMap).length>0;
-  var demoOn=hasTickets && !!(saved && saved.demoLiveStatus);
-  // #1265: an agent's snapshot, when one is loaded, is a second choice beside the demo; one of them at a time.
-  var liveSnapshot=lifecycle && lifecycle.liveSnapshot && lifecycle.liveSnapshot(),snapshotOn=!!liveSnapshot && !demoOn && !!(saved && saved.liveSnapshot);
-  var metricsOn=!!(saved && saved.metricsPreview) && !snapshotOn;
+  /* #1265: an agent's snapshot, when one is loaded, is a second choice beside the demo; one shows at a time.
+     The saved values are the author's choices; while the snapshot shows, the demo and Preview metrics layout
+     are only held off, so turning the snapshot off brings back exactly what was on before. */
+  var demoWanted=hasTickets && !!(saved && saved.demoLiveStatus),metricsWanted=!!(saved && saved.metricsPreview);
+  var liveSnapshot=lifecycle && lifecycle.liveSnapshot && lifecycle.liveSnapshot(),snapshotOn=!!liveSnapshot && !!(saved && saved.liveSnapshot);
+  var snapshotMap=null,snapshotTelemetry=null;
+  if(snapshotOn){try{snapshotMap=liveSnapshot.map(Object.keys(demoMap));snapshotTelemetry=liveSnapshot.telemetry();}catch(ex){snapshotOn=false;}}
+  var demoOn=demoWanted && !snapshotOn,metricsOn=metricsWanted && !snapshotOn;
   var renderOptions={autoplay:false,authoring:true,layoutTarget:'default',telemetry:false,metricsPreview:metricsOn,loadDetail:lifecycle && lifecycle.loadDetail};
   if(snapshotOn){
-    var snapshotMap=liveSnapshot.map(Object.keys(demoMap)),snapshotTelemetry=liveSnapshot.telemetry();
     // The connection and Metrics lines read "Snapshot from <time>", never connected or demo. No provider: nothing
     // refreshes a snapshot, so the connection line never claims a refresh.
     renderOptions.liveStatus={demo:{mount:function(live){
@@ -186,7 +189,7 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
     }}};
   }
   var ctl = renderPage(view, display, skin, null, renderOptions);
-  ctl.demoLiveStatus=demoOn;ctl.liveSnapshot=snapshotOn;ctl.metricsPreview=metricsOn;
+  ctl.demoLiveStatus=demoWanted;ctl.liveSnapshot=snapshotOn;ctl.metricsPreview=metricsWanted;
   var retired=false,metricsLabel=null,metricsInput=null;
   var demoLabel=null,demoInput=null,snapshotLabel=null,snapshotInput=null;
   function changeDemo(){if(lifecycle && lifecycle.demoLiveStatus)lifecycle.demoLiveStatus(demoInput.checked);}
@@ -343,6 +346,7 @@ function createWorkbenchPreviewController(opts){
      demo on (#865) share this one path. Demo state is preview state only. */
   function setDemoLiveStatus(on){
     if(disposed || !ctl || !page)return;
+    // Checking Demo while a snapshot shows turns the snapshot off.
     ctl.demoLiveStatus=on;if(on)ctl.liveSnapshot=false;
     replace(page,renderedText,opts.skin(page),{origin:'demo-live-status'});
   }
@@ -351,12 +355,13 @@ function createWorkbenchPreviewController(opts){
   function setLiveSnapshot(read,show){
     if(disposed)return;liveSnapshot=read && read.ok?read:null;
     if(!ctl || !page)return;
-    if(show && liveSnapshot){ctl.liveSnapshot=true;ctl.demoLiveStatus=false;}else if(!liveSnapshot)ctl.liveSnapshot=false;
+    // The demo stays the author's choice underneath; an offered snapshot never shows unasked.
+    ctl.liveSnapshot=!!(show && liveSnapshot);
     replace(page,renderedText,opts.skin(page),{origin:'live-snapshot'});
   }
   function setSnapshotLiveStatus(on){
     if(disposed || !ctl || !page || !liveSnapshot)return;
-    ctl.liveSnapshot=on;if(on)ctl.demoLiveStatus=false;
+    ctl.liveSnapshot=on;
     replace(page,renderedText,opts.skin(page),{origin:'live-snapshot'});
   }
   function setMetricsPreview(on){

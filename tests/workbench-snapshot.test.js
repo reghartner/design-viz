@@ -18,3 +18,13 @@ test('anything else is refused with a reason',()=>{
   const read=C.workbenchLiveSnapshot(text);assert.equal(read.ok,false,text);assert.match(read.error,reason);
  }
 });
+test('#1265 review: a time range past the Date range is refused with a reason, never thrown',()=>{
+ const C=context();
+ const bad=[v=>{v.days[0].telemetry.stepSeconds=1e300;},v=>{v.days[0].telemetry.stepSeconds=Infinity;},v=>{v.days[0].telemetry.start='+275760-09-13T00:00:00.000Z';},v=>{v.days[0].telemetry.stepSeconds=-5;}];
+ for(const change of bad){const v=valid();change(v);const text=JSON.stringify(v).replace('"stepSeconds":null','"stepSeconds":1e400');
+  let read;assert.doesNotThrow(()=>{read=C.workbenchLiveSnapshot(text);});assert.equal(read.ok,false,text.slice(0,60));assert.match(read.error,/no usable time range/);}
+ // The shared day reader never throws either.
+ const v=valid();v.days[0].telemetry.stepSeconds=1e300;assert.deepEqual(JSON.parse(JSON.stringify(C.liveStatusDemoTelemetry(v.days[0]))),{});
+ // Anything that throws while reading becomes a reason.
+ const odd=valid();odd.days[0].issues={'AA-1':{state:'done',links:{length:1}}};const read=C.workbenchLiveSnapshot(JSON.stringify(odd));assert.equal(typeof read.ok,'boolean');
+});

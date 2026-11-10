@@ -235,4 +235,9 @@ test('#1233 each search keeps its own value and Find runs the box it is given',a
  await h.api.find(h.C.TELEMETRY_LOG_TYPED);assert.equal(h.calls.at(-1).args.logql,'{env="stg"}'+FILTER);assert.equal(h.api.snapshot().result.lookup,h.C.TELEMETRY_LOG_TYPED);
  h.api.set('traced',false);assert.equal(h.api.snapshot().result,null,'the shared checkbox clears the results');
  assert.equal(await h.api.find('nope'),null,'an unknown box runs nothing new');
+ // Lookup ids are names, so one may be an Object.prototype key: its box starts empty and runs its own query.
+ const own=setup({p:board({constructor:{label:'Constructor ID',query:DEVICE}})});await settle();const values=own.api.snapshot().form.values;
+ assert.equal(Object.prototype.hasOwnProperty.call(values,'constructor'),false,'no value yet');assert.equal(typeof values.constructor,'undefined','not the built-in');
+ own.api.set('value','cam-9','constructor');await own.api.find('constructor');assert.equal(own.calls.at(-1).args.logql,'{env="stg"} |= "Handling camera stats message" | deviceId="cam-9"'+FILTER);
+ assert.equal(own.api.snapshot().form.values.constructor,'cam-9');
 });

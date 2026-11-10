@@ -11,6 +11,7 @@
 | R7 | a board with environments qa and stg | qa → stg → qa within 5 minutes: one call for stg, none for the second qa, which shows qa's answer and time | an environment flip that refetches |
 | R8 | the same boards with a failing query | Retry after the failed answer calls at once; once a Retry answers cleanly, off/on reuses that answer | Retry that is held back after an error |
 | R10 | the same boards with a failing query | an answer that names a failure is not reused: off/on calls again at once | a failed answer held for 5 minutes with no way to try again |
+| R11 | the same boards | after clear() (a host account signal), setAvailable(false) then true, both together (an account change), retractSources, or a refresh that failed outright, Metrics off/on within 5 minutes calls again | a reused answer that outlives an account change, a revoked source or a failure |
 | R9 | the reviewer's exp8 toggles | five off/on toggles in 3 s after the first answer make no call | a reader toggle as a fast poll |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
@@ -30,7 +31,7 @@ function board(kind,refreshMs,environments){
 }
 // The data calls a refresh makes: Grafana queries and Honeycomb run_query (its raw download follows each run).
 const DATA=['query_prometheus','query_loki_logs','run_query'];
-async function setup(kind,{refreshMs,hostRefreshMs,environments,fail}={}){
+async function setup(kind,{refreshMs,hostRefreshMs,environments,fail,throwAll}={}){
  const timers=new Map(),listeners=new Set(),clock={now:START};let serial=0;
  const doc={hidden:false,visibilityState:'visible',addEventListener:(t,f)=>{if(t==='visibilitychange')listeners.add(f);},removeEventListener:(t,f)=>listeners.delete(f)};
  const C={URL,AbortController,TextDecoder,TextEncoder,console,document:doc,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id)};
@@ -42,7 +43,8 @@ async function setup(kind,{refreshMs,hostRefreshMs,environments,fail}={}){
   fetch:async()=>new Response(JSON.stringify(RAW))};
  const p=C.normalize(board(kind,refreshMs,environments)),adapter=C.createTelemetryProviders(p,win);
  assert.ok(adapter,'the board has automatic metrics providers');
- const options=hostRefreshMs===undefined?adapter.options:Object.assign({},adapter.options,{refreshMs:hostRefreshMs});
+ let options=hostRefreshMs===undefined?adapter.options:Object.assign({},adapter.options,{refreshMs:hostRefreshMs});
+ if(throwAll){const base=options.provider;options=Object.assign({},options,{provider:(...args)=>throwAll()?Promise.reject(new Error('connector down')):base(...args)});}
  const api=C.createTelemetry(p,options,{carriers:fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram || {};Object.keys(d.nodes || {}).forEach(id=>fn(d.nodes[id],id,p));})});
  const handle=adapter.attach({telemetry:api,liveStatus:{snapshot:()=>({actionLabel:''}),action(){},onChange:()=>()=>{},onDestroy:()=>()=>{}}},p);await settle();
  return {C,api,timers,clock,calls,
@@ -166,5 +168,28 @@ for(const kind of ['grafana','honeycomb'])test('R10 '+kind+': an answer that nam
   h.api.setEnabled(true);await settle();assert.equal(h.data(),1);assert.match(h.api.status().note,/boom/);
   h.advance(5000);h.api.setEnabled(false);h.api.setEnabled(true);await settle();
   assert.equal(h.data(),2,'off/on after a failed answer tries again at once');assert.deepEqual(h.armed(),[FIVE]);
+ }finally{h.close();}
+});
+for(const kind of ['grafana','honeycomb'])for(const [label,drop] of [
+ ['clear()',h=>h.api.clear()],
+ ['setAvailable(false) then true',h=>{h.api.setAvailable(false);h.api.setAvailable(true);}],
+ ['an account change (clear and setAvailable)',h=>{h.api.clear();h.api.setAvailable(false);h.api.setAvailable(true);}],
+ ['retractSources',h=>h.api.retractSources([kind])],
+])test('R11 '+kind+': after '+label+', Metrics off/on within 5 minutes calls again',async()=>{
+ const h=await setup(kind);
+ try{
+  h.api.setEnabled(true);await settle();assert.equal(h.data(),1);
+  h.advance(5000);h.api.setEnabled(false);drop(h);h.advance(5000);h.api.setEnabled(true);await settle();
+  assert.equal(h.data(),2,'the dropped answer is not reused: '+label);
+ }finally{h.close();}
+});
+for(const kind of ['grafana','honeycomb'])test('R11 '+kind+': after a refresh that failed outright, Metrics off/on within 5 minutes calls again',async()=>{
+ let down=false;const h=await setup(kind,{throwAll:()=>down});
+ try{
+  h.api.setEnabled(true);await settle();assert.equal(h.data(),1);assert.equal(h.api.status().state,'ok');
+  // A Retry 5 s later fails outright, while the first answer is still under 5 minutes old.
+  down=true;h.advance(5000);h.api.retry();await settle();assert.equal(h.api.status().state,'error',JSON.stringify(h.api.status()));
+  down=false;h.advance(5000);h.api.setEnabled(false);h.api.setEnabled(true);await settle();
+  assert.equal(h.data(),2,'the answer before the failure is not reused (the failed Retry made no data call)');assert.equal(h.api.status().state,'ok');
  }finally{h.close();}
 });

@@ -281,7 +281,9 @@ var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSki
   present:function(skin){setSkinButtons(skin);applySkinClasses(document.body,view,skin);},
   arrangementSection:function(request,next,previous){return workbenchBuilder?workbenchBuilder.arrangementSection(request,next,previous):null;},
   beforeReplace:function(request){if(workspace)workspace.canvas.capture();if(workbenchBuilder)workbenchBuilder.beforePreviewReplace(request);},
-  completed:function(outcome){if(workspace)workspace.canvas.rendered(outcome);if(workbenchBuilder)workbenchBuilder.previewRendered(outcome);},
+  completed:function(outcome){if(workspace)workspace.canvas.rendered(outcome);if(workbenchBuilder)workbenchBuilder.previewRendered(outcome);
+    // An edit can add or remove tickets: the snapshot status line follows every render.
+    if(outcome && outcome.ok && workbenchPreview && workbenchPreview.liveSnapshot())describeLiveSnapshot(workbenchPreview.liveSnapshotState());},
   liveSnapshotChanged:function(state){describeLiveSnapshot(state);}
 });
 
@@ -411,9 +413,12 @@ function sayLiveSnapshot(text,kind){if(!liveSnapshotStatus)return;liveSnapshotSt
 /* The status line always describes the snapshot as it is now: shown or not, how much of the open board it
    covers, and the errors the agent's run recorded. Refreshed after every Snapshot or Demo change. */
 function describeLiveSnapshot(state){
-  var read=state && state.snapshot;if(!read){sayLiveSnapshot('');return;}
+  // Without a loaded snapshot the line keeps what it says (a refusal stays until another load or project).
+  var read=state && state.snapshot;if(!read)return;
+  // Plain words only: the exception text is for developers, not the author.
+  if(state.failure){sayLiveSnapshot('Snapshot not shown: '+(liveSnapshotName || 'the snapshot')+' could not be read for this board.','error');return;}
   var page=workbenchPreview.page(),keys=page?Object.keys(workbenchDemoStatus(page)):[],covered=read.covers(keys),kind='info',parts=[];
-  parts.push((state.showing?'Showing ':'Loaded, not shown: ')+read.label+(liveSnapshotName?' ('+liveSnapshotName+')':'')+': '+read.tickets+' tickets, '+read.carriers+' carriers with metrics.');
+  parts.push((state.showing?'Showing ':'Loaded, not shown: ')+read.label+(liveSnapshotName?' ('+liveSnapshotName+')':'')+': '+read.tickets+' tickets, '+(read.unknown?read.unknown+' unknown, ':'')+read.carriers+' carriers with metrics.');
   if(keys.length && !covered){kind='warn';parts.push('None of this board\'s '+keys.length+' tickets are in it'+(read.board?' (it was taken of '+read.board+')':'')+', so they show as missing.');}
   else if(keys.length && covered<keys.length)parts.push(covered+' of this board\'s '+keys.length+' tickets are in it.');
   if(read.errors){kind='warn';parts.push('The agent\'s run recorded '+read.errors+' error'+(read.errors===1?'':'s')+'; first: '+read.firstError+'.');}

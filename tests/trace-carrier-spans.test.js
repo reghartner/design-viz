@@ -10,7 +10,7 @@
 | M2 | An attribute a declaration needs that no span of its service records is reported as not recorded. |
 | M3 | telemetryTraceModel: a declared node with no step gets one carrier row; its label is the union time ("… across N spans", overlaps counted once); its title lists each declaration by name and role with its time, or "not in this trace" / "attribute … not recorded". |
 | M4 | A declared node with no span in the trace gets no row and no label (Chuck, 2026-11-10). |
-| M5 | Connection declarations draw nothing in this PR: no edge row and no edge label. |
+| M5 | (PR 3) A declared connection gets one hand-off row; tests/trace-carrier-handoff.test.js covers its timing. |
 | M6 | A span that a step row and the carrier row share counts once in the node time. |
 | M7 | Imported carriers: the resolved consumer's patch and hide change the node time and title; nested re-exports too. |
 | M8 | Focus levels include carrier rows; existing step rows, labels and edge timing are unchanged. |
@@ -94,9 +94,9 @@ test('M3 M4 M5 a declared node gets the union time and a declaration title; noth
   // Nothing matched: no row, so no label.
   const absent=board({spans:{audit:{serviceName:'worker',operation:'audit write',role:'database'}}});
   assert.equal(model(absent).nodes.worker,undefined);
-  // The declared connection gets no row and no label in this PR.
-  assert.deepEqual(plain(model(board()).edges),{});
-  const noStep=board();noStep.steps=[];assert.deepEqual(plain(model(noStep).edges),{});
+  // #1290 PR 3: the declared connection now gets its hand-off row (tests/trace-carrier-handoff.test.js), with or without a step.
+  assert.deepEqual(plain(Object.keys(model(board()).edges)),['api->worker']);
+  const noStep=board();noStep.steps=[];assert.deepEqual(plain(Object.keys(model(noStep).edges)),['api->worker']);
   // An errored declared span gives the node the error tone.
   const failed=SPANS();failed[3].error=true;assert.equal(model(board(),exemplar(failed)).nodes.worker[0].tone,'error');
 });
@@ -132,7 +132,7 @@ test('M7 imported carriers follow the consumer overlay, nested re-exports includ
   assert.equal(t.text,'40 ms across 2 spans','the patched prefix keeps one find; the hidden cache spans are gone');
   assert.match(t.title,/^Declared spans: process 40 ms; find \(database\) 5 ms/);
   assert.doesNotMatch(t.title,/cache/);
-  assert.deepEqual(plain(model(plain(d)).edges),{},'the imported connection draws nothing yet');
+  assert.deepEqual(plain(Object.keys(model(plain(d)).edges)),['shared::api->shared::worker'],'the imported connection has its hand-off row (PR 3)');
   // Without the overlay the provider spans apply.
   delete diagramOf(consumer).topologyImports[0].nodeTracking;
   d=diagramOf(T.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]}));

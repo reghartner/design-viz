@@ -44,8 +44,8 @@ test('S1 the snapshot is one demo story day with exactly the mock day\'s state p
 
 /* A local Jira REST and Grafana HTTP server, reached through https names (the script refuses http):
    `fetch` maps https://jira.test and https://grafana.test to it and records each URL asked for. */
-function providers({failQuery=null,pages=false,failJira=null,failTickets=false,rateOnce=false}={}){
- let limited=false;
+function providers({failQuery=null,pages=false,failJira=null,failTickets=false,rateOnce=false,rateQuery=null,parentOnly=false,honeycombPolls=1,honeycombNever=false,honeycombEnv='prod'}={}){
+ let limited=false,polled=0;
  const seen=[],asked=[];
  const issue=(key,status,category)=>({key,fields:{summary:'Work '+key,status:{name:status,statusCategory:{key:category}},assignee:{displayName:'Pat'},updated:'2026-10-24T10:00:00.000+0000'}});
  const server=http.createServer((req,res)=>{let body='';req.on('data',c=>body+=c);req.on('end',()=>{
@@ -56,6 +56,9 @@ function providers({failQuery=null,pages=false,failJira=null,failTickets=false,r
    const ask=JSON.parse(body),jql=ask.jql;
    if(rateOnce && !limited){limited=true;res.writeHead(429,{'Content-Type':'application/json','Retry-After':'1'});return res.end('{}');}
    if(failTickets && !/Flagged/.test(jql))return send(500,{});
+   // Only the epic-children search answers: it returns HW-123 and FW-45 (children of DOOR-100).
+   const child=(...a)=>{const it=issue(...a);it.fields.parent={key:'DOOR-100'};return it;};
+   if(parentOnly){if(/^parent = /.test(jql) && !/Flagged/.test(jql))return send(200,{issues:[child('HW-123','Done','done'),child('FW-45','In Progress','indeterminate')],isLast:true});if(!/Flagged/.test(jql))return send(500,{});}
    // FW-46 is flagged as an impediment: blocked whatever its status.
    if(/Flagged/.test(jql))return send(200,{issues:/FW-46/.test(jql)?[issue('FW-46','Done','done')]:[],isLast:true});
    if(/^parent = /.test(jql))return send(200,{issues:[],isLast:true});
@@ -66,21 +69,38 @@ function providers({failQuery=null,pages=false,failJira=null,failTickets=false,r
   }
   if(url.pathname.endsWith('/api/v1/query_range')){
    if(failQuery && url.searchParams.get('query').includes(failQuery))return send(500,{error:'boom '+(req.headers.authorization||'')});
+   if(rateQuery && url.searchParams.get('query').includes(rateQuery))return send(429,{error:'slow down'});
    const end=Number(url.searchParams.get('end')),step=Number(url.searchParams.get('step'));
    return send(200,{status:'success',data:{resultType:'matrix',result:[{metric:{},values:[[end-2*step,'10'],[end-step,'12'],[end,'14']]}]}});
   }
   if(url.pathname.endsWith('/loki/api/v1/query_range')){const end=Math.floor(Number(url.searchParams.get('end'))/1e9);return send(200,{status:'success',data:{resultType:'matrix',result:[{metric:{},values:[[end,'3']]}]}});}
   if(url.pathname==='/api/annotations')return send(200,[]);
+  // Grafana /api/ds/query: a SQL table with one count column, or a CloudWatch series.
+  if(url.pathname==='/api/ds/query'){
+   const q=JSON.parse(body).queries[0];
+   if(q.rawSql)return send(200,{results:{A:{status:200,frames:[{schema:{fields:[{name:'count',type:'number'}]},data:{values:[[42]]}}]}}});
+   if(q.namespace){const to=Number(JSON.parse(body).to);return send(200,{results:{A:{status:200,frames:[{schema:{fields:[{name:'Time',type:'time'},{name:'Value',type:'number'}]},data:{values:[[to-7200000,to-3600000],[5,7]]}}]}}});}
+   return send(400,{results:{A:{error:'unknown query'}}});
+  }
+  // Honeycomb Query API: auth, create, run, poll.
+  if(url.pathname==='/1/auth')return send(200,{environment:{slug:honeycombEnv,name:honeycombEnv}});
+  if(/^\/1\/queries\//.test(url.pathname))return send(200,{id:'q-'+seen.length});
+  if(/^\/1\/query_results\/[^/]+$/.test(url.pathname))return send(200,{id:'r1',complete:false});
+  if(/^\/1\/query_results\/[^/]+\/r1$/.test(url.pathname)){
+   polled++;if(honeycombNever || polled<honeycombPolls)return send(200,{id:'r1',complete:false});
+   return send(200,{id:'r1',complete:true,data:{series:[{time:'2026-11-10T10:00:00Z',data:{COUNT:3}},{time:'2026-11-10T11:00:00Z',data:{COUNT:4}}],results:[{data:{COUNT:7}}]}});
+  }
   send(404,{});
  });});
  return new Promise(resolve=>server.listen(0,'127.0.0.1',()=>{
   const origin='http://127.0.0.1:'+server.address().port;
-  const fetchImpl=(url,options)=>{asked.push(String(url));return fetch(String(url).replace(/^https:\/\/(jira|grafana)\.test/,origin),options);};
+  const fetchImpl=(url,options)=>{asked.push(String(url));return fetch(String(url).replace(/^https:\/\/(jira|grafana|honeycomb)\.test/,origin),options);};
   resolve({origin,seen,asked,fetch:fetchImpl,close:()=>new Promise(r=>server.close(r))});
  }));
 }
 const SECRET={JIRA_EMAIL:'agent@example.test',JIRA_API_TOKEN:'jira-secret-token-123',GRAFANA_TOKEN:'glsa_grafana-secret-456'};
-const SECRETS=Object.values(SECRET).concat([Buffer.from(SECRET.JIRA_EMAIL+':'+SECRET.JIRA_API_TOKEN).toString('base64')]);
+const HONEYCOMB_KEY='hcaik_honeycomb-secret-789';
+const SECRETS=Object.values(SECRET).concat([Buffer.from(SECRET.JIRA_EMAIL+':'+SECRET.JIRA_API_TOKEN).toString('base64'),HONEYCOMB_KEY]);
 async function cli(env,dir,{fetchImpl,board=BOARD,args=[]}={}){
  const snap=require(SNAP),lines=[],stdout={write:t=>lines.push(t)};
  const copy=path.join(dir,'doorbell.spec.json');fs.copyFileSync(board,copy);
@@ -193,25 +213,23 @@ test('S7 a board that imports shared topology is refused with the reason',async(
  assert.equal(fs.existsSync(r.out),false);
 });
 
-test('S8 every signal the script does not read, and every authored PR, is one recorded error',async()=>{
+test('S8 a CloudWatch Logs signal (not read yet) and every authored PR are one recorded error each; a Honeycomb signal without a key names HONEYCOMB_API_KEY',async()=>{
  const p=await providers(),dir=tmp(),board=path.join(dir,'mixed.spec.json');
  try{
-  const raw={page:{tracking:{jira:{site:'https://acme.atlassian.net'},telemetry:{grafana:{prometheus:'prom-main'},window:'24h'}},sections:[{id:'main',diagram:{
-   nodes:{api:{title:'API',tickets:['AA-1'],prs:['https://github.com/acme/api/pull/7'],telemetry:{kind:'service',signals:{rate:{grafana:'sum(rate(x[5m]))',unit:'req/h'},spans:{honeycomb:{dataset:'api',calculation:'COUNT'},unit:'spans'}}}},
-    db:{title:'DB',telemetry:{kind:'service',signals:{rows:{sql:'select count(*) from t',unit:'rows'},cpu:{cloudwatch:{namespace:'AWS/RDS',metric:'CPUUtilization',statistic:'Average',region:'us-east-1',accountId:'123456789012',dimensions:{DBInstanceIdentifier:'db'}},unit:'%'}}}}},
+  const raw={page:{tracking:{jira:{site:'https://acme.atlassian.net'},telemetry:{grafana:{prometheus:'prom-main',cloudwatch:'cw-main'},honeycomb:{environment:'prod',dataset:'api'},window:'24h'}},sections:[{id:'main',diagram:{
+   nodes:{api:{title:'API',tickets:['AA-1'],prs:['https://github.com/acme/api/pull/7'],telemetry:{kind:'service',signals:{rate:{grafana:'sum(rate(x[5m]))',unit:'req/h'},spans:{honeycomb:{calculations:[{op:'COUNT'}]},unit:'spans'}}}},
+    db:{title:'DB',telemetry:{kind:'service',signals:{logs:{cloudwatchLogs:{logGroups:['/app'],query:'stats count(*) as n',region:'us-east-1'},unit:'lines'}}}}},
    rows:[['api','db']],edges:[{from:'api',to:'db'}]}}]}};
   fs.writeFileSync(board,JSON.stringify(raw));
   const r=await cli({JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET},dir,{fetchImpl:p.fetch,board});
   const snapshot=JSON.parse(fs.readFileSync(r.out,'utf8')),by=snapshot.errors.map(e=>e.source+' '+e.tool);
-  for(const want of ['honeycomb api spans','grafana db rows','grafana db cpu','github https://github.com/acme/api/pull/7'])assert.ok(by.includes(want),'one error for '+want+': '+JSON.stringify(by));
-  assert.equal(by.filter(e=>e==='grafana db rows').length,1,'one per signal, not per call');
-  assert.ok(!by.includes('grafana api rate'),'a read signal has no error');assert.match(r.lines[0],/errors \(/);
-  // Unread SQL, CloudWatch and Honeycomb signals beside it never cost the signals the script reads.
-  assert.ok(snapshot.days[0].telemetry.carriers.api && snapshot.days[0].telemetry.carriers.api.rate,'api rate is observed: '+JSON.stringify(Object.keys(snapshot.days[0].telemetry.carriers)));
-  assert.match(r.lines[0],/1 carriers, 1 of 4 signals/);
+  for(const want of ['grafana db logs','github https://github.com/acme/api/pull/7'])assert.ok(by.includes(want),'one error for '+want+': '+JSON.stringify(by));
+  assert.equal(by.filter(e=>e==='grafana db logs').length,1,'one per signal, not per call');
+  assert.ok(snapshot.errors.some(e=>e.source==='honeycomb' && /HONEYCOMB_API_KEY is not set/.test(e.message)),'the Honeycomb key is named');
+  assert.ok(!by.includes('grafana api rate'),'a read signal has no error');
+  assert.ok(snapshot.days[0].telemetry.carriers.api && snapshot.days[0].telemetry.carriers.api.rate,'api rate is observed beside the unread signals');
  }finally{await p.close();}
 });
-
 test('S9 the real CLI prints exactly one line and nothing on stderr',async()=>{
  const dir=tmp(),board=path.join(dir,'doorbell.spec.json');fs.copyFileSync(BOARD,board);
  const child=spawn(process.execPath,[path.resolve(__dirname,'..','tools','live-snapshot.js'),board],{env:{PATH:process.env.PATH},stdio:['ignore','pipe','pipe']});
@@ -230,7 +248,7 @@ test('S10 Jira pages are followed; a Jira that never answers leaves the tickets 
  p=await providers({failJira:429});
  try{
   const dir=tmp(),r=await cli(env,dir,{fetchImpl:p.fetch});
-  assert.equal(r.code,1);assert.equal(r.lines.length,1);assert.match(r.lines[0],/^snapshot not written: Jira answered no search for the board's tickets, so its 7 tickets are unknown \(first: Jira search is rate limited \(HTTP 429, retry after 30\)\)/);
+  assert.equal(r.code,1);assert.equal(r.lines.length,1);assert.match(r.lines[0],/^snapshot not written: the board's 7 tickets are unknown, because Jira did not answer every search for them \(first: Jira search is rate limited \(HTTP 429, retry after 30\)\)/);
   assert.doesNotMatch(r.lines[0],/missing/);assert.equal(fs.existsSync(r.out),false);
  }finally{await p.close();}
 });
@@ -247,21 +265,25 @@ test('S11 a datasource uid that is not one path segment is refused before any re
  }finally{await p.close();}
 });
 
-test('S12 an unread SQL or CloudWatch signal on the example board leaves every read signal in place',async()=>{
+test('S12 SQL and CloudWatch signals on the example board are read through /api/ds/query beside every other signal',async()=>{
  const env={JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET};
  const p=await providers();
  try{
-  const base=await cli(env,tmp(),{fetchImpl:p.fetch}),before=JSON.parse(fs.readFileSync(base.out,'utf8')).days[0].telemetry.carriers,count=o=>Object.values(o).reduce((n,c)=>n+Object.keys(c).length,0);
-  assert.ok(count(before)>0,'precondition: the example board has read signals');
-  for(const extra of [{q:{sql:'select 1',unit:'rows'}},{cpu:{cloudwatch:{namespace:'AWS/RDS',metric:'CPUUtilization',statistic:'Average',region:'us-east-1',accountId:'123456789012',dimensions:{DBInstanceIdentifier:'db'}},unit:'%'}}]){
-   const raw=JSON.parse(fs.readFileSync(BOARD,'utf8')),dir=tmp(),board=path.join(dir,'extra.spec.json');
-   raw.page.tracking.telemetry.grafana.sql='sql-main';raw.page.tracking.telemetry.grafana.cloudwatch='cw-main';
-   const ingest=raw.page.sections.map(s=>s.diagram && s.diagram.nodes && s.diagram.nodes.ingest).find(Boolean);Object.assign(ingest.telemetry.signals,extra);
-   fs.writeFileSync(board,JSON.stringify(raw));
-   const r=await cli(env,dir,{fetchImpl:p.fetch,board}),after=JSON.parse(fs.readFileSync(r.out,'utf8')).days[0].telemetry.carriers;
-   assert.equal(count(after),count(before),Object.keys(extra)[0]+': every read signal is still observed');
-   assert.ok(JSON.parse(fs.readFileSync(r.out,'utf8')).errors.some(e=>e.tool==='ingest '+Object.keys(extra)[0]),'the unread one is one error');
-  }
+  const base=await cli(env,tmp(),{fetchImpl:p.fetch}),count=o=>Object.values(o).reduce((n,c)=>n+Object.keys(c).length,0),before=count(JSON.parse(fs.readFileSync(base.out,'utf8')).days[0].telemetry.carriers);
+  assert.ok(before>0,'precondition: the example board has read signals');
+  const raw=JSON.parse(fs.readFileSync(BOARD,'utf8')),dir=tmp(),board=path.join(dir,'extra.spec.json');
+  raw.page.tracking.telemetry.grafana.sql='sql-main';raw.page.tracking.telemetry.grafana.cloudwatch='cw-main';
+  const ingest=raw.page.sections.map(s=>s.diagram && s.diagram.nodes && s.diagram.nodes.ingest).find(Boolean);
+  Object.assign(ingest.telemetry.signals,{q:{sql:'select count(*) from events',unit:'rows'},cpu:{cloudwatch:{namespace:'AWS/RDS',metric:'CPUUtilization',statistic:'Sum',region:'us-east-1',accountId:'123456789012',dimensions:{DBInstanceIdentifier:'db'}},unit:'%'}});
+  fs.writeFileSync(board,JSON.stringify(raw));
+  const r=await cli(env,dir,{fetchImpl:p.fetch,board}),snapshot=JSON.parse(fs.readFileSync(r.out,'utf8')),carriers=snapshot.days[0].telemetry.carriers;
+  assert.equal(count(carriers),before+2,'both new signals are observed and none is lost');
+  assert.equal(carriers.ingest.q.values.at(-1),42,'the SQL value');assert.deepEqual(carriers.ingest.cpu.values.filter(v=>v!==null),[5,7],'CloudWatch buckets on the shared grid');assert.equal(carriers.ingest.cpu.value,12,'CloudWatch Sum over the window');
+  const C=runtime(),read=plain(C.liveStatusDemoTelemetry(snapshot.days[0]));assert.equal(read.ingest.signals.cpu.value,12,'the reader shows the window Sum, not the last bucket');assert.equal(read.ingest.signals.q.value,42);
+  const queries=p.seen.filter(s=>s.path==='/api/ds/query').map(s=>JSON.parse(s.body).queries[0]);
+  assert.ok(queries.some(q=>q.rawSql==='select count(*) from events' && q.datasource.uid==='sql-main'),'SQL through its datasource uid');
+  assert.ok(queries.some(q=>q.namespace==='AWS/RDS' && q.datasource.uid==='cw-main' && JSON.stringify(q.dimensions)==='{"DBInstanceIdentifier":["db"]}'),'CloudWatch through its datasource uid');
+  assert.ok(!snapshot.errors.some(e=>/ingest (q|cpu)/.test(String(e.tool))),'no error for them');noSecret([fs.readFileSync(r.out,'utf8'),r.lines[0]]);
  }finally{await p.close();}
 });
 test('S13 scrub removes each secret in plain, URL-encoded and lower-case encoded forms',()=>{
@@ -283,7 +305,7 @@ test('S15 a Flagged search alone does not count as Jira answering: the tickets s
  try{
   const r=await cli({JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET},tmp(),{fetchImpl:p.fetch});
   assert.ok(p.seen.some(s=>s.path==='/rest/api/3/search/jql' && /Flagged/.test(JSON.parse(s.body).jql)),'precondition: the Flagged search answered');
-  assert.equal(r.code,1);assert.match(r.lines[0],/^snapshot not written: Jira answered no search for the board's tickets, so its 7 tickets are unknown/);assert.equal(fs.existsSync(r.out),false);
+  assert.equal(r.code,1);assert.match(r.lines[0],/^snapshot not written: the board's 7 tickets are unknown, because Jira did not answer every search for them/);assert.equal(fs.existsSync(r.out),false);
  }finally{await p.close();}
 });
 test('S16 a rate-limited call that the retry recovers is not recorded as an error',async()=>{
@@ -295,5 +317,65 @@ test('S16 a rate-limited call that the retry recovers is not recorded as an erro
   const snapshot=JSON.parse(fs.readFileSync(r.out,'utf8'));
   assert.equal(snapshot.errors.filter(e=>/rate limited/.test(e.message)).length,0,'the recovered 429 is not an error');assert.doesNotMatch(r.lines[0],/rate limited/);
   assert.equal(snapshot.days[0].issues['FW-46'].state,'blocked','the retried search still delivered');assert.equal(Object.keys(snapshot.days[0].issues).filter(k=>/^(HW|FW|BE)-/.test(k)).length,6);
+ }finally{await p.close();}
+});
+
+/* #1270: Honeycomb through its Query API. */
+function honeycombBoard(){
+ return {page:{tracking:{telemetry:{honeycomb:{environment:'prod',dataset:'api'},window:'24h'}},sections:[{id:'main',diagram:{
+  nodes:{api:{title:'API',telemetry:{kind:'service',signals:{spans:{honeycomb:{calculations:[{op:'COUNT'}],filters:[{column:'service.name',op:'=',value:'api'}]},unit:'spans'}}}},db:{title:'DB'}},
+  rows:[['api','db']],edges:[{from:'api',to:'db',telemetry:{kind:'call',signals:{calls:{honeycomb:{calculations:[{op:'COUNT'}]},unit:'calls'}}}}]}}]}};
+}
+async function honeycombRun(options,env={HONEYCOMB_API_KEY:HONEYCOMB_KEY,HONEYCOMB_API_URL:'https://honeycomb.test'},timeout='20'){
+ const p=await providers(options),dir=tmp(),board=path.join(dir,'hc.spec.json');fs.writeFileSync(board,JSON.stringify(honeycombBoard()));
+ const r=await cli(env,dir,{fetchImpl:p.fetch,board,args:['--timeout',timeout]});return {p,r,dir};
+}
+test('S17 Honeycomb signals: the query is created, run and polled, and the snapshot holds its series; one line, no key written',async()=>{
+ const {p,r}=await honeycombRun({honeycombPolls:2});
+ try{
+  assert.equal(r.code,0);assert.equal(r.lines.length,1);assert.match(r.lines[0],/2 carriers, 2 of 2 signals/);
+  const text=fs.readFileSync(r.out,'utf8'),snapshot=JSON.parse(text);noSecret([text,r.lines[0]]);
+  const C=runtime(),telemetry=plain(C.liveStatusDemoTelemetry(snapshot.days[0]));
+  assert.equal(telemetry.api.signals.spans.value,7,'the aggregate row, as the viewer shows it');assert.deepEqual(telemetry.api.signals.spans.series.map(x=>x[1]),[3,4],'the series buckets');
+  assert.ok(telemetry['api->db'].signals.calls,'the edge signal too');
+  const created=p.seen.filter(s=>s.path==='/1/queries/api'),spec=JSON.parse(created[0].body);
+  assert.equal(created.length,2,'one query per signal');assert.equal(spec.time_range,86400,'the board window as time_range');assert.equal(spec.from,undefined);
+  assert.deepEqual(spec.filters,[{column:'service.name',op:'=',value:'api'}],'the authored filters');
+  assert.ok(p.seen.filter(s=>/^\/1\/query_results\/api\/r1$/.test(s.path)).length>=2,'the result was polled');
+  assert.ok(p.asked.every(url=>url.startsWith('https://honeycomb.test/1/')),'every request goes to HONEYCOMB_API_URL');
+  assert.ok(p.seen.filter(s=>s.path.startsWith('/1/')).every(s=>s.auth===''),'no Authorization header; the key travels as X-Honeycomb-Team only');
+ }finally{await p.close();}
+});
+test('S18 a Honeycomb poll that never completes times out per signal and the run goes on; a key for another environment is refused',async()=>{
+ let run=await honeycombRun({honeycombNever:true},undefined,'4');
+ try{
+  const snapshot=JSON.parse(fs.readFileSync(run.r.out,'utf8'));
+  assert.equal(run.r.lines.length,1);assert.ok(snapshot.errors.filter(e=>e.source==='honeycomb' && /did not complete within 2 s/.test(e.message)).length>=1,'the timeout is recorded: '+JSON.stringify(snapshot.errors));
+  assert.equal(Object.keys(snapshot.days[0].telemetry.carriers).length,0);
+ }finally{await run.p.close();}
+ run=await honeycombRun({honeycombEnv:'staging'});
+ try{
+  const snapshot=JSON.parse(fs.readFileSync(run.r.out,'utf8'));
+  assert.ok(snapshot.errors.some(e=>/HONEYCOMB_API_KEY belongs to environment "staging", but the board names "prod"/.test(e.message)),JSON.stringify(snapshot.errors));
+  assert.equal(run.p.seen.filter(s=>s.path.startsWith('/1/queries')).length,0,'no query runs with the wrong environment');
+ }finally{await run.p.close();}
+});
+test('S19 one Grafana 429 fails only its signal: the other signals stay observed',async()=>{
+ const p=await providers({rateQuery:'code=~'});
+ try{
+  const r=await cli({JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET},tmp(),{fetchImpl:p.fetch}),snapshot=JSON.parse(fs.readFileSync(r.out,'utf8'));
+  assert.ok(snapshot.errors.some(e=>e.source==='grafana' && /rate limited \(HTTP 429\)/.test(e.message)),'the 429 is recorded');
+  const C=runtime(),telemetry=plain(C.liveStatusDemoTelemetry(snapshot.days[0]));
+  assert.equal(telemetry.ingest.signals.rate.value,14,'the other signals are kept');assert.equal(telemetry.ingest.signals.errors,undefined);
+ }finally{await p.close();}
+});
+test('S20 when only the epic-children search answers, the board\'s tickets are unknown, not missing',async()=>{
+ const p=await providers({parentOnly:true});
+ try{
+  const dir=tmp(),r=await cli({JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET},dir,{fetchImpl:p.fetch});
+  assert.ok(p.seen.some(s=>s.path==='/rest/api/3/search/jql' && /^parent = /.test(JSON.parse(s.body).jql)),'precondition: the epic-children search answered');
+  // The viewer publishes ticket state only when every search answered, so none is known: no file rather than every ticket missing.
+  assert.equal(r.code,1);assert.match(r.lines[0],/^snapshot not written: the board's 7 tickets are unknown, because Jira did not answer every search for them/);
+  assert.doesNotMatch(r.lines[0],/missing/);assert.equal(fs.existsSync(r.out),false);
  }finally{await p.close();}
 });

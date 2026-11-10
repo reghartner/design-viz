@@ -35,4 +35,7 @@ test('#1265 review: the label names the time zone and an old year; errors and bo
  const now=valid();now.snapshotAt=new Date().toISOString();assert.doesNotMatch(C.workbenchLiveSnapshot(JSON.stringify(now)).label,new RegExp(String(new Date().getFullYear())),'this year is not repeated');
  assert.equal(read.errors,2);assert.equal(read.firstError,'grafana ingest rate: Grafana Prometheus answered HTTP 500');assert.equal(read.board,'other.spec.json');
  assert.equal(read.covers(['AA-1','BB-1']),1);assert.equal(read.covers(['BB-1']),0);
+ // #1275 review: a ticket no answered Jira search covered is written `unknown`; it is not counted as held.
+ const partial=valid();partial.days[0].issues['CC-1']={state:'unknown'};const held=C.workbenchLiveSnapshot(JSON.stringify(partial));
+ assert.equal(held.covers(['AA-1','CC-1']),1);assert.equal(JSON.parse(JSON.stringify(held.map(['CC-1'])))['CC-1'].state,'unknown');
 });

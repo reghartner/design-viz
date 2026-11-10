@@ -565,3 +565,46 @@ test('#1201 editing a signal unit, query or Show on card keeps role "error"',()=
     assert.equal(out.error,undefined,field);assert.equal(out.value.signals.dlq.role,'error',field+' keeps role');
   }
 });
+
+// #1228 test plan 2: folds use the Inspector <details> disclosure state.
+test('#1228 the Metrics editor folds each signal, Add signal, Links and Card; folds start closed on a new selection and an open fold survives an edit to the same carrier',()=>{
+  const binding={kind:'call',signals:{rate:{grafana:PROM_RATE,unit:'req/h'},errors:{grafana:PROM_ERRORS,unit:'req/h'}},card:{side:'below',offset:0}};
+  const ui=harness(board(binding,{templates:TEMPLATES()}),EDGE);
+  const folds=()=>ui.metrics().querySelectorAll('details.metrics-fold');
+  const fold=title=>folds().find(f=>f.querySelector('summary').textContent===title);
+  const title=f=>f.querySelector('summary').textContent;
+  assert.deepEqual(folds().map(title),['Signal rate','Signal errors','Add signal','Links','Card']);
+  for(const [label,owner] of [['rate query','Signal rate'],['errors unit','Signal errors'],['errors max','Signal errors'],['New signal name','Add signal'],['Dashboard link','Links'],['Query link','Links'],['Card side','Card'],['Card width','Card']])
+    assert.equal(ui.control(label).closest('details'),fold(owner),label+' is in the '+owner+' fold');
+  assert.equal(ui.button('Remove signal errors').closest('details'),fold('Signal errors'));
+  assert.equal(ui.button('Add signal').closest('details'),fold('Add signal'));
+  for(const label of ['Metrics kind','Signals from'])assert.equal(ui.control(label).closest('details'),null,label+' stays outside the folds');
+  assert.equal(ui.button('Remove metrics').closest('details'),null,'Remove metrics stays outside the folds');
+  assert.deepEqual(folds().map(f=>f.open),[false,false,false,false,false],'folds start closed on a new selection');
+  fold('Card').open=true;fold('Signal errors').open=true;
+  ui.set('Card width','300');assert.equal(edgeOf(ui).telemetry.card.width,300);
+  assert.deepEqual(folds().map(f=>[title(f),f.open]),[['Signal rate',false],['Signal errors',true],['Add signal',false],['Links',false],['Card',true]],'open folds stay open across the same-carrier refresh');
+  ui.set('errors unit','msgs');assert.equal(fold('Signal errors').open,true);assert.equal(fold('Card').open,true);
+  ui.select({kind:'node',section:0,id:'ingest'});ui.select(EDGE);
+  assert.deepEqual(folds().map(f=>f.open),[false,false,false,false,false],'a new selection starts every fold closed');
+});
+
+test('#1228 Document settings → Tracking → Metrics folds Environments, each template and Add template; template signal folds nest inside and keep their open state',()=>{
+  const page={templates:TEMPLATES(),environments:{qa:{grafana:{prometheus:'prom-qa'}}}};
+  const ui=harness(board(null,page),{kind:'document'});
+  const box=()=>ui.settings(),title=f=>f.querySelector('summary').textContent;
+  const top=()=>box().querySelectorAll('details.metrics-fold').filter(f=>!f.parentNode.closest('details'));
+  const find=(list,name)=>list.find(f=>title(f)===name);
+  const outer=el=>{let found=null;for(let d=el.closest('details');d;d=d.parentNode && d.parentNode.closest('details'))found=d;return found;};
+  assert.deepEqual(top().map(title),['Environments','Template kafka-topic','Add template']);
+  const template=()=>find(top(),'Template kafka-topic'),nested=()=>template().querySelectorAll('details.metrics-fold');
+  assert.deepEqual(nested().map(title),['Signal in','Signal lag','Add kafka-topic signal']);
+  for(const [label,owner] of [['qa Grafana Prometheus UID','Environments'],['New environment id','Environments'],['kafka-topic template kind','Template kafka-topic'],['New template name','Add template']])
+    assert.equal(outer(ui.control(label)),find(top(),owner),label+' is in the '+owner+' fold');
+  assert.equal(ui.control('kafka-topic lag unit').closest('details'),find(nested(),'Signal lag'));
+  for(const label of ['Allow metrics','Grafana Prometheus UID','Metrics window'])assert.equal(ui.control(label).closest('details'),null,label+' stays outside the folds');
+  assert.deepEqual(box().querySelectorAll('details.metrics-fold').map(f=>f.open),[false,false,false,false,false,false]);
+  template().open=true;find(nested(),'Signal lag').open=true;
+  ui.set('kafka-topic lag unit','items');assert.equal(ui.raw.page.tracking.telemetry.templates['kafka-topic'].signals.lag.unit,'items');
+  assert.equal(template().open,true);assert.equal(find(nested(),'Signal lag').open,true);assert.equal(find(nested(),'Signal in').open,false);
+});

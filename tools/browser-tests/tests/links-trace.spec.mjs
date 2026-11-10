@@ -98,7 +98,8 @@ test('T3 By element: the inline editor edits a match in one Undo step; a drop on
   expect(steps(await source(page))[1].traceMatch.attributes).toEqual({'deployment.environment.name':'prod'});
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
   // An attribute name trace matching does not support is refused beside its field, before any write.
-  const newName=editor.getByRole('textbox',{name:'New attribute name',exact:true});
+  // The name field suggests the supported names (a datalist), so its role is combobox.
+  const newName=editor.getByRole('combobox',{name:'New attribute name',exact:true});
   await newName.fill('event.type');await editor.getByRole('textbox',{name:'New attribute value',exact:true}).fill('doorbell.press');
   await editor.getByRole('button',{name:'Add attribute',exact:true}).click();
   await expect(newName).toHaveAttribute('aria-invalid','true');

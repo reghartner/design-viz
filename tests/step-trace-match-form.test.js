@@ -213,6 +213,7 @@ test('F6 validator messages for this step\'s trace match sit beside the field th
   const attrs=ui.h.guide.querySelector('[aria-label="attributes"]'),attrNote=ui.h.guide.querySelectorAll('p').find(p=>p.id===attrs.getAttribute('aria-describedby'));
   assert.equal(attrNote.textContent,'traceMatch.attributes: use supported operational attributes only','the attribute rows are described by their message');
   assert.equal(ui.warningFor('service name'),'');
+  assert.equal(ui.h.guide.querySelectorAll('summary').find(x=>x.textContent.startsWith('Code and trace evidence')).textContent,'Code and trace evidence · trace match set · 3 warnings','the closed fold flags the warnings');
   // Fixing the field clears its message on the next render.
   oneStep(ui,()=>ui.set('node','payment'));assert.equal(ui.warningFor('node'),'');
   oneStep(ui,()=>ui.set('advanced JSON','{"maxDurationMs": 800}'));assert.equal(ui.warningFor('advanced JSON'),'');

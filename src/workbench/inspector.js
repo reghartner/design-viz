@@ -1088,6 +1088,178 @@ function stepTicketFilterControl(val, ctx, t){
     });
     return box;
   }
+/* #1238: the step's traceMatch as a form (planStepTraceMatch; one Undo step
+   per edit). One alternative is the object form, two or more the array form.
+   Keys the form does not show stay in each alternative's Advanced JSON box.
+   The validator's messages for this step's traceMatch (those that go away
+   without it) sit next to the field they name. */
+function traceMatchMessages(val){
+    if(val.traceMatch===undefined || !session.validate)return [];
+    var parsed=parseEditor();if(parsed.error)return [];
+    var path=builderTargetPath(parsed.raw,session.target);if(!path)return [];
+    var without=JSON.parse(JSON.stringify(parsed.raw)),st=specValueAt(without,path);
+    if(!st || typeof st!=='object')return [];
+    delete st.traceMatch;
+    var withIt=session.validate(parsed.raw),base=session.validate(without),rest=Object.create(null);
+    base.errors.concat(base.warnings).forEach(function(m){rest[m]=(rest[m] || 0)+1;});
+    return withIt.errors.concat(withIt.warnings).filter(function(m){if(rest[m]){rest[m]--;return false;}return /traceMatch/.test(m);});
+  }
+function traceMatchPlaced(messages,many){
+    var placed={general:[]};
+    messages.forEach(function(text){
+      var rel=text.slice(text.indexOf('traceMatch')),m=/^traceMatch(?:\[(\d+)\])?(?:\.([A-Za-z]+))?/.exec(rel);
+      var alt=m && m[1]!=null?Number(m[1]):many?null:0,field=m && m[2];
+      if(!field)field=/nodeId/.test(rel)?'nodeId':/serviceName and operation/.test(rel)?'serviceName':/occurrence and repeat/.test(rel)?'occurrence':/parentStepId|optional/.test(rel)?'advanced':null;
+      if(field && TRACE_MATCH_FORM_KEYS.indexOf(field)<0)field='advanced';
+      if(alt==null || !field){placed.general.push(rel);return;}
+      var at=placed[alt]=placed[alt] || {};(at[field]=at[field] || []).push(rel);
+    });
+    return placed;
+  }
+function traceMatchEditor(val,ctx,t){
+    var box=document.createElement('fieldset');box.className='trace-match-editor';
+    var legend=document.createElement('legend');legend.textContent='Trace match';box.appendChild(legend);
+    var list=traceMatchFormAlternatives(val.traceMatch);
+    function note(parent,text,cls){var p=document.createElement('p');p.className='fnote'+(cls?' '+cls:'');p.textContent=text;parent.appendChild(p);return p;}
+    if(!list){
+      note(box,'This trace match is not a selector object or a list of them, so it is edited as JSON.');
+      box.appendChild(frow('Trace match JSON',jsonFieldControl('traceMatch',val.traceMatch,'jsonObjArr',refreshFormSoon)));
+      return box;
+    }
+    note(box,'A loaded trace maps a span to this step when its service name and operation match exactly. Add an alternative when another span can stand for this step; the first that matches wins.');
+    var messages=traceMatchMessages(val),many=list.length>1,placed=traceMatchPlaced(messages,many),serial=0;
+    box.setAttribute('data-warning-count',String(messages.length));
+    function commit(edit){
+      var parsed=parseEditor();if(parsed.error){formError(parsed.error);return false;}
+      var plan=planStepTraceMatch(parsed.text,parsed.raw,t.section,t.index,edit);
+      if(plan.noop){refreshFormSoon();return true;}
+      if(plan.error){formError(plan.error);return false;}
+      formError('');
+      return applyPlan(plan,{after:refreshFormSoon},parsed);
+    }
+    function warn(parent,control,texts){
+      if(!texts || !texts.length)return;
+      var p=document.createElement('p');p.className='fnote trace-match-warning';p.id=prefix+'-trace-warning-'+(serial++);
+      p.setAttribute('role','note');p.textContent=texts.join(' ');parent.appendChild(p);
+      if(control){if(/^(INPUT|SELECT|TEXTAREA)$/i.test(control.tagName))control.setAttribute('aria-invalid','true');control.setAttribute('aria-describedby',p.id);}
+    }
+    function general(){
+      if(!placed.general.length)return;
+      var gen=document.createElement('ul');gen.className='metrics-warnings trace-match-warnings';gen.setAttribute('aria-label','Trace match warnings');
+      placed.general.forEach(function(text){var li=document.createElement('li');li.textContent=text;gen.appendChild(li);});box.appendChild(gen);
+    }
+    function named(control,name,title){control.setAttribute('aria-label',name);if(title)control.title=title;return control;}
+    var nodeIds=Object.keys((ctx.diagram && ctx.diagram.nodes) || {}).filter(function(id){return !isTextBoxNode(ctx.diagram.nodes[id]);});
+    var attributeNames=typeof FlowCanon!=='undefined' && FlowCanon.traceAttributeNames?FlowCanon.traceAttributeNames(ctx.resolvedPage):[];
+    var attrListId=prefix+'-trace-attributes';
+    if(attributeNames.length){
+      var dl=document.createElement('datalist');dl.id=attrListId;
+      attributeNames.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});box.appendChild(dl);
+    }
+    if(!list.length){
+      /* A selector needs both strings, so a new trace match starts from both in one edit. */
+      note(box,'No trace match: a loaded trace leaves this step unmapped.');
+      var drafts={};
+      [['Service name','serviceName','checkout-api','The span service.name, exactly as the trace shows it.'],['Operation','operation','POST /orders','The span name, exactly as the trace shows it.']].forEach(function(f){
+        var input=named(document.createElement('input'),'new trace match '+f[0].toLowerCase(),f[3]);input.type='text';input.className='fctl';input.placeholder=f[2];
+        drafts[f[1]]=input;box.appendChild(frow(f[0],input));
+      });
+      function create(){return commit({op:'create',serviceName:drafts.serviceName.value,operation:drafts.operation.value});}
+      Object.keys(drafts).forEach(function(k){listen(drafts[k],'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();create();}});});
+      var createActs=actionGroup('Trace match actions','trace-match-actions'),createButton=actionButton('Add trace match',create);
+      createButton.title='Write this step’s trace match from the service name and operation (Enter in either field also adds it).';
+      createActs.appendChild(createButton);box.appendChild(createActs);general();
+      return box;
+    }
+    list.forEach(function(m,i){
+      var group=box,lead=many?'Alternative '+(i+1)+' ':'',fieldWarnings=placed[i] || {};
+      if(many){
+        group=document.createElement('fieldset');group.className='trace-match-alternative';
+        var gl=document.createElement('legend');gl.textContent='Alternative '+(i+1)+(i===0?' (tried first)':'');group.appendChild(gl);box.appendChild(group);
+      }
+      function textRow(label,field,placeholder,title){
+        var input=named(textControl(m[field],function(v){return commit({op:'set',alternative:i,field:field,value:v});},{placeholder:placeholder}),lead+label.toLowerCase(),title);
+        group.appendChild(frow(label,input));warn(group,input,fieldWarnings[field]);
+      }
+      textRow('Service name','serviceName','checkout-api','The span service.name, exactly as the trace shows it.');
+      textRow('Operation','operation','POST /orders','The span name, exactly as the trace shows it.');
+      var nodeOptions=nodeIds.slice();
+      var nodeSelect=named(selectControl(nodeOptions,m.nodeId==null?'':m.nodeId,function(v){return commit({op:'set',alternative:i,field:'nodeId',value:v});},true),lead+'node','The node that shows this span’s conditions and timing. Imported nodes are listed by their namespaced id.');
+      Array.prototype.forEach.call(nodeSelect.options,function(option){
+        var node=option.value && ctx.diagram && ctx.diagram.nodes[option.value];
+        if(option.value==='')option.textContent='(none)';
+        else if(node)option.textContent=(node.title?node.title+' · ':'')+option.value;
+      });
+      group.appendChild(frow('Node',nodeSelect));warn(group,nodeSelect,fieldWarnings.nodeId);
+      textRow('Namespace','namespace','orders','Matches the span service.namespace attribute. Empty matches any namespace.');
+      var occurrence=named(textControl(m.occurrence,function(v){return commit({op:'set',alternative:i,field:'occurrence',value:v});},{placeholder:'any'}),lead+'occurrence',
+        m.repeat!=null?'Turn off Retry attempts to pick one call by order.':'Pick the Nth serial call of this service and operation (1 is the first). Empty matches a single span.');
+      occurrence.className+=' fnum';occurrence.disabled=m.repeat!=null;
+      group.appendChild(frow('Occurrence',occurrence));warn(group,occurrence,fieldWarnings.occurrence);
+      var repeat=checkboxControl(m.repeat!=null,function(on){return commit({op:'set',alternative:i,field:'repeat',value:on});}),repeatBox=repeat.firstChild;
+      named(repeatBox,lead+'retry attempts',m.occurrence!=null?'Clear Occurrence to count retry attempts.':'Treat recorded retry attempts (retry.attempt 0, 1, …) under one parent as this one step.');
+      repeatBox.disabled=m.occurrence!=null;
+      var repeatCaption=document.createElement('span');repeatCaption.className='fnote';repeatCaption.textContent=' Retries are one step';repeat.appendChild(repeatCaption);
+      group.appendChild(frow('Retry attempts',repeat));warn(group,repeatBox,fieldWarnings.repeat);
+      /* Attributes: one row per key (name, value, type, remove) and an add row. */
+      var attrs=traceMatchFormObject(m.attributes)?m.attributes:{},attrBox=document.createElement('div');attrBox.className='rowsedit trace-match-attributes';
+      attrBox.setAttribute('role','group');attrBox.setAttribute('aria-label',lead+'attributes');
+      var TYPES=[['string','Text'],['number','Number'],['boolean','True/false']];
+      function typeSelect(current,label){
+        var sel=document.createElement('select');sel.className='fctl trace-match-attr-type';
+        TYPES.forEach(function(pair){var o=document.createElement('option');o.value=pair[0];o.textContent=pair[1];sel.appendChild(o);});
+        sel.value=current;return named(sel,label,'Value type. Honeycomb table cells are text.');
+      }
+      Object.keys(attrs).forEach(function(key,n){
+        var line=document.createElement('div');line.className='rowline trace-match-attr';
+        var type=typeof attrs[key],rowLead=lead+'attribute '+(n+1)+' ';
+        var name=named(textControl(key,function(v){return commit({op:'attribute',alternative:i,key:key,name:v,value:String(attrs[key]),type:type});},{placeholder:'attribute name',list:attrListId}),rowLead+'name');
+        var value=named(textControl(String(attrs[key]),function(v){return commit({op:'attribute',alternative:i,key:key,name:key,value:v==null?'':v,type:type});},{placeholder:'value'}),rowLead+'value');
+        var types=typeSelect(type,rowLead+'type');
+        listen(types,'change',function(){if(commit({op:'attribute',alternative:i,key:key,name:key,value:String(attrs[key]),type:types.value})===false)types.value=type;});
+        var remove=actionButton('×',function(){return commit({op:'attribute',alternative:i,key:key,name:null});},'rowx');
+        named(remove,'Remove '+lead.toLowerCase()+'attribute '+key,'Remove attribute '+key);
+        line.appendChild(name);line.appendChild(value);line.appendChild(types);line.appendChild(remove);attrBox.appendChild(line);
+      });
+      var addLine=document.createElement('div');addLine.className='rowline trace-match-attr-add';
+      var newName=named(document.createElement('input'),lead+'new attribute name','A supported span attribute, such as deployment.environment.name.');
+      newName.type='text';newName.className='fctl';newName.placeholder='new attribute';if(attributeNames.length)newName.setAttribute('list',attrListId);
+      var newValue=named(document.createElement('input'),lead+'new attribute value');newValue.type='text';newValue.className='fctl';newValue.placeholder='value';
+      var newType=typeSelect('string',lead+'new attribute type');
+      function addAttribute(){
+        if(commit({op:'attribute',alternative:i,key:null,name:newName.value,value:newValue.value,type:newType.value})!==false){newName.value='';newValue.value='';}
+      }
+      [newName,newValue].forEach(function(input){listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addAttribute();}});});
+      var add=actionButton('Add attribute',addAttribute,'rowadd');named(add,'Add '+lead.toLowerCase()+'attribute','Add the attribute typed to the left (Enter also adds it).');
+      addLine.appendChild(newName);addLine.appendChild(newValue);addLine.appendChild(newType);addLine.appendChild(add);attrBox.appendChild(addLine);
+      group.appendChild(frowBlock('Attributes',attrBox));warn(group,attrBox,fieldWarnings.attributes);
+      /* Advanced JSON: the alternative's other keys, replaced as one object. */
+      var advanced=document.createElement('details');advanced.className='rawjson trace-match-advanced';
+      var sum=document.createElement('summary');sum.textContent='Advanced (JSON)';advanced.appendChild(sum);
+      var extra=traceMatchFormAdvanced(m);
+      note(advanced,'Limits and conditions: maxDurationMs, maxQueueDepth, parentStepId, optional, role, panelId. The fields above are not edited here.');
+      var area=named(textControl(Object.keys(extra).length?JSON.stringify(extra,null,2):'',function(v){
+        var parsedExtra=null;
+        if(v!=null){try{parsedExtra=JSON.parse(v);}catch(ex){formError('Advanced JSON: not valid JSON ('+ex.message+')');return false;}}
+        return commit({op:'advanced',alternative:i,value:parsedExtra});
+      },{textarea:true,placeholder:'{"maxDurationMs": 500}'}),lead+'advanced JSON');
+      advanced.appendChild(area);warn(advanced,area,fieldWarnings.advanced);
+      if(fieldWarnings.advanced)advanced.setAttribute('data-inspector-reveal','');
+      group.appendChild(advanced);
+      if(many){
+        var removeAlt=actionButton('Remove alternative '+(i+1),function(){return commit({op:'remove-alternative',alternative:i});});
+        removeAlt.title=list.length===2?'The other alternative becomes the single trace match.':'Remove this alternative.';
+        var acts=actionGroup('Alternative '+(i+1)+' actions','trace-match-actions');acts.appendChild(removeAlt);group.appendChild(acts);
+      }
+    });
+    general();
+    var actions=actionGroup('Trace match actions','trace-match-actions');
+    var addAlt=actionButton('Add alternative',function(){return commit({op:'add-alternative'});});
+    addAlt.title='Adds a copy of the last alternative to edit.';actions.appendChild(addAlt);
+    var clear=actionButton('Remove trace match',function(){return commit({op:'clear'});});clear.title='Remove every selector; the step is then unmapped.';actions.appendChild(clear);
+    box.appendChild(actions);
+    return box;
+  }
 function stepForm(val, ctx){
     var t = session.target, panelRows=[];
     function toggled(planFn){
@@ -1132,9 +1304,14 @@ function stepForm(val, ctx){
     resetCoin.disabled=!coinPlaced;resetCoin.setAttribute('aria-label','Reset step circle to automatic position');coinBox.appendChild(resetCoin);
     rows.push(frow('Circle position',coinBox));
     var evidence=document.createElement('details');
-    var evidenceTitle=document.createElement('summary'); evidenceTitle.textContent='Code and trace evidence';evidence.appendChild(evidenceTitle);
+    var evidenceTitle=document.createElement('summary'),matchCount=(traceMatchFormAlternatives(val.traceMatch) || [val.traceMatch]).length;
+    evidence.appendChild(evidenceTitle);
     evidence.appendChild(frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr')));
-    evidence.appendChild(frow('Trace match JSON',jsonFieldControl('traceMatch',val.traceMatch,'jsonObjArr')));
+    var matchEditor=traceMatchEditor(val,ctx,t),matchWarnings=Number(matchEditor.getAttribute('data-warning-count')) || 0;
+    // The summary says whether a trace match is set and flags its warnings; the disclosure identity ignores text after ' · '.
+    evidenceTitle.textContent='Code and trace evidence'+(matchCount>1?' · trace match, '+matchCount+' alternatives':matchCount?' · trace match set':'')+
+      (matchWarnings?' · '+matchWarnings+(matchWarnings===1?' warning':' warnings'):'');
+    evidence.appendChild(matchEditor);
     evidence.appendChild(frow('Runtime conditions JSON',jsonFieldControl('conditions',val.conditions,'jsonArr')));
     rows.push(evidence);
     ((ctx.diagram && ctx.diagram.panels) || []).forEach(function(p){

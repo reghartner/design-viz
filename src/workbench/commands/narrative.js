@@ -429,3 +429,133 @@ function planStepSetPanelPatch(text, raw, sectionIdx, stepIdx, panelId, patchTex
     Object.keys(patch).forEach(function(k){ copy[k] = patch[k]; });
   });
 }
+
+/* #1238 step trace match form. A step's traceMatch is one selector object or,
+   with alternatives, an array of them (docs/provider-traces.md). The form
+   edits TRACE_MATCH_FORM_KEYS; every other key of an alternative (limits,
+   parentStepId, optional, role, panelId) is its Advanced JSON and survives
+   form edits unchanged. traceMatchFormEdit returns {value} (null removes the
+   field), {noop:true} or {error}; planStepTraceMatch turns one edit into one
+   source change, so every edit is one Undo step. */
+var TRACE_MATCH_FORM_KEYS=['serviceName','operation','nodeId','namespace','attributes','occurrence','repeat'];
+function traceMatchFormObject(v){return !!v && typeof v==='object' && !Array.isArray(v);}
+/* The alternatives as the form shows them, [] without a traceMatch, or null
+   when the value is not selector objects with scalar attributes (the form
+   then falls back to raw JSON). */
+function traceMatchFormAlternatives(value){
+  if(value==null)return [];
+  var list=Array.isArray(value)?value:[value];
+  var ok=list.every(function(m){
+    if(!traceMatchFormObject(m))return false;
+    if(m.attributes===undefined)return true;
+    return traceMatchFormObject(m.attributes) && Object.keys(m.attributes).every(function(k){return ['string','number','boolean'].indexOf(typeof m.attributes[k])>=0;});
+  });
+  return ok?list:null;
+}
+function traceMatchFormAdvanced(m){
+  var out={};Object.keys(m || {}).forEach(function(k){if(TRACE_MATCH_FORM_KEYS.indexOf(k)<0)out[k]=m[k];});return out;
+}
+function traceMatchAttributeValue(text,type,name){
+  if(type==='number'){
+    var n=typeof text==='string' && text.trim()?Number(text.trim()):NaN;
+    return Number.isFinite(n)?{value:n}:{error:'Attribute '+name+': enter a number.'};
+  }
+  if(type==='boolean'){
+    var t=String(text).trim();
+    return t==='true' || t==='false'?{value:t==='true'}:{error:'Attribute '+name+': enter true or false.'};
+  }
+  return {value:String(text==null?'':text)};
+}
+function traceMatchFormEdit(value,edit){
+  var list=traceMatchFormAlternatives(value);
+  if(!list)return {error:'This trace match is not a selector object or a list of them. Fix it in the JSON box.'};
+  var many=Array.isArray(value) && value.length>0,next=builderClone(list),op=edit && edit.op;
+  function done(){
+    var out=many?next:next[0];
+    if(!many && traceMatchFormObject(out) && !Object.keys(out).length)out=null;
+    return JSON.stringify(out===undefined?null:out)===JSON.stringify(value===undefined?null:value)?{noop:true}:{value:out===undefined?null:out};
+  }
+  if(op==='clear')return value==null?{noop:true}:{value:null};
+  if(op==='create'){
+    if(list.length)return {error:'This step already has a trace match. Reselect the step.'};
+    var service=typeof edit.serviceName==='string'?edit.serviceName.trim():'',operation=typeof edit.operation==='string'?edit.operation.trim():'';
+    if(!service || !operation)return {error:'Enter both the service name and the operation of the span this step stands for.'};
+    return {value:{serviceName:service,operation:operation}};
+  }
+  if(op==='add-alternative'){
+    if(!list.length)return {error:'Set a service name and operation first; an alternative starts as a copy of the last one.'};
+    next.push(builderClone(list[list.length-1]));many=true;return done();
+  }
+  var i=edit && typeof edit.alternative==='number'?edit.alternative:0;
+  if(i<0 || i>=next.length || Math.floor(i)!==i)return {error:'That alternative no longer exists. Reselect the step.'};
+  var m=next[i];
+  if(op==='remove-alternative'){
+    if(next.length<=1)return {value:null};
+    next.splice(i,1);
+    if(next.length===1){many=false;}
+    return done();
+  }
+  if(op==='set'){
+    var field=edit.field,v=edit.value;
+    if(['serviceName','operation','nodeId','namespace'].indexOf(field)>=0){
+      if(v!=null && typeof v!=='string')return {error:field+' is text.'};
+      v=v==null?'':v.trim();
+      if(!v && (field==='serviceName' || field==='operation'))return {error:'A trace match needs a service name and an operation. To delete it, use '+(next.length>1?'Remove alternative':'Remove trace match')+'.'};
+      if(v)m[field]=v;else delete m[field];
+      return done();
+    }
+    if(field==='occurrence'){
+      var text=v==null?'':String(v).trim();
+      if(!text){delete m.occurrence;return done();}
+      var n=Number(text);
+      if(!Number.isInteger(n) || n<1)return {error:'Occurrence is a whole number from 1: the Nth serial call of this service and operation.'};
+      if(m.repeat!=null)return {error:'Turn off Retry attempts first: occurrence and retry attempts cannot be combined.'};
+      m.occurrence=n;return done();
+    }
+    if(field==='repeat'){
+      if(v){if(m.occurrence!=null)return {error:'Clear Occurrence first: occurrence and retry attempts cannot be combined.'};m.repeat='attempts';}
+      else delete m.repeat;
+      return done();
+    }
+    return {error:'Unknown trace match field '+field+'.'};
+  }
+  if(op==='attribute'){
+    var attrs=traceMatchFormObject(m.attributes)?m.attributes:{},key=edit.key==null?null:String(edit.key),name=edit.name==null?'':String(edit.name).trim();
+    if(key!=null && !Object.prototype.hasOwnProperty.call(attrs,key))return {error:'Attribute '+key+' is no longer on this alternative. Reselect the step.'};
+    if(!name){
+      if(key==null)return {error:'Enter an attribute name, such as deployment.environment.name.'};
+      delete attrs[key];
+    } else {
+      if(name!==key && Object.prototype.hasOwnProperty.call(attrs,name))return {error:'Attribute '+name+' is already on this alternative.'};
+      var type=edit.type || (key!=null?typeof attrs[key]:'string');
+      if(['string','number','boolean'].indexOf(type)<0)return {error:'Attribute types are text, number or true/false.'};
+      var parsed=traceMatchAttributeValue(edit.value!==undefined?edit.value:key!=null?String(attrs[key]):'',type,name);
+      if(parsed.error)return parsed;
+      var out={};
+      if(key==null){Object.keys(attrs).forEach(function(k){out[k]=attrs[k];});out[name]=parsed.value;}
+      else Object.keys(attrs).forEach(function(k){if(k===key)out[name]=parsed.value;else out[k]=attrs[k];});
+      attrs=out;
+    }
+    if(Object.keys(attrs).length)m.attributes=attrs;else delete m.attributes;
+    return done();
+  }
+  if(op==='advanced'){
+    var extra=edit.value==null?{}:edit.value;
+    if(!traceMatchFormObject(extra))return {error:'Advanced JSON is an object, such as {"maxDurationMs": 500}.'};
+    var inForm=Object.keys(extra).filter(function(k){return TRACE_MATCH_FORM_KEYS.indexOf(k)>=0;});
+    if(inForm.length)return {error:'Edit '+inForm.join(', ')+' in the form fields, not in Advanced JSON.'};
+    var rebuilt={};
+    // Form keys keep their place; advanced keys follow in the order given.
+    Object.keys(m).forEach(function(k){if(TRACE_MATCH_FORM_KEYS.indexOf(k)>=0)rebuilt[k]=m[k];});
+    Object.keys(extra).forEach(function(k){rebuilt[k]=extra[k];});
+    next[i]=rebuilt;return done();
+  }
+  return {error:'Unknown trace match edit.'};
+}
+function planStepTraceMatch(text,raw,sectionIdx,stepIdx,edit){
+  var got=builderStepAt(raw,sectionIdx,stepIdx);
+  if(!got)return {error:'Step not found. Reselect it and try again.'};
+  var r=traceMatchFormEdit(got.st.traceMatch,edit);
+  if(r.error || r.noop)return r;
+  return planSetField(text,raw,got.path,'traceMatch',r.value==null?null:JSON.stringify(r.value));
+}

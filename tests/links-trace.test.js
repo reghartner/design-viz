@@ -143,3 +143,28 @@ test('LT8 imported nodes: listed for the Node select, named by namespaced id, an
   assert.equal(api2.label,'Items API');assert.deepEqual(plain(api2.via.map(v=>v.index)),[0]);
   assert.equal(group(m2,'api · GET /items').uses[0].nodeId,'canon::api');
 });
+
+test('LT9 no duplicate service · operation on one step: Add as alternative and a clashing rename are refused and write nothing',()=>{
+  const spec=board();d(spec).steps[3].traceMatch=[{serviceName:'notify-svc',operation:'route.event'},{serviceName:'notify-svc',operation:'route.evt'}];
+  const text=JSON.stringify(spec,null,2),raw=JSON.parse(text);
+  const clash=c.planLinksTraceRename(text,raw,{serviceName:'notify-svc',operation:'route.event'},{serviceName:'notify-svc',operation:'route.evt'},null);
+  assert.match(clash.error,/Step 4 · retry already has notify-svc · route\.evt; renaming would give it two/);assert.equal(clash.text,undefined,'nothing is written');
+  assert.equal(clash.field,'operation');
+  const empty=c.planLinksTraceRename(text,raw,{serviceName:'notify-svc',operation:'route.event'},{serviceName:'notify-svc',operation:'  '},null);
+  assert.equal(empty.field,'operation','the error names the empty field');
+  const twice=c.planLinksTraceMove(text,raw,step(1),step(3),'alternative',true,null);
+  assert.match(twice.error,/already has notify-svc · route\.event/);
+  const m=model(spec);
+  assert.match(c.linksTraceAlternativeRefusal(el(m,'step',3),KEY),/already has/);
+  assert.equal(c.linksTraceAlternativeRefusal(el(m,'step',0),KEY),null);
+});
+
+test('LT10 a connection lists every alternative of the steps that light it; a rename reports how many steps it changed',()=>{
+  const spec=board();d(spec).steps[1].traceMatch=[d(spec).steps[1].traceMatch,{serviceName:'notify-svc',operation:'route.event.retry'}];
+  const route=el(model(spec),'edge',1);
+  assert.deepEqual(plain(route.via.map(u=>u.key)),[KEY,'notify-svc · route.event.retry']);
+  const s=apply(spec,(t,r)=>c.planLinksTraceRename(t,r,{serviceName:'notify-svc',operation:'route.event.retry'},{serviceName:'notify-svc',operation:'route.retry'},null));
+  assert.equal(s.plan.count,1);assert.equal(d(s.raw).steps[1].traceMatch[1].operation,'route.retry');assert.equal(d(s.raw).steps[1].traceMatch[0].operation,'route.event');
+  const same=apply(spec,(t,r)=>c.planLinksTraceRename(t,r,{serviceName:'notify-svc',operation:'route.event'},{serviceName:' notify-svc ',operation:'route.event'},null));
+  assert.ok(same.unchanged,'renaming to the same key writes nothing');assert.equal(same.plan.count,0);
+});

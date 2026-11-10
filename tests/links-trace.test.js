@@ -20,7 +20,7 @@ function board(){
     edges:[{from:'ctrl',to:'ingest',label:'event'},{from:'ingest',to:'notify',label:'route'}],
     steps:[
       {id:'publish',text:'publish',edge:'ctrl->ingest',traceMatch:{serviceName:'ingest-api',operation:'POST /v1/events'}},
-      {id:'route',text:'route',edge:'ingest->notify',traceMatch:{serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'event.type':'doorbell.press'},maxDurationMs:500}},
+      {id:'route',text:'route',edge:'ingest->notify',traceMatch:{serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'deployment.environment.name':'prod'},maxDurationMs:500}},
       {id:'push',text:'push',nodes:['notify']},
       {id:'retry',text:'retry',nodes:['notify'],traceMatch:{serviceName:'notify-svc',operation:'route.event'}}]}}]}};
 }
@@ -34,6 +34,7 @@ function el(m,kind,at){const found=m.elements.find(e=>e.kind===kind && (kind==='
 const step=(index,alternative)=>({kind:'step',section:0,index,alternative:alternative||0});
 
 test('LT1 By trace match groups steps by service · operation; nodes and connections show through their steps',()=>{
+  assert.deepEqual(plain(c.validate(c.normalize(board())).errors),[],'the fixture is a board the product accepts');
   const m=model(board());assert.equal(m.error,undefined,m.error);
   assert.deepEqual(plain(m.groups.map(g=>g.key)),['ingest-api · POST /v1/events',KEY]);
   const g=group(m,KEY);
@@ -49,7 +50,7 @@ test('LT1 By trace match groups steps by service · operation; nodes and connect
 test('LT2 moving a match onto a step with none moves the whole alternative in one plan; copy keeps the source',()=>{
   let s=apply(board(),(t,r)=>c.planLinksTraceMove(t,r,step(1),step(2),null,false,null));
   assert.equal(d(s.raw).steps[1].traceMatch,undefined);
-  assert.deepEqual(d(s.raw).steps[2].traceMatch,{serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'event.type':'doorbell.press'},maxDurationMs:500},'advanced keys travel with it');
+  assert.deepEqual(d(s.raw).steps[2].traceMatch,{serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'deployment.environment.name':'prod'},maxDurationMs:500},'advanced keys travel with it');
   s=apply(board(),(t,r)=>c.planLinksTraceMove(t,r,step(1),step(2),null,true,null));
   assert.equal(d(s.raw).steps[1].traceMatch.operation,'route.event');assert.equal(d(s.raw).steps[2].traceMatch.operation,'route.event');
 });
@@ -75,7 +76,7 @@ test('LT4 the shared rename changes every step that uses the match in one plan a
   assert.equal(c.linksTraceRenameCount(g),2);
   const s=apply(board(),(t,r)=>c.planLinksTraceRename(t,r,{serviceName:'notify-svc',operation:'route.event'},{serviceName:'notify-svc',operation:'route.evt'},null));
   assert.equal(s.plan.count,2);
-  assert.deepEqual(d(s.raw).steps[1].traceMatch,{serviceName:'notify-svc',operation:'route.evt',nodeId:'notify',attributes:{'event.type':'doorbell.press'},maxDurationMs:500},'attributes, node and Advanced keys stay');
+  assert.deepEqual(d(s.raw).steps[1].traceMatch,{serviceName:'notify-svc',operation:'route.evt',nodeId:'notify',attributes:{'deployment.environment.name':'prod'},maxDurationMs:500},'attributes, node and Advanced keys stay');
   assert.deepEqual(d(s.raw).steps[3].traceMatch,{serviceName:'notify-svc',operation:'route.evt'});
   assert.deepEqual(d(s.raw).steps[0].traceMatch,d(board()).steps[0].traceMatch,'other matches are untouched');
   const text=JSON.stringify(board());
@@ -187,4 +188,16 @@ test('LT12 a New trace match draft stays with its step: by id, or by caption for
   assert.equal(c.linksTraceSameStep(idless,a),true);
   assert.equal(c.linksTraceSameStep(idless,b),false,'an id-less step that shifts into its place is a different step');
   assert.equal(c.linksTraceSameStep({stepId:null,caption:''},Object.assign({},a,{caption:''})),false,'no id and no caption: never assume the same step');
+});
+
+test('LT13 the inline editor refuses an attribute name trace matching does not support, before any write',()=>{
+  const text=JSON.stringify(board(),null,2),raw=JSON.parse(text);
+  const bad=c.planLinksTraceEdit(text,raw,0,1,{op:'attribute',alternative:0,key:null,name:'event.type',value:'doorbell.press'},null);
+  assert.match(bad.error,/event\.type is not a trace attribute/);assert.equal(bad.text,undefined);
+  const s=apply(board(),(t,r)=>c.planLinksTraceEdit(t,r,0,1,{op:'attribute',alternative:0,key:null,name:'service.version',value:'1.2'},null));
+  assert.equal(d(s.raw).steps[1].traceMatch.attributes['service.version'],'1.2');
+  assert.deepEqual(plain(c.validate(c.normalize(s.raw)).errors),[],'the accepted edit leaves a valid board');
+  const ren=c.planLinksTraceEdit(text,raw,0,1,{op:'attribute',alternative:0,key:'deployment.environment.name',name:'env',value:'prod'},null);
+  assert.match(ren.error,/env is not a trace attribute/,'renaming an attribute is checked too');
+  assert.ok(c.linksTraceAttributeNames(raw,null).includes('deployment.environment.name'));
 });

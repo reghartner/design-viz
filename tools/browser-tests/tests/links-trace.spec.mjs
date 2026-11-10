@@ -2,7 +2,7 @@
    row | fixture | assertion | rejects
    T1 by trace match + highlight | board below | the notify-svc · route.event row has chips for steps 2 and 4 and the matched node; Highlight lights both Steps rows, step 2's edge and the node, and Esc clears | a list that misses a sharing step, a highlight of one step only
    T2 drag + Assign | same | dragging step 2's chip onto Steps row 3 (no match) moves the whole match in one Undo step; + Assign step ticks step 3 and writes {serviceName, operation}; Undo restores | a drop that copies, two Undo steps
-   T3 by element edit + Add as alternative | same | step 2's chip opens the inline editor; an Operation edit is one Undo step; dragging step 1's chip onto step 2 offers Replace / Add as alternative, and Add as alternative writes the array form in one Undo step | a silent replace, an edit that drops attributes
+   T3 by element edit + Add as alternative | same | step 2's chip opens the inline editor; an Operation edit is one Undo step; an unsupported attribute name (event.type) is refused beside its field with nothing written; dragging step 1's chip onto step 2 offers Replace / Add as alternative, and Add as alternative writes the array form in one Undo step | a silent replace, an edit that drops attributes
    T4 keyboard Move to… + Esc | same | Enter on step 1's chip → Move to… → Step 2 asks Replace / Add as alternative; Esc writes nothing; Replace writes step 1's match onto step 2 and clears step 1 | a keyboard path that skips the question, an Esc that writes
    T5 shared rename | same | Rename on the row says "Renames on 2 steps" before the write; Save changes both steps; one Undo restores both | a rename that changes one step, a count missing before the write
    T7 drag wording | same | a chip drag names its source step and asks for a step, never undefined or nodes/connections; a handle drop on a step with another match says "as an alternative" before and after the write | a status naming undefined, a silent alternative
@@ -21,7 +21,7 @@ const fixture={page:{title:'Doorbell',sections:[{heading:'Flow',diagram:{autopla
   edges:[{from:'ctrl',to:'ingest',label:'event'},{from:'ingest',to:'notify',label:'route'}],
   steps:[
     {id:'publish',text:'The controller publishes',edge:'ctrl->ingest',traceMatch:{serviceName:'ingest-api',operation:'POST /v1/events'}},
-    {id:'route',text:'Ingest routes the event',edge:'ingest->notify',traceMatch:{serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'event.type':'doorbell.press'}}},
+    {id:'route',text:'Ingest routes the event',edge:'ingest->notify',traceMatch:{serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'deployment.environment.name':'prod'}}},
     {id:'push',text:'The service pushes an alert',nodes:['notify']},
     {id:'retry',text:'Offline: retry',nodes:['notify'],traceMatch:{serviceName:'notify-svc',operation:'route.event'}}]}}]}};
 const source=async page=>JSON.parse(await page.locator('#src').inputValue());
@@ -74,7 +74,7 @@ test('T2 dragging a match onto a step with none moves it in one Undo step, and +
   await pointerTo(page,chip,target,{release:false});
   await expect(target).toHaveClass(/dv-links-drop/);
   await page.mouse.up();
-  await expect.poll(async()=>steps(await source(page))[2].traceMatch).toEqual({serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'event.type':'doorbell.press'}});
+  await expect.poll(async()=>steps(await source(page))[2].traceMatch).toEqual({serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'deployment.environment.name':'prod'}});
   expect(steps(await source(page))[1].traceMatch).toBeUndefined();
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
 
@@ -94,8 +94,15 @@ test('T3 By element: the inline editor edits a match in one Undo step; a drop on
   const operation=editor.getByRole('textbox',{name:'Operation',exact:true});
   await operation.fill('route.event.v2');await operation.press('Enter');
   await expect.poll(async()=>steps(await source(page))[1].traceMatch.operation).toBe('route.event.v2');
-  expect(steps(await source(page))[1].traceMatch.attributes).toEqual({'event.type':'doorbell.press'});
+  expect(steps(await source(page))[1].traceMatch.attributes).toEqual({'deployment.environment.name':'prod'});
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
+  // An attribute name trace matching does not support is refused beside its field, before any write.
+  const newName=editor.getByRole('textbox',{name:'New attribute name',exact:true});
+  await newName.fill('event.type');await editor.getByRole('textbox',{name:'New attribute value',exact:true}).fill('doorbell.press');
+  await editor.getByRole('button',{name:'Add attribute',exact:true}).click();
+  await expect(newName).toHaveAttribute('aria-invalid','true');
+  await expect(page.locator('#'+await newName.getAttribute('aria-describedby'))).toContainText('event.type is not a trace attribute');
+  await expect(page.locator('#src')).toHaveValue(text);
 
   const from=panel.locator('[data-links-element="step:0:0"] [data-links-trace-chip="ingest-api · POST /v1/events"] .links-chip-main');
   const onto=panel.locator('[data-links-element="step:0:1"]');

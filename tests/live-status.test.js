@@ -5020,3 +5020,42 @@ test('#1280 a log-line Load leaves the focused span in view; it does not scroll 
   assert.equal(scroller.scrollTop,1138,'revealed once by the least scroll (2030 - 900 + 8), not sent back up to the request line');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
 });
+/* Follow-up to #1280 (review c9 minor 1): the page's top edge is the reader's bar where it is now (sticky in a native mount,
+   fixed in the published reader), read live from the view's .explore-navigation. --flowview-navigation-bottom is measured
+   only at a nav resize or font load, so it can be stale; it is only the fallback. */
+test('#1280 follow-up: the page top edge is the bar\'s live bottom, not a stale --flowview-navigation-bottom',async()=>{
+ const {h,api}=await stage2Loaded();
+ h.view.classList.add('docview');const nav=new Element('nav',{class:'explore-navigation'});h.view.appendChild(nav);
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,scroller={scrollTop:0};
+ proto.getClientRects=function(){return [1];};
+ proto.getBoundingClientRect=function(){if(this===nav)return {top:0,bottom:56,left:0,right:1000,width:1000,height:56};if(this.classList.contains('dv-trace-span-item'))return {top:100,bottom:130,left:0,right:100,width:100,height:30};return bound.call(this);};
+ // The variable still says where the bar was when it was last measured: bottom 356 (+8).
+ h.doc.scrollingElement=scroller;h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:name=>name==='--flowview-navigation-bottom'?'364px':''}),innerHeight:900};
+ try{
+  const t=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t.context,spanId:t.exemplar.spans[20].id}),true);h.flush();
+  assert.equal(scroller.scrollTop,0,'the row at 100-130 is below the live bar (56): visible, so nothing moves');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;nav.remove();api.destroy();}
+});
+/* Follow-up to #1280 (review c9 minor 2): the capped Edit-mode list scrolled up under the bar. A row revealed inside the
+   list lands below the bar (top edge max(list top, bar bottom)), and the cap's measured top is clamped to the bar. */
+test('#1280 follow-up: in the capped Edit list a row never lands under the bar, and the cap top is clamped to it',async()=>{
+ const editor=mapEditor();editor.state=()=>({editable:true,blocked:'',active:true,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
+ const b=mapBoard({editor});b.h.view.classList.add('docview');const nav=new Element('nav',{class:'explore-navigation'});b.h.view.appendChild(nav);
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect;
+ proto.getClientRects=function(){return [1];};
+ proto.getBoundingClientRect=function(){
+  if(this===nav)return {top:0,bottom:56,left:0,right:1000,width:1000,height:56};
+  if(this.classList.contains('dv-trace-waterfall'))return {top:-100,bottom:600,left:0,right:100,width:100,height:700};
+  if(this.classList.contains('dv-trace-span-item') && this.querySelector('.dv-trace-span[data-span-id="'+MAP_SPAN+'"]'))return {top:-50,bottom:-20,left:0,right:100,width:100,height:30};
+  return bound.call(this);};
+ b.h.doc.defaultView={addEventListener(){},removeEventListener(){},requestAnimationFrame:f=>f(),innerHeight:900,
+  getComputedStyle:el=>({overflowY:el.classList && el.classList.contains('dv-trace-waterfall-edit')?'auto':'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ try{
+  assert.ok(await b.api.loadDirectTrace(false));b.h.flush();
+  const list=b.m.body.querySelector('.dv-trace-waterfall');assert.ok(list.classList.contains('dv-trace-waterfall-edit'),'the cap is on');
+  assert.equal(list.style.getPropertyValue('--dv-trace-list-top'),'56px','the cap\'s top is clamped to the bar\'s bottom, not to 0');
+  list.scrollHeight=2000;list.clientHeight=700;list.scrollTop=0;
+  const s=b.api.snapshot().trace.selected;assert.equal(b.api.selectTraceSpan({context:s.context,spanId:MAP_SPAN}),true);b.h.flush();
+  assert.equal(list.scrollTop,-114,'the row (top -50) is brought below the bar inside the list (-50 - 56 - 8)');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;nav.remove();b.api.destroy();}
+});

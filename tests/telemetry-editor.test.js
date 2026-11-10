@@ -585,6 +585,8 @@ test('#1228 the Metrics editor folds each signal, New signal, Links and Card; fo
   ui.set('Card width','300');assert.equal(edgeOf(ui).telemetry.card.width,300);
   assert.deepEqual(folds().map(f=>[title(f),f.open]),[['Signal rate',false],['Signal errors',true],['New signal',false],['Links',false],['Card',true]],'open folds stay open across the same-carrier refresh');
   ui.set('errors unit','msgs');assert.equal(fold('Signal errors').open,true);assert.equal(fold('Card').open,true);
+  ui.set('errors name','failures');assert.ok(edgeOf(ui).telemetry.signals.failures);
+  assert.deepEqual(folds().map(f=>[title(f),f.open]),[['Signal rate',false],['Signal failures',true],['New signal',false],['Links',false],['Card',true]],'a renamed signal keeps its fold open');
   ui.select({kind:'node',section:0,id:'ingest'});ui.select(EDGE);
   assert.deepEqual(folds().map(f=>f.open),[false,false,false,false,false],'a new selection starts every fold closed');
 });

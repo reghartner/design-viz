@@ -49,6 +49,7 @@ test('F0 desktop inherited imported connection Card width commit keeps the Inspe
   await settle(page);await settle(page);
   expect(Math.abs(await guideTop(page)-before),'Inspector scrollTop unchanged after the inherited Card width commit').toBeLessThanOrEqual(2);
   await expect(guide.getByLabel('Card width',{exact:true})).toBeFocused();
+  await expect(fold(guide,'Card')).toHaveCount(1);await expect(fold(guide,'Card')).toHaveAttribute('open','');
 });
 
 for(const [row,foldTitle,label,value,read] of [

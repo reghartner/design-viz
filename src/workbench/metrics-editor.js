@@ -33,7 +33,12 @@ function flowMetricsDom(o){
     var signals=telemetryObject(binding.signals)?binding.signals:{},names=Object.keys(signals);
     names.forEach(function(name){
       var entry=signals[name],source=telemetrySignalSource(entry),box=fold(parent,'metrics-signal','Signal '+name);
-      row(box,prefix+name+' name',c.text(name,function(v){return commit({op:'signal',name:name,field:'name',value:v});},{required:'A signal needs a name; use Remove signal to delete it.'}));
+      row(box,prefix+name+' name',c.text(name,function(v){
+        var ok=commit({op:'signal',name:name,field:'name',value:v});
+        // The fold's disclosure key is its title: retitle it now so the refresh keeps the renamed signal's fold open.
+        if(ok && v)box.querySelector('summary').textContent='Signal '+v;
+        return ok;
+      },{required:'A signal needs a name; use Remove signal to delete it.'}));
       row(box,prefix+name+' source',relabel(c.select(TELEMETRY_SOURCES,source || '',function(v){return commit({op:'signal',name:name,field:'source',value:v});}),TELEMETRY_SOURCE_LABELS));
       row(box,prefix+name+' query',c.text(source?telemetryQueryText(source,entry[source]):'',function(v){return commit({op:'signal',name:name,field:'query',value:v});},{textarea:true,placeholder:source==='honeycomb'?'{"calculations":[{"op":"COUNT"}],"filters":[]}':'Query text'}));
       row(box,prefix+name+' unit',c.text(telemetryObject(entry)?entry.unit:null,function(v){return commit({op:'signal',name:name,field:'unit',value:v});},{placeholder:'req/h, msgs, ms'}));

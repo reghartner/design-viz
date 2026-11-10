@@ -118,5 +118,27 @@ function carrierSpans(d,trace){
   (Array.isArray(d.edges)?d.edges:[]).forEach(e=>{if(!object(e))return;const list=declarations(e);if(list.length)out.edges[e.from+'->'+e.to]=list;});
   return out;
 }
-return {baseSteps:baseSteps,mapTrace:mapTrace,selector:selector,carrierSpans:carrierSpans};
+/* #1290: pair a connection's send spans with its receiving spans, sends in start order and
+   each receiver used once. A send's receiver is the earliest candidate that descends from it
+   (parent chain or links, any depth). Failing that, a single candidate with no known ancestry
+   (its parent not in the trace, and no link to a span in it) that starts at or after the send
+   pairs as `orphan`. A candidate whose known ancestry leads elsewhere never pairs. */
+function handoffs(trace,sends,receivers){
+  const byId=new Map(trace.spans.map(s=>[s.id,s])),used=new Set();
+  const descends=(span,ancestor)=>{
+    const seen=new Set(),queue=[span.parentId,...(span.links || [])];
+    while(queue.length){const id=queue.shift();if(!id || seen.has(id))continue;if(id===ancestor.id)return true;seen.add(id);const p=byId.get(id);if(p)queue.push(p.parentId,...(p.links || []));}
+    return false;
+  };
+  const unknown=s=>!(s.parentId && byId.has(s.parentId)) && !(s.links || []).some(id=>byId.has(id));
+  const order=(a,b)=>a.startMs-b.startMs;
+  return sends.slice().sort(order).map(send=>{
+    const open=receivers.filter(r=>!used.has(r.id) && r.id!==send.id).sort(order);
+    let receive=open.find(r=>descends(r,send)) || null,orphan=false;
+    if(!receive){const loose=open.filter(r=>unknown(r) && r.startMs>=send.startMs);if(loose.length===1){receive=loose[0];orphan=true;}}
+    if(receive)used.add(receive.id);
+    return {send,receive,orphan};
+  });
+}
+return {baseSteps:baseSteps,mapTrace:mapTrace,selector:selector,carrierSpans:carrierSpans,handoffs:handoffs};
 })();

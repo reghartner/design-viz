@@ -2407,9 +2407,21 @@ union time of its matched spans (`45 ms across 5 spans`) and whose title lists e
 declaration, for example `Declared spans: process 40 ms; find (database) 10 ms across 2 spans;
 audit (database): not in this trace; region (cache): attribute cache.region not recorded`.
 A span that a step also maps counts once. A declared node with no span in the trace shows no
-label. Imported nodes use the consumer's merged declarations. Connection declarations do not
-draw yet. A board whose only mapping is declarations is trace-ready: company trace profiles
-apply and nothing calls the provider before **Load trace**.
+label. Imported nodes use the consumer's merged declarations. A board whose only mapping is
+declarations is trace-ready: company trace profiles apply and nothing calls the provider
+before **Load trace**.
+
+A declared connection reads the **hand-off**: the time from the start of its `send` span to
+the start of the span that receives it (`9 ms`; several read `8 ms across 2 hand-offs`). The
+receiving span is the connection's own `receive` declaration, or else the receiving node's
+`process` spans; it is the earliest one that descends from the send (parent or link), or the
+only one whose parent is not in the trace and that starts after the send (the title says so).
+The receiver's own work counts on its node, not on the connection. Without a receiver the
+label reads `send only · 2 ms` (the send span's own time); a connection that declares
+`receive` and has no send in the trace reads `receive seen · send not in trace`. A queue node
+in the middle is not crossed: each connection is timed on its own. On a declared connection a
+step `traceMatch` time moves into the label's title (`Step charge: 23.6 ms (the receiving
+span's own time, as before)`); undeclared connections keep the step time.
 
 A step that may be absent from a trace (for example, its operation runs in a different
 trace) can carry `traceMatch.optional: true`; with alternatives, set it on every

@@ -80,9 +80,15 @@ function createFlowLogSearches(o){
   }
   var label=drafted(d.draft(add,'New log search label','text',null,''),'label'),query=drafted(d.draft(add,'New log search query','textarea',null,''),'query'),idInput=drafted(d.draft(add,'New log search id','text',null,''),'id');
   label.placeholder='Order ID';query.placeholder='{env="$env"} |= "order placed" | order_id="$value"';idInput.placeholder='Optional; made from the label';
-  var preview=d.note(add,'','log-search-id-preview');preview.id=prefix+'-id-preview';preview.setAttribute('aria-live','polite');idInput.setAttribute('aria-describedby',preview.id);
+  var preview=d.note(add,'','log-search-id-preview');preview.id=prefix+'-id-preview';idInput.setAttribute('aria-describedby',preview.id);
   function nextId(){return idInput.value.trim() || telemetryLookupId(label.value,lookups);}
-  function showId(){preview.textContent=label.value.trim() || idInput.value.trim()?'Saved as tracking.telemetry.lookups.'+nextId()+(idInput.value.trim()?'':' (from the label)')+'.':'The id is made from the label unless you type one.';}
+  // Read on demand through the id field's description, so it is not announced on every keystroke.
+  function showId(){
+    var typed=idInput.value.trim(),bad=typed && !telemetryNamePattern.test(typed)?'"'+typed+'" cannot be an id: start with a letter and use letters, digits, - and _.':
+      typed && telemetryOwn(lookups,typed)?'Log search "'+typed+'" already exists; choose another id.':'';
+    preview.textContent=bad || (label.value.trim() || typed?'Will be saved as tracking.telemetry.lookups.'+nextId()+(typed?'':' (from the label)')+'.':'The id is made from the label unless you type one.');
+    preview.classList.toggle('log-search-warning',!!bad);if(bad)idInput.setAttribute('aria-invalid','true');else idInput.removeAttribute('aria-invalid');
+  }
   [label,idInput].forEach(function(input){o.listen(input,'input',showId);});showId();
   if(!ids.length || ['label','query','id'].some(function(k){return drafts.has('new:'+k);}) || intent && intent.add){add.open=true;add.setAttribute('data-inspector-open','');}
   function submit(){

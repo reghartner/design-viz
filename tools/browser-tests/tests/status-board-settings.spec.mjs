@@ -94,7 +94,7 @@ test('B4 desktop Log searches: add a search, one Undo removes it; values without
   const values=fold.getByLabel('order-id suggested values',{exact:true});await values.fill('A-1\nA-2');await values.blur();
   await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.telemetry.lookups['order-id'].values).toEqual(['A-1','A-2']);
   const warned=section(guide,'lookups').getByLabel('order-id query',{exact:true});await expect(warned).toHaveAttribute('aria-invalid','true');
-  const note=page.locator('#'+await warned.getAttribute('aria-describedby'));await expect(note).toBeVisible();await expect(note).toContainText('has suggested values but no $value slot');
+  const note=page.locator('#'+await warned.getAttribute('aria-describedby'));await expect(note).toBeVisible();await expect(note).toHaveText('Has suggested values but no $value slot. The Trace view drops this search until it is fixed.');
   await page.screenshot({path:info.outputPath('log-searches-warning.png')});
   // Review c1: Enter in New log search's label adds, the form refreshes, and focus moves to the new search's label.
   const addFold=lookups.locator('details.log-search-add');if(!await addFold.evaluate(d=>d.open))await addFold.locator(':scope > summary').click();

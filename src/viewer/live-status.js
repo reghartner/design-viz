@@ -2102,8 +2102,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     setDirectTraceField:function(change){if(!retired && change){traceDayNote='';traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
     loadDirectTrace:async function(verify,line){if(retired)return;statusAuto=false;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';traceDayNote='';var mine=++traceLoads,result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;if(!retired)traceFollow(result);}else if(!retired && mine===traceLoads)settleParked();paint();notify();return result;},
     clearDirectTrace:function(){if(retired)return;traceDayNote='';traceNotice='';clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();settleParked();},
-    setLogLookupField:function(change){if(!retired && change)logLookup.set(change.field,change.value);},
-    findLogLines:function(){return retired?Promise.resolve(null):logLookup.find();},
+    // #1233: change.lookup names the search box a value belongs to; findLogLines(lookup) runs that box.
+    setLogLookupField:function(change){if(!retired && change)logLookup.set(change.field,change.value,change.lookup);},
+    findLogLines:function(lookup){return retired?Promise.resolve(null):logLookup.find(lookup);},
     // Load the chosen line's trace exactly as a pasted ID, then focus the line's span.
     loadLogTrace:async function(index){
       if(retired)return null;var row=logLookup.row(index);if(!row || !row.traceId)return null;

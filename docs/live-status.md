@@ -2140,8 +2140,8 @@ trace**) stays open below it, so another line or ID can be loaded at once; the
 reader can collapse it to one line naming the connection and environment
 ("Fixture Honeycomb · Production · Change trace"), and it reopens when no trace is
 shown. A load error sits by what was clicked: a log line's report (with **Try the
-next log line**) inside that line's row, a Load trace or Verify error right after
-those buttons. The request card (#1173) is one line: "8413cd87a9f1 · partial ·
+next log line**) directly under that line's row, a Load trace or Verify error
+directly under those buttons. The request card (#1173) is one line: "8413cd87a9f1 · partial ·
 Nov 9 07:19 · 55 spans · 6/7 steps matched". Warning flags (partial, unknown completeness, limit reached) come right after the
 trace ID, and the line wraps rather than clipping (#1186). It holds Returned traces and the request details. Each line opens with
 one click, and an opened section stays open until the shown trace changes. A

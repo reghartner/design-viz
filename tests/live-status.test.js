@@ -2049,7 +2049,8 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
  assert.ok(!metrics.classList.contains('tbtn'),'#1131 a switch, not a button that looks like a third view');
  assert.equal(metrics.getAttribute('aria-checked'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
  const top=header.querySelector('.dv-status-top'),controls=head.querySelector('.dv-live-controls');
- assert.equal(top.children.at(-1),metrics,'#1131 the switch ends the top row');assert.ok(header.children.indexOf(top)<header.children.indexOf(live.parentElement),'#1131 Live | Over time is the row below');
+ const style=top.querySelector('.dv-live-metrics-style');
+ assert.ok(top.children.at(-2)===metrics && top.children.at(-1)===style,'#1131 the switch ends the top row, followed only by its #1294 Metrics style choice');assert.ok(style.hidden===true,'#1294 the style choice is hidden while the overlay is off');assert.ok(header.children.indexOf(top)<header.children.indexOf(live.parentElement),'#1131 Live | Over time is the row below');
  assert.ok(head.children.indexOf(controls)<head.children.indexOf(head.querySelector('.dv-live-status')),'M6 controls precede status text');
  assert.ok(conn,'M6 metrics connector text');assert.ok(!conn.classList.contains('dv-live-connection'),'M6 distinct connector');
  assert.equal(head.querySelectorAll('.dv-live-connection').length,1);

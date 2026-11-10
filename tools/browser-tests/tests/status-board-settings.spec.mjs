@@ -76,9 +76,10 @@ test('B3 desktop Make this a status board on a bare diagram adds page, tracking 
 
 test('B4 desktop Log searches: add a search, one Undo removes it; values without a $value slot warn at the Query field',async({page,server},info)=>{
   await open(page,server,board());
-  const guide=page.locator('#guide'),src=page.locator('#src');await page.locator('#status-board-settings').click();
-  const lookups=section(guide,'lookups');await lookups.locator(':scope > summary').click();
-  const before=await src.inputValue();
+  const guide=page.locator('#guide'),src=page.locator('#src'),lookups=section(guide,'lookups');
+  // Undo and redo can change the selection, so the section is reopened from the Inspect header each time.
+  const openLookups=async()=>{await page.locator('#status-board-settings').click();await expect(lookups).toHaveCount(1);if(!await lookups.evaluate(d=>d.open))await lookups.locator(':scope > summary').click();};
+  await openLookups();const before=await src.inputValue();
   const add=lookups.locator('details.log-search-add');if(!await add.evaluate(d=>d.open))await add.locator(':scope > summary').click();
   await lookups.getByLabel('New log search label',{exact:true}).fill('Order ID');
   await lookups.getByLabel('New log search query',{exact:true}).fill('{env="$env"} |= "order placed" | order_id="$value"');
@@ -87,7 +88,7 @@ test('B4 desktop Log searches: add a search, one Undo removes it; values without
   await expect(lookups.locator('details.log-search > summary')).toHaveText(['Log search order-id · Order ID']);
   await page.screenshot({path:info.outputPath('log-searches-added.png')});
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);
-  await page.locator('#redo-builder').click();await expect.poll(async()=>Object.keys(JSON.parse(await src.inputValue()).page.tracking.telemetry.lookups)).toEqual(['order-id']);
+  await page.locator('#redo-builder').click();await expect.poll(async()=>Object.keys(JSON.parse(await src.inputValue()).page.tracking.telemetry.lookups)).toEqual(['order-id']);await openLookups();
   const fold=lookups.locator('details.log-search').first();if(!await fold.evaluate(d=>d.open))await fold.locator(':scope > summary').click();
   const query=fold.getByLabel('order-id query',{exact:true});await query.fill('{env="$env"} |= "order placed"');await query.blur();
   const values=fold.getByLabel('order-id suggested values',{exact:true});await values.fill('A-1\nA-2');await values.blur();

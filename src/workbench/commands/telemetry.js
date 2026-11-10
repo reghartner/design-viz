@@ -299,6 +299,7 @@ function telemetryEditPage(telemetry,edit){
     else t.refreshMs=edit.value;
     return done();
   }
+  if(op==='lookupsEnabled' || op==='addLookup' || op==='removeLookup' || op==='moveLookup' || op==='lookup')return telemetryEditLookups(t,edit,done);
   var templates=telemetryObject(t.templates)?t.templates:{};
   if(op==='addTemplate'){
     if(typeof edit.name!=='string' || !telemetryNamePattern.test(edit.name))return {error:'Template names start with a letter and use letters, digits, - and _.'};
@@ -390,6 +391,69 @@ function planCarrierTelemetry(text,raw,target,edit,context){
   if(JSON.stringify(result.value)===JSON.stringify(t.binding) && !(t.hasField && !t.binding))return {text:text};
   if(t.owner)return planTopologyTracking(text,raw,target.section,target.kind,t.id,'telemetry',result.value,result.value==null,context,target.index);
   return planSetField(text,raw,t.path,'telemetry',result.value==null?null:JSON.stringify(result.value,null,2));
+}
+/* #1233: Status board settings → Log searches (tracking.telemetry.lookups). Authored key order is the Trace
+   view's box order. The validator reports content problems next to each field; these edits refuse only what
+   cannot be written: a bad or taken id, an empty label or query, an unknown search or setting. */
+function telemetryLookupDefine(object,id,value){Object.defineProperty(object,id,{value:value,enumerable:true,writable:true,configurable:true});}
+function telemetryEditLookups(t,edit,done){
+  var op=edit.op,id=edit.name;
+  if(telemetryOwn(t,'lookups') && !telemetryObject(t.lookups))return {error:'Log searches are not an object; repair tracking.telemetry.lookups in JSON first.'};
+  var lookups=telemetryObject(t.lookups)?t.lookups:{};
+  if(op==='lookupsEnabled'){
+    if(typeof edit.value!=='boolean')return {error:'Offer log searches must be true or false.'};
+    if(edit.value){t.lookups=lookups;return done();}
+    if(Object.keys(lookups).length)return {error:'Remove the log searches first.'};
+    delete t.lookups;return done();
+  }
+  if(op==='addLookup'){
+    if(typeof id!=='string' || !telemetryNamePattern.test(id))return {error:'Log search ids start with a letter and use letters, digits, - and _.'};
+    if(telemetryOwn(lookups,id))return {error:'Log search "'+id+'" already exists.'};
+    var label=typeof edit.label==='string'?edit.label.trim():'',query=typeof edit.query==='string'?edit.query.trim():'';
+    if(!label)return {error:'Enter a label for the new log search.'};
+    if(!query)return {error:'Enter a LogQL query for the new log search.'};
+    telemetryLookupDefine(lookups,id,{label:label,query:query});t.lookups=lookups;return done();
+  }
+  if(typeof id!=='string' || !telemetryOwn(lookups,id))return {error:'Log search not found. Reopen Status board settings.'};
+  if(op==='removeLookup'){delete lookups[id];t.lookups=lookups;return done();}
+  if(op==='moveLookup'){
+    if(edit.offset!==-1 && edit.offset!==1)return {error:'Move a log search up or down.'};
+    var ids=Object.keys(lookups),at=ids.indexOf(id),to=at+edit.offset;if(to<0 || to>=ids.length)return done();
+    ids.splice(at,1);ids.splice(to,0,id);var moved={};ids.forEach(function(key){telemetryLookupDefine(moved,key,lookups[key]);});t.lookups=moved;return done();
+  }
+  var entry=lookups[id],field=edit.field,value=edit.value;
+  if(!telemetryObject(entry))return {error:'Log search "'+id+'" is not an object; remove it or repair it in JSON.'};
+  if(field==='label' || field==='query'){
+    if(typeof value!=='string' || !value.trim())return {error:'A log search needs a '+(field==='label'?'label':'LogQL query')+'; use Remove log search to delete it.'};
+    entry[field]=value.trim();
+  }else if(field==='values'){
+    if(value==null || Array.isArray(value) && !value.length)delete entry.values;
+    else if(!Array.isArray(value) || value.some(function(v){return typeof v!=='string';}))return {error:'Suggested values are a list of text values.'};
+    else entry.values=value.slice();
+  }else if(field==='datasource'){
+    if(value==null || typeof value==='string' && !value.trim())delete entry.datasource;
+    else if(typeof value!=='string')return {error:'Enter a Loki datasource UID, or clear the field.'};
+    else entry.datasource=value.trim();
+  }else if(field==='traceId' || field==='spanId'){
+    var fields=telemetryObject(entry.fields)?entry.fields:{};
+    if(value==null || typeof value==='string' && !value.trim())delete fields[field];
+    else if(typeof value!=='string')return {error:'Enter a field name, or clear the field.'};
+    else fields[field]=value.trim();
+    if(Object.keys(fields).length)entry.fields=fields;else delete entry.fields;
+  }else return {error:'Unknown log search setting.'};
+  return done();
+}
+// An unused log search id made from its label ("Order ID" → order-id, then order-id-2).
+function telemetryLookupId(label,existing){
+  var base=String(label || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40) || 'search';
+  if(!/^[a-z]/.test(base))base='search-'+base;
+  var id=base,n=2;while(telemetryOwn(existing || {},id))id=base+'-'+(n++);return id;
+}
+/* Read model for Status board settings → Log searches. */
+function telemetryLookupState(raw){
+  var doc=builderDocumentPage(raw),page=doc && doc.page,t=page && telemetryObject(page.tracking) && telemetryObject(page.tracking.telemetry)?page.tracking.telemetry:null;
+  var present=!!t && telemetryOwn(t,'lookups'),valid=!present || telemetryObject(t.lookups),lookups=present && valid?telemetryClone(t.lookups):{};
+  return {present:present,valid:valid,ids:Object.keys(lookups),lookups:lookups};
 }
 function planPageTelemetry(text,raw,edit){
   var doc=builderDocumentPage(raw);if(!doc)return {error:'Add document settings to this bare diagram first.'};

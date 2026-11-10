@@ -825,6 +825,10 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .metrics-fold{min-width:0;margin:6px 0;}
 .metrics-fold>.frow,.metrics-fold>.fnote{margin-top:6px;}
 .metrics-fold .metrics-fold{margin-left:8px;}
+/* #1233 Status board settings → Log searches. */
+.log-searches .log-search-warning{margin:0 0 2px 96px;padding-left:6px;border-left:3px solid #D99A1E;color:var(--ink);}
+.log-searches .log-search-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.log-searches .log-search-kind{font-style:italic;}
 /* #1236 Status board settings: one top-level fold per section; the summary carries a short status. */
 .board-section{min-width:0;margin:3px 0;}
 .board-section>summary{font-weight:650;}

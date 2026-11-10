@@ -1714,13 +1714,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function metricsPeek(outline){
     if(peekTimer){clearTimeout(peekTimer);peekTimer=0;}
     view.querySelectorAll('.dv-metrics-peek').forEach(function(el){if(!outline || (el!==outline._metricsCard && el!==outline._metricsLeader))el.classList.remove('dv-metrics-peek');});
-    if(outline && outline._metricsCard){outline._metricsCard.classList.add('dv-metrics-peek');if(outline._metricsLeader)outline._metricsLeader.classList.add('dv-metrics-peek');}
+    if(outline && outline._metricsCard){
+      var shown=outline._metricsCard,svg=shown.ownerSVGElement;
+      // Placed for the board as it is now, then raised above later overlays (Jira cues, coins) while shown.
+      if(!shown.classList.contains('dv-metrics-peek')){if(shown._metricsPlace)shown._metricsPlace();if(svg){if(outline._metricsLeader)svg.appendChild(outline._metricsLeader);svg.appendChild(shown);}}
+      shown.classList.add('dv-metrics-peek');if(outline._metricsLeader)outline._metricsLeader.classList.add('dv-metrics-peek');}
   }
   function metricsUnpeek(){if(peekTimer)clearTimeout(peekTimer);peekTimer=setTimeout(function(){peekTimer=0;var now=view.getRootNode && view.getRootNode().activeElement;if(!retired)metricsPeek(metricsOutlineOf(now));},200);}
   function peekOver(ev){if(ev.pointerType==='touch')return;var o=metricsOutlineOf(ev.target);if(o)metricsPeek(o);}
   function peekOut(ev){if(ev.pointerType==='touch' || !metricsOutlineOf(ev.target))return;if(metricsOutlineOf(ev.relatedTarget)===metricsOutlineOf(ev.target))return;metricsUnpeek();}
   function peekDown(ev){lastPointer=ev.pointerType || 'mouse';if(lastPointer==='touch' && !metricsOutlineOf(ev.target) && !(pop && pop.contains(ev.target)))metricsPeek(null);}
-  function peekFocus(ev){var o=metricsOutlineOf(ev.target);if(o)metricsPeek(o);}
+  // Focus shows the card for keyboard and mouse readers; after a touch, focus moves (a closed popover returns it) never open a card over the board.
+  function peekFocus(ev){if(lastPointer==='touch')return;var o=metricsOutlineOf(ev.target);if(o)metricsPeek(o);}
   function outlineButton(o){return o.classList.contains('dv-live-target')?o:o._livePointerTarget || o;}
   // A shown card's query links follow its carrier button in Tab order, then Tab moves on past the card.
   function peekTab(ev){

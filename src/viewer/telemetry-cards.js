@@ -125,7 +125,7 @@ function telemetryCardPlace(path,w,h,placement,boxes){
   }
   if(!box){
     var far=boxes.reduce(function(value,r){return Math.max(value,side==='right'?r.x+r.w-mid.x:side==='left'?mid.x-r.x:side==='below'?r.y+r.h-mid.y:mid.y-r.y);},12);
-    box=candidate(far+12,0);
+    box=candidate(far+12,0);return {box:box,mid:mid,side:side,fallback:true};
   }
   return {box:box,mid:mid,side:side};
 }
@@ -267,9 +267,35 @@ function telemetryOutlineState(binding,view,id){
 /* #1294: the board's frame as obstacles, so a shown outline card is placed inside it; clamp is the last resort. */
 function telemetryFrameBoxes(svg){
   var f=svg.viewBox && svg.viewBox.baseVal;if(!f || !f.width || !f.height)return {boxes:[],clamp:function(box){return box;}};
+  f={x:f.x,y:f.y,width:f.width,height:f.height};
+  // The part of the board the reader can see: the viewBox cut by every clipping ancestor (the board canvas and its scroller).
+  try{
+    var m=svg.getScreenCTM(),view=svg.ownerDocument.defaultView,r=svg.getBoundingClientRect(),clip={l:r.left,t:r.top,r:r.right,b:r.bottom};
+    for(var a=svg.parentElement || (svg.getRootNode && svg.getRootNode().host);a;a=a.parentElement || (a.getRootNode && a.getRootNode().host)){
+      var cs=view.getComputedStyle(a);if(cs.overflowX==='visible' && cs.overflowY==='visible')continue;
+      var c=a.getBoundingClientRect();clip={l:Math.max(clip.l,c.left),t:Math.max(clip.t,c.top),r:Math.min(clip.r,c.right),b:Math.min(clip.b,c.bottom)};
+    }
+    if(m && clip.r>clip.l && clip.b>clip.t){
+      var inv=m.inverse(),p0=new DOMPoint(clip.l,clip.t).matrixTransform(inv),p1=new DOMPoint(clip.r,clip.b).matrixTransform(inv);
+      var x0=Math.max(f.x,Math.min(p0.x,p1.x)),y0=Math.max(f.y,Math.min(p0.y,p1.y)),x1=Math.min(f.x+f.width,Math.max(p0.x,p1.x)),y1=Math.min(f.y+f.height,Math.max(p0.y,p1.y));
+      if(x1-x0>40 && y1-y0>40)f={x:x0,y:y0,width:x1-x0,height:y1-y0};
+    }
+  }catch(ignored){}
   var far=1e5;
-  return {boxes:[{x:f.x-far,y:f.y-far,w:far,h:3*far},{x:f.x+f.width,y:f.y-far,w:far,h:3*far},{x:f.x-far,y:f.y-far,w:3*far,h:far},{x:f.x-far,y:f.y+f.height,w:3*far,h:far}],
+  return {rect:f,boxes:[{x:f.x-far,y:f.y-far,w:far,h:3*far},{x:f.x+f.width,y:f.y-far,w:far,h:3*far},{x:f.x-far,y:f.y-far,w:3*far,h:far},{x:f.x-far,y:f.y+f.height,w:3*far,h:far}],
     clamp:function(box){return {x:Math.max(f.x+4,Math.min(box.x,f.x+f.width-box.w-4)),y:Math.max(f.y+4,Math.min(box.y,f.y+f.height-box.h-4)),w:box.w,h:box.h};}};
+}
+/* #1294: an outline card for a connection: the first side (its usual one first) with free room inside the
+   visible board; if none has room, the side with the most visible room, partly clipped, never over its line. */
+function telemetryOutlineEdgePlace(path,w,h,obstacles,fr){
+  var first=telemetryCardPlace(path,w,h,{},obstacles.concat(fr.boxes));if(!first.fallback)return first;
+  var order={below:['above','right','left'],above:['below','right','left'],right:['left','below','above'],left:['right','below','above']}[first.side],tries=[first];
+  for(var i=0;i<order.length;i++){var next=telemetryCardPlace(path,w,h,{side:order[i]},obstacles.concat(fr.boxes));if(!next.fallback)return next;tries.push(next);}
+  var f=fr.rect;if(!f)return first;
+  function room(t){var b=t.box;return Math.max(0,Math.min(b.x+b.w,f.x+f.width)-Math.max(b.x,f.x))*Math.max(0,Math.min(b.y+b.h,f.y+f.height)-Math.max(b.y,f.y));}
+  // The nearest box on each side (off the line, ignoring the frame) and its visible room.
+  var near=['below','above','right','left'].map(function(side){return telemetryCardPlace(path,w,h,{side:side},obstacles);});
+  return near.reduce(function(best,t){return room(t)>room(best)?t:best;},near[0]);
 }
 /* #1294: points along a connection, so its outline card never covers its own line. */
 function telemetryPathBoxes(path){
@@ -307,8 +333,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       var id=edge.from+'->'+edge.to,attrs={'data-dv-edge':index};if(outline)attrs['data-metrics-style']='outline';
       var built=telemetryCardBuild(doc,svg,edge,binding,id,attrs,view,window),card=built.card,height=built.height;
       // An outline card is shown alone, so other cards are not obstacles; it stays inside the frame and off its own line.
-      var placed=outline?telemetryCardPlace(path,built.w,height,{},boxes.concat(frame.boxes,telemetryPathBoxes(path))):telemetryCardPlace(path,built.w,height,binding.card || {},boxes),box=placed.box;
-      if(outline)box=placed.box=frame.clamp(box);
+      var placed=outline?telemetryOutlineEdgePlace(path,built.w,height,boxes.concat(telemetryPathBoxes(path)),frame):telemetryCardPlace(path,built.w,height,binding.card || {},boxes),box=placed.box;
       card.setAttribute('data-metrics-anchor-x',placed.mid.x);card.setAttribute('data-metrics-anchor-y',placed.mid.y);
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');card.setAttribute('data-side',placed.side);
       var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-dv-edge':index,d:telemetryCardLeaderTo(placed.mid,box,labels),'pointer-events':'none','aria-hidden':'true'});
@@ -321,6 +346,10 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
         return;
       }
       leader.setAttribute('data-metrics-style','outline');
+      // Placed again when shown: the board may have been zoomed or scrolled since this paint.
+      var obstacles=boxes.slice(),line=telemetryPathBoxes(path),w=built.w;
+      card._metricsPlace=function(){var fr=telemetryFrameBoxes(svg),again=telemetryOutlineEdgePlace(path,w,height,obstacles.concat(line),fr),b=again.box;
+        card.setAttribute('transform','translate('+b.x+' '+b.y+')');card.setAttribute('data-side',again.side);leader.setAttribute('d',telemetryCardLeaderTo(again.mid,b,labels));};
       var ring=telemetrySvg(doc,'path',{'class':'dv-metrics-outline',d:path.getAttribute('d'),'data-dv-edge':index,'data-metrics-carrier':id,'data-metric-state':telemetryOutlineState(binding,view,id)});
       path.parentNode.insertBefore(ring,path);
       ring._metricsCard=card;ring._metricsLeader=leader;card._metricsOutline=ring;
@@ -332,10 +361,13 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       if(!binding || !shape || node.hidden===true || !telemetryMetricNames(telemetryCardBinding(binding)).length)return;
       var nodeBox=boardControlBox(shape,svg);if(!nodeBox)return;
       var built=telemetryCardBuild(doc,svg,{label:node.title || id,telemetry:node.telemetry},binding,id,{'data-metrics-node':id,'data-metrics-style':'outline'},view,window),card=built.card;
-      var placed=telemetryNodeCardPlace(nodeBox,built.w,built.height,boxes.concat(frame.boxes),svg.viewBox && svg.viewBox.baseVal),box=placed.box;
+      var placed=telemetryNodeCardPlace(nodeBox,built.w,built.height,boxes.concat(frame.boxes),frame.rect),box=placed.box;
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');
       var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-metrics-node':id,'data-metrics-style':'outline',d:telemetryCardLeaderTo(placed.mid,box,labels),'pointer-events':'none','aria-hidden':'true'});
       svg.insertBefore(leader,card);
+      var obstacles=boxes.slice(),cw=built.w,ch=built.height;
+      card._metricsPlace=function(){var fr=telemetryFrameBoxes(svg),again=telemetryNodeCardPlace(nodeBox,cw,ch,obstacles.concat(fr.boxes),fr.rect);
+        card.setAttribute('transform','translate('+again.box.x+' '+again.box.y+')');leader.setAttribute('d',telemetryCardLeaderTo(again.mid,again.box,labels));};
       var b=shape.getBBox(),pad=8,rx=Number(shape.getAttribute('rx')) || 0;
       var ring=telemetrySvg(doc,'rect',{'class':'dv-metrics-outline',x:b.x-pad,y:b.y-pad,width:b.width+2*pad,height:b.height+2*pad,rx:rx+pad,'data-metrics-carrier':id,'data-metric-state':telemetryOutlineState(binding,view,id)});
       group.insertBefore(ring,group.firstChild);

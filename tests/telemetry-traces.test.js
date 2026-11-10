@@ -59,9 +59,10 @@ test('official Grafana source fixture preserves exact timing, events; synthetic 
 });
 test('returned ID mismatch fails closed while scalar peer survives; no signed error leakage',async t=>{const {EVENT_QUERY}=await import('./helpers/honeycomb-bridge.mjs'),p=pageSpec();p.sections[0].diagram.nodes.a.telemetry.signals.rate={grafana:EVENT_QUERY};const h=await setup({page:p,wrap:b=>{const call=b.callTool;b.callTool=async(...args)=>{const result=await call(...args);if(args[1]==='get_trace')result.content[0].text=result.content[0].text.replace(/  trace_id: .*/, '  trace_id: "'+ 'f'.repeat(32)+'"');return result;};}});t.after(()=>h.close());h.api.setEnabled(true);await settle();assert.ok(h.api.snapshot().map.a.signals.rate.value>0);assert.equal(h.api.snapshot().map.a.exemplars,undefined);assert.match(h.api.status().note,/Returned trace ID differs/);});
 test('failed scalar cannot clobber healthy trace and passing alternative is an actual returned status',async t=>{const {nativeQuery}=await import('./helpers/honeycomb-bridge.mjs'),p=pageSpec();p.sections[0].diagram.nodes.a.telemetry.signals.bad={honeycomb:nativeQuery('does-not-exist')};const h=await setup({page:p});t.after(()=>h.close());h.api.setEnabled(true);await settle();const e=h.api.snapshot().map.a.exemplars[0];assert.equal(h.api.snapshot().map.a.signals.bad,undefined);const passing=e.candidates.find(c=>c.status==='passing'&&c.traceId!==e.traceId);assert.ok(passing);const chosen=await h.api.chooseExemplar('a',e.selectionToken,passing.traceId);assert.equal(chosen.traceId,passing.traceId);assert.ok(chosen.spans.every(s=>!s.error));});
-test('rebinding then off/on cannot reuse an old selection token',async t=>{const h=await setup();t.after(()=>h.close());h.api.setEnabled(true);await settle();const old=h.api.snapshot().map.a.exemplars[0];h.p.sections[0].diagram.nodes.a.telemetry.signals.trace.honeycomb.results_limit=1;h.api.bindingsChanged();await settle();const current=h.api.snapshot().map.a.exemplars[0];assert.notEqual(current.selectionToken,old.selectionToken);await assert.rejects(h.api.chooseExemplar('a',old.selectionToken,current.traceId),/expired/);h.api.setEnabled(false);h.api.setEnabled(true);await settle();
- // #1289: on again within 5 minutes reuses the numbers but never the session's trace exemplars or their tokens.
- assert.notEqual(h.api.snapshot().map.a?.exemplars?.[0]?.selectionToken,current.selectionToken);assert.equal(h.api.canChooseExemplar('a',current.selectionToken,current.traceId),false);});
+test('rebinding then off/on cannot reuse an old selection token',async t=>{const h=await setup();t.after(()=>h.close());h.api.setEnabled(true);await settle();const old=h.api.snapshot().map.a.exemplars[0];h.p.sections[0].diagram.nodes.a.telemetry.signals.trace.honeycomb.results_limit=1;h.api.bindingsChanged();await settle();const current=h.api.snapshot().map.a.exemplars[0];assert.notEqual(current.selectionToken,old.selectionToken);await assert.rejects(h.api.chooseExemplar('a',old.selectionToken,current.traceId),/expired/);const searches=h.bridge.calls.filter(c=>c.name==='run_query').length;h.api.setEnabled(false);h.api.setEnabled(true);await settle();
+ // #1289 review c2: on again within 5 minutes reuses the answer, its example trace included, under a fresh token; the old token is dead.
+ const reused=h.api.snapshot().map.a?.exemplars?.[0];assert.ok(reused,'the reused answer keeps its example trace');assert.equal(reused.traceId,current.traceId);assert.notEqual(reused.selectionToken,current.selectionToken);
+ assert.equal(h.api.canChooseExemplar('a',current.selectionToken,current.traceId),false);assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,searches,'no new trace search');});
 test('latest candidate ordering preserves sub-millisecond timestamps; conflicting complete/collapsed flags stay partial',()=>{const {C}=context(),c=[{traceId:'a'.repeat(32),time:'2026-10-12T00:00:00.000000001Z',status:'unknown'},{traceId:'b'.repeat(32),time:'2026-10-12T00:00:00.000000002Z',status:'unknown'}];assert.equal(C.telemetryTraceSelect(c).candidate.traceId,c[1].traceId);const conflict=traceText.replace('collapsed_nodes: 1','collapsed_nodes: 0').replace('total_spans: 77','total_spans: 55').replace('view_mode: auto','view_mode: full');assert.equal(C.telemetryHoneycombTrace({payload:conflict},recordedId).completeness,'partial');});
 test('oversize source with duplicate spans fails before display limit; missing raw wrapper fields do not query',async t=>{const {C}=context(),lines=traceText.split('\n'),duplicate=[lines[0],lines[1],...Array(201).fill(lines[2]),'','Metadata:',`  trace_id: ${recordedId}`].join('\n');assert.throws(()=>C.telemetryHoneycombTrace({payload:duplicate},recordedId),/Duplicate/);const p=pageSpec();delete p.sections[0].diagram.nodes.a.telemetry.signals.trace.honeycomb.results_limit;const h=await setup({page:p});t.after(()=>h.close());h.api.setEnabled(true);await settle();assert.equal(h.bridge.calls.length,0);assert.equal(h.api.snapshot().available,false);});
 test('synthetic 1ns boundary catches epoch-before-subtraction precision loss',()=>{const {C}=context();const variant=traceText.replace('1791779586602194688','1791779586602194689').replace('1791779591242913280','1791779586602194690');const spans=C.telemetryHoneycombTrace({payload:variant},recordedId).spans;assert.equal(spans[1].startMs,0.000001);});
@@ -171,8 +172,9 @@ test('identical trace queries in different deployment profiles never share candi
  hold=true;const choice=h.api.chooseExemplar('a',old.selectionToken,other.traceId),rejected=assert.rejects(choice,/cancelled|expired|unavailable/i);await settle();assert.ok(release);
  h.api.setEnvironment('prd');assert.deepEqual(plain(h.api.snapshot().map),{});assert.equal(h.api.canChooseExemplar('a',old.selectionToken,other.traceId),false);await settle();release();await rejected;await settle();
  assert.equal(h.api.enabled(),true);const fresh=h.api.snapshot().map.a.exemplars[0];assert.notEqual(fresh.selectionToken,old.selectionToken);assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,2);
- // #1289: back to qa within 5 minutes reuses qa's answer without a call, and never its old exemplars or tokens.
- h.api.setEnvironment('qa');await settle();assert.equal(h.api.snapshot().map.a?.exemplars,undefined);assert.equal(h.api.canChooseExemplar('a',old.selectionToken,other.traceId),false);assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,2);
+ // #1289 review c2: back to qa within 5 minutes reuses qa's answer without a call; its example trace returns under a fresh token, and the old token stays dead.
+ h.api.setEnvironment('qa');await settle();const back=h.api.snapshot().map.a?.exemplars?.[0];assert.ok(back,'qa\'s example trace is listed again');assert.equal(back.traceId,old.traceId);assert.notEqual(back.selectionToken,old.selectionToken);assert.notEqual(back.selectionToken,fresh.selectionToken);
+ assert.equal(h.api.canChooseExemplar('a',old.selectionToken,other.traceId),false);assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,2);
 });
 
 test('switch during trace discovery keeps the newest environment available without data queries',async()=>{
@@ -274,4 +276,21 @@ test('#1252 a late rejection does not delete the entry that replaced it',async t
  release();await settle();
  const again=await poll(changed);await settle();
  assert.equal(searches(),before,'the newer entry is still cached after the late rejection');assert.equal(again.a?.exemplars?.length,1);
+});
+
+/* #1289 review c2: a reused answer (Metrics off/on within 5 minutes) keeps a trace-only carrier and its example trace,
+   re-issued under a fresh selection token from the cached data, with no provider call; choosing another returned
+   candidate is the reader's action and loads only that trace's detail. */
+test('a reused answer keeps example traces choosable under fresh tokens, without a provider call',async t=>{
+ const h=await setup();t.after(()=>h.close());h.api.setEnabled(true);await settle();
+ const first=h.api.snapshot().map.a?.exemplars?.[0];assert.ok(first,'the carrier holds only an example trace');const other=first.candidates.find(c=>c.traceId!==first.traceId);assert.ok(other,'a second candidate');
+ const before=h.bridge.calls.length;h.api.setEnabled(false);h.api.setEnabled(true);await settle();
+ assert.equal(h.bridge.calls.length,before,'Metrics on within 5 minutes makes no provider call');
+ const again=h.api.snapshot().map.a?.exemplars?.[0];assert.ok(again,'the trace-only carrier is still listed with its example trace');
+ assert.equal(again.traceId,first.traceId);assert.deepEqual(again.candidates.map(c=>c.traceId),first.candidates.map(c=>c.traceId));assert.equal(again.spans.length,first.spans.length);
+ assert.notEqual(again.selectionToken,first.selectionToken,'a fresh token');
+ assert.equal(h.api.canChooseExemplar('a',first.selectionToken,other.traceId),false,'the old token is dead');assert.equal(h.api.canChooseExemplar('a',again.selectionToken,other.traceId),true,'the fresh token chooses');
+ const chosen=await h.api.chooseExemplar('a',again.selectionToken,other.traceId);assert.equal(chosen.traceId,other.traceId);
+ const after=h.bridge.calls.slice(before).map(c=>c.name);
+ assert.ok(after.includes('get_trace'),'choosing loads that trace\'s detail: '+JSON.stringify(after));assert.ok(!after.includes('run_query'),'and runs no new trace search: '+JSON.stringify(after));
 });

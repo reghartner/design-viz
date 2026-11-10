@@ -35,8 +35,9 @@ function workbenchLiveSnapshotRead(text){
   var first=errors[0]?String((errors[0].source || '')+(errors[0].tool?' '+errors[0].tool:'')).trim()+': '+errors[0].message.replace(/\s+/g,' ').slice(0,160):'';
   return {ok:true,at:at,label:'Snapshot from '+workbenchLiveSnapshotTime(at),board:typeof data.board==='string'?data.board:'',
     tickets:Object.keys(day.issues).length,carriers:Object.keys(telemetry).length,errors:errors.length,firstError:first,
-    // How many of the open board's ticket keys the snapshot holds.
-    covers:function(keys){return keys.filter(function(key){return Object.prototype.hasOwnProperty.call(day.issues,key);}).length;},
+    // How many of the open board's ticket keys the snapshot holds a state for (an `unknown` row is a ticket no
+    // answered Jira search covered).
+    covers:function(keys){return keys.filter(function(key){var issue=Object.prototype.hasOwnProperty.call(day.issues,key) && day.issues[key];return !!issue && issue.state!=='unknown';}).length;},
     map:function(keys){return liveStatusDemoMap(day,keys,epics);},
     telemetry:function(){return liveStatusDemoTelemetry(day);}};
 }

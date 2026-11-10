@@ -503,8 +503,8 @@ overlay is on with the snapshot's values. Like the
 demo it is preview state only: it is never saved to the spec, exported or published (Download and
 Copy SVG, which copy the preview, are refused while it shows), and opening
 another project forgets it. A status line under the File actions says what loaded (tickets,
-carriers with metrics), whether it is showing, how many of the board's tickets the snapshot holds
-(a warning when none, since they would all show as missing), and how many errors the agent's run
+carriers with metrics), whether it is showing, how many of the board's tickets the snapshot holds a
+state for (an `unknown` ticket does not count; a warning when none, since they would all show as missing), and how many errors the agent's run
 recorded with the first one. A file that is not a snapshot, or larger than 8 MB, is refused there
 with its reason.
 
@@ -1470,7 +1470,10 @@ and Grafana Prometheus and Loki range queries through the board's datasource uid
 signals through `POST /api/ds/query` with the same datasource uids (#1270); and Honeycomb signals
 through the Honeycomb Query API: it creates the query (`POST /1/queries/{dataset}`), runs it
 (`POST /1/query_results/{dataset}`) and polls the result. The viewer runs Honeycomb queries one
-after another, so each one polls for its share of `--timeout` (at most 20 s). The board window
+after another, so they share one deadline, `--timeout`: each query polls for 80% of the time left,
+divided by the Honeycomb signals still to run (at most 10 counted), and for at most 20 s; time a
+query does not use goes to the next. A query that does not complete in its share is one error on
+its signal that says to raise `--timeout`. The board window
 becomes the query's `time_range` and may be at most 7 days, Honeycomb's limit (a longer window is
 one error per signal). Honeycomb also allows only 10 query-result requests a minute: on a board
 with more Honeycomb signals, each one past the limit fails alone and says so; the dataset is `tracking.telemetry.honeycomb.dataset` (`__all__` without
@@ -1480,14 +1483,18 @@ in `results[0].data`, no header or granularity field; a failed query answers `co
 with an `error` string instead of `data`, which fails that signal with the fixed text "Honeycomb
 query failed (complete with an error)". The key form
 inside `data` (`COUNT`, `P99(duration_ms)`) comes from the docs' examples, not a stated rule, and
-no rule is given for a calculation's `name`, so the script reads the `OP(column)` key. Neither has
+no rule is given for a calculation's `name`, so the script reads the `OP(column)` key. A
+calculation named `time` is refused for its signal before the query is created, because series
+rows carry their time under that name. Neither has
 been checked against a live answer; if a real answer differs, each Honeycomb signal fails alone
 and no wrong number is written. A signal's snapshot value is the
 viewer's measurement for the window (a CloudWatch Sum, a Honeycomb aggregate), its series the
 buckets. Grafana CloudWatch Logs signals, traces, Honeycomb span attributes and log searches are
 not read yet: each such signal is one recorded error (carrier id and signal name) and the run
 goes on. A failed Grafana or Honeycomb call (rate limit, network error, request timeout, query
-error) fails only its own signal and is recorded on that signal with fixed text; a provider's
+error) fails only its own signal and is recorded on that signal with fixed text. Two signals with
+the same query each keep their own outcome, and a CloudWatch failure is recorded only on signals of
+its statistic (an Average signal's SampleCount weight query belongs to Average); a provider's
 own error text, which can hold data, is never printed or written. Pull request states are not read either
 (no GitHub transport yet): each authored PR is one recorded error. A board that imports shared
 topology (`topologyImports`) is refused, because the script does not resolve imported carriers
@@ -1508,10 +1515,15 @@ recorded message is scrubbed of the credential values.
 Provider responses never reach the agent: the script prints exactly one line, for example
 `snapshot examples/live-status/live-status.snapshot.json at 2026-11-10T11:02:00.000Z: 7 tickets (0 missing) ·
 6 carriers, 11 of 14 signals · no errors`. It exits 1 without writing a file when neither
-provider could run, and when no ticket state is known: the viewer shows ticket state only when
-every Jira search it made answered, and then it names every ticket (missing when Jira did not
-return it). With no state at all the tickets are unknown, and a snapshot showing them all as
-missing would be wrong. A missing variable is named only for a provider the board uses (Grafana
+provider could run, and when no ticket state is known. The viewer searches 10 ticket keys at a
+time and names a ticket only when a search covering it answered (a key search naming it, or an
+epic-children search returning it); a ticket such a search did not return is missing. On a board
+with epics it shows nothing until every search answered. Without epics it shows the searches that
+answered, so one failed search leaves its tickets with no state: they are **unknown**, never
+missing. The script writes each with state `unknown`, which the readers show as no status, counts
+them in its line (`12 tickets (1 missing, 2 unknown)`) and records one Jira error naming them. With
+no state at all every ticket is unknown, and a snapshot showing them all as missing would be
+wrong. A missing variable is named only for a provider the board uses (Grafana
 for grafana, loki, sql, cloudwatch or cloudwatchLogs signals; Honeycomb for honeycomb signals). A
 rate-limited Jira call (HTTP 429) is retried once after its Retry-After (at most
 10 s) and recorded only if it still fails; a datasource uid that is not one path segment is refused.
@@ -1525,7 +1537,7 @@ the [demo story](#demo-mode) plus `snapshotAt` and the recorded `errors`:
 `{"version": 1, "kind": "flowview-live-snapshot", "snapshotAt", "board", "epics", "days": [{"label":
 "Snapshot from …", "issues": {…}, "telemetry": {"start", "stepSeconds", "carriers"}}], "errors": [{"source",
 "tool", "message"}]}`. A ticket Jira did not return is left out of `issues`, so the board shows
-it as missing.
+it as missing; a ticket no answered search covered has state `unknown`.
 
 REST credentials and this script are the zero-token route: no provider response reaches the
 agent. An agent with only MCP connectors cannot avoid that, because every tool result enters its

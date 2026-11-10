@@ -112,7 +112,7 @@ function perSignal(error,what,signal){
 /* REST transports built from the environment. `missing` names each variable a provider lacks, `refused` each
    one the URL rules refuse; `secrets` are the values every printed or recorded message is scrubbed of. */
 // `boardSite` is the board's tracking.jira.site: the site the viewer matches.
-// `options.pollMs` bounds one Honeycomb query's polling.
+// `options.pollMs` caps one Honeycomb query's polling; the run's deadline shares the rest (honeycombBudget).
 function restTransport(env,fetchImpl,now,boardSite,options){
   options=options || {};
   const fetcher=fetchImpl || globalThis.fetch,servers=[],missing=[],refused=[],handlers=Object.create(null);
@@ -226,7 +226,7 @@ function restTransport(env,fetchImpl,now,boardSite,options){
   }
   /* Honeycomb Query API: create the query, run it, poll the result. The key's environment must be the
      board's tracking.telemetry.honeycomb.environment (checked once through /1/auth). */
-  let honeycomb=null,pollMs=20000;
+  let honeycomb=null,pollMs=20000,deadline=null,runnable=0,finished=0;
   if(set('HONEYCOMB_API_URL')){const checked=providerBase(env.HONEYCOMB_API_URL);if(checked.error)refused.push({provider:'honeycomb',message:'HONEYCOMB_API_URL '+checked.error});else honeycomb=checked.base;}
   else honeycomb='https://api.honeycomb.io';
   if(!set('HONEYCOMB_API_KEY'))missing.push({provider:'honeycomb',variables:['HONEYCOMB_API_KEY']});
@@ -253,15 +253,23 @@ function restTransport(env,fetchImpl,now,boardSite,options){
         // Honeycomb answers a query over more than 7 days with HTTP 400; say why instead.
         const span=spec.time_range!=null?spec.time_range:spec.end_time-spec.start_time;
         if(span>HONEYCOMB_MAX_SECONDS)throw failure('Honeycomb queries cover at most 7 days; the board window is '+Math.round(span/86400)+' d');
+        // Series rows carry `time` beside the calculation values: a calculation named time would be overwritten.
+        const calc=Array.isArray(spec.calculations) && spec.calculations.length===1?spec.calculations[0]:null;
+        const alias=calc && typeof calc.name==='string' && calc.name?calc.name:null;
+        if(alias==='time')throw failure('Honeycomb calculation name "time" is the series time field; name the calculation something else');
         const query=await call('/1/queries/'+dataset,spec,'Honeycomb query',signal);
         if(!query || typeof query.id!=='string')throw failure('Honeycomb query returned no id');
         // Honeycomb allows 10 query-result creations a minute; past that each signal fails alone and says why.
         let result=await call('/1/query_results/'+dataset,{query_id:query.id,disable_series:false},'Honeycomb query result',signal).catch(error=>{
           if(error && error.code==='rate_limited')throw failure('Honeycomb query result is rate limited (HTTP 429; Honeycomb allows 10 query results a minute)');throw error;});
-        const started=Date.now();
+        /* The queries run one after another. Each one's polling gets 80% of the time left in the run, shared by the
+           signals still to run (at most 10: past Honeycomb's 10 query results a minute the rest fail at once), and
+           at most pollMs. Time a fast query leaves goes to the next. */
+        const started=Date.now(),left=Math.max(1,Math.min(10,runnable-finished));
+        const budget=deadline==null?pollMs:Math.max(1000,Math.min(pollMs,Math.floor((deadline-started)*0.8/left)));
         while(!(result && result.complete===true)){
           if(!result || typeof result.id!=='string')throw failure('Honeycomb query result returned no id');
-          if(Date.now()-started>=pollMs)throw failure('Honeycomb query did not complete within '+Math.round(pollMs/1000)+' s');
+          if(Date.now()-started>=budget)throw failure('Honeycomb query did not complete within '+Math.round(budget/1000)+' s (raise --timeout to give it longer)');
           await new Promise(resolve=>setTimeout(resolve,500));
           result=await call('/1/query_results/'+dataset+'/'+encodeURIComponent(result.id),undefined,'Honeycomb query result',signal);
         }
@@ -271,8 +279,7 @@ function restTransport(env,fetchImpl,now,boardSite,options){
         if(!result.data || typeof result.data!=='object')throw failure('Honeycomb query answered no data');
         // The docs show result keys as OP(column) (COUNT, P99(duration_ms)) and give no rule for a calculation's
         // `name`, so a named calculation's value is also copied to its name, which the viewer's adapter looks up.
-        const calc=Array.isArray(spec.calculations) && spec.calculations.length===1?spec.calculations[0]:null;
-        const opKey=calc && typeof calc.op==='string'?calc.op+(calc.column?'('+calc.column+')':''):null,alias=calc && typeof calc.name==='string' && calc.name?calc.name:null;
+        const opKey=calc && typeof calc.op==='string'?calc.op+(calc.column?'('+calc.column+')':''):null;
         const named=data=>{const out=Object.assign({},data);if(alias && opKey && !Object.prototype.hasOwnProperty.call(out,alias) && Object.prototype.hasOwnProperty.call(out,opKey))out[alias]=out[opKey];return out;};
         // Series rows are {time, data} with time beside data (the same page); run_query's raw rows carry time inside data.
         const data=result.data,series=(Array.isArray(data.series)?data.series:[]).map(row=>({data:Object.assign(named(row && row.data),{time:row && row.time})}));
@@ -287,12 +294,12 @@ function restTransport(env,fetchImpl,now,boardSite,options){
         return raw;
       }catch(error){
         throw perSignal(error,'Honeycomb',signal);
-      }
+      }finally{finished++;}
     };
   }
   return {servers:()=>servers,missing,refused,secrets,
-    // The viewer's Honeycomb adapter runs its queries one after another: each one's polling gets its share of the run.
-    shareHoneycomb:(timeoutMs,count)=>{if(count>0)pollMs=Math.max(1000,Math.min(pollMs,Math.floor(timeoutMs*0.8/count)));},
+    // The run's deadline and how many Honeycomb signals will query (the adapter's jobs).
+    honeycombBudget:(at,count)=>{deadline=at;runnable=count;finished=0;},
     call:(server,tool,input,signal)=>{const handler=handlers[server];if(!handler)return Promise.reject(failure('No server '+server));return handler(tool,input || {},signal);}};
 }
 
@@ -308,12 +315,15 @@ function mcpHandlerTransport(handlers,env){
 
 /* The connector namespace the adapters expect, over a transport. A watch answers once: a snapshot never polls. */
 function providerOf(server){return /grafana/i.test(server)?'grafana':/honeycomb/i.test(server)?'honeycomb':'jira';}
-// A failed call is recorded under its call key; the same call answering later (the adapter's retry) removes it.
+/* A failed call is recorded under its call key. A call that belongs to bound signals (callFingerprints) keeps its
+   error until the run ends, when it goes to each of those signals that was not observed: two signals can make the
+   same call, and one's answer says nothing about the other's failure. Any other call (a Jira search, an auth
+   lookup) that answers later, as the adapter's retry, removes its own error. */
 function connectorNamespace(transport,errors,signal,answered){
   const call=(server,tool,input)=>{
     const key=server+'\u0000'+tool+'\u0000'+JSON.stringify(input || {});
     return Promise.resolve().then(()=>transport.call(server,tool,input,signal)).then(payload=>{
-      for(let i=errors.length-1;i>=0;i--)if(errors[i].key===key)errors.splice(i,1);
+      if(!callFingerprints(tool,input).length)for(let i=errors.length-1;i>=0;i--)if(errors[i].key===key)errors.splice(i,1);
       if(answered){const source=providerOf(server);answered[source]=(answered[source] || 0)+1;}
       return {payload};
     },error=>{
@@ -334,18 +344,21 @@ function honeycombKey(query){const q=Object.assign({},query);['from','to','start
 function signalFingerprint(signal){
   const q=signal && signal.query;
   if(signal.source==='grafana' || signal.source==='loki' || signal.source==='sql')return typeof q==='string'?signal.source[0]+':'+q:null;
-  if(signal.source==='cloudwatch')return q && typeof q==='object'?'c:'+JSON.stringify(canonical([q.namespace,q.metric,q.region,q.dimensions || {}])):null;
+  if(signal.source==='cloudwatch')return q && typeof q==='object'?cloudwatchKey(q.namespace,q.metric,q.region,q.dimensions,q.statistic):null;
   if(signal.source==='honeycomb')return q && typeof q==='object'?honeycombKey(q):null;
   return null;
 }
-function callFingerprint(tool,input){
-  if(!input)return null;
-  if(tool==='query_prometheus')return 'g:'+input.expr;
-  if(tool==='query_loki_logs')return 'l:'+input.logql;
-  if(tool==='query_sql')return 's:'+input.query;
-  if(tool==='query_cloudwatch')return 'c:'+JSON.stringify(canonical([input.namespace,input.metricName,input.region,input.dimensions || {}]));
-  if(tool==='run_query'){try{return honeycombKey(typeof input.query_spec==='string'?JSON.parse(input.query_spec):input.query_spec || {});}catch(ex){return null;}}
-  return null;
+function cloudwatchKey(namespace,metric,region,dimensions,statistic){return 'c:'+JSON.stringify(canonical([namespace,metric,region,dimensions || {},statistic || null]));}
+// The signal fingerprints a call can belong to. An Average signal also asks for SampleCount (its weights), so a
+// SampleCount call belongs to a SampleCount or an Average signal of that metric.
+function callFingerprints(tool,input){
+  if(!input)return [];
+  if(tool==='query_prometheus')return ['g:'+input.expr];
+  if(tool==='query_loki_logs')return ['l:'+input.logql];
+  if(tool==='query_sql')return ['s:'+input.query];
+  if(tool==='query_cloudwatch'){const key=statistic=>cloudwatchKey(input.namespace,input.metricName,input.region,input.dimensions,statistic);return input.statistic==='SampleCount'?[key('SampleCount'),key('Average')]:[key(input.statistic)];}
+  if(tool==='run_query'){try{return [honeycombKey(typeof input.query_spec==='string'?JSON.parse(input.query_spec):input.query_spec || {})];}catch(ex){return [];}}
+  return [];
 }
 
 /* Runs the viewer's adapters on a headless copy of the board and returns {snapshot, summary}. */
@@ -385,7 +398,8 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
   transport.missing.forEach(m=>{if(!wanted(m.provider))return;errors.push({source:m.provider,tool:null,message:m.variables.join(', ')+(m.variables.length>1?' are':' is')+' not set'+(m.note?' ('+m.note+')':'')});});
   (transport.refused || []).forEach(r=>{if(!wanted(r.provider))return;errors.push({source:r.provider,tool:null,message:r.message+'; no request was made'});});
   const hasServer=name=>transport.servers().some(s=>s.server===name);
-  if(typeof transport.shareHoneycomb==='function'){let count=0;ctl.telemetry.bindings().forEach(b=>Object.keys(b.signals).forEach(name=>{if(b.signals[name].source==='honeycomb')count++;}));transport.shareHoneycomb(timeoutMs,count);}
+  // Honeycomb signals in query_spec form are not run by the adapter (telemetryHoneycombJobs), so they take no share.
+  if(typeof transport.honeycombBudget==='function')transport.honeycombBudget(Date.now()+timeoutMs,typeof C.telemetryHoneycombJobs==='function'?C.telemetryHoneycombJobs(ctl.telemetry.bindings()).length:0);
   const hasJira=wantsJira && transport.servers().some(s=>s.tools.some(t=>(t.name || t)==='searchJiraIssuesUsingJql'));
   const hasMetrics=!!providers && transport.servers().some(s=>s.tools.some(t=>['query_prometheus','run_query'].indexOf(t.name || t)>=0));
   if(hasJira)C.wireLiveStatusClaude(ctl,page,win);
@@ -410,12 +424,15 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
     if(READ_SOURCES.indexOf(signal.source)<0){errors.push({source,tool:b.id+' '+name,message:signal.source+' signals are not read by the snapshot script yet'});return;}
     if(hasMetrics && signal.error)errors.push({source,tool:b.id+' '+name,message:String(signal.error)});
   }));
-  // A failed metrics call is recorded on each signal that made it (carrier id and signal name), not on the tool.
-  const fingerprints=[];bindings.forEach(b=>Object.keys(b.signals).forEach(name=>{const f=signalFingerprint(b.signals[name]);if(f)fingerprints.push({f,tool:b.id+' '+name});}));
+  /* A failed metrics call is recorded on each signal that could have made it (carrier id and signal name), not on
+     the tool, and only on those that were not observed: an observed signal's own call answered (a retry, or
+     another signal with the same query failed). */
+  const observedSignal=(id,name)=>{const s=evidence.map && evidence.map[id] && evidence.map[id].signals && evidence.map[id].signals[name];return !!s && typeof s.value==='number' && isFinite(s.value);};
+  const fingerprints=[];bindings.forEach(b=>Object.keys(b.signals).forEach(name=>{const f=signalFingerprint(b.signals[name]);if(f)fingerprints.push({f,tool:b.id+' '+name,observed:observedSignal(b.id,name)});}));
   for(let i=errors.length-1;i>=0;i--){
     const e=errors[i];if(!e.input || (e.source!=='grafana' && e.source!=='honeycomb'))continue;
-    const f=callFingerprint(e.tool,e.input),owners=f?fingerprints.filter(x=>x.f===f):[];
-    if(owners.length)errors.splice(i,1,...owners.map(owner=>({source:e.source,tool:owner.tool,message:e.message})));
+    const keys=callFingerprints(e.tool,e.input),owners=fingerprints.filter(x=>keys.indexOf(x.f)>=0);
+    if(owners.length)errors.splice(i,1,...owners.filter(owner=>!owner.observed).map(owner=>({source:e.source,tool:owner.tool,message:e.message})));
   }
   // PR states come from GitHub, which the script does not read yet: one error per authored PR.
   refs.prs.forEach(url=>errors.push({source:'github',tool:url,message:'pull request state is not read by the snapshot script yet'}));
@@ -424,12 +441,20 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
   // intervalSeconds keeps the file a valid demo timeline (tools/inject.py --timeline); one day never advances.
   const snapshot={version:1,kind:SNAPSHOT_KIND,snapshotAt:at,board,intervalSeconds:6,epics:day.epics,days:[{label:'Snapshot from '+at,issues:day.issues,telemetry:day.telemetry}],
     errors:dedupe(errors.map(e=>({source:e.source,tool:e.tool==null?null:scrub(e.tool,transport.secrets),message:scrub(e.message,transport.secrets)})))};
-  const requested=refs.tickets,missingTickets=requested.filter(key=>!day.issues[key]).length;
   const signals=hasMetrics?bindings.reduce((n,b)=>n+Object.keys(b.signals).length,0):0,observed=Object.keys(day.telemetry.carriers).reduce((n,id)=>n+Object.keys(day.telemetry.carriers[id]).length,0);
-  /* The viewer publishes ticket state only when every search it made answered, and then it names every requested
-     ticket (missing when Jira did not return it). With no state at all the tickets are unknown, not missing. */
-  const jiraFailed=hasJira && requested.length>0 && !requested.some(key=>Object.prototype.hasOwnProperty.call(live.states,key));
-  return {snapshot,summary:{tickets:requested.length,missing:hasJira && !jiraFailed?missingTickets:null,jiraFailed,carriers:Object.keys(day.telemetry.carriers).length,signals,observed,errors:snapshot.errors,at,jira:hasJira,metrics:hasMetrics}};
+  /* The viewer names a ticket only when a search covering it answered: a key search (10 keys a search) naming it,
+     or an epic-children search returning it. Then a ticket Jira did not return is missing. On a board with epics
+     it publishes nothing until every search answered; without epics it publishes the searches that answered, so
+     the tickets of a failed search have no entry. Those are unknown, never missing: each is written with state
+     `unknown`, which the readers show as no status. With no ticket known the snapshot is refused. */
+  const requested=refs.tickets,known=key=>hasJira && Object.prototype.hasOwnProperty.call(live.states,key);
+  const unknown=hasJira?requested.filter(key=>!known(key)):[],jiraFailed=hasJira && requested.length>0 && unknown.length===requested.length;
+  const missingTickets=requested.filter(key=>known(key) && !day.issues[key]).length;
+  if(hasJira && !jiraFailed && unknown.length){
+    unknown.forEach(key=>{day.issues[key]={state:'unknown'};});
+    snapshot.errors.push({source:'jira',tool:null,message:unknown.length+' ticket'+(unknown.length===1?' is':'s are')+' unknown, because no search covering '+(unknown.length===1?'it':'them')+' answered: '+unknown.slice(0,20).join(', ')+(unknown.length>20?', …':'')});
+  }
+  return {snapshot,summary:{tickets:requested.length,missing:hasJira && !jiraFailed?missingTickets:null,unknown:jiraFailed?null:unknown.length,jiraFailed,carriers:Object.keys(day.telemetry.carriers).length,signals,observed,errors:snapshot.errors,at,jira:hasJira,metrics:hasMetrics}};
 }
 function dedupe(list){const seen=new Set();return list.filter(e=>{const key=JSON.stringify(e);if(seen.has(key))return false;seen.add(key);return true;});}
 
@@ -476,7 +501,7 @@ function snapshotDay(states,telemetryMap,bindings,at){
 /* The one line an agent sees. */
 function summaryLine(file,summary){
   const parts=[];
-  parts.push(!summary.jira?'Jira skipped':summary.jiraFailed?'Jira failed ('+summary.tickets+' tickets unknown)':summary.tickets+' tickets ('+summary.missing+' missing)');
+  parts.push(!summary.jira?'Jira skipped':summary.jiraFailed?'Jira failed ('+summary.tickets+' tickets unknown)':summary.tickets+' tickets ('+summary.missing+' missing'+(summary.unknown?', '+summary.unknown+' unknown':'')+')');
   parts.push(summary.metrics?summary.carriers+' carriers, '+summary.observed+' of '+summary.signals+' signals':'metrics skipped');
   const errors=summary.errors.map(e=>e.source+(e.tool?' '+e.tool:'')+': '+e.message.replace(/\s+/g,' ').slice(0,120));
   parts.push(errors.length?errors.length+' error'+(errors.length===1?'':'s')+' ('+errors.slice(0,3).join('; ')+(errors.length>3?'; …':'')+')':'no errors');

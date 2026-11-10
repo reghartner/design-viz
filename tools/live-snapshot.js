@@ -263,14 +263,21 @@ function restTransport(env,fetchImpl,now,boardSite,options){
           await new Promise(resolve=>setTimeout(resolve,500));
           result=await call('/1/query_results/'+dataset+'/'+encodeURIComponent(result.id),undefined,'Honeycomb query result',signal);
         }
-        const data=result.data || {},series=(Array.isArray(data.series)?data.series:[]).map(row=>({data:Object.assign({},row && row.data,{time:row && row.time})}));
+        // A failed query answers HTTP 200, complete:true and an `error` string where `data` would be (docs.honeycomb.io
+        // /api/query-data/get-query-result). Only fixed text is recorded: the provider's message can hold data.
+        if(result.error!=null || !result.data || typeof result.data!=='object')throw failure('Honeycomb query failed');
+        // The docs show result keys as OP(column) (COUNT, P99(duration_ms)) and give no rule for a calculation's
+        // `name`, so a named calculation's value is also copied to its name, which the viewer's adapter looks up.
+        const calc=Array.isArray(spec.calculations) && spec.calculations.length===1?spec.calculations[0]:null;
+        const opKey=calc && typeof calc.op==='string'?calc.op+(calc.column?'('+calc.column+')':''):null,alias=calc && typeof calc.name==='string' && calc.name?calc.name:null;
+        const named=data=>{const out=Object.assign({},data);if(alias && opKey && !Object.prototype.hasOwnProperty.call(out,alias) && Object.prototype.hasOwnProperty.call(out,opKey))out[alias]=out[opKey];return out;};
+        // Series rows are {time, data} with time beside data (the same page); run_query's raw rows carry time inside data.
+        const data=result.data,series=(Array.isArray(data.series)?data.series:[]).map(row=>({data:Object.assign(named(row && row.data),{time:row && row.time})}));
         let granularity=Number(spec.granularity);
         if(!(granularity>0)){const times=series.map(row=>Date.parse(row.data.time)).filter(isFinite).sort((a,b)=>a-b);for(let i=1;i<times.length;i++){const gap=(times[i]-times[i-1])/1000;if(gap>0 && (!(granularity>0) || gap<granularity))granularity=gap;}}
-        /* The REST answer's shape, as Honeycomb's own Go client models it (terraform-provider-honeycombio
-           client/query_result.go): data.series rows {time, data}, data.results rows {data}. The keys inside data
-           (COUNT, P99(duration_ms), a calculation's name) are not verified against a live answer; a mismatch
-           fails the signal in the adapter, never a wrong number. run_query's raw result keeps time inside data. */
-        const raw={results:(Array.isArray(data.results)?data.results:[]).map(row=>({data:Object.assign({},row && row.data)})),series};
+        /* The REST answer has no header, info or granularity field (docs.honeycomb.io /api/query-data); the
+           granularity is the query's, or the series spacing. run_query's raw result keeps time inside data. */
+        const raw={results:(Array.isArray(data.results)?data.results:[]).map(row=>({data:named(row && row.data)})),series};
         if(granularity>0 && Number.isSafeInteger(granularity))raw.info={granularity_seconds:granularity};
         return raw;
       }catch(error){

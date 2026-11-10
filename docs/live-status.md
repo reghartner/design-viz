@@ -1474,12 +1474,14 @@ after another, so each one polls for its share of `--timeout` (at most 20 s). Th
 becomes the query's `time_range` and may be at most 7 days, Honeycomb's limit (a longer window is
 one error per signal); the dataset is `tracking.telemetry.honeycomb.dataset` (`__all__` without
 one, one path segment), and the key must belong to its `environment` (checked once through
-`/1/auth`). The result shape the script reads (series rows as `{time, data}`, the aggregate in
-`results[0].data`) is the one Honeycomb's own Go client models (`client/query_result.go` in
-`honeycombio/terraform-provider-honeycombio`). The keys inside `data` (`COUNT`,
-`P99(duration_ms)`, or a calculation's `name`) are assumed and have not been checked against a
-live Honeycomb answer; if a real answer differs, each Honeycomb signal fails alone and no wrong
-number is written. A signal's snapshot value is the
+`/1/auth`). The result shape follows Honeycomb's Query Data docs: series rows `{time, data}`, the aggregate
+in `results[0].data`, no header or granularity field; a failed query answers `complete: true`
+with an `error` string instead of `data`, which fails that signal with fixed text. The key form
+inside `data` (`COUNT`, `P99(duration_ms)`) comes from the docs' examples, not a stated rule, and
+no rule is given for a calculation's `name`, so the script reads the `OP(column)` key. Neither has
+been checked against a live answer; if a real answer differs, each Honeycomb signal fails alone
+and no wrong number is written. Honeycomb allows 10 query-result requests a minute: on a board
+with more Honeycomb signals, the extra ones are rate limited and fail one by one. A signal's snapshot value is the
 viewer's measurement for the window (a CloudWatch Sum, a Honeycomb aggregate), its series the
 buckets. Grafana CloudWatch Logs signals, traces, Honeycomb span attributes and log searches are
 not read yet: each such signal is one recorded error (carrier id and signal name) and the run

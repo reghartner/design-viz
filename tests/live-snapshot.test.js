@@ -91,11 +91,13 @@ function providers({failQuery=null,pages=false,failJira=null,failTickets=false,r
   // Honeycomb Query API: auth, create, run, poll.
   if(url.pathname==='/1/auth')return send(200,{environment:{slug:honeycombEnv,name:honeycombEnv}});
   // A query whose filters name "stuck" never completes; "busy" is rate limited when created.
+  // "fails" answers as a failed query does: complete, with an error string in place of data.
   if(/^\/1\/queries\//.test(url.pathname)){if(/busy/.test(body))return send(429,{error:'slow down'});const id='q'+seen.length;hcQueries[id]=body;return send(200,{id});}
   if(/^\/1\/query_results\/[^/]+$/.test(url.pathname))return send(200,{id:'r-'+JSON.parse(body).query_id,complete:false});
   const poll=/^\/1\/query_results\/[^/]+\/r-(q\d+)$/.exec(url.pathname);
   if(poll){
    polled++;if(honeycombNever || /stuck/.test(hcQueries[poll[1]] || '') || polled<honeycombPolls)return send(200,{id:'r-'+poll[1],complete:false});
+   if(/fails/.test(hcQueries[poll[1]] || ''))return send(200,{id:'r-'+poll[1],complete:true,error:'column secret_customer_email does not exist'});
    return send(200,{id:'r-'+poll[1],complete:true,data:{series:[{time:'2026-11-10T10:00:00Z',data:{COUNT:3}},{time:'2026-11-10T11:00:00Z',data:{COUNT:4}}],results:[{data:{COUNT:7}}]}});
   }
   send(404,{});
@@ -460,4 +462,15 @@ test('S26 CloudWatch answers with more than one series or value column are refus
   assert.match(by['ingest two'] || '',/returned 2 series; set dimensions that select one/);assert.match(by['ingest wide'] || '',/returned 2 value columns/);
   assert.equal(snapshot.days[0].telemetry.carriers.ingest.two,undefined);assert.ok(snapshot.days[0].telemetry.carriers.ingest.rate,'the other signals stay');
  }finally{await p.close();}
+});
+test('S27 a failed Honeycomb query (complete, with an error string) fails only its signal with fixed text; a named calculation is read by its OP(column) key',async()=>{
+ const named={honeycomb:{calculations:[{op:'COUNT',name:'requests'}],filters:[{column:'service.name',op:'=',value:'named'}]},unit:'requests'};
+ const run=await honeycombRun({},undefined,'20',honeycombBoard({extra:{broken:hcSignal('fails'),named}}));
+ try{
+  const text=JSON.stringify(run.snapshot)+run.r.lines.join('');
+  assert.ok(run.snapshot.errors.some(e=>e.tool==='api broken' && e.message==='Honeycomb query failed'),JSON.stringify(run.snapshot.errors));
+  assert.ok(!text.includes('secret_customer_email'),'the provider\'s error text is never printed or written');
+  const carriers=run.snapshot.days[0].telemetry.carriers;assert.ok(carriers.api.spans,'the healthy signal is observed');
+  assert.equal(carriers.api.named && carriers.api.named.value,7,'the named calculation\'s aggregate, found under COUNT');
+ }finally{await run.p.close();}
 });

@@ -42,7 +42,9 @@ function harness(spec,target){
     click(label){const b=ui.button(label);assert.ok(b,'button "'+label+'" exists');b.focus();b.fire('click');h.flush();return ui;},
     error(){const slot=h.guide.querySelector('.ierr');return slot?slot.textContent:'';},
     warnings(raw){return plain(e.C.validate(e.C.normalize(raw || ui.raw)).warnings);},
-    message(control,role){const row=control.closest('.frow') || control.parentNode;const found=row.querySelectorAll('[role="'+role+'"]')[0];return found?found.textContent:'';},
+    // The message beside a field is the one its aria-describedby names (it sits right after a <label> row, never inside it).
+    message(control,role){const ids=(control.getAttribute('aria-describedby') || '').split(' ');const found=h.guide.querySelectorAll('[role="'+role+'"]').find(n=>n.id && ids.includes(n.id));return found?found.textContent:'';},
+    named(control){const row=control.closest('.frow');return row?row.querySelector('.flab').textContent:'';},
     get focused(){return e.doc.activeElement;},
     text_(box){const out=[];(function walk(n){if(n.textContent)out.push(n.textContent);n.children.forEach(walk);})(box);return out.join(' ');}};
   if(target)ui.select(target);
@@ -109,7 +111,8 @@ test('T16 a refused Tracking edit is shown next to its field and marks it invali
   const ui=harness(page(),NODE),before=ui.text;
   const input=ui.enter('Add ticket','hw-1');
   assert.equal(ui.text,before);
-  assert.match(ui.message(input,'alert'),/Jira key/,'the message sits in the field row');
+  assert.match(ui.message(input,'alert'),/Jira key/,'the message is beside the field and named by aria-describedby');
+  assert.equal(input.closest('.frow').querySelectorAll('.field-message').length,0,'the message is not inside the <label>, so the field keeps its accessible name');
   assert.equal(input.getAttribute('aria-invalid'),'true');
   input.value='';input.fire('keydown',{key:'Enter'});ui.h.flush();
   assert.equal(input.getAttribute('aria-invalid'),null,'emptying the field clears the refusal');assert.equal(ui.message(input,'alert'),'');

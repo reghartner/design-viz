@@ -201,7 +201,11 @@ function flashPositionLine(){
     var control=text && messageControl();if(!control)return;
     var host=control.closest('.frow') || control.parentNode;if(!host)return;
     var note=document.createElement('span');note.className='field-message field-message-'+kind;note.id=prefix+'-field-message';
-    note.setAttribute('role',kind==='error'?'alert':'status');note.textContent=text;host.appendChild(note);
+    note.setAttribute('role',kind==='error'?'alert':'status');note.textContent=text;
+    // A <label> row names its control from its text, so the message goes right after the row, not inside it.
+    if(host.tagName==='LABEL' && host.insertAdjacentElement)host.insertAdjacentElement('afterend',note);
+    else if(host.tagName==='LABEL' && host.parentNode)host.parentNode.appendChild(note);
+    else host.appendChild(note);
     control.setAttribute('data-field-message-for',control.getAttribute('aria-describedby') || '');
     control.setAttribute('aria-describedby',((control.getAttribute('aria-describedby') || '')+' '+note.id).trim());
     if(kind==='error')control.setAttribute('aria-invalid','true');

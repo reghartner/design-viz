@@ -168,3 +168,11 @@ test('LT10 a connection lists every alternative of the steps that light it; a re
   const same=apply(spec,(t,r)=>c.planLinksTraceRename(t,r,{serviceName:'notify-svc',operation:'route.event'},{serviceName:' notify-svc ',operation:'route.event'},null));
   assert.ok(same.unchanged,'renaming to the same key writes nothing');assert.equal(same.plan.count,0);
 });
+
+test('LT11 a clashing rename names the field the reader changed; steps carry their id',()=>{
+  const spec=board();d(spec).steps[3].traceMatch=[{serviceName:'notify-svc',operation:'route.event'},{serviceName:'other-svc',operation:'route.event'},{serviceName:'x',operation:'y'}];
+  const text=JSON.stringify(spec,null,2),raw=JSON.parse(text),g={serviceName:'notify-svc',operation:'route.event'};
+  assert.equal(c.planLinksTraceRename(text,raw,g,{serviceName:'other-svc',operation:'route.event'},null).field,'serviceName');
+  assert.equal(c.planLinksTraceRename(text,raw,g,{serviceName:'x',operation:'y'},null).field,'both');
+  assert.equal(el(model(board()),'step',2).stepId,'push');
+});

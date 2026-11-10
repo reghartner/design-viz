@@ -476,7 +476,7 @@ function initWorkbenchLinksView(opts){
   function popKeys(ev){
     if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();closePopover(true);return;}
     if(ev.key!=='ArrowDown' && ev.key!=='ArrowUp')return;
-    var items=Array.from(popover.querySelectorAll('input:not([disabled]),[role="menuitem"],.links-pop-target:not([disabled])'));if(!items.length)return;
+    var items=Array.from(popover.querySelectorAll('input:not([disabled]),[role="menuitem"]:not([disabled]),.links-pop-target:not([disabled])'));if(!items.length)return;
     ev.preventDefault();var at=items.indexOf(doc.activeElement),next=ev.key==='ArrowDown'?at+1:at-1;
     items[(next+items.length)%items.length].focus();
   }
@@ -678,7 +678,7 @@ function initWorkbenchLinksView(opts){
       var sv=service.querySelector('input').value,op=operation.querySelector('input').value;
       if(!sv.trim()){fieldError(service.querySelector('input'),'Enter the service name of the span this step stands for.');return;}
       if(!op.trim()){fieldError(operation.querySelector('input'),'Enter the operation of the span this step stands for.');return;}
-      var keep={id:linksElementId(e),serviceName:sv,operation:op};state.traceCreate=null;
+      var keep={id:linksElementId(e),stepId:e.stepId,serviceName:sv,operation:op};state.traceCreate=null;
       if(!traceEdit(e,0,{op:'create',serviceName:sv,operation:op})){
         // Keep what was typed; the reason shows beside the service field.
         var msg=error.textContent;state.traceCreate=keep;render();
@@ -708,7 +708,7 @@ function initWorkbenchLinksView(opts){
       head.appendChild(key);
       var count=linksTraceRenameCount(g);head.appendChild(el('span','links-count',count+(count===1?' step':' steps')));
       var rename=button('bbtn links-edit','Rename','Rename '+g.key,'Change the service name or operation on every step that uses it (one Undo step)');
-      rowsLife.listen(rename,'click',function(){state.traceRename=g.key;render();var f=list.querySelector('[data-links-field="'+cssEscape('rename|'+g.key+'|serviceName')+'"]');if(f)f.focus();});
+      rowsLife.listen(rename,'click',function(){state.traceRename=g.key;state.traceRenameDraft=null;render();var f=list.querySelector('[data-links-field="'+cssEscape('rename|'+g.key+'|serviceName')+'"]');if(f)f.focus();});
       head.appendChild(rename);
       if(state.traceRename===g.key){
         var form=el('div','links-merge links-trace-rename');form.setAttribute('role','group');form.setAttribute('aria-label','Rename '+g.key);
@@ -729,7 +729,9 @@ function initWorkbenchLinksView(opts){
           if(!ok){
             // Keep what was typed, and show the reason under the field at fault.
             if(lit && state.highlight)state.highlight.key=g.key;state.traceRename=g.key;state.traceRenameDraft={key:g.key,serviceName:next.serviceName,operation:next.operation};render();
-            var f=list.querySelector('[data-links-field="'+cssEscape('rename|'+g.key+'|'+(refused || 'serviceName'))+'"]');if(f && error.textContent){var msg=error.textContent;fail('');fieldError(f,msg);}return;
+            var msg=error.textContent;if(!msg)return;fail('');
+            (refused==='both'?['serviceName','operation']:[refused || 'serviceName']).forEach(function(name){var f=list.querySelector('[data-links-field="'+cssEscape('rename|'+g.key+'|'+name)+'"]');if(f)fieldError(f,msg);});
+            return;
           }
           var k=list.querySelector('[data-links-trace="'+cssEscape(nk)+'"] .links-key');if(k)k.focus();
         }
@@ -767,7 +769,7 @@ function initWorkbenchLinksView(opts){
           e.matches.forEach(function(u){chips.appendChild(traceChip(u,e,false));});
           if(e.form && !e.matches.length){
             var addMatch=button('links-assign','+ Add trace match','Add trace match to '+e.label);
-            rowsLife.listen(addMatch,'click',function(){state.traceCreate={id:linksElementId(e),serviceName:'',operation:''};state.traceEdit=null;render();var f=list.querySelector('[data-links-field="'+cssEscape(linksElementId(e)+'|new|serviceName')+'"]');if(f)f.focus();});
+            rowsLife.listen(addMatch,'click',function(){state.traceCreate={id:linksElementId(e),stepId:e.stepId,serviceName:'',operation:''};state.traceEdit=null;render();var f=list.querySelector('[data-links-field="'+cssEscape(linksElementId(e)+'|new|serviceName')+'"]');if(f)f.focus();});
             chips.appendChild(addMatch);
           }
         }else{
@@ -782,7 +784,10 @@ function initWorkbenchLinksView(opts){
           // Undo, or a drag that took this alternative away, closes the editor.
           if(e.matches[state.traceEdit.alternative])row.appendChild(traceEditor(e,state.traceEdit.alternative));else state.traceEdit=null;
         }
-        if(e.kind==='step' && state.traceCreate && state.traceCreate.id===linksElementId(e))row.appendChild(traceCreateForm(e));
+        if(e.kind==='step' && state.traceCreate && state.traceCreate.id===linksElementId(e)){
+          // The draft belongs to one step: if steps moved under it (a delete or Undo above), drop it.
+          if(state.traceCreate.stepId===e.stepId && !e.matches.length)row.appendChild(traceCreateForm(e));else state.traceCreate=null;
+        }
         if(state.highlight && state.highlight.type==='element' && state.highlight.id===linksElementId(e))row.classList.add('links-row-active');
         list.appendChild(row);
       });

@@ -8,6 +8,8 @@
    T7 drag wording | same | a chip drag names its source step and asks for a step, never undefined or nodes/connections; a handle drop on a step with another match says "as an alternative" before and after the write | a status naming undefined, a silent alternative
    T8 refused rename | same | clearing Operation and pressing Rename keeps the typed values, marks Operation aria-invalid with the reason beside it, and writes nothing | lost typing, an error under the wrong field
    T9 editor Esc + gone alternative + failed create | same | Esc from the Node select closes the editor; removing the match being edited closes its editor; a re-render keeps the typed service and operation, and a refused Create keeps them with the reason beside Service name | an editor stuck on "This match changed", lost typing
+   T10 menu keys skip disabled | same | Move to… step 4 (it already has the same match) disables Add as alternative; ArrowDown from Replace reaches Cancel; Enter on Cancel writes nothing | arrow keys stuck on a disabled item
+   T11 create draft follows its step | same | a + Add trace match draft on step 3 is dropped when a JSON edit removes step 1 and moves another step into its place | a draft that jumps to another step
    T6 imported node | consumer importing provider api | the Node select lists API (imported) and writes nodeId canon::api in one Undo step | imported nodes missing from the select */
 import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
 import {digest} from '../../canon/drift.mjs';
@@ -23,6 +25,12 @@ const fixture={page:{title:'Doorbell',sections:[{heading:'Flow',diagram:{autopla
     {id:'push',text:'The service pushes an alert',nodes:['notify']},
     {id:'retry',text:'Offline: retry',nodes:['notify'],traceMatch:{serviceName:'notify-svc',operation:'route.event'}}]}}]}};
 const source=async page=>JSON.parse(await page.locator('#src').inputValue());
+// Edit the JSON source as an author does: the JSON window, then Render; then back to Links.
+async function renderSource(page,edit){
+  const raw=await source(page);edit(raw);
+  await page.locator('#editor-tab-json').click();await page.locator('#src').fill(JSON.stringify(raw,null,2));await page.locator('#go').click();
+  await page.locator('#editor-tab-links').click();
+}
 const steps=raw=>raw.page.sections[0].diagram.steps;
 
 async function open(page,server,spec=fixture){
@@ -198,6 +206,13 @@ test('T8 a refused rename keeps the typed values and puts the reason under the f
   await expect(again.getByRole('textbox',{name:'Service name',exact:true})).toHaveValue('notify-v2');
   await expect(page.locator('#'+await op.getAttribute('aria-describedby'))).toContainText('service name and an operation');
   await expect(page.locator('#src')).toHaveValue(text);
+  // Opening Rename on another row drops this row's unsaved typing; reopening shows the saved values.
+  await panel.locator('[data-links-trace="ingest-api · POST /v1/events"]').getByRole('button',{name:'Rename ingest-api · POST /v1/events',exact:true}).click();
+  await expect(panel.getByRole('group',{name:'Rename '+KEY})).toHaveCount(0);
+  await panel.locator('[data-links-trace="'+KEY+'"]').getByRole('button',{name:'Rename '+KEY,exact:true}).click();
+  const fresh=panel.getByRole('group',{name:'Rename '+KEY});
+  await expect(fresh.getByRole('textbox',{name:'Service name',exact:true})).toHaveValue('notify-svc');
+  await expect(fresh.getByRole('textbox',{name:'Operation',exact:true})).toHaveValue('route.event');
 });
 
 test('T9 inline editor: Esc from the Node select closes it, removing its match closes it, and a failed Create keeps the typing',async({page,server})=>{
@@ -219,7 +234,7 @@ test('T9 inline editor: Esc from the Node select closes it, removing its match c
   await create.getByRole('textbox',{name:'Service name',exact:true}).fill('push-gw');
   await create.getByRole('textbox',{name:'Operation',exact:true}).fill('apns.send');
   // Another edit gives step 3 a match meanwhile (JSON + Render): the form keeps the typing, and Create is refused.
-  await page.evaluate(()=>{const src=document.getElementById('src'),raw=JSON.parse(src.value);raw.page.sections[0].diagram.steps[2].traceMatch={serviceName:'other',operation:'op'};src.value=JSON.stringify(raw,null,2);src.dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('go').click();});
+  await renderSource(page,raw=>{raw.page.sections[0].diagram.steps[2].traceMatch={serviceName:'other',operation:'op'};});
   await expect.poll(async()=>steps(await source(page))[2].traceMatch).toEqual({serviceName:'other',operation:'op'});
   await expect(create.getByRole('textbox',{name:'Service name',exact:true})).toHaveValue('push-gw');
   await create.getByRole('button',{name:'Create trace match',exact:true}).click();
@@ -227,4 +242,29 @@ test('T9 inline editor: Esc from the Node select closes it, removing its match c
   await expect(kept.getByRole('textbox',{name:'Service name',exact:true})).toHaveValue('push-gw');
   await expect(kept.getByRole('textbox',{name:'Operation',exact:true})).toHaveValue('apns.send');
   await expect(kept.getByRole('textbox',{name:'Service name',exact:true})).toHaveAttribute('aria-invalid','true');
+});
+
+test('T10 arrow keys in the Replace / Add as alternative menu skip the disabled item',async({page,server})=>{
+  const {panel,text}=await open(page,server);
+  await panel.getByRole('button',{name:'By element',exact:true}).click();
+  await panel.locator('[data-links-element="step:0:1"] [data-links-trace-chip="'+KEY+'"] .links-chip-main').focus();await page.keyboard.press('Enter');
+  await page.getByRole('menu',{name:new RegExp(KEY)}).getByRole('menuitem',{name:'Move to…'}).click();
+  await page.getByRole('dialog',{name:new RegExp('Move '+KEY)}).getByRole('button',{name:'Step 4 · retry',exact:true}).click();
+  const ask=page.getByRole('menu',{name:/Step 4 · retry already has a trace match/});await expect(ask).toBeVisible();
+  await expect(ask.getByRole('menuitem',{name:'Add as alternative'})).toBeDisabled();
+  await expect(ask.getByRole('menuitem',{name:'Replace'})).toBeFocused();
+  await page.keyboard.press('ArrowDown');await expect(ask.getByRole('menuitem',{name:'Cancel'})).toBeFocused();
+  await page.keyboard.press('Enter');await expect(ask).toBeHidden();
+  await expect(page.locator('#src')).toHaveValue(text);
+});
+
+test('T11 a new trace match draft is dropped when its step moves away',async({page,server})=>{
+  const {panel}=await open(page,server);
+  await panel.getByRole('button',{name:'By element',exact:true}).click();
+  await panel.locator('[data-links-element="step:0:2"]').getByRole('button',{name:'Add trace match to Step 3 · push',exact:true}).click();
+  await panel.getByRole('group',{name:'New trace match · Step 3 · push'}).getByRole('textbox',{name:'Service name',exact:true}).fill('push-gw');
+  await renderSource(page,raw=>{raw.page.sections[0].diagram.steps.splice(0,1);});
+  await expect.poll(async()=>steps(await source(page)).length).toBe(3);
+  await expect(panel.locator('.links-trace-editor')).toHaveCount(0);
+  await expect(panel.locator('[data-links-element="step:0:1"]').getByRole('button',{name:'Add trace match to Step 2 · push',exact:true})).toBeVisible();
 });

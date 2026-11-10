@@ -50,7 +50,7 @@ function linksTraceModel(text,raw,context){
         uses.push(use);if(!use.key)return;
         var g=groups[use.key] || (groups[use.key]={key:use.key,serviceName:use.serviceName,operation:use.operation,uses:[]});g.uses.push(use);
       });
-      var el={kind:'step',section:section,index:index,label:label,caption:typeof st.text==='string'?st.text:'',matches:matches,form:alts!==null,
+      var el={kind:'step',section:section,index:index,stepId:typeof st.id==='string'?st.id:null,label:label,caption:typeof st.text==='string'?st.text:'',matches:matches,form:alts!==null,
         edgeKeys:stepKeys(st).concat(Object.keys(stepFailures(st))),editable:true};
       if(alts===null)el.reason=label+'’s traceMatch is not a selector object or a list of them. Fix it in JSON or Inspect first.';
       // Static drop checks look a source step up through its model.
@@ -140,7 +140,9 @@ function planLinksTraceRename(text,raw,group,next,context){
   });
   if(!changes.length)return {error:key+' is not on any step. Render and try again.'};
   var clash=changes.find(function(got){return linksTraceHasKey(got.alternatives,nextKey);});
-  if(clash)return {error:clash.label+' already has '+nextKey+'; renaming would give it two. Remove one of them first.',field:'operation'};
+  // The reason goes under the field the reader changed (both when both changed).
+  var changed=[service!==group.serviceName?'serviceName':null,operation!==group.operation?'operation':null].filter(Boolean);
+  if(clash)return {error:clash.label+' already has '+nextKey+'; renaming would give it two. Remove one of them first.',field:changed.length===2?'both':changed[0] || 'operation'};
   // Only traceMatch values change, so every step path stays valid on the edited text.
   var out=text;
   for(var i=0;i<changes.length;i++){

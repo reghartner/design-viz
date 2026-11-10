@@ -12,7 +12,7 @@
 | T18 | 18 | Buttons keep focus across the refresh; Remove ticket N moves focus to the next control; Add environment / Add signal move focus into the new row and open its fold. | node with two tickets; board with telemetry; edge with one signal | focused element after each action | focus dropping to the body; a closed new fold |
 | T24 | 24 | The in-app guide names Missing work, Exists when tickets are complete, Exclude story, GitHub scope and Tickets on this step. | src/workbench/human-guide.html | each phrase present | missing guide text |
 | T25 | 25 | Adding a ticket, PR or Parent that is already attached says so next to the field and clears it, with no history entry. | node with HW-1 and a PR; board with Parent DOOR-100 | status note text; empty field; no Undo entry | silent no-op keeping the typed text |
-| T27 | 27 | In a document that imports nodes, an Inspector edit that makes the combined document invalid is refused inside the form. | consumer importing a provider; the session resolver refuses one section heading (stand-in for a provider rule) | error "This edit was not applied: …"; form and source unchanged | replacing the Inspector or losing the form |
+| T27 | 27 | In a document that imports nodes, an Inspector edit that makes the combined document invalid is refused inside the form. | consumer importing a provider; a real heading edit, then step Code references JSON `[1]`, which the real import resolver refuses | error "This edit was not applied: …codeRefs…" in the form and beside the field; same textarea with the typed text; aria-invalid; no history entry; Undo reverts the heading edit | replacing the Inspector or losing the form |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -76,6 +76,9 @@ test('T8 a Jira site edit leaves the rest of the tracking block text as written'
   assert.ok(ui.text.split('\n').length>lines,'the edit adds a line instead of collapsing the block: '+ui.text.split('\n').length+' vs '+lines);
   for(const line of block.filter(l=>l.includes('"lag"') || l.includes('"unit"')))assert.ok(ui.text.includes(line.trim()),'kept: '+line.trim());
   assert.deepEqual(ui.raw.page.tracking.telemetry,telemetry);
+  const stored=ui.text;ui.select(BOARD);ui.set('Jira site','https://acme.atlassian.net');
+  assert.equal(ui.text,stored,'the same site without its trailing slash changes nothing');
+  assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'and records no history entry');
 });
 
 test('T9a add then remove Parent on a page without tracking or panel leaves no tracking and no new warning',()=>{
@@ -108,7 +111,9 @@ test('T16 a refused Tracking edit is shown next to its field and marks it invali
   assert.equal(ui.text,before);
   assert.match(ui.message(input,'alert'),/Jira key/,'the message sits in the field row');
   assert.equal(input.getAttribute('aria-invalid'),'true');
-  const ok=ui.enter('Add ticket','HW-1');void ok;
+  input.value='';input.fire('keydown',{key:'Enter'});ui.h.flush();
+  assert.equal(input.getAttribute('aria-invalid'),null,'emptying the field clears the refusal');assert.equal(ui.message(input,'alert'),'');
+  ui.enter('Add ticket','hw-1');ui.enter('Add ticket','HW-1');
   ui.select(NODE);const fresh=ui.control('Add ticket');assert.equal(fresh.getAttribute('aria-invalid'),null);assert.equal(ui.message(fresh,'alert'),'');
   ui.select(BOARD);const parent=ui.enter('Parent','bad');
   assert.match(ui.message(parent,'alert'),/Jira key/);assert.equal(parent.getAttribute('aria-invalid'),'true');
@@ -143,6 +148,7 @@ test('T25 adding something already attached says so next to the field, clears it
   const input=ui.enter('Add ticket','HW-1');
   assert.equal(ui.text,before);assert.equal(ui.h.session.canUndo(),false);
   assert.match(ui.message(input,'status'),/HW-1 is already attached/);assert.equal(input.value,'','the field is cleared');
+  ui.enter('Add ticket','HW-1');assert.match(ui.message(input,'status'),/HW-1 is already attached/,'typing the same duplicate again says so again');assert.equal(input.value,'');
   const pr=ui.enter('Add PR','https://github.com/acme/api/pull/1');
   assert.match(ui.message(pr,'status'),/already attached/);assert.equal(pr.value,'');
   const board=harness(page({tracking:{jira:{epic:'DOOR-100'}}}),BOARD),parent=board.enter('Parent','DOOR-100');
@@ -150,23 +156,23 @@ test('T25 adding something already attached says so next to the field, clears it
 });
 
 test('T27 in a document that imports nodes a refused Inspector edit stays in the form',()=>{
-  const spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+  const spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',heading:'Flow',diagram}]}});
   const provider=spec('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
-  const consumer=spec('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],edges:[{from:'local',to:'canon::api',label:'call'}],topologyImports:[{spec:'provider',export:'core',as:'canon'}]});
+  const consumer=spec('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],edges:[{from:'local',to:'canon::api',label:'call'}],
+    topologyImports:[{spec:'provider',export:'core',as:'canon'}],steps:[{id:'s1',text:'Call the API',nodes:['local']}]});
   const ui=harness(consumer);
   ui.h.session.replaceProject(JSON.stringify(consumer,null,2),null,{topologyContext:{version:1,id:'consumer',specs:[provider,consumer]}});
-  // A resolver refusal the planners cannot see ahead of time (for example a provider rule): the
-  // session's import resolver throws for this one heading, as it does for an invalid combined document.
-  const resolve=ui.h.session.resolve;
-  ui.h.session.resolve=function(raw){if(JSON.stringify(raw).includes('Refused heading'))throw new Error('Topology consumer: invalid materialized spec');return resolve.apply(this,arguments);};
-  const SECTION={kind:'section',section:0};
-  ui.select(SECTION);const before=ui.text,heading=ui.control('heading');
-  heading.focus();heading.value='Refused heading';heading.fire('change');ui.h.flush();
-  assert.equal(ui.text,before,'the source is unchanged');
-  assert.match(ui.error(),/^This edit was not applied: Topology consumer: invalid materialized spec/);
-  assert.equal(ui.control('heading'),heading,'the form stays');assert.equal(heading.value,'Refused heading','the typed text stays');
-  assert.equal(heading.getAttribute('aria-invalid'),'true','the field is marked');
-  assert.equal(ui.h.session.canUndo(),false,'no history entry');
-  heading.value='Accepted heading';heading.fire('change');ui.h.flush();
-  assert.equal(ui.raw.page.sections[0].heading,'Accepted heading','a valid edit still applies');
+  const original=ui.text;
+  ui.select({kind:'section',section:0});ui.set('heading','Checkout');
+  const good=ui.text;assert.notEqual(good,original,'a real edit first');
+  // The real import resolver refuses a code reference that is not an object; no planner checks it first.
+  const STEP={kind:'step',section:0,index:0};ui.select(STEP);
+  const area=ui.control('Code references JSON');area.focus();area.value='[1]';area.fire('change');ui.h.flush();
+  assert.equal(ui.text,good,'the source is unchanged');
+  assert.match(ui.error(),/^This edit was not applied: .*codeRefs/,'the reason is shown in the form');
+  assert.equal(ui.control('Code references JSON'),area,'the form stays');assert.equal(area.value,'[1]','the typed text stays');
+  assert.equal(area.getAttribute('aria-invalid'),'true','the field is marked');
+  assert.match(ui.message(area,'alert'),/codeRefs/,'the message sits beside the field');
+  assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,original,'Undo reverts the previous real edit, not the refused one');
+  assert.equal(ui.h.session.canUndo(),false,'the refusal added no history entry');
 });

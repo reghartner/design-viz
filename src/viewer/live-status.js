@@ -926,7 +926,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var appearance=!cardsView.preview && workPaint && api.enabled() && availabilityOn && references?liveStatusPresentation(edge,map):null;
         liveStatusInk(card,null);
         if(authoring){
-          if(binding.ordinal!=null){card.setAttribute('data-metrics-section',binding.ordinal);card.setAttribute('tabindex','0');card.setAttribute('role','button');card.setAttribute('aria-label',(bound.card && bound.card.title || edge.label || edge.from+' to '+edge.to)+'. Drag metrics card to move. Arrow keys move 10 units; Shift moves 50.');}
+          if(binding.ordinal!=null){card.setAttribute('data-metrics-section',binding.ordinal);card.setAttribute('tabindex','0');card.setAttribute('role','button');card.setAttribute('aria-label',(bound.card && bound.card.title || edge.label || edge.from+' to '+edge.to)+'. Drag metrics card to move. Arrow keys move 10 units; Shift moves 50. Drag a corner handle, or press Alt+Left or Alt+Right, to change the width.');telemetryCardResizeHandles(card);}
           return;
         }
         var previous=path._livePointerTarget || path,c=previous._liveCarrier;

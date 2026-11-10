@@ -165,6 +165,25 @@ function telemetryTraceLabelsBlocked(texts){
 function telemetryTraceLabelBoxes(svg){
   return Array.from(svg.querySelectorAll('.dv-trace-overlay text')).map(function(el){return boardControlBox(el,svg);}).filter(Boolean);
 }
+/* #1242 Workbench-only width handles for an editable card (readers never call this).
+   Each corner has an 8-unit drawn square inside a 20-unit transparent hit area. */
+var TELEMETRY_CARD_HANDLE_HIT=20,TELEMETRY_CARD_HANDLE_MARK=8;
+function telemetryCardResizeHandles(card){
+  var doc=card.ownerDocument,box=card.querySelector('.dv-metrics-card-box');if(!box)return;
+  card.querySelectorAll('.dv-metrics-resize').forEach(function(el){el.remove();});
+  var hit=TELEMETRY_CARD_HANDLE_HIT,mark=TELEMETRY_CARD_HANDLE_MARK;
+  ['nw','ne','sw','se'].forEach(function(corner){
+    var g=telemetrySvg(doc,'g',{'class':'dv-metrics-resize','data-corner':corner},card);
+    telemetrySvg(doc,'title',{},g).textContent='Drag to change the card width ('+TELEMETRY_CARD_WIDTH_MIN+'–'+TELEMETRY_CARD_WIDTH_MAX+'). With the card focused, Alt+Left/Right changes it by 10; Shift+Alt by 50.';
+    telemetrySvg(doc,'rect',{'class':'dv-metrics-resize-hit',x:-hit/2,y:-hit/2,width:hit,height:hit,fill:'transparent'},g);
+    telemetrySvg(doc,'rect',{'class':'dv-metrics-resize-mark',x:-mark/2,y:-mark/2,width:mark,height:mark,rx:1.5,'aria-hidden':'true'},g);
+  });
+  telemetryCardPlaceHandles(card,Number(box.getAttribute('width')));
+}
+function telemetryCardPlaceHandles(card,w){
+  var box=card.querySelector('.dv-metrics-card-box'),h=box?Number(box.getAttribute('height')):0;
+  card.querySelectorAll('.dv-metrics-resize').forEach(function(g){var corner=g.getAttribute('data-corner');g.setAttribute('transform','translate('+(corner[1]==='w'?0:w)+' '+(corner[0]==='n'?0:h)+')');});
+}
 function telemetryPaintCards(scope,diagram,templates,view,window,activate,config){
   telemetryClearCards(scope);
   if(!view || !diagram)return;

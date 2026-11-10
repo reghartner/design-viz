@@ -38,6 +38,48 @@ function planDocumentSource(text,raw,key,value){
   return planDocumentSetting(text,raw,'generatedFrom',source);
 }
 
+/* #1236 Status board settings. What a document still needs to be a status board:
+   a page wrapper, a page `tracking` object and a Live status panel. */
+function statusBoardMissing(raw){
+  var doc=builderDocumentPage(raw),paths=specSectionPaths(raw);
+  var panel=paths.some(function(rec){
+    var d=specValueAt(raw,rec.diagram);
+    return specObject(d) && Array.isArray(d.panels) && d.panels.some(function(p){return specObject(p) && p.type==='live-status';});
+  });
+  return {page:!doc,tracking:!doc || !specObject(doc.page.tracking),panel:!panel};
+}
+/* One plan, so one Undo step: wrap a bare diagram, add `tracking: {}`, then a Live
+   status panel in the first section that has a diagram (a detail-only section last). */
+function planMakeStatusBoard(text,raw){
+  var missing=statusBoardMissing(raw);
+  if(!missing.page && !missing.tracking && !missing.panel)return {error:'This document is already a status board.'};
+  var out=text,current=raw;
+  function step(plan){if(plan.error)return plan;out=plan.text;current=JSON.parse(out);return null;}
+  if(missing.page){var wrapped=step(planWrapDocument(out,current));if(wrapped)return wrapped;}
+  if(missing.panel){
+    var paths=specSectionPaths(current),order=paths.map(function(rec,i){return i;}).filter(function(i){return specObject(specValueAt(current,paths[i].diagram));});
+    order.sort(function(a,b){return !!specValueAt(current,paths[a].section).detailOnly-!!specValueAt(current,paths[b].section).detailOnly || a-b;});
+    if(!order.length)return {error:'Add a diagram first; the Live status panel sits beside a diagram.'};
+    var added=step(planAddPanel(out,current,order[0],'live-status'));if(added)return added;
+  }
+  if(missing.tracking){
+    var doc=builderDocumentPage(current),tracked=step(planSetField(out,current,doc.path,'tracking','{}'));if(tracked)return tracked;
+  }
+  return {text:out};
+}
+/* Validator warnings for the page tracking block, split by Status board section. */
+var STATUS_BOARD_WARNING_SECTIONS=[['environments',/^tracking\.telemetry\.environments?[.:[]/],['lookups',/^tracking\.telemetry\.lookups[.:[]/],
+  ['traces',/^tracking\.telemetry\.traceConnections[.:[]/],['metrics',/^tracking\.telemetry[.:[]/],['jira',/^tracking\.[A-Za-z]/],['board',/^tracking:/]];
+function statusBoardWarnings(raw,validateSource){
+  var out={board:[],jira:[],metrics:[],traces:[],environments:[],lookups:[]},warnings;
+  try{warnings=builderValidateSource(raw,validateSource).warnings || [];}catch(ex){warnings=[];}
+  warnings.forEach(function(message){
+    var match=STATUS_BOARD_WARNING_SECTIONS.find(function(rule){return rule[1].test(message);});
+    if(match)out[match[0]].push(message);
+  });
+  return out;
+}
+
 var BUILDER_SECTION_TEMPLATE = [
   '{',
   '  "heading": "New section",',

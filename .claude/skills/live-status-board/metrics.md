@@ -302,7 +302,7 @@ slug. Match the selected deployment to the ticket/PR feature rollout; never
 assume it is in production. `$env` / `${env}` in queries (including nested
 Honeycomb string values), links and datasource fields use the reader's selected
 profile. A declared template parameter named `env` retains its existing meaning.
-Document settings → Tracking → Metrics provides profile controls; Live status
+Status board settings → Environments provides profile controls; Live status
 provides a session-only Environment selector. See the environment section in
 [the runtime contract](../../../docs/live-status.md#telemetry-environments).
 

@@ -815,6 +815,13 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .metrics-fold{min-width:0;margin:6px 0;}
 .metrics-fold>.frow,.metrics-fold>.fnote{margin-top:6px;}
 .metrics-fold .metrics-fold{margin-left:8px;}
+/* #1236 Status board settings: one top-level fold per section; the summary carries a short status. */
+.board-section{min-width:0;margin:3px 0;}
+.board-section>summary{font-weight:650;}
+.board-section>.frow,.board-section>.fnote,.board-section>div,.board-section>ul{margin-top:6px;}
+.board-section>fieldset.metrics-settings{min-width:0;margin:0;padding:0;border:0;}
+.board-settings-link{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+.board-make{margin:6px 0;}
 /* builder: selection highlight on the rendered page (svg + widget cards) */
 .docview .grp, .docview .node, .docview .edge, .docview .halo, .docview .coin,
 .docview .pwidget, .docview .sec-text[data-dv-para],

@@ -132,7 +132,7 @@ function createBuilderInteractions(opts){
     return String(s).replace(/[^A-Za-z0-9_-]/g, '\\$&');
   }
   function findTargetEl(t){
-    if (!t || t.kind === 'document') return null;
+    if (!t || t.kind === 'document' || t.kind === 'board') return null;
     if (t.kind === 'tab') return document.getElementById('tab-' + t.block + '-' + t.tab);
     var secEl = view.querySelector('.doc-sec[data-dv-section="' + t.section + '"]');
     if (!secEl) return null;
@@ -702,7 +702,7 @@ function createBuilderInteractions(opts){
     /* setSelected paints first; publish the stable authored identity after it
        is assigned so selection mirrors (clipboard context) see it. */
     selectionChanged();
-    if (target.kind !== 'tab' && target.kind !== 'document') session.insertSection = target.section;
+    if (target.kind !== 'tab' && target.kind !== 'document' && target.kind !== 'board') session.insertSection = target.section;
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
     /* Viewer navigation has already selected the path/step and painted the

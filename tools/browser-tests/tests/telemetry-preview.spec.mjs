@@ -20,7 +20,7 @@ async function open(page,server,spec=raw){
  });
  await page.goto(server.origin+'/lifetime/index.html');await paste(page,JSON.stringify(spec,null,2));await prepareEditorSurface(page);
 }
-async function settings(page){await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();}
+async function settings(page){await page.locator('#editor-tab-inspect').click();await page.locator('#status-board-settings').click();}
 async function exported(page){const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const files=await projectFiles(await pending);return JSON.parse(files[Object.keys(files).find(k=>k.endsWith('.spec.json'))]);}
 async function settle(page){await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));}
 async function box(card){return card.evaluate(el=>{const r=el.querySelector('rect'),m=el.transform.baseVal.consolidate().matrix;return {x:m.e,y:m.f,w:+r.getAttribute('width'),h:+r.getAttribute('height'),side:el.dataset.side};});}

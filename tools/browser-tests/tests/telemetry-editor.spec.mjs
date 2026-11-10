@@ -1,9 +1,9 @@
-/* #941 PR 1 of 2: desktop Workbench Inspect → Tracking → Metrics editor and Document settings telemetry block.
+/* #941 PR 1 of 2: desktop Workbench Inspect → Tracking → Metrics editor and the page telemetry block (#1236: Status board settings → Metrics).
    Node-level rows M1–M15 live in tests/telemetry-editor.test.js; this spec proves the real Workbench path.
 | row | rule | fixture | structurally scoped assertion | plausible broken implementation it rejects |
 |---|---|---|---|---|
 | W1 | Desktop: select a connection label; once its Tracking fieldset is visible, exactly one Metrics sub-section is in it (immediate count) and it shows the connection unbound; choosing Metrics kind and typing New signal name/source/query/unit, then Enter, binds one raw signal; one Undo restores the exact source and one Redo the edit; a proof limit is added; Export project keeps the binding and declares flow.telemetry. | `raw`: two connections, page `tracking.jira`, a live-status panel; viewport 1440×1000 | `#guide fieldset.tracking-editor fieldset.metrics-editor` count is 1; the source's `edges[0]` equals the original plus the binding; Undo/Redo give exact text; the exported `edges[0]` equals the original plus binding and proof, `edges[1]` and `tracking` unchanged | controls missing or outside Tracking; UI-only state that never reaches the source; a kind change that writes a half binding; an export that drops telemetry |
-| W2 | Document settings → Tracking: once GitHub scope is visible, exactly one Metrics block is in it (immediate count); Add template with name, kind, parameters and a first signal; one Undo/Redo; Metrics window; a connection uses the template through Signals from + Template parameter inputs; Export project keeps the page block and the carrier binding. | same `raw` | `#guide fieldset.tracking-editor fieldset.metrics-settings` count is 1; `tracking.telemetry` equals `{templates:{kafka-topic}}`, then gains `window`; `edges[1].telemetry` equals `{use,topic,group}`; the export keeps both and `edges[0]` unchanged | a settings block that is not wired to `tracking.telemetry`; a template picker not fed by page templates; settings lost on export |
+| W2 | Status board settings (#1236; was Document settings → Tracking): once GitHub scope is visible, exactly one Metrics block is in its Metrics section (immediate count); Add template with name, kind, parameters and a first signal; one Undo/Redo; Metrics window; a connection uses the template through Signals from + Template parameter inputs; Export project keeps the page block and the carrier binding. | same `raw` | `details.board-section[data-board-section="metrics"] fieldset.metrics-settings` count is 1; `tracking.telemetry` equals `{templates:{kafka-topic}}`, then gains `window`; `edges[1].telemetry` equals `{use,topic,group}`; the export keeps both and `edges[0]` unchanged | a settings block that is not wired to `tracking.telemetry`; a template picker not fed by page templates; settings lost on export |
 | P1 | Preview metrics layout toggle (placeholder edge cards): covered in telemetry-preview.spec.mjs. | n/a | n/a | n/a |
 */
 import {test,expect,paste,prepareEditorSurface,openMetricsFold} from '../helpers/test.mjs';
@@ -62,7 +62,7 @@ test('W1 desktop connection gets a raw metrics signal with one Undo Redo, a proo
 test('desktop relative metrics windows preserve aliases and exact Undo Redo source',async({page,server},testInfo)=>{
   await open(page,server);
   const source=page.locator('#src'),guide=page.locator('#guide');
-  const settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};
+  const settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#status-board-settings').click();};
   for(const entered of [' -6h ',' now-6h ']){
     await settings();const before=await source.inputValue(),input=guide.getByLabel('Metrics window',{exact:true});
     await input.fill(entered);await input.press('Enter');
@@ -80,15 +80,15 @@ test('desktop relative metrics windows preserve aliases and exact Undo Redo sour
   await settings();await guide.locator('fieldset.metrics-settings').screenshot({path:testInfo.outputPath('relative-metrics-window-desktop.png')});
 });
 
-test('W2 Document settings templates round-trip through Undo Redo, a connection template binding and Export project',async({page,server},testInfo)=>{
+test('W2 Status board settings templates round-trip through Undo Redo, a connection template binding and Export project',async({page,server},testInfo)=>{
   await open(page,server);
   const source=page.locator('#src'),guide=page.locator('#guide');
-  const settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};
+  const settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#status-board-settings').click();};
   await settings();
-  // Document settings → Tracking has rendered: GitHub scope predates #941 and is built in the same pass as the Metrics block.
+  // Status board settings has rendered: GitHub scope (Jira section) is built in the same pass as the Metrics block.
   await expect(guide.getByLabel('GitHub scope',{exact:true})).toBeVisible();
-  expect(await page.locator('#guide fieldset.tracking-editor fieldset.metrics-settings').count(),'Document settings → Tracking → Metrics block rendered').toBe(1);
-  const block=guide.locator('fieldset.tracking-editor fieldset.metrics-settings');await expect(block).toBeVisible();
+  expect(await page.locator('#guide details.board-section[data-board-section="metrics"] fieldset.metrics-settings').count(),'Status board settings → Metrics block rendered').toBe(1);
+  const block=guide.locator('details.board-section[data-board-section="metrics"] fieldset.metrics-settings');await expect(block).toBeVisible();
   const before=await source.inputValue();
   await openMetricsFold(block,'New template');await guide.getByLabel('New template name',{exact:true}).fill('kafka-topic');
   await guide.getByLabel('New template kind',{exact:true}).selectOption('queue');

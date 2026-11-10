@@ -123,6 +123,9 @@ export function metricsFold(scope,title){
   return scope.locator('details.metrics-fold').filter({has:scope.page().locator(':scope > summary',{hasText:new RegExp('^'+title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$')})});
 }
 export async function openMetricsFold(scope,title){const fold=metricsFold(scope,title);await openInspectorGroup(fold);return fold;}
+// #1236 Status board settings: one <details class="board-section" data-board-section="id"> per section (jira, metrics, traces, environments, lookups).
+export function boardSection(scope,id){return scope.locator('details.board-section[data-board-section="'+id+'"]');}
+export async function openBoardSection(scope,id){const section=boardSection(scope,id);await openInspectorGroup(section);return section;}
 export async function paste(page,text){
   await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(text);
   await page.locator('#welcome-paste-form button[type=submit]').click();

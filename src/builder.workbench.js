@@ -836,6 +836,14 @@ function initWorkbenchBuilder(opts){
   ['document-settings','outline-document-settings'].forEach(function(id){
     var button=document.getElementById(id);if(button)life.listen(button,'click',openDocumentSettings);
   });
+  /* #1236: board-level Jira, Metrics, Traces, Environments and Log searches. */
+  function openStatusBoardSettings(){
+    if(interactions.busy()){inspectorMessage('Finish the current canvas action before opening status board settings.');return;}
+    clearMultiSelect();selectTarget({kind:'board'},false);
+  }
+  ['status-board-settings','outline-status-board-settings'].forEach(function(id){
+    var button=document.getElementById(id);if(button)life.listen(button,'click',openStatusBoardSettings);
+  });
   function scrollTextareaTo(start){
     /* newline counting under-measures because long JSON lines soft-wrap
        in the textarea; mirror the text up to the selection in an

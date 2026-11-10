@@ -916,7 +916,7 @@ for(const linked of [true,false])test('D8 desktop dependency buttons visibly foc
 });
 test('E8 desktop page Parent controls validate preserve history export and demo',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);
- const src=page.locator('#src'),settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};await settings();
+ const src=page.locator('#src'),settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#status-board-settings').click();};await settings();
  const input=page.locator('#guide').getByLabel('Parent',{exact:true}),before=await src.inputValue();await input.fill('bad');await input.press('Enter');await expect(src).toHaveValue(before);await expect(page.locator('#guide .ierr')).toContainText('Jira key');
  for(const key of ['DOOR-100','INIT-100']){
   const previous=await src.inputValue();await input.fill(key);await input.press('Enter');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.jira.epic).toContain(key);const changed=await src.inputValue();
@@ -1309,7 +1309,7 @@ test('G2 G11 Jira-only connector retains plain PR links without GitHub evidence 
 });
 test('G12 desktop GitHub scope validates repos and org with one Undo Redo and export',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);
- const src=page.locator('#src'),settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};await settings();const input=page.locator('#guide').getByLabel('GitHub scope',{exact:true});
+ const src=page.locator('#src'),settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#status-board-settings').click();};await settings();const input=page.locator('#guide').getByLabel('GitHub scope',{exact:true});
  const before=await src.inputValue();await input.fill('bad scope!');await input.press('Enter');await expect(src).toHaveValue(before);await expect(page.locator('#guide .ierr')).toContainText('owner/repo');
  for(const [value,want] of [['acme/firmware, acme/backend',{repos:['acme/firmware','acme/backend']}],['org:acme',{org:'acme'}]]){
   const previous=await src.inputValue();await input.fill(value);await input.press('Enter');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.github).toEqual(want);const changed=await src.inputValue();await page.locator('#undo-builder').click();await expect(src).toHaveValue(previous);await page.locator('#redo-builder').click();await expect(src).toHaveValue(changed);await settings();
@@ -1365,7 +1365,7 @@ test('X desktop exclusions and displayed dependencies use one deduplicated story
 test('X desktop exclusion controls validate deduplicate undo redo remove and export',async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});await useProjectDownloads({page});await page.goto(server.origin+'/workbench.html');
  const spec=structuredClone(raw);spec.page.tracking.jira.epic='DOOR-100';spec.page.tracking.github={org:'acme'};await paste(page,JSON.stringify(spec));await prepareEditorSurface(page);
- const src=page.locator('#src'),settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();};await settings();const input=page.locator('#guide').getByLabel('Exclude story',{exact:true});
+ const src=page.locator('#src'),settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#status-board-settings').click();};await settings();const input=page.locator('#guide').getByLabel('Exclude story',{exact:true});
  const before=await src.inputValue();await input.fill('bad');await input.press('Enter');await expect(src).toHaveValue(before);await expect(page.locator('#guide .ierr')).toContainText('Jira key');
  await input.fill('HW-124');await input.press('Enter');await expect.poll(async()=>JSON.parse(await src.inputValue()).page.tracking.jira.exclude).toEqual(['HW-124']);const added=await src.inputValue();
  await input.fill('HW-124');await input.press('Enter');await expect(src).toHaveValue(added);await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);await page.locator('#redo-builder').click();await expect(src).toHaveValue(added);await settings();

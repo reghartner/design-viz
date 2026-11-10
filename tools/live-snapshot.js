@@ -255,7 +255,9 @@ function restTransport(env,fetchImpl,now,boardSite,options){
         if(span>HONEYCOMB_MAX_SECONDS)throw failure('Honeycomb queries cover at most 7 days; the board window is '+Math.round(span/86400)+' d');
         const query=await call('/1/queries/'+dataset,spec,'Honeycomb query',signal);
         if(!query || typeof query.id!=='string')throw failure('Honeycomb query returned no id');
-        let result=await call('/1/query_results/'+dataset,{query_id:query.id,disable_series:false},'Honeycomb query result',signal);
+        // Honeycomb allows 10 query-result creations a minute; past that each signal fails alone and says why.
+        let result=await call('/1/query_results/'+dataset,{query_id:query.id,disable_series:false},'Honeycomb query result',signal).catch(error=>{
+          if(error && error.code==='rate_limited')throw failure('Honeycomb query result is rate limited (HTTP 429; Honeycomb allows 10 query results a minute)');throw error;});
         const started=Date.now();
         while(!(result && result.complete===true)){
           if(!result || typeof result.id!=='string')throw failure('Honeycomb query result returned no id');
@@ -265,7 +267,8 @@ function restTransport(env,fetchImpl,now,boardSite,options){
         }
         // A failed query answers HTTP 200, complete:true and an `error` string where `data` would be (docs.honeycomb.io
         // /api/query-data/get-query-result). Only fixed text is recorded: the provider's message can hold data.
-        if(result.error!=null || !result.data || typeof result.data!=='object')throw failure('Honeycomb query failed');
+        if(result.error!=null)throw failure('Honeycomb query failed (complete with an error)');
+        if(!result.data || typeof result.data!=='object')throw failure('Honeycomb query answered no data');
         // The docs show result keys as OP(column) (COUNT, P99(duration_ms)) and give no rule for a calculation's
         // `name`, so a named calculation's value is also copied to its name, which the viewer's adapter looks up.
         const calc=Array.isArray(spec.calculations) && spec.calculations.length===1?spec.calculations[0]:null;
@@ -275,8 +278,10 @@ function restTransport(env,fetchImpl,now,boardSite,options){
         const data=result.data,series=(Array.isArray(data.series)?data.series:[]).map(row=>({data:Object.assign(named(row && row.data),{time:row && row.time})}));
         let granularity=Number(spec.granularity);
         if(!(granularity>0)){const times=series.map(row=>Date.parse(row.data.time)).filter(isFinite).sort((a,b)=>a-b);for(let i=1;i<times.length;i++){const gap=(times[i]-times[i-1])/1000;if(gap>0 && (!(granularity>0) || gap<granularity))granularity=gap;}}
-        /* The REST answer has no header, info or granularity field (docs.honeycomb.io /api/query-data); the
-           granularity is the query's, or the series spacing. run_query's raw result keeps time inside data. */
+        /* The REST answer's shape (docs.honeycomb.io/api/query-data/get-query-result, and Honeycomb's Go client,
+           terraform-provider-honeycombio client/query_result.go): data.series rows {time, data}, data.results rows
+           {data}, and no header, info or granularity field. The granularity is the query's, or the series
+           spacing. run_query's raw result keeps time inside data. */
         const raw={results:(Array.isArray(data.results)?data.results:[]).map(row=>({data:named(row && row.data)})),series};
         if(granularity>0 && Number.isSafeInteger(granularity))raw.info={granularity_seconds:granularity};
         return raw;

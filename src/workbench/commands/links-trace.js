@@ -160,3 +160,21 @@ function planLinksTraceRename(text,raw,group,next,context){
   }
   return {text:out,count:changes.length};
 }
+
+/* Attribute names trace matching supports on this board: canon's operational
+   list plus those the page's trace connections allow (as the validator reads). */
+function linksTraceAttributeNames(raw,context){
+  if(typeof FlowCanon==='undefined' || !FlowCanon.traceAttributeNames)return null;
+  var resolved;try{resolved=linksResolve(raw,context);}catch(ex){resolved=raw;}
+  return FlowCanon.traceAttributeNames(resolved);
+}
+/* One inline-editor edit (planStepTraceMatch), refusing an attribute name the
+   validator would reject, so an edit never leaves the board invalid. */
+function planLinksTraceEdit(text,raw,section,index,edit,context){
+  if(edit && edit.op==='attribute' && typeof edit.name==='string' && edit.name.trim()){
+    var names=linksTraceAttributeNames(raw,context),name=edit.name.trim();
+    if(names && names.indexOf(name)<0)return {error:name+' is not a trace attribute Flowview can match on. Use one of '+names.join(', ')+', or one your trace connection lists in allowedAttributes.',field:edit.key==null?'attr-new-name':'attr-name'};
+  }
+  var plan=planStepTraceMatch(text,raw,section,index,edit);
+  return plan.noop?{text:text}:plan;
+}

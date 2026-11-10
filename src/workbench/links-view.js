@@ -556,7 +556,7 @@ function initWorkbenchLinksView(opts){
   }
   function traceEdit(e,alternative,edit,field){
     var t={section:e.section,index:e.index};
-    var ok=commit(function(text,raw){var plan=planStepTraceMatch(text,raw,t.section,t.index,edit);return plan.noop?{text:text}:plan;},{ok:'Saved the trace match on '+e.label+'. Undo restores it.'});
+    var ok=commit(function(text,raw,ctx){return planLinksTraceEdit(text,raw,t.section,t.index,edit,ctx);},{ok:'Saved the trace match on '+e.label+'. Undo restores it.'});
     if(!ok && field && error.textContent){var input=list.querySelector('[data-links-field="'+cssEscape(field)+'"]');if(input){var msg=error.textContent;fail('');fieldError(input,msg);}}
     return ok;
   }
@@ -650,8 +650,12 @@ function initWorkbenchLinksView(opts){
       var rm=button('bbtn links-trace-remove','Remove','Remove attribute '+name);rowsLife.listen(rm,'click',function(){traceEdit(e,alternative,{op:'attribute',alternative:alternative,key:name,name:''});});
       row.appendChild(rm);box.appendChild(row);
     });
+    var names=!s.error && linksTraceAttributeNames(s.raw,context()) || [],listId=uid+'-trace-attrs';
+    if(names.length && !doc.getElementById(listId)){var dl=el('datalist');dl.id=listId;names.forEach(function(n){var o=el('option');o.value=n;dl.appendChild(o);});root.appendChild(dl);}
+    function suggest(row){var input=row.querySelector('input');if(input && names.length){input.setAttribute('list',listId);input.title='Supported attribute names are suggested; others are refused.';}return row;}
+    Array.prototype.forEach.call(box.querySelectorAll('[data-links-field*="|attr-name-"]'),function(input){suggest(input.parentNode);});
     var add=el('div','links-trace-attr links-trace-add');add.setAttribute('role','group');add.setAttribute('aria-label','New attribute');
-    var newName=traceField(base+'attr-new-name','New attribute name','',function(){},'event.type'),newValue=traceField(base+'attr-new-value','New attribute value','',function(){},'doorbell.press');
+    var newName=suggest(traceField(base+'attr-new-name','New attribute name','',function(){},'deployment.environment.name')),newValue=traceField(base+'attr-new-value','New attribute value','',function(){},'doorbell.press');
     var addBtn=button('bbtn','Add attribute');
     rowsLife.listen(addBtn,'click',function(){var n=newName.querySelector('input'),v=newValue.querySelector('input');traceEdit(e,alternative,{op:'attribute',alternative:alternative,key:null,name:n.value,value:v.value},base+'attr-new-name');});
     add.appendChild(newName);add.appendChild(newValue);add.appendChild(addBtn);box.appendChild(add);

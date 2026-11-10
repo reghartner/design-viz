@@ -1425,13 +1425,21 @@ it makes the calls a published board makes, and sends each call to the provider'
 Jira search and issue reads (`POST /rest/api/3/search/jql`, `GET /rest/api/3/issue/{key}`),
 and Grafana Prometheus and Loki range queries through the board's datasource uids
 (`/api/datasources/proxy/uid/{uid}/…`) plus `/api/annotations`. Grafana SQL and CloudWatch
-signals, Honeycomb, traces and log searches are not read yet; each such signal is recorded as an
-error and the run goes on. It takes today's state only (no Over time history).
+signals, Honeycomb, traces and log searches are not read yet: each such signal is one recorded
+error (carrier id and signal name) and the run goes on. Pull request states are not read either
+(no GitHub transport yet): each authored PR is one recorded error. A board that imports shared
+topology (`topologyImports`) is refused, because the script does not resolve imported carriers
+yet. It takes today's state only (no Over time history). Every request ends after 30 s or at
+`--timeout` (default 60 s), and the process exits once its line is printed.
 
 Credentials come from the environment and are never written to the snapshot:
-`JIRA_EMAIL` and `JIRA_API_TOKEN` (an Atlassian API token; the site is the board's
-`tracking.jira.site`, or `JIRA_SITE`), and `GRAFANA_URL` with `GRAFANA_TOKEN` (a service
-account token). A provider whose variables are missing is skipped and its variables are named.
+`JIRA_EMAIL` and `JIRA_API_TOKEN` (an Atlassian API token), and `GRAFANA_URL` with
+`GRAFANA_TOKEN` (a service account token). A provider whose variables are missing is skipped and
+its variables are named. Credentials go only to a host the environment names: `JIRA_SITE` and
+`GRAFANA_URL`, which must use https and hold no user name or password. Without `JIRA_SITE`, the
+Jira host is the board's `tracking.jira.site` only when it is an https `*.atlassian.net` site; a
+board authored elsewhere cannot send the agent's token to another host. Every printed and
+recorded message is scrubbed of the credential values.
 
 Provider responses never reach the agent: the script prints exactly one line, for example
 `snapshot diagrams/doorbell/doorbell.snapshot.json at 2026-11-10T11:02:00.000Z: 7 tickets (0 missing) ·

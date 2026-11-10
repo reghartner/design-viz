@@ -1307,12 +1307,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
       coverage:coverage,readiness:readiness,activity:copy(liveStatusActivity(activity.filter(function(item){return storyKeys.indexOf(item.key)>=0;}),telemetryActivity.snapshot())).map(function(item){item.relative=telemetryTime(item.at)?relative(item.at):'time unavailable';return item;}),
       demo:demoControls?{ended:!!demoControls.ended,first:!demoControls.prev || !!demoControls.first}:null,verdict:verdict,
       overTime:overTimeState(),
+      // #1253: no provider, no host-applied map and no connector adapter: the page cannot show live status here.
+      noProvider:!provider && !applied && !demoMode && connection.state==='none' && (refs().tickets.length || refs().epics.length)?{prs:refs().prs.slice()}:null,
       editHistory:copy(editHistory),edit:editState(),
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
       connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+clockTime(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}},
       metrics:metricsSnapshot(),mode:statusMode,trace:traceSnapshot()};
   }
-  function editState(){var state=editor?editor.state():null;return state && over && !state.blocked?Object.assign({},state,{blocked:'Editing is off while a past day is shown.'}):state;}
+  // #1253: Edit waits while history loads too, since the load would end on a past day.
+  function editState(){var state=editor?editor.state():null;return state && (over || overLoading) && !state.blocked?Object.assign({},state,{blocked:over?'Editing is off while a past day is shown.':'Editing is off while history loads.'}):state;}
   // #1138 (D2, V2): a board with no ticket, epic, exclusion or missing-work reference after imports has no Jira
   // history, so when it has Metrics, Over time uses the local day list. The reader's click still opens it.
   var localHistory={load:function(){return liveStatusLocalDays(Date.now());}};
@@ -1390,6 +1393,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(mark && !target && directTrace.snapshot().busy){overParked={request:request,result:result,source:source,reader:!!mark.reader};notify();return;}
     if(mark && (target?target.key===localDayKey(Date.now()):!mark.reader)){notify();return;}
     if(target){index=days.findIndex(function(day){return day.key===target.key;});if(index<0){traceDayNote=outsideNote(target);notify();return;}}
+    // #1253: Edit mode can start without the Edit button (a conflict replay); a past day is never shown while editing.
+    if(editing()){overError='Over time did not open because Edit mode is on. Finish editing, then try again.';notify();return;}
     var show=function(){over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null,source:source};on=true;availabilityOn=true;traceViewChanged();telemetry.openHistory(days,index);overShow();};
     if(target)traceMoved(show);else show();
   }
@@ -1479,45 +1484,67 @@ function createLiveStatus(ctl,page,options,renderOptions){
     else if(anchor){var root=pop.getRootNode();if(root.activeElement===anchor)pop.querySelector('.node-link-close').focus({preventScroll:true});anchor.remove();}
     return true;
   }
+  /* #1253: a repaint keeps an open popover. A Jira popover is rebuilt from its carrier's values now
+     (states, waiting, stale and PR lines); a Metrics section keeps its element and updates in place. */
   function refreshPopover(){
     if(!active || !pop)return;
+    if(active._liveCarrier && !active._liveCarrier.metricsOnly){rebuildPopover(active);active.setAttribute('aria-expanded','true');return;}
     var hadProduction=!!pop.querySelector('.dv-live-production');
     if(!paintProduction(active) && hadProduction){close(true);return;}
-    pop.querySelectorAll('.dv-live-ticket[data-live-ticket]').forEach(function(row){
-      var entry=map[row.getAttribute('data-live-ticket')],pill=row.querySelector('.dv-live-ticket-state');
-      if(pill){pill.textContent=entry?entry.state:'No status';liveStatusClass(pill,entry?entry.state:null);row.style.setProperty('--dv-live-chip-ch',String(pill.textContent.length));}
-    });
     active.setAttribute('aria-expanded','true');
+  }
+  function popoverControlKey(el){var row=el.closest('[data-live-ticket]');return [row?row.getAttribute('data-live-ticket'):'',el.tagName,el.className,el.getAttribute('href') || '',el.getAttribute('aria-label') || ''].join('|');}
+  function popoverMarkup(nodes){return nodes.every(function(node){return typeof node.outerHTML==='string';})?nodes.map(function(node){return node.outerHTML;}).join(''):null;}
+  // Unchanged content stays as it is (text selection, hover); focus inside goes back to the same control, else to Close.
+  function rebuildPopover(trigger){
+    var c=trigger._liveCarrier,root=pop.getRootNode?pop.getRootNode():document,focused=root && root.activeElement;
+    // The Metrics section stays in place (never detached): a control focused inside it keeps its focus.
+    var block=pop.querySelector('.dv-live-production'),inBlock=!!(block && focused && block.contains(focused)),key=focused && focused!==pop && !inBlock && pop.contains(focused)?popoverControlKey(focused):null;
+    var question=asked && editing() && editor.question(),box=document.createElement('div'),filled=fillPopover(box,trigger,c.value,c.tracking,c.label,c.waiting,c.availability,c.ref,question || null),dismiss=filled.dismiss;asked=!!filled.asking;
+    var fresh=Array.prototype.slice.call(box.children),old=Array.prototype.filter.call(pop.children,function(node){return node!==block;}),before=popoverMarkup(old);
+    if(before==null || before!==popoverMarkup(fresh)){
+      old.forEach(function(node){node.remove();});
+      fresh.forEach(function(node){pop.insertBefore(node,block || null);});
+      if(key){var again=Array.prototype.find.call(pop.querySelectorAll('a,button'),function(el){return !(block && block.contains(el)) && popoverControlKey(el)===key;}) || dismiss;again.focus({preventScroll:true});}
+    }
+    paintProduction(trigger);place(trigger);
   }
   function show(trigger,value,tracking,label,waiting,availability,ref,asking){
     if(retired)return;
     if(active===trigger){close(true);return;}close(false);
     if(!pop){pop=element('div','nbackpop dv-live-popover',null,view);pop.setAttribute('role','dialog');pop.setAttribute('popover','manual');pop.hidden=true;}
+    pop.replaceChildren();
+    var filled=fillPopover(pop,trigger,value,tracking,label,waiting,availability,ref,asking);
+    paintProduction(trigger);
+    reveal(trigger,filled.dismiss,!!filled.asking);
+  }
+  // The popover's content for a carrier, built into `box` (the popover, or a detached box for a refresh).
+  function fillPopover(box,trigger,value,tracking,label,waiting,availability,ref,asking){
     var metricsOnly=!!(trigger._liveCarrier && trigger._liveCarrier.metricsOnly);
-    pop.replaceChildren();pop.setAttribute('aria-label',metricsOnly?'Metrics for '+label:(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label);
-    element('strong','node-link-title',(metricsOnly?'Metrics · ':'Work status · ')+label,pop);
-    var dismiss=element('button','node-link-close','×',pop);dismiss.type='button';dismiss.setAttribute('aria-label',metricsOnly?'Close metrics':'Close live tickets');dismiss.addEventListener('click',function(){close(true);});
-    if(metricsOnly){paintProduction(trigger);reveal(trigger,dismiss,false);return;}
+    pop.setAttribute('aria-label',metricsOnly?'Metrics for '+label:(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label);
+    element('strong','node-link-title',(metricsOnly?'Metrics · ':'Work status · ')+label,box);
+    var dismiss=element('button','node-link-close','×',box);dismiss.type='button';dismiss.setAttribute('aria-label',metricsOnly?'Close metrics':'Close live tickets');dismiss.addEventListener('click',function(){close(true);});
+    if(metricsOnly)return {dismiss:dismiss,asking:null};
     var summary=trigger._liveCarrier && trigger._liveCarrier.summary,found=trackingRefs(summary || value);
-    if(summary)element('p','dv-live-domain-summary','Domain summary: this node and '+summary.carriers+' descendant nodes/connections · '+summary.tickets.length+' unique tickets.'+(summary.missing?' Missing work: '+summary.missing+' marked carriers.':'')+(summary.unavailable.length?' Detail evidence unavailable: '+summary.unavailable.join(', ')+'. Completion is unknown.':''),pop);
-    if(value && value.missingWork===true)element('p','dv-live-coverage-detail','Missing work: additional work remains without a linked ticket. Clear this Missing work marker when covered.',pop);
-    else if(!summary && !found.tickets.length && referencesAvailable())element('p','dv-live-coverage-detail','No change needed: no linked tickets or missing-work marker.',pop);
+    if(summary)element('p','dv-live-domain-summary','Domain summary: this node and '+summary.carriers+' descendant nodes/connections · '+summary.tickets.length+' unique tickets.'+(summary.missing?' Missing work: '+summary.missing+' marked carriers.':'')+(summary.unavailable.length?' Detail evidence unavailable: '+summary.unavailable.join(', ')+'. Completion is unknown.':''),box);
+    if(value && value.missingWork===true)element('p','dv-live-coverage-detail','Missing work: additional work remains without a linked ticket. Clear this Missing work marker when covered.',box);
+    else if(!summary && !found.tickets.length && referencesAvailable())element('p','dv-live-coverage-detail','No change needed: no linked tickets or missing-work marker.',box);
     // #855 Edit mode: clear a marker set on this board; an inherited one names its source diagram.
     var marker=ref && editing() && value && value.missingWork===true?editor.missingWork(ref):null;
     if(asking && !(marker && marker.clearable)){editor.endQuestion();asking=null;}
-    if(marker && !marker.clearable)element('p','dv-live-missing-source','Missing work comes from the source diagram "'+marker.source+'" and must be cleared there.',pop);
+    if(marker && !marker.clearable)element('p','dv-live-missing-source','Missing work comes from the source diagram "'+marker.source+'" and must be cleared there.',box);
     if(marker && marker.clearable){
-      var choice=element('div','dv-live-clear',null,pop);
+      var choice=element('div','dv-live-clear',null,box);
       if(asking)element('p','dv-live-question','Does '+asking.ticket+' cover the missing work?',choice);
       var clear=element('button','reader-button dv-live-clear-missing','Clear Missing work',choice);clear.type='button';
-      clear.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();editor.endQuestion();close(false);setTimeout(function(){editor.clearMissingWork(ref);},0);});
+      clear.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();editor.endQuestion();editFromPopover(ref,function(){return editor.clearMissingWork(ref);});});
       if(asking){
         var keep=element('button','reader-button dv-live-keep','Keep',choice);keep.type='button';
         keep.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();close(true);});
       }
     }
     if(availability){
-      element('p','dv-live-availability-detail',liveStatusAvailabilityLabel(availability),pop);
+      element('p','dv-live-availability-detail',liveStatusAvailabilityLabel(availability),box);
       availability.forEach(function(cause){cause.tickets.forEach(function(key){
         if(found.tickets.indexOf(key)<0)found.tickets.push(key);
       });});
@@ -1526,22 +1553,22 @@ function createLiveStatus(ctl,page,options,renderOptions){
       // "Waiting on KEY · state" per direct upstream, then the chain(s) this carrier's tickets sit in.
       var shown=[];found.tickets.forEach(function(ticket){(ticketWaiting[ticket] ? ticketWaiting[ticket].on : []).forEach(function(up){
         if(shown.indexOf(up.key)>=0)return;shown.push(up.key);
-        var row=element('div','dv-live-waiting-detail','Waiting on '+up.key+' · '+up.state,pop);row.setAttribute('data-tone',up.tone);
+        var row=element('div','dv-live-waiting-detail','Waiting on '+up.key+' · '+up.state,box);row.setAttribute('data-tone',up.tone);
       });});
       // Only chains in which one of this carrier's tickets is a waiting hop; a chain
       // this carrier merely holds up belongs to the downstream carrier's popover.
       liveStatusDependencyChains(ticketWaiting).forEach(function(chain){
         if(!chain.some(function(key,index){return index>0 && found.tickets.indexOf(key)>=0;}))return;
-        element('div','dv-live-waiting-chain',chain.join(' holds '),pop);
+        element('div','dv-live-waiting-chain',chain.join(' holds '),box);
       });
     }
     // Edit mode: Remove only for tickets authored on this carrier, never for availability causes or provider-inherited ones.
     var removable=ref && editing()?editor.removable(ref):[];
     found.tickets.forEach(function(key){
-      var entry=map[key],row=element('div','dv-live-ticket',null,pop);row.setAttribute('data-live-ticket',key);
+      var entry=map[key],row=element('div','dv-live-ticket',null,box);row.setAttribute('data-live-ticket',key);
       if(removable.indexOf(key)>=0){
         var remove=element('button','reader-button dv-live-remove','Remove',row);remove.type='button';remove.setAttribute('aria-label','Remove '+key+' from '+label);
-        remove.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();close(false);setTimeout(function(){editor.remove(ref,key);},0);});
+        remove.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();editFromPopover(ref,function(){return editor.remove(ref,key);});});
       }
       var ticketSource=summary && summary.ticketSources[key];
       // #1198: one line per ticket: the key, the title cut to one line (full title in its tooltip), PRs and staleness, then the
@@ -1555,15 +1582,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var pill=element('span','dv-live-ticket-state dv-live-state-pill',entry?entry.state:'No status',row);liveStatusClass(pill,entry?entry.state:null);row.style.setProperty('--dv-live-chip-ch',String(pill.textContent.length));
       if(entry && entry.detail)element('span','dv-live-ticket-detail',entry.detail,row);
     });
-    found.prs.forEach(function(url){link(pop,url,url);});
-    paintProduction(trigger);
-    reveal(trigger,dismiss,!!(asking && marker && marker.clearable));
+    found.prs.forEach(function(url){link(box,url,url);});
+    return {dismiss:dismiss,asking:asking && marker && marker.clearable?asking:null};
   }
-  function reveal(trigger,dismiss,ask){
-    active=trigger;asked=ask;trigger.setAttribute('aria-expanded','true');pop.hidden=false;if(pop.showPopover)pop.showPopover();
+  function place(trigger){
     var rect=trigger.getBoundingClientRect();
     pop.style.left=Math.max(8,Math.min(window.innerWidth-pop.offsetWidth-8,rect.left))+'px';
     pop.style.top=Math.max(8,Math.min(window.innerHeight-pop.offsetHeight-8,rect.bottom+6))+'px';
+  }
+  function reveal(trigger,dismiss,ask){
+    active=trigger;asked=ask;trigger.setAttribute('aria-expanded','true');pop.hidden=false;if(pop.showPopover)pop.showPopover();
+    place(trigger);
     dismiss.focus({preventScroll:true});document.addEventListener('click',outside,true);document.addEventListener('keydown',escape,true);
   }
   /* Cards and edge labels remain the single keyboard ticket triggers. Small
@@ -1612,14 +1641,40 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return node.querySelector('.card.dv-live-target');
   }
   function openCarrier(el,asking){var c=el._liveCarrier;show(el,c.value,c.tracking,c.label,c.waiting,c.availability,c.ref,asking);}
+  function sameRef(r,q){return !!r && !!q && r.section===q.section && r.kind===q.kind && (r.kind==='node'?r.id===q.id:r.index===q.index);}
+  function refTarget(ref){return Array.prototype.find.call(view.querySelectorAll('.dv-live-target'),function(el){return !el.classList.contains('dv-metrics-label-hidden') && sameRef(el._liveCarrier && el._liveCarrier.ref,ref);});}
+  /* #1253: focus hand-offs kept by the editor, which outlives the re-render an edit causes. An edit control's
+     hand-off is the panel's (takeFocus); a popover edit's goes to its carrier in the next render, else to the panel. */
+  function editAction(list,run){
+    if(!editor.rememberFocus){run();return;}
+    var before=JSON.stringify(editor.state()),intent={panel:list};editor.rememberFocus(intent);run();
+    if(JSON.stringify(editor.state())===before && editor.focusIntent()===intent)editor.rememberFocus(null);
+  }
+  function editFromPopover(ref,run){
+    var trigger=active;close(false);
+    var intent=editor.rememberFocus?{carrier:ref,panel:['save','done','edit']}:null;if(intent)editor.rememberFocus(intent);
+    setTimeout(function(){
+      if(run())return;
+      // Nothing changed: focus goes back to the carrier the popover was opened from.
+      if(intent && editor.focusIntent()===intent)editor.rememberFocus(null);
+      if(!retired && trigger && trigger.isConnected)trigger.focus({preventScroll:true});
+    },0);
+  }
+  function focusEditedCarrier(){
+    var intent=editor && editor.focusIntent && editor.focusIntent();if(!intent || !intent.carrier)return;
+    // A new render paints once before it applies the remembered live map; a carrier without tickets is a button only after that.
+    if(!applied && editor.lastMap && editor.lastMap())return;
+    var el=refTarget(intent.carrier),root=typeof view.getRootNode==='function'?view.getRootNode():view.ownerDocument,now=root && root.activeElement;
+    // Only while focus is nowhere (the closed popover's control is gone): a reader who moved on keeps their place.
+    if(now && now!==document.body && now.isConnected!==false && !(pop && pop.contains(now))){editor.rememberFocus(null);return;}
+    editor.rememberFocus(!el && intent.panel?{panel:intent.panel}:null);
+    if(el)el.focus({preventScroll:true});
+  }
   /* #855: the drop re-renders the page, so the post-drop question is the editor's
      until answered; each paint reopens it on the carrier's popover. */
   function askPending(){
     var q=editing() && editor.question();if(!q || asked)return;
-    var el=Array.prototype.find.call(view.querySelectorAll('.dv-live-target'),function(candidate){
-      var r=candidate._liveCarrier && candidate._liveCarrier.ref;
-      return !!r && r.section===q.ref.section && r.kind===q.ref.kind && (r.kind==='node'?r.id===q.ref.id:r.index===q.ref.index);
-    });
+    var el=Array.prototype.find.call(view.querySelectorAll('.dv-live-target'),function(candidate){return sameRef(candidate._liveCarrier && candidate._liveCarrier.ref,q.ref);});
     if(!el)return;
     if(active)close(false);
     openCarrier(el,q);
@@ -2046,7 +2101,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     bindings.forEach(function(binding){
       ['dv:pathrender','dv:pathchange','dv:stepchange'].forEach(function(type){binding.el.addEventListener(type,schedule);});
       if(binding.stepper && binding.stepper.onBeforeAdvance)stepHooks.push(binding.stepper.onBeforeAdvance(function(index){
-        var d=binding.section.diagram,state=statusMode!=='trace' && on && liveStatusStep(statusDiagram(binding),d.steps[index],map);
+        // #1253: as in firstBlocker, a ticket with no status on an Over time day (it did not exist yet) stops nothing.
+        var d=binding.section.diagram,state=statusMode!=='trace' && on && liveStatusStep(statusDiagram(binding),d.steps[index],liveStatusWithoutGaps(map));
         if(state!=='blocked' && state!=='missing')return true;
         paint();focusBlocker(binding,index);return false;
       }));
@@ -2068,8 +2124,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     try{
       var focusRoot=typeof view.getRootNode==='function'?view.getRootNode():view.ownerDocument;
       var focused=focusRoot && focusRoot.activeElement,focusCarrier=focused && focused.classList && focused.classList.contains('dv-live-target') && focused.getAttribute('data-live-carrier'),focusBinding=focusCarrier && bindings.find(function(binding){return binding.el.contains(focused);});
-      var openId=active && active.getAttribute('data-live-carrier'),openBinding=active && bindings.find(function(binding){return binding.el.contains(active);});
-      if(asked || active && !pop.querySelector('.dv-live-production'))close(false);syncBindings();clearTargets();refreshDependencies();
+      // #1253: an open popover stays open through the repaint, the post-drop question too (rebuilt in place).
+      var openId=active && active.getAttribute('data-live-carrier'),openBinding=active && bindings.find(function(binding){return binding.el.contains(active);}),openMetrics=!!(active && active._liveCarrier && active._liveCarrier.metricsOnly);
+      syncBindings();clearTargets();refreshDependencies();
       if(applied || availabilityOn || refs().tickets.length){
         view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
         bindings.forEach(paintBinding);
@@ -2088,7 +2145,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(editing())bindings.forEach(function(binding){if(binding.ordinal!=null)binding.el.querySelectorAll('g.node[data-dv-node]:not(.node-text),path.edge[data-dv-edge]').forEach(function(el){el.classList.add('dv-edit-target');});});
       if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier && !el.classList.contains('dv-metrics-label-hidden');});if(replacement)replacement.focus({preventScroll:true});}
       if(active){
-        var target=openBinding && openBinding.el.isConnected && Array.from(openBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===openId && !el.classList.contains('dv-metrics-label-hidden');});
+        var target=openBinding && openBinding.el.isConnected && Array.from(openBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===openId && !el.classList.contains('dv-metrics-label-hidden') && !!(el._liveCarrier && el._liveCarrier.metricsOnly)===openMetrics;});
         if(target){active=target;refreshPopover();}else close(false);
       }
       changedKeys=[];
@@ -2096,7 +2153,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       painting=false;if(!retired)observeBindings();
     }
     if(traceRecheck){traceRecheck=false;traceLabelsResized();}
-    if(!retired && editor)askPending();
+    if(!retired && editor){focusEditedCarrier();askPending();}
   }
   function schedule(){if(retired || painting || frame)return;frame=requestAnimationFrame(function(){frame=0;paint();notify();});}
   /* Last-refresh stamp in the viewer's local clock (Chuck, 2026-11-02): a relative
@@ -2248,10 +2305,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
     action:function(label,fn){if(retired)return;actionLabel=typeof label==='string'?label:'';actionFn=actionLabel && typeof fn==='function'?fn:null;notify();},
     setDemoControls:function(value){if(retired)return;demoControls=value;notify();},
     status:function(value){setStatus(value);},
-    editStart:function(){if(!retired && editor && !over)editor.start();},
-    editDone:function(){if(!retired && editor)editor.done();},
-    editSave:function(){if(!retired && editor)editor.save();},
-    editDiscard:function(){if(!retired && editor)editor.discard();},
+    // #1253: each edit control names the controls that take keyboard focus after it (the first one shown).
+    editStart:function(){if(!retired && editor && !over && !overLoading)editAction(['done','save'],function(){editor.start();});},
+    editDone:function(){if(!retired && editor)editAction(['edit'],function(){editor.done();});},
+    editSave:function(){if(!retired && editor)editAction(['edit','save','done'],function(){editor.save();});},
+    editDiscard:function(){if(!retired && editor)editAction(['edit'],function(){editor.discard();});},
+    // The panel's share of a focus hand-off: the control names to focus, once, and never while a save runs.
+    takeFocus:function(){
+      var intent=!retired && editor && editor.focusIntent && editor.focusIntent();
+      if(!intent || intent.carrier || !intent.panel || editor.state().saving)return null;
+      editor.rememberFocus(null);return intent.panel.slice();
+    },
     destroy:function(){
       if(retired)return;if(editor && editor.rememberTrace)editor.rememberTrace(traceCarry());clearTraceFocus();on=false;paintLanes();retired=true;directTrace.destroy();logLookup.destroy();bindings.forEach(function(b){telemetryClearStep(b.el);telemetryClearTrace(b.el);b.el.querySelectorAll('.dv-proof-caption').forEach(function(el){el.remove();});});releaseColors();liveStatusControllers.delete(view);coverageRequest++;if(motion && motion.removeEventListener)motion.removeEventListener('change',motionChanged);releaseBindings();destroyListeners.splice(0).forEach(function(fn){try{fn();}catch(ex){}});close(false);if(poller)poller.stop();telemetry.destroy();telemetryClearCues(view);telemetryClearCards(view);if(demoDestroy)demoDestroy();
       if(frame)cancelAnimationFrame(frame);if(firstPaint)cancelAnimationFrame(firstPaint);frame=firstPaint=0;

@@ -64,7 +64,7 @@ function boardEditSamePrefix(path,prefix){return prefix.every(function(part,i){r
 
 function createBoardEditor(options){
   var win=options.win || window,text=options.text,base=text,context=options.context || null,fallback=options.fallback || null;
-  var ops=[],active=false,saving=false,readOnly=false,reloading=false,canEdit=false,artifact=null,user=null,notice=null,listeners=[],lastMap=null,question=null,carriedTrace=null;
+  var ops=[],active=false,saving=false,readOnly=false,reloading=false,canEdit=false,artifact=null,user=null,notice=null,listeners=[],lastMap=null,question=null,carriedTrace=null,carriedFocus=null;
   var stashKey='flowview-board-edit:'+String(win.location && win.location.pathname || '')+':'+(options.specFile || 'flowspec.json');
 
   function changed(){listeners.slice().forEach(function(fn){try{fn();}catch(ex){}});}
@@ -129,7 +129,8 @@ function createBoardEditor(options){
     return m.local.missingWork?{clearable:true}:null;
   }
   // The new text, or the same text when the operation changes nothing.
-  function splice(source,t,op,ticket,match){
+  // `restore` {at, item}: an add that undoes a pending remove puts the removed entry back where it was (#1253).
+  function splice(source,t,op,ticket,match,restore){
     // #1180: a replacement swaps serviceName and operation and keeps the step's other traceMatch fields.
     if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation},typeof match.nodeId==='string' && match.nodeId?{nodeId:match.nodeId}:{}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));return set?set.text:null;}
     if(op==='clear-missing-work'){
@@ -142,10 +143,11 @@ function createBoardEditor(options){
       return plan.error?null:plan.text;
     }
     var list=Array.isArray(t.local.tickets)?t.local.tickets.slice():[],keys=trackingRefs(t.local).tickets,at=keys.indexOf(ticket);
-    if(op==='add'){if(at>=0)return source;list.push(ticket);}
+    if(op==='add'){if(at>=0)return source;if(restore)list.splice(Math.min(restore.at,list.length),0,restore.item);else list.push(ticket);}
     else{
       if(at<0)return source;
-      list=list.filter(function(entry){return (typeof entry==='string'?entry:entry && entry.key)!==ticket;});
+      // An authored entry is a key or a Jira browse URL; both name the ticket by its key.
+      list=list.filter(function(entry){return (trackingTicket(entry) || {}).key!==ticket;});
     }
     var result=jsonSetField(source,t.path,'tickets',list.length?JSON.stringify(list):null);
     return result?result.text:null;
@@ -173,19 +175,29 @@ function createBoardEditor(options){
     if(op==='trace-match' && (t.alternatives || !sameMatch(t.previous,previous)))return false;
     if(op==='remove' && authoredKeys(t).indexOf(ticket)<0)return false;
     if(op==='clear-missing-work'){var m=marker(t);if(!m || !m.clearable)return false;}
-    var next=splice(text,t,op,ticket,match),before=text;
+    // An add or remove that undoes a pending remove or add of the same ticket on the same carrier cancels it
+    // (#1253), but only when the carrier's tickets are then exactly as they were before that op; otherwise
+    // both stay recorded. A clear or a span mapping has no inverse here. undoMap restores a mapping's exact
+    // `before` text only while that text holds no cancelled op, so a mapping made after the cancelled op forgets it.
+    var path=JSON.stringify(t.path),inverse=op!=='add' && op!=='remove'?-1:ops.findIndex(function(o){return (o.entry.op==='add' || o.entry.op==='remove') && o.entry.op!==op && o.entry.ticket===ticket && JSON.stringify(o.entry.path)===path;});
+    var next=splice(text,t,op,ticket,match,inverse>=0 && ops[inverse].removed || null),before=text;
     if(next==null || next===text)return false;
-    if(!render(next))return false;
-    var entry=record(t,op,ticket,match),chain=boardEditChain(t.raw,t.path);
-    // An operation that undoes a pending one cancels it. A clear or a span mapping has no inverse here.
-    // Coupling (#1180 m8): undoMap restores a mapping's exact `before` text only while this check never
-    // cancels an op after it. It reads o.ticket and o.path on the op wrapper, so today it never matches.
-    var inverse=op==='clear-missing-work' || op==='trace-match'?-1:ops.findIndex(function(o){return o.ticket===ticket && o.op!==op && JSON.stringify(o.path)===JSON.stringify(entry.path);});
-    if(inverse>=0)ops.splice(inverse,1);
-    else ops.push({entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,previous:op==='trace-match'?t.previous:undefined,before:op==='trace-match'?before:undefined});
+    // The pending list changes before the render, so the re-rendered board shows the new count at once (#1253);
+    // a refused render puts it back.
+    var entry=record(t,op,ticket,match),chain=boardEditChain(t.raw,t.path),kept=ops.slice(),befores=ops.map(function(o){return o.before;});
+    if(inverse>=0 && carrierTickets(next,t.path)===ops[inverse].tickets){ops.splice(inverse,1);ops.slice(inverse).forEach(function(o){o.before=undefined;});}
+    else{
+      var made={entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,previous:op==='trace-match'?t.previous:undefined,before:op==='trace-match'?before:undefined};
+      if(op==='add' || op==='remove')made.tickets=carrierTickets(text,t.path);
+      if(op==='remove' && !t.imported){var list=Array.isArray(t.local.tickets)?t.local.tickets:[],at=list.findIndex(function(item){return (trackingTicket(item) || {}).key===ticket;});if(at>=0)made.removed={at:at,item:list[at]};}
+      ops.push(made);
+    }
+    if(!render(next)){ops=kept;kept.forEach(function(o,i){o.before=befores[i];});return false;}
     question=ask || null;
     changed();return true;
   }
+  // The carrier's authored tickets value as JSON (the overlay entry's for an imported carrier), for cancel checks.
+  function carrierTickets(source,path){var value=specValueAt(parsed(source),path);return JSON.stringify(value && typeof value==='object' && value.tickets!==undefined?value.tickets:null);}
   function render(next){
     var error=options.render(next);
     if(error){if(win.console)console.warn('flowspec: board edit refused: '+error);return false;}
@@ -210,7 +222,7 @@ function createBoardEditor(options){
     try{saved=JSON.parse(win.sessionStorage.getItem(stashKey) || 'null');}catch(ex){saved=null;}
     unstash();
     if(!saved || !Array.isArray(saved.ops) || !saved.ops.length)return;
-    var applied=0,dropped=[];
+    var applied=0,already=0,dropped=[];
     saved.ops.forEach(function(op){
       var entry=op && op.entry;if(!entry)return;
       var where=entry.label || entry.node || entry.step || (entry.edge || []).join(' → ');
@@ -224,16 +236,20 @@ function createBoardEditor(options){
         // A clear with no marker of this board's left to clear is dropped (#855).
         if(entry.op==='clear-missing-work'){dropped.push(describe);return;}
         // A step that already has this exact traceMatch needs nothing; any other is dropped (#1078).
-        if(entry.op==='trace-match'){var step=specValueAt(parsed(text),paths[0]),m=step && step.traceMatch,want=entry.traceMatch || {};if(m && m.serviceName===want.serviceName && m.operation===want.operation)applied++;else dropped.push(describe);return;}
+        if(entry.op==='trace-match'){var step=specValueAt(parsed(text),paths[0]),m=step && step.traceMatch,want=entry.traceMatch || {};if(m && m.serviceName===want.serviceName && m.operation===want.operation)already++;else dropped.push(describe);return;}
         // Already true in the winning version: nothing left to do for it.
         var t=target(text,ref);var has=t && authoredKeys(t).indexOf(entry.ticket)>=0;
-        if(t && ((entry.op==='add')===has))applied++;else dropped.push(describe);
+        if(t && ((entry.op==='add')===has))already++;else dropped.push(describe);
         return;
       }
       applied++;
     });
     if(!ops.length)active=false;
-    notice={kind:'warn',text:'Another editor saved first. '+applied+' of your changes were re-applied; '+dropped.length+' could not be (carrier moved, removed or ambiguous)'+(dropped.length?': '+dropped.join('; '):'')+'. Save again.'};
+    // #1253: a change the winning version already has is not re-applied, and "Save again" only when one is pending.
+    var parts=[applied+' of your changes were re-applied'];
+    if(already)parts.push(already+' '+(already===1?'was':'were')+' already in their version');
+    parts.push(dropped.length+' could not be (carrier moved, removed or ambiguous)'+(dropped.length?': '+dropped.join('; '):''));
+    notice={kind:'warn',text:'Another editor saved first. '+parts.join('; ')+'.'+(ops.length?' Save again.':'')};
     changed();
   }
   // A rendered-carrier reference for a concrete path in raw.
@@ -337,6 +353,9 @@ function createBoardEditor(options){
     // #1078: the Trace view a retiring controller showed, handed once to the next render's.
     rememberTrace:function(value){carriedTrace=value || null;},
     takeTrace:function(){var value=carriedTrace;carriedTrace=null;return value;},
+    // #1253: where keyboard focus goes after an edit control or a popover edit, kept across the re-render it causes.
+    rememberFocus:function(value){carriedFocus=value || null;},
+    focusIntent:function(){return carriedFocus;},
     text:function(){return text;}
   };
 

@@ -740,7 +740,9 @@ navigation action.
 An unlabelled edge uses its path, or its visible live break when blocked or unavailable.
 Press Enter/Space to open the popover.
 Escape or an outside click closes it and
-returns focus to the carrier. In the Workbench, clicks keep selecting for
+returns focus to the carrier. A repaint (a Jira or Metrics refresh, a host poll, a step change
+during playback, a Live toggle) keeps an open popover open and redraws its lines with the new
+values, keeping focus on the same control; it closes only when its carrier is gone (#1253). In the Workbench, clicks keep selecting for
 editing and the Tickets table is the route to a carrier. Jira browse links
 use the page tracking site, falling back to the provider URL. Each ticket row of
 the popover also shows its pull-request icons when the entry carries `prs.links`;
@@ -857,7 +859,10 @@ stripe and the lane names in Blockers. Status-board step captions omit the team 
 even with Live disabled; ordinary diagrams retain their authored lane context.
 Without ticket or epic references the panel opens on the Trace view (see the header above).
 Before a provider or applied map is available, it shows the connector note and any
-required authorization action without an empty rollup. Print preserves the last
+required authorization action without an empty rollup. With no provider at all (a plain web
+host or a local file: not claude.ai, no host provider, no demo) on a page with ticket or epic references it says “Live ticket status
+needs a host with a Jira connector (claude.ai).” and lists the page's authored tickets (Jira
+links when the tracking site is set) with their PR links, and any other authored PRs, without a state (#1253). Print preserves the last
 paint, and reduced motion disables ring animation.
 
 Validation warns when tracking or carrier tickets exist without a `live-status`
@@ -1441,7 +1446,7 @@ children, so they need no history calls. The last day is exactly the live map.
 that day: its node or edge wears the Missing paint, the Tickets table says missing,
 and its popover says "No ticket on this day". An uncolored carrier would hide the gap.
 It is not a blocker: it stays out of the blocked count and the blockers list, First
-blocker cannot reach it, and a ticket that depends on it waits with a grey tone. It
+blocker cannot reach it, Play does not stop at it, and a ticket that depends on it waits with a grey tone. It
 keeps its title and row and stays in the total, so the total is the same on every day.
 This covers a ticket not created yet and a ticket missing today, which has no history.
 
@@ -1449,8 +1454,11 @@ This covers a ticket not created yet and a ticket missing today, which has no hi
 display. Returning to **Live** applies the newest live status as a normal refresh,
 including anything that changed meanwhile. Moving the slider adds nothing to
 Activity, causes no change pulse and shows no "no activity N d" mark. The Edit
-button is disabled with a stated reason, Over time is disabled while Edit mode
-is active, and the saved spec never changes.
+button is disabled with a stated reason, also while history loads ("Editing is off while
+history loads."), Over time is disabled while Edit mode is active, and the saved spec never
+changes. A load that ends while Edit mode is on shows no past day and says why. While history
+loads, **Over time** reads "Loading history n of N…" and keeps keyboard focus; when the day
+shows, focus moves to the day slider (#1253).
 
 **History source and call cost.** Only a click loads history, as one batch of
 one-shot `callTool` calls. Nothing polls, and no history call happens at page load
@@ -1851,7 +1859,10 @@ mode:
 - **Remove:** the carrier's ticket popover shows **Remove** for tickets authored on
   that carrier. Tickets the popover lists because of an availability rule, and
   provider-inherited tickets on imported carriers, have none. A move is add +
-  remove.
+  remove. Removing a ticket added in this session (or adding back one removed, which puts
+  it back where it was) cancels that pending change when the carrier's tickets are then as
+  they were; otherwise both changes stay recorded (#1253). A ticket authored as a Jira
+  browse URL is removed like one authored as a key.
 - **Clear Missing work** (#855): a node or edge marked `missingWork: true` shows
   **Clear Missing work** in its popover. Clicking it removes the marker (one
   pending change) and the carrier repaints from its tickets alone. A drop that
@@ -1878,6 +1889,13 @@ mode:
 - After the first change the header shows **Save N changes** and **Discard**.
   Discard drops every pending change and shows the last loaded spec. Leaving the
   page with pending changes raises the browser's leave-page warning.
+- **Keyboard focus** (#1253): each edit control hands focus to the control that replaces
+  it: Edit to Done, Done to Edit, Save and Discard to Edit once the board re-renders (Save
+  keeps focus while it saves). After Remove or Clear Missing work in a popover, focus goes to
+  that carrier in the re-rendered board, or to **Save N changes** when the carrier is no longer
+  a button (an edge without tickets). Focus moves only while it is still on the pressed control
+  or nowhere; a reader who moved on keeps their place. A read-only answer moves focus to its
+  notice. A repaint redraws the post-drop question in place and does not take focus back.
 - **Save** appends one `page.editHistory` entry (`at`, `by: {id, name}` from
   `user.me()`, one change per operation with the carrier's path, identity and
   display label; the newest 200 entries are kept) and publishes only
@@ -1889,7 +1907,9 @@ mode:
   carrier's identity (section id or heading, edge endpoints and label, the import's
   provider reference), never by position. A change whose carrier is gone, or was
   not unique when it was made (two identical unlabeled parallel edges), is dropped
-  and listed, as is a clear whose carrier no longer has a marker set on this board. Nothing is published until the editor saves again.
+  and listed, as is a clear whose carrier no longer has a marker set on this board. A change
+  the winning version already has is named as already there. Nothing is published until the
+  editor saves again, and the notice ends with “Save again.” only while a change is pending.
 - A read-only answer (`not_writer`, `not_granted`, `capability_disabled`,
   `not_declared`) hides the edit controls and says the board is read-only here.
 - While the page shows the "couldn't load its latest version" warning (booted from

@@ -47,7 +47,7 @@ fail; drop the post-drop question → E18 fails on the question assertion.
 */
 import {test,expect} from '../helpers/test.mjs';
 import {rm} from 'node:fs/promises';
-import {EDITOR,boardSpec,buildBoard,serveWinner,mockRuntime,publishes,openBoard,showBoard,ticketRow,coverageTag,editButton,saveButton,discardButton,
+import {EDITOR,MAP,boardSpec,buildBoard,serveWinner,mockRuntime,publishes,openBoard,showBoard,ticketRow,coverageTag,editButton,saveButton,discardButton,
  nodeCard,edgeLabel,cardPoint,strokePoint,dragTicket,holdTicketOver,reloadRecordingDialogs,startEditing,save,diagramAt,expectSurgical,withoutEdits,TRACKING,PANELS} from '../helpers/board-edit.mjs';
 
 const cue=(root,id)=>root.locator('g.node[data-dv-node="'+id+'"] .dv-jira-cue');
@@ -467,4 +467,66 @@ test('E20 outside Edit mode and for read-only viewers a marked carrier popover h
   }
   await viewer.close();
  }
+});
+
+/* #1253 items 14 and 15: keyboard focus after an Edit-mode control hides itself or the board re-renders.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| E21 edit controls hand focus on | boardSpec | Enter on Edit focuses Done; Enter on Done focuses Edit; after a drop, Enter on Save focuses Edit once the save re-renders the board; after another drop, Enter on Discard focuses Edit | focus left on <body> after the pressed control hides |
+| E22 popover edits return focus to the carrier | boardSpec with edge A → B holding EX-1 | Enter on Remove AA-1 in A's popover focuses A's card in the re-rendered board (A keeps its work-status button); Remove EX-1 from the edge (no button without tickets) focuses "Save 2 changes" | focus left on <body> after the re-render |
+| E23 a refresh keeps the popover and its focus | boardSpec; the host provider answers AA-1 active, then done; fake clock | A's popover opened from the keyboard has focus on Close (inside #host's shadow root when present); after the 30 s refresh the popover is still open, AA-1 reads done and focus is still on Close | a repaint that closes the popover or drops focus to <body> |
+E21 and E22 fail at the baseline on the focus assertion: no code moves focus. */
+// The focused element, through any shadow roots.
+const focusedControl=page=>page.evaluate(()=>{
+ let at=document.activeElement;while(at && at.shadowRoot && at.shadowRoot.activeElement)at=at.shadowRoot.activeElement;
+ if(!at)return null;const node=at.closest('[data-dv-node]');
+ return {tag:at.tagName.toLowerCase(),text:(at.textContent || '').trim().slice(0,80),label:at.getAttribute('aria-label'),node:node?node.getAttribute('data-dv-node'):null,card:at.classList.contains('card')};
+});
+test('E21 #1253 Edit, Done, Save and Discard hand keyboard focus to the control that replaces them',async({page,server})=>{
+ const board=await buildBoard(server,'focus-controls',boardSpec());await mockRuntime(page);
+ const {root,panel}=await openBoard(page,board);
+ await editButton(panel).press('Enter');
+ await expect(panel.getByRole('button',{name:'Done',exact:true})).toBeVisible();
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Done'});
+ await panel.getByRole('button',{name:'Done',exact:true}).press('Enter');
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Edit'});
+ await editButton(panel).press('Enter');
+ await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(root,'b')));
+ await expect(saveButton(panel)).toHaveText('Save 1 change');
+ await saveButton(panel).press('Enter');
+ await expect.poll(()=>publishes(page).then(list=>list.length)).toBe(1);
+ await expect(editButton(panel)).toBeVisible();
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Edit'});
+ await editButton(panel).press('Enter');
+ await dragTicket(page,panel,'AA-1',await cardPoint(nodeCard(root,'b')));
+ await discardButton(panel).press('Enter');
+ await expect(discardButton(panel)).toHaveCount(0);
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Edit'});
+});
+test('E22 #1253 Remove in a carrier popover returns keyboard focus to the carrier after the board re-renders',async({page,server})=>{
+ const spec=boardSpec();diagramAt(spec).edges[0].tickets=['EX-1'];
+ const board=await buildBoard(server,'focus-remove',spec);await mockRuntime(page);
+ const {root,panel}=await openBoard(page,board);await startEditing(panel);
+ await nodeCard(root,'a').press('Enter');let pop=popover(page);await expect(pop).toBeVisible();
+ await pop.getByRole('button',{name:'Remove AA-1 from Alpha service',exact:true}).press('Enter');
+ await expect(saveButton(panel)).toHaveText('Save 1 change');
+ await expect.poll(()=>focusedControl(page)).toMatchObject({node:'a',card:true});
+ // An edge without tickets is no button: focus goes to Save, which shows the count.
+ await edgeLabel(root,0).press('Enter');pop=popover(page);await expect(pop).toBeVisible();
+ await pop.getByRole('button',{name:'Remove EX-1 from calls',exact:true}).press('Enter');
+ await expect(saveButton(panel)).toHaveText('Save 2 changes');
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Save 2 changes'});
+});
+test('E23 #1253 a Jira refresh keeps the open popover, updates its line and keeps focus on Close',async({page,server})=>{
+ const board=await buildBoard(server,'focus-refresh',boardSpec());await mockRuntime(page);
+ // The host provider answers AA-1 active first and done on the next refresh.
+ await page.addInitScript(map=>{let calls=0;window.flowviewLiveStatus={provider:async()=>{calls++;const next=JSON.parse(JSON.stringify(map));if(calls>1)next['AA-1'].state='done';return next;}};},MAP);
+ await page.clock.install();
+ const {root}=await openBoard(page,board);await page.clock.runFor(1000);
+ await nodeCard(root,'a').press('Enter');const pop=popover(page);await expect(pop).toBeVisible();
+ const pill=pop.locator('.dv-live-ticket[data-live-ticket="AA-1"] .dv-live-ticket-state');await expect(pill).toHaveText('active');
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',label:'Close live tickets'});
+ await page.clock.runFor(31000);
+ await expect(pill).toHaveText('done');await expect(pop).toBeVisible();
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',label:'Close live tickets'});
 });

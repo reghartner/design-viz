@@ -249,3 +249,9 @@ function planLinksTicketRename(text,raw,oldKey,newRef,context,merge){
   });
   return out;
 }
+
+/* The Move to… / Copy to… target list: every element with its static refusal
+   (null when offered). No plan runs here; a picked target runs the real plan. */
+function linksMoveTargets(model,from,key,copy){
+  return model.elements.map(function(e){return {element:e,refusal:linksDropRefusal(from || null,e,key,!!copy)};});
+}

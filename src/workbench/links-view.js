@@ -385,7 +385,8 @@ function initWorkbenchLinksView(opts){
       });
       if(!keys.length)body.appendChild(el('p','links-none',e.kind==='step'?'The nodes and connections this step lights carry no tickets.':'No tickets yet. Type a key above and press Enter.'));
     }else{
-      var key=spec.key;
+      var key=spec.key,why_={};
+      if(spec.type==='move')linksMoveTargets(model,from,key,spec.copy).forEach(function(t){why_[linksElementId(t.element)]=t.refusal;});
       [['node','Nodes'],['edge','Connections'],['step','Steps']].forEach(function(group){
         var items=model.elements.filter(function(x){return x.kind===group[0] && (!q || (x.label+' '+(x.caption || '')).toLowerCase().indexOf(q)>=0);});
         if(!items.length)return;section(group[1]);
@@ -396,7 +397,7 @@ function initWorkbenchLinksView(opts){
             var reason=!x.editable?x.reason:x.kind==='step' && x.lit.indexOf(key)<0?'Lights no node or connection with '+key:x.kind!=='step' && x.inherited.indexOf(key)>=0?'Inherited from the provider (read only)':null;
             body.appendChild(option(id,sectionPrefix(x)+x.label,on,reason,function(checked){assign(x,key,!checked);},note));
           }else{
-            var why=refusal(x,key,from,spec.copy),pick=button('links-pop-target',sectionPrefix(x)+x.label);pick.setAttribute('data-links-option',id);
+            var why=why_[id],pick=button('links-pop-target',sectionPrefix(x)+x.label);pick.setAttribute('data-links-option',id);
             if(why){pick.disabled=true;pick.title=why;}
             popLife.listen(pick,'click',function(){var source=from,copy=spec.copy;closePopover(false);if(move(copy?null:source,x,key,false))focusChip(x,key);});
             var line=el('div','links-pop-row');line.appendChild(pick);if(note)line.appendChild(el('span','links-chip-note',note));body.appendChild(line);
@@ -507,11 +508,27 @@ function initWorkbenchLinksView(opts){
     if(!value)say('');
     if(value && reveal)revealLinks();
   }
+  /* Steps rows: when every lit row fits in the list, show them all; otherwise
+     bring the first lit row that is out of sight into view, so each Highlight
+     click shows another linked step. */
+  function scrollParent(n){
+    for(var p=n.parentElement;p;p=p.parentElement){var y=win.getComputedStyle(p).overflowY;if(p.scrollHeight>p.clientHeight+1 && /auto|scroll|hidden/.test(y))return p;}
+    return null;
+  }
+  function revealRows(rows){
+    if(!rows.length)return;
+    var box=scrollParent(rows[0]);if(!box){rows[0].scrollIntoView({block:'nearest'});return;}
+    var view=box.getBoundingClientRect(),first=rows[0].getBoundingClientRect(),last=rows[rows.length-1].getBoundingClientRect();
+    function inside(r){return r.top>=view.top-1 && r.bottom<=view.bottom+1;}
+    if(last.bottom-first.top<=box.clientHeight){if(!inside(first) || !inside(last))box.scrollTop+=first.top-view.top-Math.max(0,(box.clientHeight-(last.bottom-first.top))/2);return;}
+    var hidden=rows.find(function(r){return !inside(r.getBoundingClientRect());});
+    if(hidden){var r=hidden.getBoundingClientRect();box.scrollTop+=r.top<view.top?r.top-view.top:r.bottom-view.bottom;}
+  }
   /* Bring the highlighted canvas elements into view only when one is hidden
      (off the board or under a tool window); the Steps row scrolls to nearest. */
   function revealLinks(){
     var links=highlightLinks(),targets=litTargets(links);
-    var rows=targets.filter(function(n){return n.closest('#steps-list');});if(rows[0])rows[0].scrollIntoView({block:'nearest'});
+    revealRows(targets.filter(function(n){return n.closest('#steps-list');}));
     var canvas=targets.filter(function(n){return n.ownerSVGElement && n.getClientRects().length;});if(!canvas.length)return;
     var sec=canvas[0].closest('.doc-sec[data-dv-section]'),section=Number(sec.getAttribute('data-dv-section'));
     canvas=canvas.filter(function(n){return n.closest('.doc-sec')===sec;});

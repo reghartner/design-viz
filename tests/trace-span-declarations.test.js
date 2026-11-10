@@ -11,12 +11,15 @@
 | S5 | A provider declaration the consumer's validation rejects is dropped for the consumer with a warning naming the provider path; its other spans stay; a consumer patch that fixes it keeps it; a malformed provider `trace` is dropped whole; nested drops follow the re-export. The provider's own validation reports the error. A consumer patch that breaks a valid provider span is not dropped: the consumer's validation reports it. |
 | S6 | Compatibility declares flow.trace-spans for carrier and overlay declarations only. |
 | S7 | A resolved snapshot may edit `trace` on an imported carrier; the imported structure stays read only. |
+| S9 | Every Workbench and board Edit tracking edit of an imported carrier (tickets, PRs, Missing work, availability, metrics binding, Links window tickets) keeps the consumer's trace overlay, for a node and a connection. |
+| S10 | Only the exact declaration messages are set aside during resolution: a span name with a colon still only warns for consumers; any other error still fails. |
+| S11 | Overlay findings name the overlay: a hide or null entry for a span the provider lacks warns; a patch key the provider lacks says so; hide plus patch warns and the hide wins; an allowlist drop names the attribute and this board's allowedAttributes; a nested patch that cannot restore a dropped span still warns; Honeycomb number/boolean attribute values warn; a snapshot edit gets the full declaration check. |
 | S8 | The example pair examples/canon/topology/orders-platform.json + orders-board.json resolves to the documented spans. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const loader=require('../tools/source-loader.cjs');
 const C={URL,TextEncoder};vm.createContext(C);
-vm.runInContext(loader.composeSources(['canon.js','validator.js','compatibility.js']),C);
+vm.runInContext(loader.composeSources(['canon.js','validator.js','compatibility.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js','workbench/commands/graph.js','workbench/commands/document.js','workbench/commands/layout.js','workbench/commands/topology.js','workbench/commands/telemetry.js','workbench/commands/links.js','workbench/io-model.js','workbench/session.js']),C);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const spec=(id,diagram,page={})=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},...page,sections:[{id:'main',diagram}]}});
 const diagramOf=s=>s.page.sections[0].diagram;
@@ -190,10 +193,10 @@ test('S5 an invalid provider declaration is dropped for the consumer with a prov
   assert.deepEqual(Object.keys(plain(diagramOf(page).nodes['m::p::worker'].trace.spans)),['process','cache']);
   assert.deepEqual(warnings(page).map(w=>w.split(': provider ')[0]),['sections[0].diagram.nodes.m::p::worker.trace.spans.find','sections[0].diagram.edges[0].trace.spans.send']);
   assert.match(warnings(page)[0],/provider "provider" sections\[0\]\.diagram\.nodes\.worker\.trace\.spans\.find: operation and operationPrefix cannot be combined/);
-  // A consumer patch that breaks a valid provider span is the consumer's error, not a drop.
+  // A consumer patch that breaks a valid provider span is the consumer's error at its overlay, and the span is left out.
   f=fixtures({spans:{process:{role:'send'}}});page=resolved(f);
-  assert.equal(diagramOf(page).nodes['shared::worker'].trace.spans.process.role,'send');
-  assert.deepEqual(errors(page),['nodes.shared::worker.trace.spans.process: role must be one of process, database, cache, call, work']);
+  assert.equal(Object.hasOwn(diagramOf(page).nodes['shared::worker'].trace.spans,'process'),false);
+  assert.deepEqual(errors(page),['sections[0].diagram.topologyImports[0].nodeTracking.worker.trace.spans.process: role must be one of process, database, cache, call, work']);
   assert.deepEqual(warnings(page),[]);
 });
 
@@ -216,4 +219,92 @@ test('S7 a resolved snapshot may edit trace on an imported carrier; structure st
   assert.match(C.FlowTopology.editError(before,moved),/read only/);
   const broken=JSON.parse(JSON.stringify(before));diagramOf(broken).nodes['shared::worker'].trace={spans:[]};
   assert.match(C.FlowTopology.editError(before,broken),/spans must be an object keyed by span name/);
+});
+
+test('S9 Workbench and board Edit tracking edits keep the consumer trace overlay on nodes and connections',()=>{
+  const NODE={spans:{process:{operation:'process orders v2'},audit:{serviceName:'worker',operation:'audit write',role:'database'}},hide:['cache']};
+  const EDGE={spans:{send:{namespace:'eu'}}};
+  const f=fixtures(NODE,EDGE);f.provider.page.tracking={jira:{site:'https://jira.test'}};
+  const apply=(source,fn)=>{const plan=fn(JSON.stringify(source,null,2),source);assert.equal(plan.error,undefined,plan.error);assert.ok(plan.text,'the edit writes');return JSON.parse(plan.text);};
+  const overlay=(source,field,key)=>plain(diagramOf(source).topologyImports[0][field][key]);
+  let source=f.consumer;
+  const node=(fieldName,ref,remove)=>source=apply(source,(t,r)=>C.planTopologyTracking(t,r,0,'node','shared::worker',fieldName,ref,remove,f.context));
+  const edge=(fieldName,ref,remove)=>source=apply(source,(t,r)=>C.planTopologyTracking(t,r,0,'edge','shared::api->shared::worker',fieldName,ref,remove,f.context,0));
+  node('tickets','ORD-1',false);assert.deepEqual(overlay(source,'nodeTracking','worker'),{tickets:['ORD-1'],trace:NODE},'Inspect / board Edit ticket add');
+  node('prs','https://github.com/acme/orders/pull/7',false);node('missingWork',true,false);node('existsWhen','tickets-done',false);
+  node('telemetry',{kind:'service',signals:{up:{grafana:'up'}}},false);
+  assert.deepEqual(overlay(source,'nodeTracking','worker').trace,NODE,'PRs, Missing work, availability and metrics keep it');
+  for(const [field,ref] of [['telemetry',null],['existsWhen','tickets-done'],['missingWork',true],['prs','https://github.com/acme/orders/pull/7'],['tickets','ORD-1']])node(field,ref,true);
+  assert.deepEqual(overlay(source,'nodeTracking','worker'),{trace:NODE},'removing everything else leaves the trace overlay');
+  edge('missingWork',true,false);assert.deepEqual(overlay(source,'edgeTracking','api->worker'),{missingWork:true,trace:EDGE},'board Edit Missing work on a connection');
+  edge('tickets','ORD-2',false);edge('missingWork',true,true);edge('tickets','ORD-2',true);
+  assert.deepEqual(overlay(source,'edgeTracking','api->worker'),{trace:EDGE});
+  // Metrics editor (planCarrierTelemetry) and the Links window (linksOverlayPlan) share the planner.
+  source=apply(source,(t,r)=>C.planCarrierTelemetry(t,r,{section:0,kind:'edge',index:0,key:'shared::api->shared::worker'},{op:'addSignal',name:'rate',source:'grafana',query:'rate_q',kind:'call'},f.context));
+  assert.deepEqual(overlay(source,'edgeTracking','api->worker').trace,EDGE,'a metrics binding edit keeps it');
+  source=apply(source,(t,r)=>C.linksOverlayPlan(t,r,0,'node','shared::worker','ORD-3','ORD-3',false,f.context));
+  assert.deepEqual(overlay(source,'nodeTracking','worker'),{tickets:['ORD-3'],trace:NODE},'a Links window ticket keeps it');
+  // The resolved carriers still carry the merged spans.
+  const d=diagramOf(C.FlowTopology.resolveSource(source,f.context));
+  assert.deepEqual(Object.keys(plain(d.nodes['shared::worker'].trace.spans)),['process','find','audit']);
+  assert.equal(d.edges.find(e=>e.from==='shared::api').trace.spans.send.namespace,'eu');
+});
+
+test('S10 resolution sets aside only exact declaration messages',()=>{
+  // A span name with a colon is invalid in the provider and only warns for its consumers.
+  const colon=WORKER();colon.spans['mongo:find']={serviceName:'worker',operation:'find',role:'database'};
+  const provider=providerSpec(colon);
+  assert.deepEqual(canonErrors(provider),['nodes.worker.trace.spans.mongo:find: span names start with a letter and use letters, digits, - and _']);
+  const page=resolved(fixtures(undefined,undefined,provider));
+  assert.deepEqual(Object.keys(plain(diagramOf(page).nodes['shared::worker'].trace.spans)),['process','find','cache']);
+  assert.deepEqual(errors(page),[]);
+  assert.match(warnings(page)[0],/^sections\[0\]\.diagram\.nodes\.shared::worker\.trace\.spans\.mongo:find: provider "provider" .*span names start with a letter/);
+  // A spec with a span error and another error still fails resolution on the other error.
+  const both=providerSpec(colon);diagramOf(both).nodes.api.binding={entityRef:'not a ref'};
+  assert.throws(()=>resolved(fixtures(undefined,undefined,both)),e=>/invalid materialized spec/.test(e.message) && /nodes\.api\.binding/.test(e.message) && !/mongo:find/.test(e.message));
+  // A consumer overlay error does not block resolution either; the consumer's validation reports it.
+  assert.doesNotThrow(()=>resolved(fixtures({spans:{procss:{operation:'x'}}})));
+});
+
+test('S11 overlay findings name the overlay and say what happened',()=>{
+  const at='sections[0].diagram.topologyImports[0].nodeTracking.worker.trace';
+  // A hide or null entry for a span the provider lacks.
+  let page=resolved(fixtures({hide:['cahce'],spans:{gone:null}}));
+  assert.deepEqual(warnings(page),[at+'.hide: the provider declares no span cahce on this carrier; the hide is kept in case it returns',at+'.spans.gone: the provider declares no span gone on this carrier; the hide is kept in case it returns']);
+  assert.deepEqual(Object.keys(plain(diagramOf(page).nodes['shared::worker'].trace.spans)),['process','find','cache'],'the provider cache span stays');
+  // A typo'd patch key.
+  page=resolved(fixtures({spans:{procss:{operation:'process orders v2'}}}));
+  assert.deepEqual(errors(page),[at+'.spans.procss: the provider declares no span procss on this carrier, so this entry is a new span and needs a full declaration: serviceName required; role must be one of process, database, cache, call, work']);
+  assert.equal(diagramOf(page).nodes['shared::worker'].trace.spans.process.operation,'process orders','the provider span is unchanged');
+  // Hide plus patch of the same span: the hide wins.
+  page=resolved(fixtures({hide:['cache'],spans:{cache:{operation:'hget'}}}));
+  assert.deepEqual(warnings(page),[at+'.spans.cache: span cache is both hidden and patched; the hide wins']);
+  assert.equal(Object.hasOwn(diagramOf(page).nodes['shared::worker'].trace.spans,'cache'),false);
+  // A provider attribute its own profile allows but this board does not.
+  const profile={...require('./fixtures/trace-connection-profile.json'),dataset:'events',allowedAttributes:['tenant.id']};
+  const listed=providerSpec({spans:{tenant:{serviceName:'worker',attributes:{'tenant.id':'t1'},role:'process'}}});listed.page.tracking={telemetry:{traceConnections:{company:profile}}};
+  assert.deepEqual(canonErrors(listed),[]);
+  page=resolved(fixtures(undefined,undefined,listed));
+  assert.deepEqual(warnings(page),['sections[0].diagram.nodes.shared::worker.trace.spans.tenant: provider "provider" sections[0].diagram.nodes.worker.trace.spans.tenant: attribute tenant.id is not allowed on this board; list it in this board\'s trace connection allowedAttributes; not used on this board']);
+  const allowed=fixtures(undefined,undefined,listed);allowed.consumer.page.tracking={telemetry:{traceConnections:{company:profile}}};
+  assert.deepEqual(plain(diagramOf(resolved(allowed)).nodes['shared::worker'].trace.spans.tenant),{serviceName:'worker',attributes:{'tenant.id':'t1'},role:'process'},'listed on this board too: kept');
+  // Nested: an outer patch that cannot bring back a span the middle dropped still warns.
+  const broken=WORKER();broken.spans.find.operation='find orders';
+  const provider=providerSpec(broken);
+  const middle=spec('middle',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'p'}],topologyExports:{all:{nodes:['p::api','p::worker'],edges:['p::api->p::worker']}}});
+  const outer=spec('outer',{nodes:{},rows:[[]],topologyImports:[{spec:'middle',export:'all',as:'m',nodeTracking:{'p::worker':{trace:{spans:{find:{operationPrefix:null}}}}}}]});
+  page=C.FlowTopology.resolveSource(outer,{version:1,id:'outer',specs:[provider,middle,outer]});
+  assert.equal(Object.hasOwn(diagramOf(page).nodes['m::p::worker'].trace.spans,'find'),false);
+  assert.ok(warnings(page).some(w=>/^sections\[0\]\.diagram\.nodes\.m::p::worker\.trace\.spans\.find: provider "provider"/.test(w)),warnings(page).join('\n'));
+  // Honeycomb number or boolean attribute values warn, as for step traceMatch.
+  const honeycomb={...require('./fixtures/trace-connection-profile.json'),provider:'honeycomb',dataset:'events',allowedAttributes:['order.count','order.vip']};
+  const hc=providerSpec({spans:{orders:{serviceName:'worker',attributes:{'order.count':2,'order.vip':true},role:'process'}}});hc.page.tracking={telemetry:{traceConnections:{hc:honeycomb}}};
+  const hcWarnings=plain(C.FlowCanon.traceWarnings(hc)).filter(w=>/trace\.spans/.test(w));
+  assert.deepEqual(hcWarnings,['nodes.worker.trace.spans.orders.attributes.order.count: Honeycomb table cells are text; a number value never matches','nodes.worker.trace.spans.orders.attributes.order.vip: Honeycomb table cells are text; a boolean value never matches']);
+  // A resolved snapshot edit gets the full declaration check.
+  const before=resolved(fixtures());
+  for(const bad of [{hide:['cache'],spans:{}},{spans:{process:{operation:'x'}}}]){
+    const after=JSON.parse(JSON.stringify(before));diagramOf(after).nodes['shared::worker'].trace=bad;
+    assert.match(C.FlowTopology.editError(before,after) || '',/snapshot node shared::worker tracking: trace/,JSON.stringify(bad));
+  }
 });

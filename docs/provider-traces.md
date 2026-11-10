@@ -423,7 +423,8 @@ importer changes, adds or hides one span through its existing `nodeTracking` /
 ```
 
 An entry is a field patch (`null` deletes that field); a `null` entry or a name in `hide`
-hides that span, and a hide for a span the provider does not have does nothing. Setting
+hides that span. A hide for a span the provider does not declare is kept in case it
+returns, with a warning; a span both hidden and patched warns and the hide wins. Setting
 `operation` removes an inherited `operationPrefix`, and the reverse. To match by
 attributes alone, set `operation` (or `operationPrefix`) to `null` and give `attributes`;
 `attributes` is replaced as a whole. Hiding every span removes the carrier's `trace`. A
@@ -432,8 +433,12 @@ resolved snapshot may edit `trace` on imported carriers; their structure stays r
 
 **Invalid provider declarations.** The provider's own validation reports them. A consumer
 does not fail on them: an inherited span its validation rejects is not used on that board,
-with a warning naming the provider path, unless the consumer's patch fixes it. A consumer
-patch that breaks a valid provider span is reported as the consumer's own error.
+with a warning naming the provider path, unless the consumer's patch fixes it. When the
+reason is an attribute this board's trace connections do not allow, the warning names it.
+A patch that breaks a valid provider span, or that names a span the provider does not
+declare without giving a full declaration, is an error at the overlay
+(`topologyImports[i].nodeTracking.<id>.trace.spans.<name>`), and that span is left out.
+Honeycomb number or boolean attribute values warn, as for step `traceMatch`.
 
 ## Honeycomb lookback
 

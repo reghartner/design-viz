@@ -789,12 +789,8 @@ function validate(page){
       if(drop.kind==='edges')(Array.isArray(d.edges)?d.edges:[]).some(function(e,i){if(e && e.from+'->'+e.to===drop.id){at=DP+'.edges['+i+']';return true;}return false;});
       warnings.push(at+'.telemetry: provider "'+drop.spec+'" '+drop.path+': '+drop.message);
     });
-    // #1290: provider span declarations this board's validation rejects are dropped for it.
-    if(typeof FlowTopology!=='undefined' && FlowTopology.traceDrops)FlowTopology.traceDrops(d).forEach(function(drop){
-      var at=DP+'.nodes.'+drop.id;
-      if(drop.kind==='edges')(Array.isArray(d.edges)?d.edges:[]).some(function(e,i){if(e && e.from+'->'+e.to===drop.id){at=DP+'.edges['+i+']';return true;}return false;});
-      warnings.push(at+'.trace'+(drop.key==null?'':'.spans.'+drop.key)+': provider "'+drop.spec+'" '+drop.path+': '+drop.message+'; not used on this board');
-    });
+    // #1290: provider spans dropped for this board warn at the carrier; overlay findings sit at the overlay.
+    if(typeof FlowTopology!=='undefined' && FlowTopology.traceFindings){var spanFindings=FlowTopology.traceFindings(d,DP);errors.push.apply(errors,spanFindings.errors);warnings.push.apply(warnings,spanFindings.warnings);}
     // A resolved snapshot already carries overlay bindings on its imported carriers.
     if(!d.topologyProvenance)(Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp,i){
       if(!specObject(imp))return;

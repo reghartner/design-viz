@@ -230,7 +230,21 @@ var FlowCanon = (function(){
           if(typeof m.attributes[k]!=='string')warnings.push(at+'Honeycomb table cells are text; a '+typeof m.attributes[k]+' value never matches');
         });
       });
-    });});
+    });
+    // #1290: the same rule for span declarations on nodes and edges.
+    function declared(value,at){
+      var spans=object(value) && object(value.trace) && object(value.trace.spans)?value.trace.spans:{};
+      Object.keys(spans).forEach(function(key){
+        var attrs=object(spans[key]) && object(spans[key].attributes)?spans[key].attributes:{};
+        Object.keys(attrs).forEach(function(k){
+          if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}) || typeof attrs[k]==='string')return;
+          warnings.push(at+'.trace.spans.'+key+'.attributes.'+k+': Honeycomb table cells are text; a '+typeof attrs[k]+' value never matches');
+        });
+      });
+    }
+    if(object(sec.diagram.nodes))Object.keys(sec.diagram.nodes).forEach(function(id){declared(sec.diagram.nodes[id],'nodes.'+id);});
+    (Array.isArray(sec.diagram.edges)?sec.diagram.edges:[]).forEach(function(e){if(object(e))declared(e,'edges.'+e.from+'->'+e.to);});
+    });
     return warnings;
   }
   /* #1290: trace span declarations on a node or edge: trace.spans, keyed by a short name.
@@ -263,6 +277,21 @@ var FlowCanon = (function(){
     });
     return out;
   }
+  // The validate() messages for every carrier declaration of a page, e.g. 'nodes.worker.trace.spans.find: …'.
+  function traceCarrierErrors(raw,listed){
+    if(!listed)listed=profileAttributes(raw);
+    var errors=[];
+    sections(raw).forEach(function(sec){
+      var d=sec.diagram;
+      function spans(value,kind,at){
+        if(!object(value) || !Object.prototype.hasOwnProperty.call(value,'trace'))return;
+        traceDeclarationErrors(value.trace,kind,raw,listed).forEach(function(x){errors.push(at+'.trace'+(x.key==null?'':'.spans.'+x.key)+': '+x.message);});
+      }
+      if(object(d.nodes))Object.keys(d.nodes).forEach(function(id){spans(d.nodes[id],'node','nodes.'+id);});
+      (Array.isArray(d.edges)?d.edges:[]).forEach(function(e){if(object(e))spans(e,'edge','edges.'+e.from+'->'+e.to);});
+    });
+    return errors;
+  }
   function validate(raw){
     var errors=[], p=pageOf(raw);
     if (!object(p)) return errors;
@@ -290,15 +319,7 @@ var FlowCanon = (function(){
       });
     });
     var listed=profileAttributes(raw);
-    sections(raw).forEach(function(sec){
-      var d=sec.diagram;
-      function spans(value,kind,at){
-        if(!object(value) || !Object.prototype.hasOwnProperty.call(value,'trace'))return;
-        traceDeclarationErrors(value.trace,kind,raw,listed).forEach(function(x){errors.push(at+'.trace'+(x.key==null?'':'.spans.'+x.key)+': '+x.message);});
-      }
-      if(object(d.nodes))Object.keys(d.nodes).forEach(function(id){spans(d.nodes[id],'node','nodes.'+id);});
-      (Array.isArray(d.edges)?d.edges:[]).forEach(function(e){if(object(e))spans(e,'edge','edges.'+e.from+'->'+e.to);});
-    });
+    traceCarrierErrors(raw,listed).forEach(function(e){errors.push(e);});
     sections(raw).forEach(function(sec){
       var d=sec.diagram, steps=Array.isArray(d.steps)?d.steps:[], ids=new Set(steps.map(function(s){return s && s.id;}));
       if(d.referenceTrace!=null){var r=d.referenceTrace;if(!object(r) || r.version!==1 || !object(r.trace) || !object(r.trace.context) || !Array.isArray(r.trace.spans) || typeof r.trace.traceId!=='string' || !object(r.approval) || typeof r.approval.reason!=='string' || typeof r.contract!=='string')errors.push('referenceTrace: expected an approved version-1 trace mapping');}
@@ -359,6 +380,6 @@ var FlowCanon = (function(){
   }
   /* #1238: the attribute names traceMatch.attributes accepts on this page, for the Workbench form. */
   function traceAttributeNames(raw){return traceAttributes.concat(Object.keys(profileAttributes(raw)).filter(function(k){return traceAttributes.indexOf(k)<0;}));}
-  return {version:1,traceWarnings:traceWarnings,traceDeclarationErrors:traceDeclarationErrors,traceAttributeNames:traceAttributeNames,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
+  return {version:1,traceWarnings:traceWarnings,traceDeclarationErrors:traceDeclarationErrors,traceCarrierErrors:traceCarrierErrors,traceAttributeNames:traceAttributeNames,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
     referenceErrors:referenceErrors,locate:locate,codeUrl:codeUrl,references:references,validate:validate,links:links};
 })();

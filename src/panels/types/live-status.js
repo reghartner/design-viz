@@ -293,7 +293,7 @@
       // A Verify report stays after the search; a loading or loaded report sits at the end of the search, with Clear.
       var lines=direct.logs && direct.logs.result,atRow=!!(r && r.error && r.logLine && lines && lines.rows[lines.chosen]);
       if(r && r.error && !atRow)connectionReport(config);
-      if(direct.logs){var chosenRow=logLookupBody(config,box,direct.logs,direct);if(atRow && chosenRow)connectionReport(chosenRow);}
+      var chosenRow=direct.logs?logLookupBody(config,box,direct.logs,direct):null;if(atRow)connectionReport(chosenRow || config);
       // #1145: why a loaded trace left, or why the view did not move to its day.
       if(direct.dayNote)el(box,'p','day-note','dv-trace-day-note',direct.dayNote).setAttribute('role','status');
       if(!direct.available)el(box,'p','unavailable','dv-trace-direct-status','Direct trace retrieval is unavailable in this host or view.').setAttribute('role','status');

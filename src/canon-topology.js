@@ -201,13 +201,15 @@ var FlowTopology = (function(){
     var addition=object(overlay) && own(overlay,'trace')?clone(overlay.trace):null;
     if(!own(value,'trace') && !addition)return;
     var errors=own(value,'trace')?FlowCanon.traceDeclarationErrors(value.trace,kind,page):[];
-    if(errors.some(function(x){return x.key==null;})){drop(null,errors[0].message);delete value.trace;errors=[];}
+    var malformed=errors.some(function(x){return x.key==null;});
+    if(malformed){drop(null,errors[0].message);delete value.trace;errors=[];}
     var provided=object(value.trace)?clone(value.trace.spans):{};
     if(addition){
       var spans=object(addition.spans)?addition.spans:{},hidden=(Array.isArray(addition.hide)?addition.hide:[]).slice();
       Object.keys(spans).forEach(function(key){if(spans[key]===null && hidden.indexOf(key)<0)hidden.push(key);});
       hidden.forEach(function(key){
-        if(!own(provided,key))note('warning',own(spans,key) && spans[key]===null?'.spans.'+key:'.hide','the provider declares no span '+key+' on this carrier; the hide is kept in case it returns');
+        // A malformed provider trace already warns; its span names are unknown, not missing.
+        if(!own(provided,key) && !malformed)note('warning',own(spans,key) && spans[key]===null?'.spans.'+key:'.hide','the provider declares no span '+key+' on this carrier; the hide is kept in case it returns');
         if(object(spans[key])){note('warning','.spans.'+key,'span '+key+' is both hidden and patched; the hide wins');delete spans[key];}
       });
       var merged=mergeTrace(value.trace,addition);
@@ -218,14 +220,19 @@ var FlowTopology = (function(){
     Object.keys(value.trace.spans).forEach(function(key){
       var still=after.filter(function(x){return x.key===key;}).map(function(x){return x.message;});
       if(!still.length)return;
-      delete value.trace.spans[key];
+      var entry=value.trace.spans[key];delete value.trace.spans[key];
       if(own(provided,key) && errors.some(function(x){return x.key===key;})){
         // Valid in the provider's own build: this board's attribute allowlist is the reason.
         var own_=FlowCanon.traceDeclarationErrors({spans:{x:provided[key]}},kind,providerPage),allowed=FlowCanon.traceAttributeNames(page);
         var missing=Object.keys(object(provided[key].attributes)?provided[key].attributes:{}).filter(function(k){return allowed.indexOf(k)<0;});
         drop(key,!own_.length && missing.length?'attribute '+missing.join(', ')+' is not allowed on this board; list it in this board\'s trace connection allowedAttributes':still.join('; '));
       }
-      else note('error','.spans.'+key,(own(provided,key)?'':'the provider declares no span '+key+' on this carrier, so this entry is a new span and needs a full declaration: ')+still.join('; '));
+      else{
+        // Name the new-span rule only when that is what is missing.
+        var incomplete=!object(entry) || typeof entry.serviceName!=='string' || !entry.serviceName.trim() || entry.role==null ||
+          !own(entry,'operation') && !own(entry,'operationPrefix') && !(object(entry.attributes) && Object.keys(entry.attributes).length);
+        note('error','.spans.'+key,(own(provided,key) || !incomplete?'':'the provider declares no span '+key+' on this carrier, so this entry is a new span and needs a full declaration: ')+still.join('; '));
+      }
     });
     if(!Object.keys(value.trace.spans).length)delete value.trace;
   }

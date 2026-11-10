@@ -201,3 +201,10 @@ test('L14 perf guard: the Move to… / Copy to… list (linksMoveTargets, as the
     assert.ok(offered>700,'most targets are offered: '+offered);
   }finally{c.planLinksTicketMove=saved.move;c.planLinksTicket=saved.one;c.linksCarrierTicketPlan=saved.carrier;c.linksStepTicketPlan=saved.step;}
 });
+
+test('L15 an imported carrier with no consumer overlay: every ticket is inherited and read only',()=>{
+  const f=imported();delete f.source.page.sections[0].diagram.topologyImports[0].nodeTracking;
+  const text=JSON.stringify(f.source,null,2),m=c.linksTicketModel(text,JSON.parse(text),f.context),api=el(m,'node','canon::api');
+  assert.deepEqual(plain(api.keys),['CAN-1']);assert.deepEqual(plain(api.inherited),['CAN-1']);
+  assert.equal(m.tickets.find(t=>t.key==='CAN-1').links.find(l=>l.kind==='node').inherited,true);
+});

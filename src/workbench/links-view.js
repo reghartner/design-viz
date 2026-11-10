@@ -10,9 +10,9 @@ function initWorkbenchLinksView(opts){
   var life=createWorkbenchLifetime(),rowsLife=createWorkbenchLifetime(),popLife=createWorkbenchLifetime();
   life.own(function(){rowsLife.destroy();popLife.destroy();});
   var TABS=[['tickets','Tickets'],['metrics','Metrics'],['trace','Trace match'],['logs','Log searches']];
-  var state={logEdit:null,logAdding:false,logDraft:{},logDrag:null,tab:'tickets',by:'ticket',traceBy:'match',show:'all',filter:'',drafts:[],highlight:null,popover:null,drag:null,editing:null,adding:false,traceEdit:null,traceCreate:null,traceRename:null};
-  var LIVE_TABS=['tickets','trace','logs'];
-  var logsModel=null,traceModel=null,traceKey=null,traceById=Object.create(null),traceByKey=Object.create(null),modelRev=0,byId=Object.create(null),byKey=Object.create(null),visible=false,filterTimer=null,dryRuns=Object.create(null),model=null,modelKey=null,stale=false,suppressClick=false,uid='links-'+Math.random().toString(36).slice(2);
+  var state={metricsBy:'binding',metricEdit:null,logEdit:null,logAdding:false,logDraft:{},logDrag:null,tab:'tickets',by:'ticket',traceBy:'match',show:'all',filter:'',drafts:[],highlight:null,popover:null,drag:null,editing:null,adding:false,traceEdit:null,traceCreate:null,traceRename:null};
+  var LIVE_TABS=['tickets','trace','logs','metrics'];
+  var metricsModel=null,metricsById=Object.create(null),logsModel=null,traceModel=null,traceKey=null,traceById=Object.create(null),traceByKey=Object.create(null),modelRev=0,byId=Object.create(null),byKey=Object.create(null),visible=false,filterTimer=null,dryRuns=Object.create(null),model=null,modelKey=null,stale=false,suppressClick=false,uid='links-'+Math.random().toString(36).slice(2);
 
   function el(tag,cls,text){var n=doc.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;}
   function button(cls,text,label,title){var b=el('button',cls,text);b.type='button';if(label)b.setAttribute('aria-label',label);if(title)b.title=title;return b;}
@@ -54,9 +54,10 @@ function initWorkbenchLinksView(opts){
     return {el:wrap,paint:function(value){Object.keys(buttons).forEach(function(k){buttons[k].setAttribute('aria-pressed',String(k===value));});}};
   }
   var bySeg=segmented('Rows by',[['ticket','By ticket'],['element','By element']],state.by,function(value){state.by=value;closePopover(false);render();});
+  var metricsSeg=segmented('Rows by',[['binding','By binding'],['element','By element']],state.metricsBy,function(value){state.metricsBy=value;state.metricEdit=null;closePopover(false);render();});
   var traceSeg=segmented('Rows by',[['match','By trace match'],['element','By element']],state.traceBy,function(value){state.traceBy=value;state.traceEdit=state.traceCreate=state.traceRename=null;closePopover(false);render();});
   var showSeg=segmented('Show',[['all','All'],['step','Steps'],['node','Nodes'],['edge','Connections']],state.show,function(value){state.show=value;render();});
-  toolbar.appendChild(bySeg.el);toolbar.appendChild(traceSeg.el);toolbar.appendChild(showSeg.el);
+  toolbar.appendChild(bySeg.el);toolbar.appendChild(traceSeg.el);toolbar.appendChild(metricsSeg.el);toolbar.appendChild(showSeg.el);
   var filter=el('input','fctl links-filter');filter.type='search';filter.setAttribute('aria-label','Filter tickets, nodes, connections and steps');filter.placeholder='Filter tickets, nodes, connections, steps';
   life.listen(filter,'input',function(){
     if(filterTimer!=null)life.cancelDelay(filterTimer);
@@ -93,6 +94,9 @@ function initWorkbenchLinksView(opts){
     var traces=traceModel && !traceModel.error?traceModel.groups.length:null;
     tabButtons.trace.querySelector('.links-tab-count').textContent=traces==null?'':String(traces);
     if(traces==null)tabButtons.trace.removeAttribute('aria-label');else tabButtons.trace.setAttribute('aria-label','Trace match ('+traces+')');
+    var metrics=metricsModel && !metricsModel.error?metricsModel.groups.length:null;
+    tabButtons.metrics.querySelector('.links-tab-count').textContent=metrics==null?'':String(metrics);
+    if(metrics==null)tabButtons.metrics.removeAttribute('aria-label');else tabButtons.metrics.setAttribute('aria-label','Metrics ('+metrics+')');
     var logs=logsModel && logsModel.valid?logsModel.rows.length:null;
     tabButtons.logs.querySelector('.links-tab-count').textContent=logs==null?'':String(logs);
     if(logs==null)tabButtons.logs.removeAttribute('aria-label');else tabButtons.logs.setAttribute('aria-label','Log searches ('+logs+')');
@@ -126,12 +130,16 @@ function initWorkbenchLinksView(opts){
     // The Trace match model is built with the Tickets model, so both tab counts show.
     if(key!==traceKey){
       try{logsModel=linksLogSearchModel(s.raw);}catch(ex){logsModel=null;}
+      metricsModel=linksMetricsModel(s.text,s.raw,context());metricsById=Object.create(null);
+      if(!metricsModel.error)metricsModel.elements.forEach(function(e){metricsById[linksElementId(e)]=e;});
       traceKey=key;traceModel=linksTraceModel(s.text,s.raw,context());traceById=Object.create(null);traceByKey=Object.create(null);
       if(!traceModel.error){traceModel.elements.forEach(function(e){traceById[linksElementId(e)]=e;});traceModel.groups.forEach(function(g){traceByKey[g.key]=g;});}
     }
+    if(state.tab==='metrics' && metricsModel && metricsModel.error)return metricsModel;
     return state.tab==='trace' && traceModel && traceModel.error?traceModel:model;
   }
   function element(id){
+    if(state.tab==='metrics')return metricsModel && !metricsModel.error && metricsById[id] || null;
     if(state.tab==='trace')return traceModel && !traceModel.error && traceById[id] || null;
     return model && !model.error && byId[id] || null;
   }
@@ -181,6 +189,7 @@ function initWorkbenchLinksView(opts){
      target and model revision, so a drop never glows amber and then fails. */
   function dropRefusal(e,key,from,copy){
     if(state.tab==='trace')return traceDropRefusal(e,key,from,copy);
+    if(state.tab==='metrics')return metricsDropRefusal(e,key,from);
     var why=refusal(e,key,from,copy);if(why)return why;
     var memo=modelRev+'|'+(from?linksElementId(from):'')+'|'+linksElementId(e)+'|'+key+'|'+(copy?1:0);
     if(!(memo in dryRuns)){
@@ -330,15 +339,16 @@ function initWorkbenchLinksView(opts){
     var focusKey=focusSignature();
     rowsLife.destroy();rowsLife=createWorkbenchLifetime();list.innerHTML='';
     var current=ensureModel();if(!model.error)state.drafts=state.drafts.filter(function(d){return !ticketRow(d.key);});
-    var trace=state.tab==='trace',byElement=trace?state.traceBy==='element':state.by==='element';
-    paintTabs();bySeg.paint(state.by);traceSeg.paint(state.traceBy);showSeg.paint(state.show);
-    bySeg.el.hidden=trace;traceSeg.el.hidden=!trace;showSeg.el.hidden=!byElement;addKey.hidden=trace || state.by!=='ticket';
-    list.setAttribute('aria-label',trace?'Trace match links':'Ticket links');
+    var trace=state.tab==='trace',metrics=state.tab==='metrics',byElement=trace?state.traceBy==='element':metrics?state.metricsBy==='element':state.by==='element';
+    paintTabs();bySeg.paint(state.by);traceSeg.paint(state.traceBy);metricsSeg.paint(state.metricsBy);showSeg.paint(state.show);
+    bySeg.el.hidden=trace || metrics;traceSeg.el.hidden=!trace;metricsSeg.el.hidden=!metrics;showSeg.el.hidden=!byElement;addKey.hidden=trace || metrics || state.by!=='ticket';
+    list.setAttribute('aria-label',trace?'Trace match links':metrics?'Metrics links':'Ticket links');
     filter.setAttribute('aria-label',trace?'Filter trace matches, steps, nodes and connections':'Filter tickets, nodes, connections and steps');
     filter.placeholder=trace?'Filter services, operations, steps':'Filter tickets, nodes, connections, steps';
     if(current.error){list.appendChild(el('p','links-empty',current.error));applyHighlight();return;}
     if(stale)list.appendChild(el('p','links-empty links-stale','The source changed. Click Render to refresh links before editing.'));
-    if(trace){if(byElement)renderTraceByElement();else renderTraceByMatch();}
+    if(metrics){if(byElement)renderMetricsByElement();else renderMetricsByBinding();}
+    else if(trace){if(byElement)renderTraceByElement();else renderTraceByMatch();}
     else if(state.by==='ticket')renderByTicket();else renderByElement();
     applyHighlight();
     if(state.popover)paintPopover();
@@ -347,11 +357,11 @@ function initWorkbenchLinksView(opts){
   /* Rows are rebuilt on every source render; keep focus on the same control. */
   function focusSignature(){
     var a=doc.activeElement;if(!a || !root.contains(a) && !(popover && popover.contains(a)))return null;
-    var c=a.closest('[data-links-chip]'),r=a.closest('[data-links-ticket],[data-links-element],[data-links-trace]'),o=a.closest('[data-links-option]'),f=a.closest('[data-links-field]');
+    var c=a.closest('[data-links-chip]'),r=a.closest('[data-links-ticket],[data-links-element],[data-links-trace],[data-links-metric]'),o=a.closest('[data-links-option]'),f=a.closest('[data-links-field]');
     var rows=Array.prototype.slice.call(list.querySelectorAll('[data-links-ticket],[data-links-element],[data-links-trace]'));
     return {at:r?rows.indexOf(r):-1,cls:a.className,field:f && f.getAttribute('data-links-field'),
       chip:c && [c.getAttribute('data-links-chip'),c.getAttribute('data-links-chip-ticket') || c.getAttribute('data-links-trace-chip') || '',c.getAttribute('data-links-chip-alt') || ''].join('|'),
-      row:r && (r.getAttribute('data-links-ticket') || r.getAttribute('data-links-element') || r.getAttribute('data-links-trace')),option:o && o.getAttribute('data-links-option'),inPopover:!!(popover && popover.contains(a))};
+      row:r && (r.getAttribute('data-links-ticket') || r.getAttribute('data-links-element') || r.getAttribute('data-links-trace') || r.getAttribute('data-links-metric')),option:o && o.getAttribute('data-links-option'),inPopover:!!(popover && popover.contains(a))};
   }
   function restoreFocus(sig){
     if(!sig)return;var scope=sig.inPopover?popover:state.tab==='logs'?logsBox:list,found=null;if(!scope)return;
@@ -362,7 +372,7 @@ function initWorkbenchLinksView(opts){
       var parts=sig.chip.split('|'),chips=scope.querySelectorAll('[data-links-chip="'+cssEscape(parts[0])+'"]');
       Array.prototype.some.call(chips,function(n){if((n.getAttribute('data-links-chip-ticket') || n.getAttribute('data-links-trace-chip') || '')===parts[1] && (n.getAttribute('data-links-chip-alt') || '')===parts[2]){found=n.querySelector('.'+cls);return true;}return false;});
     }
-    if(!found && sig.row){var row=scope.querySelector('[data-links-ticket="'+cssEscape(sig.row)+'"],[data-links-element="'+cssEscape(sig.row)+'"],[data-links-trace="'+cssEscape(sig.row)+'"]');found=row && (cls && row.querySelector('.'+cls) || row.querySelector('button'));}
+    if(!found && sig.row){var row=scope.querySelector('[data-links-ticket="'+cssEscape(sig.row)+'"],[data-links-element="'+cssEscape(sig.row)+'"],[data-links-trace="'+cssEscape(sig.row)+'"],[data-links-metric="'+cssEscape(sig.row)+'"]');found=row && (cls && row.querySelector('.'+cls) || row.querySelector('button'));}
     // The row went away (its last link was removed): the next row, else the previous one, else the filter.
     if(!found && !sig.inPopover && sig.at>=0){
       var rows=list.querySelectorAll('[data-links-ticket],[data-links-element],[data-links-trace]'),near=rows[sig.at] || rows[sig.at-1];
@@ -393,7 +403,8 @@ function initWorkbenchLinksView(opts){
     var opener=root.querySelector('[data-links-opener="'+cssEscape(spec.opener)+'"]');
     if(!opener){state.popover=null;popover=null;return;}
     opener.setAttribute('aria-expanded','true');
-    popover=el('div','links-popover');popover.setAttribute('role',spec.type==='menu' || spec.type==='trace-menu' || spec.type==='trace-choose'?'menu':'dialog');
+    popover=el('div','links-popover');popover.setAttribute('role',['menu','trace-menu','trace-choose','metric-menu','metric-choose'].indexOf(spec.type)>=0?'menu':'dialog');
+    if(spec.type.indexOf('metric-')===0)return paintMetricPopover(spec,opener);
     if(spec.type==='menu')return paintMenu(spec,opener);
     if(spec.type.indexOf('trace-')===0)return paintTracePopover(spec,opener);
     var e=spec.id?element(spec.id):null,from=spec.from?element(spec.from):null;
@@ -1128,10 +1139,239 @@ function initWorkbenchLinksView(opts){
   function cancelLogDrag(message){if(!state.logDrag)return;endLogDrag();if(message)say(message);}
   life.listen(win,'keydown',function(ev){if(state.logDrag && ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancelLogDrag('Drag cancelled. Nothing changed.');}},true);
 
+  /* ---------- Metrics tab (#1243 part 4) ---------- */
+  function metricGroup(key){return metricsModel && !metricsModel.error && metricsModel.groups.find(function(g){return g.key===key;}) || null;}
+  function carrierRef(e){return e.kind==='node'?{kind:'node',section:e.section,id:e.id}:{kind:'edge',section:e.section,index:e.index,key:e.key};}
+  function bindingText(e){
+    if(e.group==='provider')return 'provider · '+e.inheritedSignals.length+' signals'+(e.added.length?' · +'+e.added.length+' added':'')+(e.hidden.length?' · '+e.hidden.length+' hidden':'');
+    if(e.template)return e.template+(e.missingParams.length?' · needs '+e.missingParams.join(', '):'');
+    if(e.group==='raw')return 'raw · '+e.signals.length+(e.signals.length===1?' signal':' signals');
+    return 'No metrics';
+  }
+  function metricsHighlightLinks(h){
+    var out=[],seen={};function add(l){var id=linksElementId(l);if(!seen[id]){seen[id]=1;out.push(l);}}
+    if(h.type==='metric'){var g=metricGroup(h.key);if(!g)return [];g.carriers.forEach(add);g.steps.forEach(add);return out;}
+    var e=element(h.id);if(!e)return [];add(e);
+    if(e.kind==='step')e.carriers.forEach(add);
+    else metricsModel.elements.forEach(function(s){if(s.kind==='step' && s.carriers.indexOf(e)>=0)add(s);});
+    return out;
+  }
+  function metricCommit(e,edit,okText,fieldId){
+    var ref=carrierRef(e),ok=commit(function(text,raw,ctx){var plan=planCarrierTelemetry(text,raw,ref,edit,ctx);return plan.noop?{text:text}:plan;},{ok:okText || 'Saved the metrics on '+describe(e)+'. Undo restores it.'});
+    if(!ok && fieldId && error.textContent){var input=list.querySelector('[data-links-field="'+cssEscape(fieldId)+'"]');if(input){var msg=error.textContent;fail('');fieldError(input,msg);}}
+    return ok;
+  }
+  // Use a template on a carrier; raw signals ask first. On success the editor opens with any missing parameter flagged.
+  function metricUse(e,name,opener){
+    var ref=carrierRef(e);
+    if(e.group==='raw'){openPopover({type:'metric-choose',id:linksElementId(e),template:name,opener:opener || 'metric-chip:'+linksElementId(e)});return false;}
+    var ok=commit(function(text,raw,ctx){return planLinksMetricsUse(text,raw,ref,name,false,ctx);},{ok:describe(e)+' now uses '+name+'. Undo restores it.'});
+    if(ok){state.metricEdit=linksElementId(e);render();focusMetricEditor(e);}
+    return ok;
+  }
+  function focusMetricEditor(e){var f=list.querySelector('.links-metric-editor[data-links-editor="'+cssEscape(linksElementId(e))+'"] input[aria-invalid="true"], .links-metric-editor[data-links-editor="'+cssEscape(linksElementId(e))+'"] select');if(f)f.focus();}
+  function metricChip(e,inGroup){
+    var wrap=el('span','links-chip links-chip-'+e.kind);wrap.setAttribute('data-links-chip',linksElementId(e));wrap.setAttribute('role','listitem');
+    var opener='metric-chip:'+linksElementId(e),main=button('links-chip-main');main.setAttribute('data-links-opener',opener);main.setAttribute('aria-haspopup','menu');
+    if(inGroup){var tag=el('span','links-kind',e.kind==='edge'?'EDGE':'NODE');tag.setAttribute('aria-hidden','true');main.appendChild(tag);main.appendChild(el('span','links-chip-text',sectionPrefix(e)+e.label));}
+    else main.appendChild(el('span','links-chip-text',bindingText(e)));
+    if(inGroup && (e.imported || e.missingParams.length))main.appendChild(el('span','links-chip-note',e.imported?'imported'+(e.added.length?' · +'+e.added.length+' added':'')+(e.hidden.length?' · '+e.hidden.length+' hidden':''):'needs '+e.missingParams.join(', ')));
+    main.setAttribute('aria-label','Edit metrics on '+describe(e));
+    main.title='Click to edit here. Enter or right-click: Highlight, Move to…, Remove metrics.'+(e.group!=='none' && !e.imported?' Drag onto another template row to switch.':'');
+    wrap.appendChild(main);
+    rowsLife.listen(main,'click',function(){if(suppressClick){suppressClick=false;return;}state.metricEdit=state.metricEdit===linksElementId(e)?null:linksElementId(e);render();if(state.metricEdit)focusMetricEditor(e);});
+    function menu(ev){ev.preventDefault();openPopover({type:'metric-menu',id:linksElementId(e),opener:opener},main);}
+    rowsLife.listen(main,'keydown',function(ev){if(ev.key==='Enter' || ev.key==='ContextMenu' || ev.key==='F10' && ev.shiftKey)menu(ev);});
+    rowsLife.listen(main,'contextmenu',menu);
+    if(e.group!=='none' && e.group!=='provider')rowsLife.listen(main,'pointerdown',function(ev){startDrag(ev,main,e.template || 'metrics',e,false);});
+    return wrap;
+  }
+  function metricEditor(e){
+    var id=linksElementId(e),base='metric|'+id+'|',box=el('div','links-trace-editor links-metric-editor');
+    box.setAttribute('role','group');box.setAttribute('aria-label','Metrics on '+describe(e));box.setAttribute('data-links-editor',id);
+    rowsLife.listen(box,'keydown',function(ev){if(ev.key==='Escape' && !ev.defaultPrevented){ev.preventDefault();ev.stopPropagation();state.metricEdit=null;render();var c=list.querySelector('[data-links-chip="'+cssEscape(id)+'"] .links-chip-main');if(c)c.focus();}});
+    function field(fid,label,value,onCommit,placeholder,invalid){
+      var row=el('label','links-trace-field');row.appendChild(el('span','links-trace-label',label));
+      var input=el('input','fctl links-trace-input');input.value=value==null?'':String(value);input.setAttribute('aria-label',label);input.setAttribute('data-links-field',base+fid);if(placeholder)input.placeholder=placeholder;
+      row.appendChild(input);box.appendChild(row);
+      if(invalid){var why=el('p','fnote links-log-warning',invalid);why.id=uid+'-metric-'+(++noteIds);why.setAttribute('role','note');row.after(why);input.setAttribute('aria-invalid','true');input.setAttribute('aria-describedby',why.id);}
+      function save(){if(input.value!==(value==null?'':String(value)))onCommit(input.value);}
+      rowsLife.listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();save();}});
+      rowsLife.listen(input,'change',save);
+      return input;
+    }
+    function select(fid,label,options,value,onChange){
+      var row=el('label','links-trace-field');row.appendChild(el('span','links-trace-label',label));
+      var s=el('select','fctl links-trace-input');s.setAttribute('aria-label',label);s.setAttribute('data-links-field',base+fid);
+      options.forEach(function(o){var opt=el('option',null,o[1]);opt.value=o[0];s.appendChild(opt);});s.value=value;
+      rowsLife.listen(s,'change',function(){onChange(s.value,s);});row.appendChild(s);box.appendChild(row);return s;
+    }
+    if(e.group==='provider'){
+      box.appendChild(el('p','links-pop-hint','These metrics come from the provider. Hide a signal here, or add signals in Inspect. '+linksMetricsTemplateRefusal(e)));
+      e.inheritedSignals.forEach(function(name){
+        var row=el('label','links-pop-option'),cb=el('input');cb.type='checkbox';cb.checked=e.hidden.indexOf(name)<0;cb.setAttribute('data-links-field',base+'show-'+name);
+        rowsLife.listen(cb,'change',function(){var hide=!cb.checked;if(!commit(function(text,raw,ctx){return planLinksMetricsHide(text,raw,carrierRef(e),name,hide,ctx);},{ok:(hide?'Hid ':'Showing ')+name+' on '+describe(e)+'. Undo restores it.'}))cb.checked=!cb.checked;});
+        row.appendChild(cb);row.appendChild(el('span',null,'Show '+name));box.appendChild(row);
+      });
+    }else{
+      var templateNames=metricsModel.templates.map(function(t){return t.name;});
+      var kindOptions=[['','(from the template)']].concat(TELEMETRY_KINDS.map(function(k){return [k,k];}));
+      var b=e.binding || {};
+      if(e.group!=='none')select('kind','Metrics kind',e.template?kindOptions:TELEMETRY_KINDS.map(function(k){return [k,k];}),typeof b.kind==='string'?b.kind:'',function(v){metricCommit(e,{op:'kind',value:v || null},null,base+'kind');});
+      select('use','Signals from',[['','Raw signals']].concat(templateNames.map(function(n){return [n,'Template '+n];})),e.template || '',function(v,s){
+        if(v){metricUse(e,v,'metric-chip:'+id);s.value=e.template || '';return;}
+        if(e.template)metricCommit(e,{op:'use',name:null},'Converted '+describe(e)+' to raw signals. Undo restores it.',base+'use');
+      });
+      var t=e.template && metricsModel.templates.find(function(x){return x.name===e.template;});
+      if(t)t.params.forEach(function(p){field('param-'+p,p,typeof b[p]==='string'?b[p]:'',function(v){metricCommit(e,{op:'param',name:p,value:v.trim()?v:null},null,base+'param-'+p);},p,e.missingParams.indexOf(p)>=0?'Template '+t.name+' needs '+p+'; until it is set, this binding is ignored.':null);});
+      if(e.signals.length){
+        box.appendChild(el('p','links-group','Signals'+(t?' · from template '+t.name+', read only here':'')));
+        e.signals.forEach(function(sig){
+          var proof=b.proof && b.proof[sig] || {};
+          field('min-'+sig,sig+' min',proof.min,function(v){var n=v.trim()===''?null:Number(v);metricCommit(e,{op:'proof',signal:sig,field:'min',value:n},null,base+'min-'+sig);},'no minimum');
+          field('max-'+sig,sig+' max',proof.max,function(v){var n=v.trim()===''?null:Number(v);metricCommit(e,{op:'proof',signal:sig,field:'max',value:n},null,base+'max-'+sig);},'no maximum');
+        });
+      }
+      if(e.group==='raw')box.appendChild(el('p','links-pop-hint','Raw signals are edited in Inspect.'));
+    }
+    var actions=el('div','links-trace-actions');
+    if(e.group!=='none'){var rm=button('bbtn links-trace-danger','Remove metrics');rowsLife.listen(rm,'click',function(){state.metricEdit=null;commit(function(text,raw,ctx){return planLinksMetricsRemove(text,raw,carrierRef(e),ctx);},{ok:'Removed the metrics on '+describe(e)+'. Undo restores them.'});});actions.appendChild(rm);}
+    var inspect=button('bbtn','Open in Inspect',null,'Raw signals, card layout and links are edited in Inspect');rowsLife.listen(inspect,'click',function(){if(opts.inspectTarget)opts.inspectTarget(carrierRef(e));});actions.appendChild(inspect);
+    if(e.template){var et=button('bbtn','Edit template',null,'Opens Status board settings → Metrics');rowsLife.listen(et,'click',function(){var b2=doc.getElementById('status-board-settings') || doc.getElementById('outline-status-board-settings');if(b2)b2.click();});actions.appendChild(et);}
+    var done=button('bbtn','Done');rowsLife.listen(done,'click',function(){state.metricEdit=null;render();var c=list.querySelector('[data-links-chip="'+cssEscape(id)+'"] .links-chip-main');if(c)c.focus();});actions.appendChild(done);
+    box.appendChild(actions);box.appendChild(el('p','links-pop-hint','Enter or leaving a field saves it; each save is one Undo step. Esc closes.'));
+    return box;
+  }
+  function renderMetricsByBinding(){
+    var shown=0;
+    metricsModel.groups.forEach(function(g){
+      var text=[g.label].concat(g.carriers.map(function(c){return c.label;})).join(' ');if(!matches(text))return;shown++;
+      var row=el('div','links-row links-ticket-row links-metric-row');row.setAttribute('role','listitem');row.setAttribute('data-links-metric',g.key);
+      var head=el('div','links-row-head');row.appendChild(head);
+      if(g.template){
+        var handle=button('links-handle','⠿','Drag '+g.template+' to a node or connection','Drag onto a canvas node or connection, or a node or connection here, to use this template. Enter opens Assign.');
+        rowsLife.listen(handle,'pointerdown',function(ev){startDrag(ev,handle,g.template,null,false);});
+        rowsLife.listen(handle,'keydown',function(ev){if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();openPopover({type:'metric-assign',template:g.template,opener:'metric-assign:'+g.template},row.querySelector('.links-assign'));}});
+        head.appendChild(handle);
+      }
+      var key=button('links-key',g.label,'Highlight '+g.label,'Highlight its nodes and connections, and the steps that light them');key.setAttribute('data-links-key',g.key);
+      key.setAttribute('aria-pressed',String(!!state.highlight && state.highlight.type==='metric' && state.highlight.key===g.key));
+      rowsLife.listen(key,'click',function(){setHighlight(state.highlight && state.highlight.type==='metric' && state.highlight.key===g.key?null:{type:'metric',key:g.key},true);});
+      head.appendChild(key);
+      var t=g.template && metricsModel.templates.find(function(x){return x.name===g.template;});
+      if(t && t.kind)head.appendChild(el('span','links-log-kind',t.kind));
+      head.appendChild(el('span','links-count',(t?t.signals.length+(t.signals.length===1?' signal · ':' signals · '):'')+g.carriers.length+(g.carriers.length===1?' carrier':' carriers')));
+      if(g.steps.length)head.appendChild(el('span','links-count','step'+(g.steps.length===1?' ':'s ')+g.steps.map(function(s){return s.index+1;}).join(', ')+(g.steps.length===1?' uses it':' use them')));
+      var chips=el('div','links-chips');chips.setAttribute('role','list');chips.setAttribute('aria-label',g.label+' carriers');row.appendChild(chips);
+      g.carriers.forEach(function(c){chips.appendChild(metricChip(c,true));});
+      if(g.template)chips.appendChild(assignButton('+ Assign carrier','Assign '+g.template+' to nodes and connections',{type:'metric-assign',template:g.template,opener:'metric-assign:'+g.template}));
+      g.carriers.forEach(function(c){if(state.metricEdit===linksElementId(c))row.appendChild(metricEditor(c));});
+      if(state.highlight && state.highlight.type==='metric' && state.highlight.key===g.key)row.classList.add('links-row-active');
+      list.appendChild(row);
+    });
+    if(!shown)list.appendChild(el('p','links-empty',metricsModel.groups.length?'Nothing matches the filter.':'No nodes or connections yet.'));
+  }
+  function renderMetricsByElement(){
+    var shown=0;
+    [['node','Nodes'],['edge','Connections'],['step','Steps']].forEach(function(group){
+      if(state.show!=='all' && state.show!==group[0])return;
+      var items=metricsModel.elements.filter(function(e){return e.kind===group[0];});if(!items.length)return;
+      var title=el('p','links-group',group[1]+' · '+items.length+(group[0]==='step'?' · shown through what they light':''));title.setAttribute('role','presentation');list.appendChild(title);
+      items.forEach(function(e){
+        if(!matches([kindName(e),e.label].concat(e.kind==='step'?[]:[bindingText(e)]).join(' ')))return;shown++;
+        var row=el('div','links-row links-element-row');row.setAttribute('role','listitem');row.setAttribute('data-links-element',linksElementId(e));
+        var tag=el('span','links-kind',e.kind==='edge'?'EDGE':e.kind.toUpperCase());tag.setAttribute('aria-hidden','true');row.appendChild(tag);
+        var name=button('links-element-name',sectionPrefix(e)+e.label,'Highlight '+describe(e));rowsLife.listen(name,'click',function(){setHighlight({type:'element',id:linksElementId(e)},true);});row.appendChild(name);
+        if(e.imported)row.appendChild(el('span','links-chip-note','imported'));
+        var chips=el('div','links-chips');chips.setAttribute('role','list');chips.setAttribute('aria-label','Metrics on '+describe(e));
+        if(e.kind==='step'){
+          var any=e.carriers.filter(function(c){return c.group!=='none';});
+          if(!any.length)chips.appendChild(el('span','links-none','What it lights has no metrics'));
+          any.forEach(function(c){var b=button('links-assign','via '+describe(c)+' · '+bindingText(c),'Highlight '+describe(c));rowsLife.listen(b,'click',function(){setHighlight({type:'element',id:linksElementId(c)},true);});chips.appendChild(b);});
+        }else chips.appendChild(metricChip(e,false));
+        row.appendChild(chips);
+        if(e.kind!=='step' && state.metricEdit===linksElementId(e))row.appendChild(metricEditor(e));
+        if(state.highlight && state.highlight.type==='element' && state.highlight.id===linksElementId(e))row.classList.add('links-row-active');
+        list.appendChild(row);
+      });
+    });
+    if(!shown)list.appendChild(el('p','links-empty',state.filter?'Nothing matches the filter.':'No nodes or connections yet.'));
+  }
+  function metricsDropRefusal(e,key,from){
+    if(from){
+      // A chip dragged onto a template row switches its template.
+      if(!e || !e.templateRow)return 'Drop on a template row to switch template.';
+      var why=linksMetricsDropRefusal(e.templateRow,from);if(why)return why;
+      return null;
+    }
+    return linksMetricsDropRefusal(key,e);
+  }
+  function metricsDropTarget(x,y,top,hit){
+    var d=state.drag;if(!d)return null;
+    if(d.from){
+      var row=top && top.closest && top.closest('[data-links-metric^="template:"]');
+      if(row && root.contains(row))return {element:{templateRow:row.getAttribute('data-links-metric').slice(9),kind:'template'},marks:[row]};
+      return null;
+    }
+    var chip=top && top.closest && top.closest('[data-links-chip]');
+    if(chip && root.contains(chip)){var e=element(chip.getAttribute('data-links-chip'));return e?{element:e,marks:[chip].concat(litTargets([e]))}:null;}
+    return undefined;
+  }
+  function metricsDrop(d){
+    var to=d.target.element;
+    if(d.from){metricUse(d.from,to.templateRow,'metric-chip:'+linksElementId(d.from));return;}
+    metricUse(to,d.key,null);
+  }
+  function paintMetricPopover(spec,opener){
+    function menuItems(items){
+      items.forEach(function(item){var b=button('links-menu-item',item[0]);b.setAttribute('role','menuitem');popLife.listen(b,'click',item[1]);popover.appendChild(b);});
+      popLife.listen(popover,'keydown',popKeys);place(opener);var first=popover.querySelector('[role="menuitem"]');if(first)first.focus();
+    }
+    var e=spec.id?element(spec.id):null;if(spec.id && !e){state.popover=null;popover=null;return;}
+    if(spec.type==='metric-choose'){
+      popover.setAttribute('aria-label',e.label+' has raw signals. Replace them with '+spec.template+'?');
+      popover.appendChild(el('p','links-pop-hint',e.label+' has raw signals ('+e.signals.join(', ')+'). Using '+spec.template+' replaces them. Esc cancels; nothing is written until you choose.'));
+      return menuItems([
+        ['Replace with '+spec.template,function(){closePopover(false);if(commit(function(text,raw,ctx){return planLinksMetricsUse(text,raw,carrierRef(e),spec.template,true,ctx);},{ok:describe(e)+' now uses '+spec.template+'; its raw signals were replaced. Undo restores them.'})){state.metricEdit=linksElementId(e);render();focusMetricEditor(e);}}],
+        ['Cancel',function(){closePopover(true);say('Nothing changed.');}]]);
+    }
+    if(spec.type==='metric-menu'){
+      popover.setAttribute('aria-label',(e.template || bindingText(e))+' on '+describe(e));
+      var items=[['Edit here',function(){closePopover(false);state.metricEdit=linksElementId(e);render();focusMetricEditor(e);}],['Highlight',function(){closePopover(false);setHighlight({type:'element',id:linksElementId(e)},true);}]];
+      if(!e.imported)items.push(['Move to…',function(){openPopover({type:'metric-move',id:spec.id,opener:spec.opener},opener);}]);
+      if(e.group!=='none')items.push(['Remove metrics',function(){closePopover(false);commit(function(text,raw,ctx){return planLinksMetricsRemove(text,raw,carrierRef(e),ctx);},{ok:'Removed the metrics on '+describe(e)+'. Undo restores them.'});}]);
+      return menuItems(items);
+    }
+    var title=spec.type==='metric-assign'?'Assign '+spec.template:'Move metrics of '+describe(e)+' to';
+    popover.setAttribute('aria-label',title);
+    var bar=el('div','links-pop-head');bar.appendChild(el('strong',null,title));
+    var close=button('links-pop-close','×','Close');popLife.listen(close,'click',function(){closePopover(true);});bar.appendChild(close);popover.appendChild(bar);
+    var body=el('div','links-pop-list');popover.appendChild(body);
+    if(spec.type==='metric-move'){
+      metricsModel.templates.forEach(function(t){
+        body.appendChild(pickTarget(t.name,'template:'+t.name,linksMetricsDropRefusal(t.name,e),function(){closePopover(false);metricUse(e,t.name,spec.opener);}));
+      });
+    }else{
+      metricsModel.elements.filter(function(x){return x.kind!=='step';}).forEach(function(x){
+        var on=x.template===spec.template,why=on?null:x.group==='raw'?x.label+' has raw signals; drag the template onto it to choose Replace.':linksMetricsDropRefusal(spec.template,x);
+        body.appendChild(option(linksElementId(x),sectionPrefix(x)+x.label,on,why,function(checked){
+          if(!checked)return commit(function(text,raw,ctx){return planLinksMetricsRemove(text,raw,carrierRef(x),ctx);},{ok:'Removed '+spec.template+' from '+describe(x)+'. Undo restores it.'});
+          var ok=commit(function(text,raw,ctx){return planLinksMetricsUse(text,raw,carrierRef(x),spec.template,false,ctx);},{ok:describe(x)+' now uses '+spec.template+'. Undo restores it.'});
+          // A tick onto a template with missing parameters binds it and opens the editor with them flagged.
+          if(ok){state.metricEdit=linksElementId(x);render();}
+          return ok;
+        },x.imported?'imported':x.group!=='none'?bindingText(x):''));
+      });
+    }
+    popover.appendChild(el('p','links-pop-hint',spec.type==='metric-move'?'↑↓ move · Enter picks · Esc closes · one Undo step':'↑↓ move · Space ticks or unticks · Esc closes · each tick is one Undo step'));
+    popLife.listen(popover,'keydown',popKeys);place(opener);var first=body.querySelector('input,button');if(first)first.focus();
+  }
+
   /* ---------- highlight ---------- */
   function highlightLinks(){
     var h=state.highlight;if(!h || !model || model.error)return [];
     if(state.tab==='trace')return traceHighlightLinks(h);
+    if(state.tab==='metrics')return metricsHighlightLinks(h);
     if(h.type==='ticket'){var row=ticketRow(h.key);return row?row.links:[];}
     var e=element(h.id);return e?[e]:[];
   }
@@ -1172,14 +1412,14 @@ function initWorkbenchLinksView(opts){
   function summary(links){
     var h=state.highlight,counts={node:0,edge:0,step:0};links.forEach(function(l){counts[l.kind]++;});
     var parts=[];if(counts.node)parts.push(counts.node+(counts.node===1?' node':' nodes'));if(counts.edge)parts.push(counts.edge+(counts.edge===1?' connection':' connections'));if(counts.step)parts.push(counts.step+(counts.step===1?' step':' steps'));
-    var keyed=h.type==='ticket' || h.type==='trace',name=keyed?h.key:(element(h.id)?describe(element(h.id)):'');
-    return 'Highlighting '+name+(keyed || state.tab==='trace'?' · '+(parts.join(' · ') || 'nothing attached'):'')+'. Others dim. Esc clears.';
+    var keyed=h.type==='ticket' || h.type==='trace' || h.type==='metric',name=h.type==='metric'?(metricGroup(h.key) || {}).label || h.key:keyed?h.key:(element(h.id)?describe(element(h.id)):'');
+    return 'Highlighting '+name+(keyed || state.tab==='trace' || state.tab==='metrics'?' · '+(parts.join(' · ') || 'nothing attached'):'')+'. Others dim. Esc clears.';
   }
   function setHighlight(value,reveal){
     state.highlight=value;
     Array.prototype.forEach.call(list.querySelectorAll('.links-row-active'),function(n){n.classList.remove('links-row-active');});
-    Array.prototype.forEach.call(list.querySelectorAll('.links-key[aria-pressed]'),function(n){n.setAttribute('aria-pressed',String(!!value && (value.type==='ticket' || value.type==='trace') && n.textContent===value.key));});
-    if(value){var row=list.querySelector(value.type==='ticket'?'[data-links-ticket="'+cssEscape(value.key)+'"]':value.type==='trace'?'[data-links-trace="'+cssEscape(value.key)+'"]':'[data-links-element="'+cssEscape(value.id)+'"]');if(row)row.classList.add('links-row-active');}
+    Array.prototype.forEach.call(list.querySelectorAll('.links-key[aria-pressed]'),function(n){n.setAttribute('aria-pressed',String(!!value && (value.type==='ticket' || value.type==='trace' || value.type==='metric') && (n.getAttribute('data-links-key') || n.textContent)===value.key));});
+    if(value){var row=list.querySelector(value.type==='ticket'?'[data-links-ticket="'+cssEscape(value.key)+'"]':value.type==='metric'?'[data-links-metric="'+cssEscape(value.key)+'"]':value.type==='trace'?'[data-links-trace="'+cssEscape(value.key)+'"]':'[data-links-element="'+cssEscape(value.id)+'"]');if(row)row.classList.add('links-row-active');}
     applyHighlight();
     if(!value)say('');
     if(value && reveal)revealLinks();
@@ -1259,6 +1499,7 @@ function initWorkbenchLinksView(opts){
   function dropTarget(x,y){
     var hits=doc.elementsFromPoint?doc.elementsFromPoint(x,y):[doc.elementFromPoint(x,y)],host=root.closest('.workspace-window') || root;
     var top=hits[0];if(!top)return null;
+    if(state.tab==='metrics'){var m=metricsDropTarget(x,y,top);if(m!==undefined){seeThrough(false);return m;}if(state.drag && state.drag.from)return null;}
     var row=top.closest && top.closest('[data-links-element]');
     if(row && root.contains(row)){seeThrough(false);return {element:element(row.getAttribute('data-links-element')),marks:[row]};}
     var hit=hits.find(function(n){return n && !host.contains(n) && !(state.drag && state.drag.ghost && state.drag.ghost.contains(n));});
@@ -1293,7 +1534,8 @@ function initWorkbenchLinksView(opts){
   function paintDrop(){
     var d=state.drag;d.marked.forEach(function(n){n.classList.remove('dv-links-drop','dv-links-refused');});d.marked=[];
     if(!d.target){
-      if(state.tab==='trace')say(d.from?'Dragging '+d.key+' from '+d.from.label+'. Drop on a step: a Steps row, a step coin or a step row here. Esc cancels.':'Dragging '+d.key+'. Drop on a step to give it this match. Esc cancels.');
+      if(state.tab==='metrics')say(d.from?'Dragging '+describe(d.from)+'. Drop on a template row to switch its template. Esc cancels.':'Dragging '+d.key+'. Drop on a node or connection to use it there. Esc cancels.');
+      else if(state.tab==='trace')say(d.from?'Dragging '+d.key+' from '+d.from.label+'. Drop on a step: a Steps row, a step coin or a step row here. Esc cancels.':'Dragging '+d.key+'. Drop on a step to give it this match. Esc cancels.');
       else say(d.from?'Dragging '+d.key+' from '+describe(d.from)+'. Drop on a node, connection, step or row. Esc cancels.':'Dragging '+d.key+'. Drop on a node, connection or step. Esc cancels.');
       return;
     }
@@ -1301,6 +1543,7 @@ function initWorkbenchLinksView(opts){
     d.target.marks.forEach(function(n){n.classList.add(why?'dv-links-refused':'dv-links-drop');d.marked.push(n);});
     var verb=d.from && !d.copyOnly?(d.copy?'copy':'move'):(state.tab==='trace'?'assign':'attach');
     if(!why && state.tab==='trace'){say(traceDropText(d));return;}
+    if(state.tab==='metrics'){var to=d.target.element;say(why?'Cannot drop here: '+why:d.from?'Drop to switch '+describe(d.from)+' to '+to.templateRow+'.':'Drop to use '+d.key+' on '+describe(to)+(to.group==='raw'?'; you choose Replace next (it has raw signals)':'')+'.');return;}
     say(why?'Cannot drop here: '+why:'Drop to '+verb+' '+d.key+(d.from && !d.copy?' from '+describe(d.from):'')+' to '+describe(d.target.element)+(d.from && !d.copy?' · hold ⌥ to copy':'')+'.');
   }
   function endDrag(){
@@ -1317,10 +1560,11 @@ function initWorkbenchLinksView(opts){
     if(!d.active){endDrag();return;}
     d.copy=!!ev.altKey || d.copyOnly;d.target=dropTarget(ev.clientX,ev.clientY);
     endDrag();suppressClick=true;win.setTimeout(function(){suppressClick=false;},0);
-    if(!d.target){say(state.tab==='trace'?'Nothing changed: drop on a step.':'Nothing changed: drop on a node, connection or step.');return;}
+    if(!d.target){say(state.tab==='metrics'?'Nothing changed: drop '+(d.from?'on a template row.':'on a node or connection.'):state.tab==='trace'?'Nothing changed: drop on a step.':'Nothing changed: drop on a node, connection or step.');return;}
     var why=dropRefusal(d.target.element,d.key,d.from,d.copy);
     if(why){fail(why);say('');return;}
     if(state.tab==='trace'){traceDrop(d);return;}
+    if(state.tab==='metrics'){metricsDrop(d);return;}
     move(d.copy?null:d.from,d.target.element,d.key,false);
   }
   function cancelDrag(message){if(!state.drag)return;endDrag();if(message)say(message);applyHighlight();}
@@ -1352,7 +1596,7 @@ function initWorkbenchLinksView(opts){
     ensureModel();
     var h=state.highlight;
     // A highlighted element or ticket that no longer exists (deleted, renamed, undone) ends the highlight.
-    var gone=h && (state.tab==='trace'?traceModel && !traceModel.error && (h.type==='element'?!element(h.id):!traceGroup(h.key))
+    var gone=h && (state.tab==='metrics'?metricsModel && !metricsModel.error && (h.type==='element'?!element(h.id):!metricGroup(h.key)):state.tab==='trace'?traceModel && !traceModel.error && (h.type==='element'?!element(h.id):!traceGroup(h.key))
       :!model.error && (h.type==='element'?!element(h.id):!ticketRow(h.key) && !state.drafts.some(function(d){return d.key===h.key;})));
     if(gone){state.highlight=null;say('');}
     render();

@@ -4881,7 +4881,9 @@ test('#1280 the Spans list has no height cap or scroll of its own in the panel C
  const h=harness(fixture()),styles=h.C.PanelRegistry.get('live-status').styles,css=typeof styles==='string'?styles:(Array.isArray(styles)?styles:[]).map(s=>typeof s==='string'?s:s.css || '').join('\n');
  assert.ok(css.includes('.dv-trace-waterfall{'),'the waterfall rule is in the panel CSS');
  const own=css.match(/\.dv-trace-waterfall\{[^}]*\}/g) || [],rules=css.match(/[^{}]*\.dv-trace-waterfall[^{]*\{[^}]*\}/g) || [];
- assert.ok(own.length>=1);for(const rule of rules)assert.doesNotMatch(rule.slice(rule.indexOf('{')),/max-height|overflow|contain:size|flex:1 1 0/,rule.trim());
+ // The one exception is Chuck's option A: the Edit-mode span-dragging class caps and scrolls the list.
+ assert.ok(own.length>=1);for(const rule of rules.filter(r=>!r.includes('dv-trace-waterfall-edit')))assert.doesNotMatch(rule.slice(rule.indexOf('{')),/max-height|overflow|contain:size|flex:1 1 0/,rule.trim());
+ assert.ok(/\.dv-trace-waterfall\.dv-trace-waterfall-edit\{max-height:calc\(100vh - 200px\);overflow:auto\}/.test(css),'the Edit-mode cap rule');
  assert.ok(!css.includes('dv-trace-fill'),'no tile fill rule');
  h.ctl.liveStatus.destroy();
 });
@@ -4927,4 +4929,25 @@ test('#1280 a span focus restored after an edit re-render never scrolls the page
    assert.equal(b.api.snapshot().trace.selected.focus.auto,false);assert.equal(scroller.scrollTop,1038,(auto?'auto':'reader')+': a reader focus of the same span after a restore scrolls (1930 - 900 + 8)');
   }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;b.api.destroy();}
  }
+});
+/* #1280 option A (Chuck 2026-11-10): only while Edit-mode span dragging is on, the list carries the cap class and a focused
+   row scrolls inside the list, never the page; the class goes the moment Edit mode ends. */
+test('#1280 Edit-mode span dragging caps the list; a focused row scrolls inside it; the cap ends with Edit mode',async()=>{
+ const editor=mapEditor();let active=true;editor.state=()=>({editable:true,blocked:'',active,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
+ const b=mapBoard({editor});assert.ok(await b.api.loadDirectTrace(false));b.h.flush();
+ const list=()=>b.m.body.querySelector('.dv-trace-waterfall');
+ assert.ok(list().classList.contains('dv-trace-waterfall-edit'),'Edit mode with span dragging: the cap class is on');
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,calls=[],scroller={scrollTop:0};
+ proto.getClientRects=function(){return [1];};
+ proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-waterfall'))return {top:200,bottom:900,left:0,right:100,width:100,height:700};if(this.classList.contains('dv-trace-span-item'))return {top:1500,bottom:1530,left:0,right:100,width:100,height:30};return bound.call(this);};
+ proto.scrollIntoView=function(){calls.push(this.className);};
+ b.h.doc.scrollingElement=scroller;b.h.doc.defaultView={getComputedStyle:el=>({overflowY:el.classList && el.classList.contains('dv-trace-waterfall-edit')?'auto':'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
+ const l=list();l.scrollHeight=1600;l.clientHeight=700;l.scrollTop=0;
+ try{
+  const s=b.api.snapshot().trace.selected;assert.equal(b.api.selectTraceSpan({context:s.context,spanId:MAP_SPAN}),true);b.h.flush();
+  assert.equal(l.scrollTop,638,'the row scrolls inside the capped list (1530 - 900 + 8)');assert.equal(scroller.scrollTop,0,'not the page');assert.equal(calls.filter(c=>/dv-trace-span-item/.test(c)).length,0);
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;}
+ active=false;b.api.setTraceShow(false);b.api.setTraceShow(true);b.h.flush();
+ assert.ok(!list().classList.contains('dv-trace-waterfall-edit'),'Edit mode ended: no cap');
+ b.api.destroy();
 });

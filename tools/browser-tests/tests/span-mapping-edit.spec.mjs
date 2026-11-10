@@ -178,3 +178,19 @@ test('M3 desktop Edit mode drags spans onto a step and onto nodes; two candidate
  await expect(root.locator('.dv-edit-first').first()).toHaveText('currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies mapped to step Resolve supported currencies');
  await expect(root.locator('.dv-edit-change').filter({hasText:'(replaced frontend · /cart/checkout)'})).toHaveCount(1);
 });
+
+/* #1280 option A (Chuck 2026-11-10): only while Edit-mode span dragging is on is the Spans list capped at about one
+   screen and scrolling itself, so every row can be dragged onto the diagram; after Done the reading view has no inner
+   scroll again. The page function measures the elements it finds (count 1) in the two-file board's light DOM. */
+test('M4 desktop the Spans list scrolls itself only while Edit-mode span dragging is on; after Done it has no inner scroll',async({page,server})=>{
+ const {panel}=await open(page,server,'span-mapping-cap',{},{drag:true});
+ const measure=()=>panel.evaluate(p=>{const r=p.shadowRoot || p,lists=r.querySelectorAll('.dv-trace-waterfall'),l=lists[0];if(lists.length!==1)return {lists:lists.length};
+  const s=getComputedStyle(l);return {lists:1,rows:l.querySelectorAll('.dv-trace-span').length,capped:l.classList.contains('dv-trace-waterfall-edit'),overflow:s.overflowY,scroll:l.scrollHeight,client:l.clientHeight,height:l.getBoundingClientRect().height,view:innerHeight};});
+ let m=await measure();expect([m.lists,m.capped,m.overflow],'reading view before Edit: no cap').toEqual([1,false,'visible']);expect(m.scroll).toBeLessThanOrEqual(m.client+1);
+ await panel.getByRole('button',{name:'Edit',exact:true}).click();await expect(span(panel,CURRENCY)).toHaveAttribute('draggable','true');
+ m=await measure();expect([m.lists,m.capped,m.overflow],'Edit mode: capped and scrolling').toEqual([1,true,'auto']);
+ expect(m.height,'about one screen').toBeLessThanOrEqual(m.view-200+1);expect(m.scroll,m.rows+' rows scroll inside the list').toBeGreaterThan(m.client+40);
+ await panel.getByRole('button',{name:'Done',exact:true}).click();await expect(panel.getByRole('button',{name:'Edit',exact:true})).toBeVisible();
+ m=await measure();expect([m.lists,m.capped,m.overflow],'after Done: the cap is gone').toEqual([1,false,'visible']);expect(m.scroll,'no inner scroll in the reading view').toBeLessThanOrEqual(m.client+1);
+});
+

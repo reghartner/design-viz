@@ -1190,7 +1190,8 @@ function initWorkbenchBuilder(opts){
   }
 
   /* #1243: the Links window reads the same session and writes through applyPlan (one Undo step per edit). */
-  var linksView=typeof initWorkbenchLinksView==='function'?initWorkbenchLinksView({document:document,window:window,view:view,session:session,apply:applyPlan}):null;
+  var linksView=typeof initWorkbenchLinksView==='function'?initWorkbenchLinksView({document:document,window:window,view:view,session:session,apply:applyPlan,
+    inspectStep:function(t){selectTarget(Object.assign({},t,{el:findTargetEl(t)}),true);}}):null;
   if(linksView)life.own(linksView.destroy);
   /* The step list shares this builder's selection, render and undo pipeline. */
   var stepList = typeof initWorkbenchStepList === 'function' ? initWorkbenchStepList({

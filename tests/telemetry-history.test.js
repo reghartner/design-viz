@@ -197,3 +197,15 @@ test('opening history notifies direct-trace consumers when numeric metrics are o
   api.closeHistory();assert.deepEqual(seen,[true,false]);api.destroy();
  }
 });
+
+/* #1289 CI (telemetry-history.spec late detail): a carrier loaded while Over time is open has no live answer yet, so
+   closing Over time refreshes at once; with the same carriers it waits out the 5 minutes (H5). */
+test('closing Over time refreshes at once when carriers were added during it, and only then',async()=>{
+ const C=context(),page={},carriers=[['a',{tickets:['AA-1'],telemetry:{kind:'service',signals:{rate:{grafana:'authored[24h]',unit:'req/h'}}}}]];let live=0;
+ const api=C.createTelemetry(page,{provider:async()=>{live++;return sample(100);},history:async()=>series([[T,0]])},{carriers:fn=>carriers.forEach(([id,c])=>fn(c,id,page)),diagrams:()=>{},jira:()=>({})});
+ api.setEnabled(true);await settle();assert.equal(live,1);
+ api.openHistory(days,0);await settle();api.closeHistory();await settle();assert.equal(live,1,'the same carriers: no early live call');
+ api.openHistory(days,0);await settle();carriers.push(['b',{telemetry:{kind:'service',signals:{rate:{grafana:'detail[24h]',unit:'req/h'}}}}]);api.bindingsChanged();await settle();
+ api.closeHistory();await settle();assert.equal(live,2,'a carrier added during Over time: one live call at once');
+ assert.equal(C.timers.size,1,'and one refresh armed');api.destroy();
+});

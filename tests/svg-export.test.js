@@ -39,3 +39,8 @@ test('editor-only state classes are removed without changing rendered state clas
   assert.equal(C.svgExportClassName('node node-styled ns-rose dv-sel dv-instep tint-cmd'),'node node-styled ns-rose tint-cmd');
   assert.equal(C.svgExportClassName('dv-rowgrab'), 'dv-rowgrab');
 });
+
+test('#1242 SVG export drops the Workbench metrics card resize handles, tooltips and drag readout',()=>{
+  const removed=C.SVG_EXPORT_REMOVED_SELECTOR.split(',');
+  for(const selector of ['.dv-metrics-resize','.dv-metrics-resize-readout'])assert.ok(removed.includes(selector),selector+' is removed from exported SVG');
+});

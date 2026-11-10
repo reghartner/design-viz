@@ -11,25 +11,13 @@ function createBuilderInspector(opts){
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
   var accentListId=prefix+'-accents',groupListId=prefix+'-groups';
   function parseEditor(){return session.snapshot();}
-  function applyPlan(plan,options,snapshot){
-    if(disposed)return false;
-    var refused=plan && !plan.error?importRefusal(plan,snapshot):'';
-    if(refused){formError(refused);return false;}
-    return opts.apply(plan,options,snapshot);
-  }
   /* #1254 item 27: in a document that imports nodes, session.accept refuses a source whose combined
-     document is invalid and its editError replaces the whole Inspector. Check first so the form, the
-     typed text and the Undo history stay, and the message is shown in the form. */
-  function importRefusal(plan,snapshot){
-    var context=session.topologyContext && session.topologyContext();
-    if(!context || !session.resolve || typeof plan.text!=='string')return '';
-    var next;try{next=JSON.parse(plan.text);}catch(ex){return '';}
-    try{session.resolve(next);}catch(ex){return 'This edit was not applied: '+ex.message;}
-    if(typeof FlowTopology!=='undefined' && FlowTopology.editError){
-      var before=snapshot && snapshot.raw || parseEditor().raw,error=before?FlowTopology.editError(before,next):null;
-      if(error)return 'This edit was not applied: '+error;
-    }
-    return '';
+     document is invalid. Its default editError replaces the whole Inspector; an Inspector edit passes
+     its own, so the form, the typed text and the Undo history stay and the message is shown in the form.
+     accept resolves once; nothing here resolves again. */
+  function inFormEditError(message){formError('This edit was not applied: '+message);}
+  function applyPlan(plan,options,snapshot){
+    return !disposed && opts.apply(plan,Object.assign({},options || {},{editError:inFormEditError}),snapshot);
   }
   function selectRange(range,force){if(!disposed)return opts.selection.range(range,force);}
   function selectTarget(target,focus,keepTool){if(!disposed)return opts.selection.select(target,focus,keepTool);}
@@ -588,7 +576,11 @@ function deltaControls(val){
 /* #1236: the page Jira and GitHub controls, rendered into Status board settings → Jira. */
 function pageTrackingControls(val,box){
     function update(edit){
-      return commitCascade(function(raw){return planPageTracking(session.text(),raw,edit);},{after:refreshFormSoon});
+      var snapshot=parseEditor();if(snapshot.error){formError(snapshot.error);return false;}
+      var plan=planPageTracking(snapshot.text,snapshot.raw,edit);
+      // Nothing to change (for example the stored site already ends in "/"): no history entry.
+      if(!plan.error && plan.text===snapshot.text){formError('');refreshFormSoon();return true;}
+      return applyPlan(plan,{after:refreshFormSoon},snapshot);
     }
     var jira=val.tracking && val.tracking.jira || {};
     box.appendChild(frow('Jira site',textControl(jira.site,function(value){
@@ -603,10 +595,10 @@ function pageTrackingControls(val,box){
       });}));box.appendChild(row);
     });
     box.appendChild(frow('Parent',textControl('',function(value){
-      if(value==null)return true;var key=value.trim();
+      if(value==null){formError('');return true;}var key=value.trim();
       if(!trackingKeyPattern.test(key)){formError('Use a Jira key like DOOR-100.');return false;}
       var current=parseEditor();if(current.error){formError(current.error);return false;}
-      var doc=builderDocumentPage(current.raw);if(doc && trackingEpics(doc.page).indexOf(key)>=0){formNote(key+' is already a parent.',true);return true;}
+      var doc=builderDocumentPage(current.raw);if(doc && trackingEpics(doc.page).indexOf(key)>=0){formNote(key+' is already a parent.',true);return false;}
       return update(function(jira,page){jira.epic=trackingEpics(page).concat([key]);});
     },{placeholder:'DOOR-100'})));
     var excluded=document.createElement('p');excluded.className='fnote';excluded.textContent='Excluded stories do not count from parents. Manually attached tickets and dependencies displayed on the board still count.';box.appendChild(excluded);
@@ -617,10 +609,10 @@ function pageTrackingControls(val,box){
       });}));box.appendChild(row);
     });
     box.appendChild(frow('Exclude story',textControl('',function(value){
-      if(value==null)return true;var key=value.trim();
+      if(value==null){formError('');return true;}var key=value.trim();
       if(!trackingKeyPattern.test(key)){formError('Use a Jira key like DOOR-100.');return false;}
       var current=parseEditor();if(current.error){formError(current.error);return false;}
-      var doc=builderDocumentPage(current.raw);if(doc && trackingExclusions(doc.page).indexOf(key)>=0){formNote(key+' is already excluded.',true);return true;}
+      var doc=builderDocumentPage(current.raw);if(doc && trackingExclusions(doc.page).indexOf(key)>=0){formNote(key+' is already excluded.',true);return false;}
       return update(function(jira,page){jira.exclude=trackingExclusions(page).concat([key]);});
     },{placeholder:'DOOR-101'})));
     var scope=trackingGithubScope(val),scopeText=scope.repos.join(', ')+(scope.org?(scope.repos.length?', ':'')+'org:'+scope.org:'');
@@ -654,7 +646,7 @@ function trackingControls(val,overlay){
       function same(entry){return field==='tickets'?(trackingTicket(entry) || {}).key===identity:deltaLinkUrl(entry)===identity;}
       if(remove){if(!list.some(same))return true;list=list.filter(function(entry){return !same(entry);});}
       else {
-        if(list.some(same)){formNote(identity+' is already attached.',true);return true;}
+        if(list.some(same)){formNote(identity+' is already attached.',true);return false;}
         list.push(ref);
       }
       var value=list.length?JSON.stringify(list):null;
@@ -719,14 +711,14 @@ function trackingControls(val,overlay){
     [['tickets','Add ticket','HW-123 or https://…/browse/HW-123','Jira key or browse URL, then Enter'],
       ['prs','Add PR','https://github.com/org/repo/pull/1','Absolute http(s) URL, then Enter']].forEach(function(field){
       var input=textControl('',function(value){
-        if(value==null)return true;
+        if(value==null){formError('');return true;}
         var ticket=field[0]==='tickets'?trackingTicket(value.trim()):null;
         var ref=field[0]==='tickets'?(ticket && (ticket.url || ticket.key)):deltaLinkUrl(value);
         if(ref===null){formError(field[0]==='tickets'?'Use a Jira key like HW-123 or an absolute http(s) Jira browse URL.':'Use an absolute http(s) URL.');return false;}
         // #1254 item 25: a reference already attached here or inherited from the provider says so and clears the field.
         var identity=field[0]==='tickets'?ticket.key:ref;
         if(refs[field[0]].indexOf(identity)>=0 || overlay && overlay.inherited[field[0]].indexOf(identity)>=0){
-          formNote(identity+' is already attached'+(refs[field[0]].indexOf(identity)<0?' (inherited from the provider)':'')+'.',true);return true;
+          formNote(identity+' is already attached'+(refs[field[0]].indexOf(identity)<0?' (inherited from the provider)':'')+'.',true);return false;
         }
         return update(field[0],ref,false);
       },{placeholder:field[2]});
@@ -1236,8 +1228,8 @@ function traceMatchEditor(val,ctx,t){
       var plan=planStepTraceMatch(parsed.text,parsed.raw,t.section,t.index,edit);
       if(plan.noop){refreshFormSoon();return true;}
       if(plan.error){formError(plan.error);return false;}
-      /* A document that imports nodes refuses a source whose resolved spec is invalid; applyPlan checks
-         first (importRefusal), so the form and the typed text stay and say why. */
+      /* A document that imports nodes refuses a source whose resolved spec is invalid; applyPlan routes
+         that refusal into this form (inFormEditError), so the form and the typed text stay and say why. */
       formError('');
       var ok=applyPlan(plan,{after:refreshFormSoon},parsed);
       // Add-row drafts are kept per alternative position; removing one shifts the positions.

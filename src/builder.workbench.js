@@ -1021,7 +1021,7 @@ function initWorkbenchBuilder(opts){
     if (!plan || plan.error){ formError(plan ? plan.error : 'edit failed'); return false; }
     formError('');
     return session.accept(plan,{
-      snapshot:snapshot,
+      snapshot:snapshot,editError:opt && opt.editError,
       retention:{multi:true,addMode:!!interactions.adding(),exploreLayout:opt && opt.exploreLayout},
       afterRender:function(){
         if (opt && opt.after) opt.after(plan);

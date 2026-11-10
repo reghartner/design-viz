@@ -183,16 +183,18 @@ function createBuilderSession(options){
           plan.text=pinned.text;
         }
       }
+      // A caller with a form mounted reports a refusal in that form (#1254); otherwise the session default.
+      function editError(message){var report=hooks && hooks.editError || options.editError;if(report)report(message);}
       var nextContext=hooks && hooks.topologyContext || topologyContext;
       if(nextContext){
         try{
           checkTopologyContext(nextContext);
           resolve(JSON.parse(plan.text),nextContext);
-        }catch(ex){plan.error=ex.message;if(options.editError)options.editError(plan.error);return false;}
+        }catch(ex){plan.error=ex.message;editError(plan.error);return false;}
       }
       if(typeof FlowTopology!=='undefined'){
         var topologyError=FlowTopology.editError(parse(before).raw,parse(plan.text).raw);
-        if(topologyError){plan.error=topologyError;if(options.editError)options.editError(topologyError);return false;}
+        if(topologyError){plan.error=topologyError;editError(topologyError);return false;}
       }
       pushUndo(hooks && hooks.history || before);
       if(nextContext!==topologyContext){topologyContext=JSON.parse(JSON.stringify(nextContext));topologyRevision++;}

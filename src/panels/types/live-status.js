@@ -206,9 +206,9 @@
       if(!r.rows.length)return;
       // #1145 (D5): loading a line's trace moves the view to the trace's day.
       if(direct.movesDay)el(section,'p','moves','dv-trace-logs-moves','Loading a trace moves the view to its date.');
-      var rows=el(section,'ol','results','dv-trace-log-results');rows.setAttribute('aria-label','Matching log lines');
+      var rows=el(section,'ol','results','dv-trace-log-results'),chosenItem=null;rows.setAttribute('aria-label','Matching log lines');
       r.rows.forEach(function(row,i){
-        var item=el(rows,'li',String(i),'dv-trace-log-row');item.setAttribute('data-chosen',String(r.chosen===i));
+        var item=el(rows,'li',String(i),'dv-trace-log-row');item.setAttribute('data-chosen',String(r.chosen===i));if(r.chosen===i)chosenItem=item;
         el(item,'time','time','dv-trace-log-time',row.time?row.time.replace('T',' ').replace(/\.\d+Z$/,'Z'):'time unavailable');
         el(item,'span','value','dv-trace-log-value',row.value).title=row.line;
         if(!row.traceId){el(item,'span','missing','dv-trace-log-missing',row.missing);return;}
@@ -222,25 +222,27 @@
           });
         };load.addEventListener('click',load._logClick);}
       });
+      return chosenItem;
     }
     // #1173: a section's open state while a trace is shown. It lives on the panel host, keyed by the shown trace
     // ([key, traceId]), so a repaint, a re-poll or a Jira <-> Trace switch keeps what the reader opened; another trace resets it.
     // One slot for the shown trace: another trace resets it; the gap while a Load or Verify runs (no token) leaves it alone,
-    // so the same trace coming back keeps the reader's choice. With nothing shown the search is open.
+    // so the same trace coming back keeps the reader's choice. The search's open state is separate (#1230).
     function traceSection(details,name,token){
-      var slot=host._traceOpen;if(token && (!slot || slot.token!==token))slot=host._traceOpen={token:token,config:false,request:false};
+      var slot=host._traceOpen;if(token && (!slot || slot.token!==token))slot=host._traceOpen={token:token,request:false};
       details._traceOpenName=name;var key=token || '';
       if(details._traceOpenFor!==key){details.open=token?slot[name]:name==='config';details._traceOpenFor=key;}
       if(!details._traceToggle){details._traceToggle=function(){var st=host._traceOpen;if(st && details._traceOpenFor && st.token===details._traceOpenFor)st[details._traceOpenName]=details.open;};details.addEventListener('toggle',details._traceToggle);}
     }
-    // #1173: `shown` names the trace on screen (loaded or picked). While one is shown the search is one collapsed line;
-    // a reader's expand stays until the shown trace changes.
+    // #1173: `shown` names the trace on screen (loaded or picked). #1230: the trace goes in the reserved space above
+    // (traceBody), so the search stays open; a reader's collapse holds until no trace is shown.
     function directTraceBody(body,direct,shown){
       if(!direct || !direct.profiles.length)return;
       var box=el(body,'section','direct','dv-trace-direct'),r=direct.report,loaded=!!shown;
       var profile=direct.profiles.find(function(p){return p.id===direct.form.connection;}),environment=profile && profile.environments.find(function(e){return e.id===direct.form.environment;});
       var config=el(box,'details','config','dv-trace-config'),token=shown || null,focusConfig=config.contains(doc.activeElement);
-      traceSection(config,'config',token);
+      var searchGen=host._traceSearchGen || 0;if(config._traceSearchGen!==searchGen){config._traceSearchGen=searchGen;config.open=host._traceSearchOpen!==false;}
+      if(!config._traceSearchToggle){config._traceSearchToggle=function(){host._traceSearchOpen=config.open;};config.addEventListener('toggle',config._traceSearchToggle);}
       var summary=el(config,'summary','summary','');summary.setAttribute('aria-label',loaded?'Change or load another trace':'Load trace options');
       summary.setAttribute('title','Load one exact request. This session only; diagram mappings use authored traceMatch steps.');
       var names=[profile && profile.label,environment && environment.label].filter(Boolean).join(' · ');
@@ -287,13 +289,17 @@
       };
       if(!load._directLoadClick){load._directLoadClick=function(){load._directLoadAction();};load.addEventListener('click',load._directLoadClick);}
       var verify=button(controls,'verify','reader-button dv-trace-verify','Verify trace connection','loadDirectTrace');verify._liveArgument=true;verify.disabled=load.disabled;
-      if(direct.logs)logLookupBody(config,box,direct.logs,direct);
+      // #1230: an error sits by what was clicked: a log line's at its row, any other right after these controls.
+      // A Verify report stays after the search; a loading or loaded report sits at the end of the search, with Clear.
+      var lines=direct.logs && direct.logs.result,atRow=!!(r && r.error && r.logLine && lines && lines.rows[lines.chosen]);
+      if(r && r.error && !atRow)connectionReport(config);
+      if(direct.logs){var chosenRow=logLookupBody(config,box,direct.logs,direct);if(atRow && chosenRow)connectionReport(chosenRow);}
       // #1145: why a loaded trace left, or why the view did not move to its day.
       if(direct.dayNote)el(box,'p','day-note','dv-trace-day-note',direct.dayNote).setAttribute('role','status');
       if(!direct.available)el(box,'p','unavailable','dv-trace-direct-status','Direct trace retrieval is unavailable in this host or view.').setAttribute('role','status');
-      // The report and Clear sit inside the search section, so a shown trace keeps them one click away.
-      // A Verify or an error report stays in view; a loaded trace's report sits in the collapsed search.
-      if(r){var report=el(r.mode==='verify' || r.error?box:config,'section','report','dv-trace-direct-report'+(loaded?' dv-trace-report-compact':''));report.setAttribute('aria-label','Trace connection report');
+      if(r && !r.error)connectionReport(r.mode==='verify'?box:config);
+      if(direct.busy || direct.exemplar || r)button(el(config,'div','clear','dv-live-controls'),'clear','reader-button',direct.busy?'Cancel request':'Clear loaded trace','clearDirectTrace');
+      function connectionReport(parent){var report=el(parent,'section','report','dv-trace-direct-report'+(loaded?' dv-trace-report-compact':''));report.setAttribute('aria-label','Trace connection report');
         el(report,'p','stage','dv-trace-direct-status',r.error || (r.stage==='complete'?'Loaded · ID matched · '+r.spanCount+' spans · '+r.completeness+' completeness':r.stage==='schema'?'Checking runtime tool schema…':'Loading exact trace…')).setAttribute('role','status');
         if(r.error)el(report,'p','error-stage','','Stage: '+r.stage);
         // #1124: the provider may not have kept a log line's trace; offer the next line with a trace ID.
@@ -304,7 +310,6 @@
         el(diagnostics,'p','receipt','', 'Stage: '+r.stage+' · request accepted: '+(r.requestAccepted?'yes':'no')+' · ID matched: '+(r.idMatched?'yes':'no'));
         if(r.arguments){el(diagnostics,'p','argument-note','','Resolved arguments (configured literals and context redacted):');el(diagnostics,'pre','arguments','dv-trace-arguments',JSON.stringify(r.arguments,null,2));}
       }
-      if(direct.busy || direct.exemplar || r)button(el(config,'div','clear','dv-live-controls'),'clear','reader-button',direct.busy?'Cancel request':'Clear loaded trace','clearDirectTrace');
     }
     // #1078: board Edit mode is reachable from the Trace view too, so a span can be mapped and saved here.
     // Its buttons are in the shared header (#1136); its notice stays in the Trace body.
@@ -323,8 +328,11 @@
       // An example keeps them while its entry key is unchanged; a new selection token expires the selection instead.
       var shownTrace=trace.selected?JSON.stringify([trace.selected.manual?'direct':trace.selected.key,trace.selected.exemplar.traceId]):null;
       // Nothing shown and nothing loading (Clear, a day move, an expired selection): the next trace starts collapsed. A Load or Verify gap keeps them.
-      if(!shownTrace && !(trace.direct && trace.direct.busy) && !trace.status.busy)host._traceOpen=null;
+      // #1230: the shown trace going away reopens a search the reader collapsed.
+      if(!shownTrace && !(trace.direct && trace.direct.busy) && !trace.status.busy){if(host._traceOpen){host._traceSearchOpen=null;host._traceSearchGen=(host._traceSearchGen || 0)+1;}host._traceOpen=null;}
       traceEditNotice(body,value.edit);
+      // #1230: with a search, the shown trace goes in a reserved space above it; empty, the space is a one-line hint.
+      var slot=trace.direct && trace.direct.profiles.length?el(body,'section','slot','dv-trace-slot'):null;if(slot)slot.setAttribute('aria-label','Shown trace');
       directTraceBody(body,trace.direct,shownTrace);
       var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Turn on Metrics overlay to refresh explicit bindings.':'Turn on Metrics overlay to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
       var status=el(body,'p','status','dv-trace-mode-status',[message,trace.hasMappings?trace.status.note:'',trace.hasMappings?trace.notice:''].filter(Boolean).join(' '));status.setAttribute('role','status');
@@ -362,8 +370,8 @@
         });
       }
       // Focus inside the card when it goes away (a Load's gap; it is swept after this render) returns to the next card's line once.
-      if(!trace.selected){var gone=host.querySelector('details.dv-trace-request');if(gone && gone.contains(doc.activeElement))host._traceCardFocus=true;if(trace.entries.length)returnedTraces(body);return;}
-      var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
+      if(!trace.selected){var gone=host.querySelector('details.dv-trace-request');if(gone && gone.contains(doc.activeElement))host._traceCardFocus=true;if(slot)el(slot,'p','hint','dv-trace-slot-hint','Load a trace to show it here');if(trace.entries.length)returnedTraces(body);return;}
+      var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(slot || body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
       // #1173: the request card (Returned traces and the selected request's details) is one collapsed line while it is shown.
       // #1186: the card shares its line with Show on diagram and Open trace, which sit outside the summary so they never toggle it.
       // The icons come first in DOM and tab order (positioned at the line's right end), so Tab never passes the card's body first.
@@ -712,8 +720,8 @@
 .dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-check-label{display:flex;align-items:center;gap:6px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
 .dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{margin-left:.4em;color:var(--dfaint)}.dv-trace-request{margin:6px 0}.dv-trace-request>summary{cursor:pointer;overflow-wrap:anywhere;font-weight:600}.dv-trace-log-mode{display:block;margin:2px 0 6px;padding:0;border:0;background:none;color:var(--dv-live-active);font:inherit;text-decoration:underline;cursor:pointer}.dv-trace-log-mode:disabled{color:var(--dfaint);cursor:default}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
-.dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}
-.dv-trace-selected{min-width:0}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
+.dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}.dv-trace-log-row>.dv-trace-direct-report{grid-column:1/-1;margin-top:4px}
+.dv-trace-selected{min-width:0}.dv-trace-slot{margin:10px 0;min-width:0}.dv-trace-slot-hint{margin:0;padding:10px;border:1px dashed var(--explore-border);border-radius:6px;color:var(--dfaint);font-size:11px}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
 .dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall{max-height:240px;overflow:auto;margin:0 0 12px;border:1px solid var(--explore-border);border-top:0;border-radius:0 0 6px 6px;padding:0 8px 8px}
 .dv-trace-span{width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;align-items:center;padding:5px 0;font-size:10px}.dv-trace-span[aria-pressed="true"]{background:color-mix(in srgb,var(--dv-live-active) 10%,transparent)}.dv-trace-span:focus-visible{outline:2px solid var(--dv-live-active)}.dv-trace-operation-detail{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;gap:6px;margin-top:12px;padding:8px;border:1px solid var(--explore-border);border-radius:6px}.dv-trace-operation-detail>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}.dv-trace-operation-detail small{grid-column:1/-1}.dv-trace-duration{font:700 13px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}.dv-trace-span .dv-trace-duration{grid-column:2;grid-row:1;white-space:nowrap}.dv-trace-operation-detail .dv-trace-duration{font-size:20px;line-height:1.4}.dv-trace-span-name{grid-column:1;grid-row:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-track{grid-column:1/-1;grid-row:2;height:10px;background:color-mix(in srgb,var(--dink) 7%,transparent)}.dv-trace-bar{display:block;box-sizing:border-box;max-width:100%;height:10px;background:var(--dv-live-active)}.dv-trace-span[data-error="true"] .dv-trace-bar{background:var(--dv-live-blocked)}
 .dv-trace-mappings{display:grid;gap:5px}.dv-trace-mapping{display:grid;grid-template-columns:1fr auto;gap:2px 8px;border-left:3px solid var(--dfaint);padding:5px 8px}.dv-trace-mapping small{grid-column:1/-1;color:var(--dfaint)}.dv-trace-mapping[data-tone="error"]{border-color:var(--dv-live-blocked)}.dv-trace-mapping[data-tone="warning"]{border-color:#d49620}
@@ -740,7 +748,7 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-trace-span-item{border-bottom:1px solid color-mix(in srgb,var(--explore-border) 50%,transparent)}.dv-trace-span-item:last-child{border-bottom:0}.dv-trace-span-item>.dv-trace-span-detail{margin:2px 0 8px;border-color:color-mix(in srgb,var(--dv-live-active) 40%,var(--explore-border));background:color-mix(in srgb,var(--dv-live-active) 5%,transparent)}.dv-trace-detail-actions{display:flex;flex-wrap:wrap;gap:6px}
 .docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 .docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>*,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>*,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill .dv-trace-selected>*{flex:none}
-.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-selected{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-selected,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-slot,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-slot>.dv-trace-selected{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 .docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill .dv-trace-selected>.dv-trace-waterfall{flex:1 1 0;min-height:200px;max-height:none;contain:size;margin-bottom:0}
 .dv-trace-focus-status{color:var(--dtext)}.dv-trace-span-identity{display:grid;gap:3px;min-width:0}.dv-trace-span-field{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;align-items:baseline;min-width:0;font-size:10px}.dv-trace-span-label{color:var(--dtext)}.dv-trace-span-field code{min-width:0;overflow-wrap:anywhere;user-select:all}.dv-trace-map-guide{justify-self:start;max-width:100%;overflow-wrap:anywhere}.dv-trace-map-step{display:flex;flex-wrap:wrap;gap:7px;min-width:0}.dv-trace-map-select{min-width:0;max-width:100%}.dv-trace-map-apply{min-width:0;max-width:100%;white-space:normal}.dv-trace-map-none{margin:0;color:var(--dtext)}.dv-trace-step-choices{display:flex;flex-wrap:wrap;gap:7px;grid-column:1/-1}.dv-trace-step-choice{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
 .dv-trace-span:focus-visible,.dv-trace-step-choice:focus-visible{outline:2px solid #009fc7;outline-offset:3px}

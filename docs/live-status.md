@@ -2133,12 +2133,16 @@ explicit `traceMatch`, including imported nodes. No display-name joins are used.
 **Show on diagram** controls runtime annotations; Jira/scalar cues return when
 switching back to Jira. No document layout or authored timing is changed.
 
-With a trace shown (loaded or picked), the Trace view is compact (#1173), so the
-waterfall sits beside the diagram. The search (Load trace, log search, the load
-report and **Clear loaded trace**) is one line naming the connection and
-environment ("Fixture Honeycomb · Production · Change trace"). The request card
-is one line too: "8413cd87a9f1 · partial · Nov 9 07:19 · 55 spans · 6/7 steps
-matched". Warning flags (partial, unknown completeness, limit reached) come right after the
+The shown trace (loaded or picked) goes in a reserved space above the search
+(#1230); before a load the space is a one-line hint, "Load a trace to show it
+here". The search (Load trace, log search, the load report and **Clear loaded
+trace**) stays open below it, so another line or ID can be loaded at once; the
+reader can collapse it to one line naming the connection and environment
+("Fixture Honeycomb · Production · Change trace"), and it reopens when no trace is
+shown. A load error sits by what was clicked: a log line's report (with **Try the
+next log line**) inside that line's row, a Load trace or Verify error right after
+those buttons. The request card (#1173) is one line: "8413cd87a9f1 · partial ·
+Nov 9 07:19 · 55 spans · 6/7 steps matched". Warning flags (partial, unknown completeness, limit reached) come right after the
 trace ID, and the line wraps rather than clipping (#1186). It holds Returned traces and the request details. Each line opens with
 one click, and an opened section stays open until the shown trace changes. A
 select with one choice (connection, environment, mapping diagram, a single log

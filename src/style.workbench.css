@@ -1828,3 +1828,9 @@ body:not(.workbench-reader-preview-active) #docview .node[data-dv-hidden="true"]
 .dv-metrics-card[data-metrics-section]{cursor:grab;touch-action:none}
 .dv-metrics-card[data-metrics-section]:focus-visible .dv-metrics-card-box{stroke:var(--accent,#4c6ef5);stroke-width:2}
 .dv-metrics-card.dv-metrics-dragging{cursor:grabbing}
+/* #1242 width handles: a 20px hit area (sized for the current zoom) always takes the resize cursor; the square shows on hover, focus and while resizing. */
+.dv-metrics-card[data-metrics-section] .dv-metrics-resize,.dv-metrics-card.dv-metrics-resizing{cursor:ew-resize}
+.dv-metrics-resize-mark{fill:var(--card,#fff);stroke:var(--accent,#4c6ef5);stroke-width:1.5;vector-effect:non-scaling-stroke;opacity:0;pointer-events:none}
+.dv-metrics-card[data-metrics-section]:hover .dv-metrics-resize-mark,.dv-metrics-card[data-metrics-section]:focus .dv-metrics-resize-mark,.dv-metrics-card.dv-metrics-resizing .dv-metrics-resize-mark{opacity:1}
+.dv-metrics-resize:hover .dv-metrics-resize-mark{fill:var(--accent,#4c6ef5)}
+.dv-metrics-resize-readout{fill:var(--accent,#4c6ef5);font:600 11px 'IBM Plex Mono',monospace;pointer-events:none}

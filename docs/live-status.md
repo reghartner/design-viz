@@ -559,8 +559,11 @@ visible bound edge, labelled **Preview · synthetic**, using the reader’s card
 placement. It does not contact connectors or show production proof. Select a
 card or edge to open Inspect. Drag a card anywhere, or Tab to it and use Arrow
 keys (10 SVG units; Shift+Arrow moves 50). Release the arrows to save one
-Undo/Redo step; Escape cancels a drag or a held keyboard move. **Reset card to automatic** restores placement using **Card side**
-and **Card offset**. Unbound edges get no cards. Moving direct or nested imported
+Undo/Redo step; Escape cancels a drag or a held keyboard move. A hovered or
+focused card shows a square handle on each corner: drag one to change **Card width**
+(140–480; a left handle keeps the right edge), or press Alt+Left/Right (10; Shift+Alt
+50). Resizing pins the card where you see it, in the same Undo step. **Reset card to
+automatic** restores automatic placement using **Card side** and **Card offset**. Unbound edges get no cards. Moving direct or nested imported
 cards saves a consumer override with the inherited binding; providers stay unchanged.
 Cards in authored local detail sections can also move. Details loaded from other
 documents display saved positions but remain read only in this document.

@@ -133,6 +133,11 @@ for(const shape of ['direct','nested','detail'])test('actual mock '+shape+': nat
  await root.getByRole('button',{name:'Live',exact:true}).click();await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(expected(11));
  // #1287: closing Over time within 5 minutes shows the held live answer and makes no early live call.
  const returned=await page.evaluate(n=>window.calls.slice(n).filter(c=>c.tool==='run_query'),cached);expect(returned).toHaveLength(0);
+ // The next live call (Retry here, else the 5-minute refresh) is back on the live window, not the historical day.
+ const live=await page.evaluate(()=>window.calls.length);await page.evaluate(()=>window.ctl.telemetry.retry());
+ await expect.poll(()=>page.evaluate(n=>window.calls.slice(n).filter(c=>c.tool==='run_query').length,live)).toBeGreaterThan(0);
+ const again=await page.evaluate(n=>window.calls.slice(n).filter(c=>c.tool==='run_query'),live);expect(again.every(c=>c.input.query_spec.from==='-24h' && c.input.query_spec.time_range===undefined)).toBe(true);
+ await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
  await metrics(root).click();expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});expect(await page.evaluate(()=>window.ctl.liveStatus.enabled())).toBe(true);
 });
 test('actual mock payload: page 6h window is applied; Day8 absence is not zero',async({page,server,audit})=>{

@@ -1432,13 +1432,16 @@ Telemetry bindings), in `days[].telemetry`:
 ```
 
 Carriers are keyed by node id or `from->to`. `values[k]` covers the step from
-`start + k·stepSeconds`; `null` is a step without a sample. All values arrays of a day
+`start + k·stepSeconds`; `null` is a step without a sample. A signal may also carry `value`, a
+finite number: its measurement for the whole window when that is not the last step (an agent
+snapshot writes it for a CloudWatch Sum or a Honeycomb aggregate, #1270). All values arrays of a day
 have the same length. The injector rejects any other field, a non-RFC3339 `start` or
 annotation `time`, a non-positive or non-integer `stepSeconds`, and values that are not
 finite numbers or `null` (`NaN` and `Infinity` included), naming the path. Each demo day hands the page that day's map
 `{carrierId: {signals: {name: {value, series: [[t, v], ...], unit}}, observedAt}}`, the
 proof engine's input: every finite point is stamped at the end of its step, `null` is missing evidence,
-a missing final step leaves the signal unobserved, `value` is the last step and
+a missing final step leaves the signal unobserved, `value` is the signal's `value` when it has one,
+else the last step, and
 `observedAt` the end of the day. **Previous day** and **Next day** move the Jira map and the
 telemetry map together. The panel's **Metrics** button appears with the demo, reported
 as “Metrics: demo”, and while it is on the [Metrics cues](#metrics-cues) follow the
@@ -1466,14 +1469,23 @@ and Grafana Prometheus and Loki range queries through the board's datasource uid
 (`/api/datasources/proxy/uid/{uid}/…`) plus `/api/annotations`; Grafana SQL and CloudWatch
 signals through `POST /api/ds/query` with the same datasource uids (#1270); and Honeycomb signals
 through the Honeycomb Query API: it creates the query (`POST /1/queries/{dataset}`), runs it
-(`POST /1/query_results/{dataset}`) and polls the result (at most 20 s, or half of `--timeout`).
-The board window becomes the query's `time_range`; the dataset is
-`tracking.telemetry.honeycomb.dataset` (`__all__` without one), and the key must belong to its
-`environment` (checked once through `/1/auth`). A signal's snapshot value is the viewer's
-measurement for the window (a CloudWatch Sum, a Honeycomb aggregate), its series the buckets.
-Grafana CloudWatch Logs signals, traces, Honeycomb span attributes and log searches are not read
-yet: each such signal is one recorded error (carrier id and signal name) and the run goes on. A
-rate-limited Grafana or Honeycomb call fails only its signal. Pull request states are not read either
+(`POST /1/query_results/{dataset}`) and polls the result. The viewer runs Honeycomb queries one
+after another, so each one polls for its share of `--timeout` (at most 20 s). The board window
+becomes the query's `time_range` and may be at most 7 days, Honeycomb's limit (a longer window is
+one error per signal); the dataset is `tracking.telemetry.honeycomb.dataset` (`__all__` without
+one, one path segment), and the key must belong to its `environment` (checked once through
+`/1/auth`). The result shape the script reads (series rows as `{time, data}`, the aggregate in
+`results[0].data`) is the one Honeycomb's own Go client models (`client/query_result.go` in
+`honeycombio/terraform-provider-honeycombio`). The keys inside `data` (`COUNT`,
+`P99(duration_ms)`, or a calculation's `name`) are assumed and have not been checked against a
+live Honeycomb answer; if a real answer differs, each Honeycomb signal fails alone and no wrong
+number is written. A signal's snapshot value is the
+viewer's measurement for the window (a CloudWatch Sum, a Honeycomb aggregate), its series the
+buckets. Grafana CloudWatch Logs signals, traces, Honeycomb span attributes and log searches are
+not read yet: each such signal is one recorded error (carrier id and signal name) and the run
+goes on. A failed Grafana or Honeycomb call (rate limit, network error, request timeout, query
+error) fails only its own signal and is recorded on that signal with fixed text; a provider's
+own error text, which can hold data, is never printed or written. Pull request states are not read either
 (no GitHub transport yet): each authored PR is one recorded error. A board that imports shared
 topology (`topologyImports`) is refused, because the script does not resolve imported carriers
 yet. It takes today's state only (no Over time history). Every request ends after 30 s or at
@@ -1493,11 +1505,12 @@ recorded message is scrubbed of the credential values.
 Provider responses never reach the agent: the script prints exactly one line, for example
 `snapshot examples/live-status/live-status.snapshot.json at 2026-11-10T11:02:00.000Z: 7 tickets (0 missing) ·
 6 carriers, 11 of 14 signals · no errors`. It exits 1 without writing a file when neither
-provider could run, and when no ticket state is known: a ticket is known only when a search that
-covered it answered (a key search naming it, or the epic-children search returning it as a child;
-the Flagged search does not count), and the viewer shows no ticket state until every search
-answered. A snapshot showing them all as missing would be wrong. A ticket left unknown in an
-otherwise complete answer is written with state `unknown`, which shows no status, never missing. A rate-limited call (HTTP 429) is retried once after its Retry-After (at most
+provider could run, and when no ticket state is known: the viewer shows ticket state only when
+every Jira search it made answered, and then it names every ticket (missing when Jira did not
+return it). With no state at all the tickets are unknown, and a snapshot showing them all as
+missing would be wrong. A missing variable is named only for a provider the board uses (Grafana
+for grafana, loki, sql, cloudwatch or cloudwatchLogs signals; Honeycomb for honeycomb signals). A
+rate-limited Jira call (HTTP 429) is retried once after its Retry-After (at most
 10 s) and recorded only if it still fails; a datasource uid that is not one path segment is refused.
 
 The snapshot is written next to the board as `<board>.snapshot.json` (`--out` chooses another

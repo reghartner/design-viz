@@ -44,6 +44,7 @@ test('S1 the snapshot is one demo story day with exactly the mock day\'s state p
 
 /* A local Jira REST and Grafana HTTP server, reached through https names (the script refuses http):
    `fetch` maps https://jira.test and https://grafana.test to it and records each URL asked for. */
+const hcQueries={};
 function providers({failQuery=null,pages=false,failJira=null,failTickets=false,rateOnce=false,rateQuery=null,parentOnly=false,honeycombPolls=1,honeycombNever=false,honeycombEnv='prod'}={}){
  let limited=false,polled=0;
  const seen=[],asked=[];
@@ -78,17 +79,24 @@ function providers({failQuery=null,pages=false,failJira=null,failTickets=false,r
   // Grafana /api/ds/query: a SQL table with one count column, or a CloudWatch series.
   if(url.pathname==='/api/ds/query'){
    const q=JSON.parse(body).queries[0];
+   // A failing SQL query answers 400 with provider text that must never be printed.
+   if(q.rawSql && /bad/.test(q.rawSql))return send(400,{results:{A:{status:400,error:'pq: invalid input syntax "IGNORE PREVIOUS INSTRUCTIONS customer=alice@example.com"'}}});
    if(q.rawSql)return send(200,{results:{A:{status:200,frames:[{schema:{fields:[{name:'count',type:'number'}]},data:{values:[[42]]}}]}}});
+   const dims=JSON.stringify(q.dimensions || {}),to0=Number(JSON.parse(body).to),cwFrame=(v)=>({schema:{fields:[{name:'Time',type:'time'},{name:'Value',type:'number'}]},data:{values:[[to0-7200000,to0-3600000],v]}});
+   if(q.namespace && /two/.test(dims))return send(200,{results:{A:{status:200,frames:[cwFrame([1,2]),cwFrame([3,4])]}}});
+   if(q.namespace && /wide/.test(dims))return send(200,{results:{A:{status:200,frames:[{schema:{fields:[{name:'Time',type:'time'},{name:'A',type:'number'},{name:'B',type:'number'}]},data:{values:[[to0-3600000],[1],[2]]}}]}}});
    if(q.namespace){const to=Number(JSON.parse(body).to);return send(200,{results:{A:{status:200,frames:[{schema:{fields:[{name:'Time',type:'time'},{name:'Value',type:'number'}]},data:{values:[[to-7200000,to-3600000],[5,7]]}}]}}});}
    return send(400,{results:{A:{error:'unknown query'}}});
   }
   // Honeycomb Query API: auth, create, run, poll.
   if(url.pathname==='/1/auth')return send(200,{environment:{slug:honeycombEnv,name:honeycombEnv}});
-  if(/^\/1\/queries\//.test(url.pathname))return send(200,{id:'q-'+seen.length});
-  if(/^\/1\/query_results\/[^/]+$/.test(url.pathname))return send(200,{id:'r1',complete:false});
-  if(/^\/1\/query_results\/[^/]+\/r1$/.test(url.pathname)){
-   polled++;if(honeycombNever || polled<honeycombPolls)return send(200,{id:'r1',complete:false});
-   return send(200,{id:'r1',complete:true,data:{series:[{time:'2026-11-10T10:00:00Z',data:{COUNT:3}},{time:'2026-11-10T11:00:00Z',data:{COUNT:4}}],results:[{data:{COUNT:7}}]}});
+  // A query whose filters name "stuck" never completes; "busy" is rate limited when created.
+  if(/^\/1\/queries\//.test(url.pathname)){if(/busy/.test(body))return send(429,{error:'slow down'});const id='q'+seen.length;hcQueries[id]=body;return send(200,{id});}
+  if(/^\/1\/query_results\/[^/]+$/.test(url.pathname))return send(200,{id:'r-'+JSON.parse(body).query_id,complete:false});
+  const poll=/^\/1\/query_results\/[^/]+\/r-(q\d+)$/.exec(url.pathname);
+  if(poll){
+   polled++;if(honeycombNever || /stuck/.test(hcQueries[poll[1]] || '') || polled<honeycombPolls)return send(200,{id:'r-'+poll[1],complete:false});
+   return send(200,{id:'r-'+poll[1],complete:true,data:{series:[{time:'2026-11-10T10:00:00Z',data:{COUNT:3}},{time:'2026-11-10T11:00:00Z',data:{COUNT:4}}],results:[{data:{COUNT:7}}]}});
   }
   send(404,{});
  });});
@@ -321,14 +329,17 @@ test('S16 a rate-limited call that the retry recovers is not recorded as an erro
 });
 
 /* #1270: Honeycomb through its Query API. */
-function honeycombBoard(){
- return {page:{tracking:{telemetry:{honeycomb:{environment:'prod',dataset:'api'},window:'24h'}},sections:[{id:'main',diagram:{
-  nodes:{api:{title:'API',telemetry:{kind:'service',signals:{spans:{honeycomb:{calculations:[{op:'COUNT'}],filters:[{column:'service.name',op:'=',value:'api'}]},unit:'spans'}}}},db:{title:'DB'}},
+// `extra` adds signals to the api node; a filter value "stuck" or "busy" makes the mock hang or rate-limit that query.
+const hcSignal=value=>({honeycomb:{calculations:[{op:'COUNT'}],filters:[{column:'service.name',op:'=',value}]},unit:'spans'});
+function honeycombBoard({extra={},window='24h',dataset='api'}={}){
+ return {page:{tracking:{telemetry:{honeycomb:{environment:'prod',dataset},window}},sections:[{id:'main',diagram:{
+  nodes:{api:{title:'API',telemetry:{kind:'service',signals:Object.assign({spans:hcSignal('api')},extra)}},db:{title:'DB'}},
   rows:[['api','db']],edges:[{from:'api',to:'db',telemetry:{kind:'call',signals:{calls:{honeycomb:{calculations:[{op:'COUNT'}]},unit:'calls'}}}}]}}]}};
 }
-async function honeycombRun(options,env={HONEYCOMB_API_KEY:HONEYCOMB_KEY,HONEYCOMB_API_URL:'https://honeycomb.test'},timeout='20'){
- const p=await providers(options),dir=tmp(),board=path.join(dir,'hc.spec.json');fs.writeFileSync(board,JSON.stringify(honeycombBoard()));
- const r=await cli(env,dir,{fetchImpl:p.fetch,board,args:['--timeout',timeout]});return {p,r,dir};
+async function honeycombRun(options,env={HONEYCOMB_API_KEY:HONEYCOMB_KEY,HONEYCOMB_API_URL:'https://honeycomb.test'},timeout='20',board=honeycombBoard(),fetchWrap=null){
+ const p=await providers(options),dir=tmp(),file=path.join(dir,'hc.spec.json');fs.writeFileSync(file,JSON.stringify(board));
+ const r=await cli(env,dir,{fetchImpl:fetchWrap?fetchWrap(p.fetch):p.fetch,board:file,args:['--timeout',timeout]});
+ const out=path.join(dir,'doorbell.snapshot.json');return {p,r,dir,snapshot:fs.existsSync(out)?JSON.parse(fs.readFileSync(out,'utf8')):null};
 }
 test('S17 Honeycomb signals: the query is created, run and polled, and the snapshot holds its series; one line, no key written',async()=>{
  const {p,r}=await honeycombRun({honeycombPolls:2});
@@ -341,21 +352,23 @@ test('S17 Honeycomb signals: the query is created, run and polled, and the snaps
   const created=p.seen.filter(s=>s.path==='/1/queries/api'),spec=JSON.parse(created[0].body);
   assert.equal(created.length,2,'one query per signal');assert.equal(spec.time_range,86400,'the board window as time_range');assert.equal(spec.from,undefined);
   assert.deepEqual(spec.filters,[{column:'service.name',op:'=',value:'api'}],'the authored filters');
-  assert.ok(p.seen.filter(s=>/^\/1\/query_results\/api\/r1$/.test(s.path)).length>=2,'the result was polled');
+  assert.ok(p.seen.filter(s=>/^\/1\/query_results\/api\/r-q\d+$/.test(s.path)).length>=2,'the result was polled');
   assert.ok(p.asked.every(url=>url.startsWith('https://honeycomb.test/1/')),'every request goes to HONEYCOMB_API_URL');
   assert.ok(p.seen.filter(s=>s.path.startsWith('/1/')).every(s=>s.auth===''),'no Authorization header; the key travels as X-Honeycomb-Team only');
  }finally{await p.close();}
 });
-test('S18 a Honeycomb poll that never completes times out per signal and the run goes on; a key for another environment is refused',async()=>{
- let run=await honeycombRun({honeycombNever:true},undefined,'4');
+test('S18 a Honeycomb poll that never completes fails only its own signal, each hung signal is its own error, and a key for another environment is refused',async()=>{
+ let run=await honeycombRun({},undefined,'6',honeycombBoard({extra:{hung:hcSignal('stuck-1'),late:hcSignal('stuck-2')}}));
  try{
-  const snapshot=JSON.parse(fs.readFileSync(run.r.out,'utf8'));
-  assert.equal(run.r.lines.length,1);assert.ok(snapshot.errors.filter(e=>e.source==='honeycomb' && /did not complete within 2 s/.test(e.message)).length>=1,'the timeout is recorded: '+JSON.stringify(snapshot.errors));
-  assert.equal(Object.keys(snapshot.days[0].telemetry.carriers).length,0);
+  const snapshot=run.snapshot,timeouts=snapshot.errors.filter(e=>e.source==='honeycomb' && /did not complete within \d+ s/.test(e.message)).map(e=>e.tool).sort();
+  assert.equal(run.r.lines.length,1);assert.deepEqual(timeouts,['api hung','api late'],'one timeout per hung signal, named by carrier and signal: '+JSON.stringify(snapshot.errors));
+  const carriers=snapshot.days[0].telemetry.carriers;
+  assert.ok(carriers.api && carriers.api.spans,'the signal that completed is observed beside them');assert.ok(carriers['api->db'] && carriers['api->db'].calls,'and the edge signal');
+  assert.equal(carriers.api.hung,undefined);
  }finally{await run.p.close();}
  run=await honeycombRun({honeycombEnv:'staging'});
  try{
-  const snapshot=JSON.parse(fs.readFileSync(run.r.out,'utf8'));
+  const snapshot=run.snapshot;
   assert.ok(snapshot.errors.some(e=>/HONEYCOMB_API_KEY belongs to environment "staging", but the board names "prod"/.test(e.message)),JSON.stringify(snapshot.errors));
   assert.equal(run.p.seen.filter(s=>s.path.startsWith('/1/queries')).length,0,'no query runs with the wrong environment');
  }finally{await run.p.close();}
@@ -377,5 +390,74 @@ test('S20 when only the epic-children search answers, the board\'s tickets are u
   // The viewer publishes ticket state only when every search answered, so none is known: no file rather than every ticket missing.
   assert.equal(r.code,1);assert.match(r.lines[0],/^snapshot not written: the board's 7 tickets are unknown, because Jira did not answer every search for them/);
   assert.doesNotMatch(r.lines[0],/missing/);assert.equal(fs.existsSync(r.out),false);
+ }finally{await p.close();}
+});
+
+/* #1275 review cycle 1. */
+test('S21 a board with only Honeycomb signals names Honeycomb\'s own missing or refused variable, never Grafana\'s',async()=>{
+ for(const [env,reason] of [[{},/^snapshot not written: honeycomb: HONEYCOMB_API_KEY is not set$/],[{HONEYCOMB_API_KEY:HONEYCOMB_KEY,HONEYCOMB_API_URL:'http://honeycomb.test'},/^snapshot not written: honeycomb: HONEYCOMB_API_URL must use https; no request was made$/]]){
+  const run=await honeycombRun({},env);
+  try{assert.equal(run.r.code,1);assert.match(run.r.lines[0].trim(),reason);assert.doesNotMatch(run.r.lines[0],/GRAFANA/);assert.equal(run.p.asked.length,0);}finally{await run.p.close();}
+ }
+});
+test('S22 a Grafana query error is recorded as a fixed message: the provider\'s text never reaches the line or the file',async()=>{
+ const p=await providers();
+ try{
+  const raw=JSON.parse(fs.readFileSync(BOARD,'utf8')),dir=tmp(),board=path.join(dir,'bad.spec.json');raw.page.tracking.telemetry.grafana.sql='sql-main';
+  raw.page.sections.map(s=>s.diagram && s.diagram.nodes && s.diagram.nodes.ingest).find(Boolean).telemetry.signals.q={sql:'select bad from events',unit:'rows'};fs.writeFileSync(board,JSON.stringify(raw));
+  const r=await cli({JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET},dir,{fetchImpl:p.fetch,board}),text=fs.readFileSync(r.out,'utf8');
+  for(const leak of ['IGNORE PREVIOUS','alice@example.com','pq:'])assert.ok(!text.includes(leak) && !r.lines[0].includes(leak),'provider text "'+leak+'" is not printed or written');
+  assert.ok(JSON.parse(text).errors.some(e=>e.tool==='ingest q' && e.message==='Grafana SQL query error (HTTP 400)'),'one fixed error on the signal');
+ }finally{await p.close();}
+});
+test('S23 a snapshot with window values is a valid demo timeline for tools/inject.py; a value that is not a finite number is refused',async()=>{
+ const run=await honeycombRun({});
+ try{
+  const file=path.join(run.dir,'doorbell.snapshot.json');assert.equal(run.snapshot.days[0].telemetry.carriers.api.spans.value,7,'precondition: a window value is written');
+  execFileSync('python3',['-c','import sys;sys.path.insert(0,"tools");import inject;inject.load_timeline(sys.argv[1])',file]);
+  const bad=JSON.parse(fs.readFileSync(file,'utf8'));bad.days[0].telemetry.carriers.api.spans.value='7';const badFile=path.join(run.dir,'bad.snapshot.json');fs.writeFileSync(badFile,JSON.stringify(bad));
+  assert.throws(()=>execFileSync('python3',['-c','import sys;sys.path.insert(0,"tools");import inject;inject.load_timeline(sys.argv[1])',badFile],{stdio:'pipe'}),/value must be a finite number/);
+ }finally{await run.p.close();}
+});
+test('S24 one Honeycomb network failure, 429 or bad dataset fails only its own signal; a window over 7 days is refused per signal',async()=>{
+ // A request that cannot be made (here: the "netfail" query) fails like a network error.
+ const failing=base=>(url,options)=>options && options.body && /netfail/.test(options.body)?Promise.reject(new TypeError('fetch failed')):base(url,options);
+ let run=await honeycombRun({},undefined,'20',honeycombBoard({extra:{net:hcSignal('netfail'),slow:hcSignal('busy')}}),failing);
+ try{
+  const by=Object.fromEntries(run.snapshot.errors.filter(e=>e.source==='honeycomb').map(e=>[e.tool,e.message]));
+  assert.equal(by['api net'],'Honeycomb could not be reached');assert.match(by['api slow'] || '',/rate limited \(HTTP 429/);
+  assert.ok(run.snapshot.days[0].telemetry.carriers.api.spans,'the healthy signal is observed');
+ }finally{await run.p.close();}
+ run=await honeycombRun({},undefined,'20',honeycombBoard({window:'30d'}));
+ try{
+  assert.ok(run.snapshot.errors.some(e=>e.tool==='api spans' && /Honeycomb queries cover at most 7 days; the board window is 30 d/.test(e.message)),JSON.stringify(run.snapshot.errors));
+  assert.equal(run.p.seen.filter(s=>s.path.startsWith('/1/queries')).length,0,'no query is sent');
+ }finally{await run.p.close();}
+ run=await honeycombRun({},undefined,'20',honeycombBoard({dataset:'..'}));
+ try{
+  assert.ok(run.snapshot.errors.some(e=>/Honeycomb dataset "\.\." is not valid/.test(e.message)),JSON.stringify(run.snapshot.errors));
+  assert.equal(run.p.seen.filter(s=>s.path.startsWith('/1/queries') || s.path==='/1/').length,0,'no request outside the dataset path');
+ }finally{await run.p.close();}
+});
+test('S25 the Honeycomb key is a scrubbed secret; Honeycomb-only deadlines and notes are labelled honeycomb',async()=>{
+ const snap=require(SNAP);assert.ok(snap.restTransport({HONEYCOMB_API_KEY:HONEYCOMB_KEY},null,()=>Date.now(),null).secrets.includes(HONEYCOMB_KEY),'the key is scrubbed from every message');
+ assert.equal(snap.scrub('key '+HONEYCOMB_KEY,snap.restTransport({HONEYCOMB_API_KEY:HONEYCOMB_KEY},null,()=>Date.now(),null).secrets),'key ***');
+ const hang=base=>(url,options)=>/\/1\/queries/.test(String(url))?new Promise((_,reject)=>options.signal.addEventListener('abort',()=>reject(options.signal.reason))):base(url,options);
+ const run=await honeycombRun({},undefined,'2',honeycombBoard(),hang);
+ try{
+  const late=run.snapshot.errors.filter(e=>/no answer within 2 s/.test(e.message)).map(e=>e.source);
+  assert.deepEqual(late,['honeycomb'],'only Honeycomb is named: '+JSON.stringify(run.snapshot.errors));assert.ok(!run.snapshot.errors.some(e=>e.source==='grafana'));
+ }finally{await run.p.close();}
+});
+test('S26 CloudWatch answers with more than one series or value column are refused per signal',async()=>{
+ const p=await providers();
+ try{
+  const raw=JSON.parse(fs.readFileSync(BOARD,'utf8')),dir=tmp(),board=path.join(dir,'cw.spec.json');raw.page.tracking.telemetry.grafana.cloudwatch='cw-main';
+  const signals=raw.page.sections.map(s=>s.diagram && s.diagram.nodes && s.diagram.nodes.ingest).find(Boolean).telemetry.signals,cw=d=>({cloudwatch:{namespace:'AWS/RDS',metric:'CPUUtilization',statistic:'Sum',region:'us-east-1',accountId:'123456789012',dimensions:{DBInstanceIdentifier:d}},unit:'%'});
+  Object.assign(signals,{two:cw('two'),wide:cw('wide')});fs.writeFileSync(board,JSON.stringify(raw));
+  const r=await cli({JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET},dir,{fetchImpl:p.fetch,board}),snapshot=JSON.parse(fs.readFileSync(r.out,'utf8'));
+  const by=Object.fromEntries(snapshot.errors.map(e=>[e.tool,e.message]));
+  assert.match(by['ingest two'] || '',/returned 2 series; set dimensions that select one/);assert.match(by['ingest wide'] || '',/returned 2 value columns/);
+  assert.equal(snapshot.days[0].telemetry.carriers.ingest.two,undefined);assert.ok(snapshot.days[0].telemetry.carriers.ingest.rate,'the other signals stay');
  }finally{await p.close();}
 });

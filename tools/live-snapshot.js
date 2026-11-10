@@ -92,10 +92,22 @@ function providerBase(value){
   return {base:(url.origin+url.pathname).replace(/\/+$/,'')};
 }
 function atlassianCloud(value){try{const url=new URL(String(value));return url.protocol==='https:' && !url.username && !url.password && /\.atlassian\.net$/i.test(url.hostname);}catch(ex){return false;}}
-const REQUEST_MS=30000;
+const REQUEST_MS=30000,HONEYCOMB_MAX_SECONDS=7*86400;
 // An ordinary tool error to the viewer's adapter, which then fails only that signal; `unsupported` keeps it out of
 // the recorded errors, since takeSnapshot records one error per unread signal itself.
 function unsupported(message){return {code:'tool_error',unsupported:true,message:String(message)};}
+/* A Grafana or Honeycomb failure as one signal's tool error: their adapters fail only that signal on a tool error and
+   stop the whole refresh on anything else. Rate limits, network errors, request timeouts and unreadable answers
+   all become tool errors; the run's own abort stays as it is. Only fixed text is recorded, never provider text. */
+function perSignal(error,what,signal){
+  if(signal && signal.aborted)return error;
+  if(error && error.code==='rate_limited')return failure(error.message);
+  if(error && typeof error.code==='string')return error;
+  const name=error && error.name;
+  if(name==='TimeoutError')return failure(what+' did not answer within '+Math.round(REQUEST_MS/1000)+' s');
+  if(name==='SyntaxError')return failure(what+' did not answer JSON');
+  return failure(what+' could not be reached');
+}
 
 /* REST transports built from the environment. `missing` names each variable a provider lacks, `refused` each
    one the URL rules refuse; `secrets` are the values every printed or recorded message is scrubbed of. */
@@ -144,13 +156,14 @@ function restTransport(env,fetchImpl,now,boardSite,options){
     // A datasource uid is one path segment: anything else could reach another Grafana route with the token.
     const uidOf=value=>{const uid=String(value==null?'':value);if(!/^[A-Za-z0-9._-]+$/.test(uid) || uid==='.' || uid==='..')throw failure('datasource uid "'+uid.slice(0,40)+'" is not valid');return uid;};
     /* /api/ds/query (SQL and CloudWatch): one query, refId A. A query error comes back in results.A.error,
-       also with HTTP 400, and is reported as that signal's error. */
+       usually with HTTP 400. It is recorded as a fixed message with the status: the provider's text can hold
+       data and must not reach the one printed line. */
     const dsQuery=async(uid,query,from,to,what,signal)=>{
       const response=await request(base+'/api/ds/query',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},headers),
         body:JSON.stringify({from:String(from),to:String(to),queries:[Object.assign({refId:'A',datasource:{uid}},query)]})},signal);
       const text=await response.text();let answer=null;try{answer=JSON.parse(text);}catch(ex){answer=null;}
       const result=answer && answer.results && answer.results.A;
-      if(result && result.error)throw failure(what+': '+String(result.error).replace(/\s+/g,' ').slice(0,200));
+      if(result && result.error)throw failure(what+' query error (HTTP '+response.status+')');
       if(response.status===429)throw failure(what+' is rate limited (HTTP 429)');
       if(!response.ok)throw failure(what+' answered HTTP '+response.status);
       if(!result)throw failure(what+' returned no result');
@@ -177,8 +190,9 @@ function restTransport(env,fetchImpl,now,boardSite,options){
         const series=frames.filter(frame=>columns(frame).values.length>=2);
         if(!series.length)return {status:'success',values:[],timestamps:[]};
         if(series.length>1)throw failure('Grafana CloudWatch returned '+series.length+' series; set dimensions that select one');
-        const {fields,values}=columns(series[0]),time=fields.findIndex(f=>f.type==='time'),value=fields.findIndex((f,i)=>i!==time && f.type==='number');
-        if(time<0 || value<0)throw failure('Grafana CloudWatch returned no time and value columns');
+        const {fields,values}=columns(series[0]),time=fields.findIndex(f=>f.type==='time'),numbers=fields.map((f,i)=>i!==time && f.type==='number'?i:-1).filter(i=>i>=0),value=numbers[0];
+        if(time<0 || !numbers.length)throw failure('Grafana CloudWatch returned no time and value columns');
+        if(numbers.length>1)throw failure('Grafana CloudWatch returned '+numbers.length+' value columns; set dimensions that select one');
         const timestamps=values[time].map(t=>typeof t==='string'?Date.parse(t):Number(t));
         return {status:'success',values:values[value],timestamps};
       }
@@ -186,7 +200,7 @@ function restTransport(env,fetchImpl,now,boardSite,options){
     };
     handlers['Grafana REST']=async(tool,input,signal)=>{
       // A rate-limited Grafana call fails only its signal: the Grafana adapter does not retry, and treats any other code as fatal.
-      try{return await grafanaCall(tool,input,signal);}catch(error){if(error && error.code==='rate_limited')throw failure(error.message);throw error;}
+      try{return await grafanaCall(tool,input,signal);}catch(error){throw perSignal(error,'Grafana',signal);}
     };
     prometheusLoki=async(tool,input,signal)=>{
       if(tool==='query_prometheus'){
@@ -212,12 +226,12 @@ function restTransport(env,fetchImpl,now,boardSite,options){
   }
   /* Honeycomb Query API: create the query, run it, poll the result. The key's environment must be the
      board's tracking.telemetry.honeycomb.environment (checked once through /1/auth). */
-  let honeycomb=null;
+  let honeycomb=null,pollMs=20000;
   if(set('HONEYCOMB_API_URL')){const checked=providerBase(env.HONEYCOMB_API_URL);if(checked.error)refused.push({provider:'honeycomb',message:'HONEYCOMB_API_URL '+checked.error});else honeycomb=checked.base;}
   else honeycomb='https://api.honeycomb.io';
   if(!set('HONEYCOMB_API_KEY'))missing.push({provider:'honeycomb',variables:['HONEYCOMB_API_KEY']});
   else if(honeycomb){
-    const base=honeycomb,headers={'X-Honeycomb-Team':String(env.HONEYCOMB_API_KEY),Accept:'application/json','Content-Type':'application/json'},pollMs=Math.max(1000,Number(options.pollMs) || 20000);
+    const base=honeycomb,headers={'X-Honeycomb-Team':String(env.HONEYCOMB_API_KEY),Accept:'application/json','Content-Type':'application/json'};pollMs=Math.max(1000,Number(options.pollMs) || 20000);
     const call=async(route,body,what,signal)=>readJson(await request(base+route,body===undefined?{headers}:{method:'POST',headers,body:JSON.stringify(body)},signal),what);
     let auth=null;
     const environment=signal=>auth || (auth=call('/1/auth',undefined,'Honeycomb auth',signal).then(a=>a && a.environment && typeof a.environment.slug==='string'?a.environment.slug:null,error=>{auth=null;throw error;}));
@@ -227,15 +241,21 @@ function restTransport(env,fetchImpl,now,boardSite,options){
         if(tool!=='run_query')throw unsupported(tool+' is not available in the snapshot script');
         const slug=await environment(signal);
         if(slug && input.environment_slug && slug!==input.environment_slug)throw failure('HONEYCOMB_API_KEY belongs to environment "'+slug+'", but the board names "'+input.environment_slug+'"');
-        const spec=typeof input.query_spec==='string'?JSON.parse(input.query_spec):Object.assign({},input.query_spec),dataset=encodeURIComponent(input.dataset_slug || '__all__');
+        // A dataset slug is one path segment, like a Grafana uid.
+        const datasetSlug=String(input.dataset_slug || '__all__');
+        if(!/^[A-Za-z0-9._-]+$/.test(datasetSlug) || datasetSlug==='.' || datasetSlug==='..')throw failure('Honeycomb dataset "'+datasetSlug.slice(0,40)+'" is not valid');
+        const spec=typeof input.query_spec==='string'?JSON.parse(input.query_spec):Object.assign({},input.query_spec),dataset=encodeURIComponent(datasetSlug);
         // The connector's relative `from` ("-24h") or absolute from/to become the REST time range.
         const relative=typeof spec.from==='string' && /^-(\d+)([smhdw])$/.exec(spec.from);
         if(relative)spec.time_range=Number(relative[1])*{s:1,m:60,h:3600,d:86400,w:604800}[relative[2]];
         else if(spec.from!=null){spec.start_time=Math.floor(parseTime(spec.from,now())/1000);spec.end_time=Math.floor(parseTime(spec.to==null?'now':spec.to,now())/1000);}
         delete spec.from;delete spec.to;
+        // Honeycomb answers a query over more than 7 days with HTTP 400; say why instead.
+        const span=spec.time_range!=null?spec.time_range:spec.end_time-spec.start_time;
+        if(span>HONEYCOMB_MAX_SECONDS)throw failure('Honeycomb queries cover at most 7 days; the board window is '+Math.round(span/86400)+' d');
         const query=await call('/1/queries/'+dataset,spec,'Honeycomb query',signal);
         if(!query || typeof query.id!=='string')throw failure('Honeycomb query returned no id');
-        let result=await call('/1/query_results/'+dataset,{query_id:query.id,disable_series:false,limit:10000},'Honeycomb query result',signal);
+        let result=await call('/1/query_results/'+dataset,{query_id:query.id,disable_series:false},'Honeycomb query result',signal);
         const started=Date.now();
         while(!(result && result.complete===true)){
           if(!result || typeof result.id!=='string')throw failure('Honeycomb query result returned no id');
@@ -246,17 +266,22 @@ function restTransport(env,fetchImpl,now,boardSite,options){
         const data=result.data || {},series=(Array.isArray(data.series)?data.series:[]).map(row=>({data:Object.assign({},row && row.data,{time:row && row.time})}));
         let granularity=Number(spec.granularity);
         if(!(granularity>0)){const times=series.map(row=>Date.parse(row.data.time)).filter(isFinite).sort((a,b)=>a-b);for(let i=1;i<times.length;i++){const gap=(times[i]-times[i-1])/1000;if(gap>0 && (!(granularity>0) || gap<granularity))granularity=gap;}}
-        // run_query's raw result: one aggregate row and the series, each row's time inside its data.
+        /* The REST answer's shape, as Honeycomb's own Go client models it (terraform-provider-honeycombio
+           client/query_result.go): data.series rows {time, data}, data.results rows {data}. The keys inside data
+           (COUNT, P99(duration_ms), a calculation's name) are not verified against a live answer; a mismatch
+           fails the signal in the adapter, never a wrong number. run_query's raw result keeps time inside data. */
         const raw={results:(Array.isArray(data.results)?data.results:[]).map(row=>({data:Object.assign({},row && row.data)})),series};
         if(granularity>0 && Number.isSafeInteger(granularity))raw.info={granularity_seconds:granularity};
         return raw;
       }catch(error){
-        // Like Grafana's, the Honeycomb adapter fails one signal only on a tool error.
-        if(error && (error.code==='rate_limited' || error.name==='SyntaxError'))throw failure(String(error.message));throw error;
+        throw perSignal(error,'Honeycomb',signal);
       }
     };
   }
-  return {servers:()=>servers,missing,refused,secrets,call:(server,tool,input,signal)=>{const handler=handlers[server];if(!handler)return Promise.reject(failure('No server '+server));return handler(tool,input || {},signal);}};
+  return {servers:()=>servers,missing,refused,secrets,
+    // The viewer's Honeycomb adapter runs its queries one after another: each one's polling gets its share of the run.
+    shareHoneycomb:(timeoutMs,count)=>{if(count>0)pollMs=Math.max(1000,Math.min(pollMs,Math.floor(timeoutMs*0.8/count)));},
+    call:(server,tool,input,signal)=>{const handler=handlers[server];if(!handler)return Promise.reject(failure('No server '+server));return handler(tool,input || {},signal);}};
 }
 
 /* An MCP JSON-RPC handler per server ({name: handleMcp}), for the mock connectors in tests. */
@@ -277,12 +302,10 @@ function connectorNamespace(transport,errors,signal,answered){
     const key=server+'\u0000'+tool+'\u0000'+JSON.stringify(input || {});
     return Promise.resolve().then(()=>transport.call(server,tool,input,signal)).then(payload=>{
       for(let i=errors.length-1;i>=0;i--)if(errors[i].key===key)errors.splice(i,1);
-      if(answered){const source=providerOf(server);answered[source]=(answered[source] || 0)+1;
-        if(tool==='searchJiraIssuesUsingJql' && input && typeof input.jql==='string'){const list=payload && (Array.isArray(payload.issues)?payload.issues:payload.issues && Array.isArray(payload.issues.nodes)?payload.issues.nodes:[]) || [];
-          answered.searches.push({jql:input.jql,issues:list.filter(issue=>issue && typeof issue.key==='string').map(issue=>({key:issue.key,parent:issue.fields && issue.fields.parent && issue.fields.parent.key || null}))});}}
+      if(answered){const source=providerOf(server);answered[source]=(answered[source] || 0)+1;}
       return {payload};
     },error=>{
-      if(!(error && error.unsupported) && !(signal && signal.aborted))errors.push({source:providerOf(server),tool,message:String(error && error.message || error),key});throw error;});
+      if(!(error && error.unsupported) && !(signal && signal.aborted))errors.push({source:providerOf(server),tool,message:String(error && error.message || error),key,input});throw error;});
   };
   return {
     listTools:()=>Promise.resolve(transport.servers()),
@@ -292,6 +315,26 @@ function connectorNamespace(transport,errors,signal,answered){
 }
 
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const GRAFANA_SOURCES=['grafana','loki','sql','cloudwatch','cloudwatchLogs'];
+// The same text for a bound signal and for the connector call it makes, to name the signal a failed call belongs to.
+function canonical(value){if(Array.isArray(value))return value.map(canonical);if(value && typeof value==='object'){const out={};Object.keys(value).sort().forEach(key=>{out[key]=canonical(value[key]);});return out;}return value;}
+function honeycombKey(query){const q=Object.assign({},query);['from','to','start','end','start_time','end_time','time_range'].forEach(key=>delete q[key]);return 'h:'+JSON.stringify(canonical(q));}
+function signalFingerprint(signal){
+  const q=signal && signal.query;
+  if(signal.source==='grafana' || signal.source==='loki' || signal.source==='sql')return typeof q==='string'?signal.source[0]+':'+q:null;
+  if(signal.source==='cloudwatch')return q && typeof q==='object'?'c:'+JSON.stringify(canonical([q.namespace,q.metric,q.region,q.dimensions || {}])):null;
+  if(signal.source==='honeycomb')return q && typeof q==='object'?honeycombKey(q):null;
+  return null;
+}
+function callFingerprint(tool,input){
+  if(!input)return null;
+  if(tool==='query_prometheus')return 'g:'+input.expr;
+  if(tool==='query_loki_logs')return 'l:'+input.logql;
+  if(tool==='query_sql')return 's:'+input.query;
+  if(tool==='query_cloudwatch')return 'c:'+JSON.stringify(canonical([input.namespace,input.metricName,input.region,input.dimensions || {}]));
+  if(tool==='run_query'){try{return honeycombKey(typeof input.query_spec==='string'?JSON.parse(input.query_spec):input.query_spec || {});}catch(ex){return null;}}
+  return null;
+}
 
 /* Runs the viewer's adapters on a headless copy of the board and returns {snapshot, summary}. */
 // Signal sources the REST transport reads; every other bound signal is recorded as one error.
@@ -308,7 +351,7 @@ function scrub(text,secrets){
   return out.replace(/(Basic|Bearer)\s+[A-Za-z0-9+/=._%-]{8,}/g,'$1 ***');
 }
 async function takeSnapshot({specText,board='board',transport,now=()=>Date.now(),timeoutMs=60000}){
-  const run=new AbortController(),errors=[],answered={jira:0,grafana:0,searches:[]},doc=headlessDocument(),namespace=connectorNamespace(transport,errors,run.signal,answered);
+  const run=new AbortController(),errors=[],answered={jira:0,grafana:0,honeycomb:0},doc=headlessDocument(),namespace=connectorNamespace(transport,errors,run.signal,answered);
   try{return await snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,namespace,answered});}
   finally{run.abort();}
 }
@@ -324,9 +367,13 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
   const api=ctl.liveStatus=C.createLiveStatus(ctl,page,{},providers?{telemetry:providers.options}:{});
   const refs=api.refs(),wantsJira=!!(refs.tickets.length || refs.epics.length);
   const boundSources=new Set();ctl.telemetry.bindings().forEach(b=>Object.keys(b.signals).forEach(name=>boundSources.add(b.signals[name].source)));
-  const wanted=provider=>provider==='jira'?wantsJira:provider==='honeycomb'?boundSources.has('honeycomb'):true;
+  // A provider's missing or refused variables are named only when the board binds a signal it reads.
+  const grafanaBound=GRAFANA_SOURCES.some(source=>boundSources.has(source)),honeycombBound=boundSources.has('honeycomb');
+  const wanted=provider=>provider==='jira'?wantsJira:provider==='honeycomb'?honeycombBound:provider==='grafana'?grafanaBound:true;
   transport.missing.forEach(m=>{if(!wanted(m.provider))return;errors.push({source:m.provider,tool:null,message:m.variables.join(', ')+(m.variables.length>1?' are':' is')+' not set'+(m.note?' ('+m.note+')':'')});});
   (transport.refused || []).forEach(r=>{if(!wanted(r.provider))return;errors.push({source:r.provider,tool:null,message:r.message+'; no request was made'});});
+  const hasServer=name=>transport.servers().some(s=>s.server===name);
+  if(typeof transport.shareHoneycomb==='function'){let count=0;ctl.telemetry.bindings().forEach(b=>Object.keys(b.signals).forEach(name=>{if(b.signals[name].source==='honeycomb')count++;}));transport.shareHoneycomb(timeoutMs,count);}
   const hasJira=wantsJira && transport.servers().some(s=>s.tools.some(t=>(t.name || t)==='searchJiraIssuesUsingJql'));
   const hasMetrics=!!providers && transport.servers().some(s=>s.tools.some(t=>['query_prometheus','run_query'].indexOf(t.name || t)>=0));
   if(hasJira)C.wireLiveStatusClaude(ctl,page,win);
@@ -338,10 +385,11 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
   const timedOut=!(jiraDone() && metricsDone());
   // Every provider still busy at the deadline is named.
   if(!jiraDone())errors.push({source:'jira',tool:null,message:'no answer within '+Math.round(timeoutMs/1000)+' s'});
-  if(!metricsDone())errors.push({source:'grafana',tool:null,message:'no answer within '+Math.round(timeoutMs/1000)+' s'});
+  const metricsSources=[grafanaBound && hasServer('Grafana REST')?'grafana':null,honeycombBound && hasServer('Honeycomb REST')?'honeycomb':null].filter(Boolean);
+  if(!metricsDone())metricsSources.forEach(source=>errors.push({source,tool:null,message:'no answer within '+Math.round(timeoutMs/1000)+' s'}));
   const live=api.snapshot(),evidence=hasMetrics?ctl.telemetry.snapshot():{map:{}};
   if(hasJira && live.note && live.note.text && live.note.kind!=='info')errors.push({source:'jira',tool:null,message:live.note.text});
-  const metricsNote=hasMetrics && ctl.telemetry.status().note;if(metricsNote && ctl.telemetry.status().state==='error')errors.push({source:'grafana',tool:null,message:metricsNote});
+  const metricsNote=hasMetrics && ctl.telemetry.status().note;if(metricsNote && ctl.telemetry.status().state==='error')errors.push({source:metricsSources.length===1?metricsSources[0]:'metrics',tool:null,message:metricsNote});
   const bindings=ctl.telemetry.bindings();
   bindings.forEach(b=>Object.keys(b.signals).forEach(name=>{
     const signal=b.signals[name];
@@ -350,6 +398,13 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
     if(READ_SOURCES.indexOf(signal.source)<0){errors.push({source,tool:b.id+' '+name,message:signal.source+' signals are not read by the snapshot script yet'});return;}
     if(hasMetrics && signal.error)errors.push({source,tool:b.id+' '+name,message:String(signal.error)});
   }));
+  // A failed metrics call is recorded on each signal that made it (carrier id and signal name), not on the tool.
+  const fingerprints=[];bindings.forEach(b=>Object.keys(b.signals).forEach(name=>{const f=signalFingerprint(b.signals[name]);if(f)fingerprints.push({f,tool:b.id+' '+name});}));
+  for(let i=errors.length-1;i>=0;i--){
+    const e=errors[i];if(!e.input || (e.source!=='grafana' && e.source!=='honeycomb'))continue;
+    const f=callFingerprint(e.tool,e.input),owners=f?fingerprints.filter(x=>x.f===f):[];
+    if(owners.length)errors.splice(i,1,...owners.map(owner=>({source:e.source,tool:owner.tool,message:e.message})));
+  }
   // PR states come from GitHub, which the script does not read yet: one error per authored PR.
   refs.prs.forEach(url=>errors.push({source:'github',tool:url,message:'pull request state is not read by the snapshot script yet'}));
   api.destroy();if(providers && providers.destroy)providers.destroy();
@@ -359,25 +414,10 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
     errors:dedupe(errors.map(e=>({source:e.source,tool:e.tool==null?null:scrub(e.tool,transport.secrets),message:scrub(e.message,transport.secrets)})))};
   const requested=refs.tickets,missingTickets=requested.filter(key=>!day.issues[key]).length;
   const signals=hasMetrics?bindings.reduce((n,b)=>n+Object.keys(b.signals).length,0):0,observed=Object.keys(day.telemetry.carriers).reduce((n,id)=>n+Object.keys(day.telemetry.carriers[id]).length,0);
-  /* A Jira that answered no search for the board's tickets says nothing about them: they are unknown, not
-     missing. The Flagged search and the epic metadata lookup do not count. */
-  /* A ticket is known when a search that covered it answered: a key search naming it, or an epic-children
-     search that returned it. Any other ticket is unknown, not missing; the Flagged search does not count. */
-  const known=new Set();
-  answered.searches.forEach(search=>{
-    if(/Flagged\s*=\s*Impediment/i.test(search.jql))return;
-    // The viewer keeps only an epic's real children from this search, so only they are known through it.
-    const epic=/^parent\s*=\s*([A-Z][A-Z0-9_]+-\d+)/i.exec(search.jql);
-    if(epic){search.issues.forEach(issue=>{if(issue.parent===epic[1])known.add(issue.key);});return;}
-    ((/key in \(([^)]*)\)/i.exec(search.jql) || [,''])[1]).split(',').map(k=>k.trim()).filter(Boolean).forEach(key=>known.add(key));
-  });
-  // The viewer publishes no ticket state until all its searches answered: then every ticket is unknown.
-  if(!Object.keys(hasJira?live.states:{}).some(key=>requested.indexOf(key)>=0))known.clear();
-  const requestedTickets=refs.tickets,unknown=hasJira?requestedTickets.filter(key=>!known.has(key)):[],jiraFailed=hasJira && requestedTickets.length>0 && unknown.length===requestedTickets.length;
-  // An unknown ticket reads "unknown", a state the viewer drops, so it shows no status rather than missing.
-  if(hasJira && !jiraFailed)unknown.forEach(key=>{snapshot.days[0].issues[key]={state:'unknown'};});
-  if(hasJira && !jiraFailed && unknown.length)snapshot.errors.push({source:'jira',tool:null,message:unknown.length+' ticket'+(unknown.length===1?' is':'s are')+' unknown (no search covering '+(unknown.length===1?'it':'them')+' answered): '+unknown.join(', ')});
-  return {snapshot,summary:{tickets:requested.length,missing:hasJira && !jiraFailed?requested.filter(key=>!day.issues[key] && known.has(key)).length:null,unknown:unknown.length,jiraFailed,carriers:Object.keys(day.telemetry.carriers).length,signals,observed,errors:snapshot.errors,at,jira:hasJira,metrics:hasMetrics}};
+  /* The viewer publishes ticket state only when every search it made answered, and then it names every requested
+     ticket (missing when Jira did not return it). With no state at all the tickets are unknown, not missing. */
+  const jiraFailed=hasJira && requested.length>0 && !requested.some(key=>Object.prototype.hasOwnProperty.call(live.states,key));
+  return {snapshot,summary:{tickets:requested.length,missing:hasJira && !jiraFailed?missingTickets:null,jiraFailed,carriers:Object.keys(day.telemetry.carriers).length,signals,observed,errors:snapshot.errors,at,jira:hasJira,metrics:hasMetrics}};
 }
 function dedupe(list){const seen=new Set();return list.filter(e=>{const key=JSON.stringify(e);if(seen.has(key))return false;seen.add(key);return true;});}
 
@@ -406,7 +446,8 @@ function snapshotDay(states,telemetryMap,bindings,at){
   // All queries end now, so each series is aligned by its last point, which takes the last slot. The step is
   // the most common gap between a series' points (a Prometheus range step); a point between slots takes the nearest.
   const gaps={};series.forEach(s=>{for(let i=1;i<s.points.length;i++){const gap=s.points[i][0]-s.points[i-1][0];if(gap>0)gaps[gap]=(gaps[gap] || 0)+1;}});
-  const step=Number(Object.keys(gaps).sort((x,y)=>gaps[y]-gaps[x] || x-y)[0]) || 60000;
+  // Whole seconds: a demo story's stepSeconds is a positive integer (tools/inject.py).
+  const step=Math.max(1000,Math.round((Number(Object.keys(gaps).sort((x,y)=>gaps[y]-gaps[x] || x-y)[0]) || 60000)/1000)*1000);
   const end=series.length?Math.max(...series.map(s=>s.points[s.points.length-1][0])):Date.parse(at);
   const slots=Math.min(MAX_SLOTS,Math.max(1,...series.map(s=>Math.round((s.points[s.points.length-1][0]-s.points[0][0])/step)+1)));
   const start=end-slots*step,carriers={};
@@ -423,7 +464,7 @@ function snapshotDay(states,telemetryMap,bindings,at){
 /* The one line an agent sees. */
 function summaryLine(file,summary){
   const parts=[];
-  parts.push(!summary.jira?'Jira skipped':summary.jiraFailed?'Jira failed ('+summary.tickets+' tickets unknown)':summary.tickets+' tickets ('+summary.missing+' missing'+(summary.unknown?', '+summary.unknown+' unknown':'')+')');
+  parts.push(!summary.jira?'Jira skipped':summary.jiraFailed?'Jira failed ('+summary.tickets+' tickets unknown)':summary.tickets+' tickets ('+summary.missing+' missing)');
   parts.push(summary.metrics?summary.carriers+' carriers, '+summary.observed+' of '+summary.signals+' signals':'metrics skipped');
   const errors=summary.errors.map(e=>e.source+(e.tool?' '+e.tool:'')+': '+e.message.replace(/\s+/g,' ').slice(0,120));
   parts.push(errors.length?errors.length+' error'+(errors.length===1?'':'s')+' ('+errors.slice(0,3).join('; ')+(errors.length>3?'; …':'')+')':'no errors');
@@ -459,7 +500,7 @@ async function main(argv,env,{fetchImpl,stdout=process.stdout,transport}={}){
   const {snapshot,summary}=result;
   // Every ticket would read missing: no snapshot at all is better than a wrong one.
   if(summary.jiraFailed){stdout.write(scrub('snapshot not written: the board\'s '+summary.tickets+' tickets are unknown, because Jira did not answer every search for them'+(summary.errors.filter(e=>e.source==='jira')[0]?' (first: '+summary.errors.filter(e=>e.source==='jira')[0].message+')':''),source.secrets)+'\n');return 1;}
-  if(!summary.jira && !summary.metrics){stdout.write(scrub('snapshot not written: '+(summary.errors.filter(e=>e.tool==null && (e.source==='jira' || e.source==='grafana')).map(e=>e.source+': '+e.message).join('; ') || 'the board has no tickets and no bound signals'),source.secrets)+'\n');return 1;}
+  if(!summary.jira && !summary.metrics){stdout.write(scrub('snapshot not written: '+(summary.errors.filter(e=>e.tool==null && (e.source==='jira' || e.source==='grafana' || e.source==='honeycomb')).map(e=>e.source+': '+e.message).join('; ') || 'the board has no tickets and no bound signals'),source.secrets)+'\n');return 1;}
   fs.writeFileSync(file,JSON.stringify(snapshot,null,2)+'\n');
   stdout.write(scrub(summaryLine(file,summary),source.secrets)+'\n');
   return 0;

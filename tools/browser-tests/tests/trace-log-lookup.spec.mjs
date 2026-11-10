@@ -39,7 +39,7 @@ const lookback=from=>{const hours=Math.max(1,Math.ceil((Date.now()-from)/3600000
 // A Honeycomb get_trace answer for a trace it did not keep.
 const notFound=id=>'---\nMetadata:\n  environment: production\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+id+'\n  view_mode: full\n  visible_spans: 0\n';
 // #1230: positions of what the page function finds (light DOM here; a native viewer host would have a shadow root).
-const layout=root=>root.evaluate(host=>{const r=host.shadowRoot || host,q=s=>Array.from(r.querySelectorAll(s)),box=n=>{const b=n.getBoundingClientRect();return {top:b.top,bottom:b.bottom,height:b.height};};
+const layout=root=>root.evaluate(host=>{const r=host.shadowRoot || host,q=s=>Array.from(r.querySelectorAll(s)),box=n=>{const b=n.getBoundingClientRect();return {top:b.top,bottom:b.bottom,height:b.height,left:b.left,right:b.right};};
  const slot=q('.dv-trace-slot')[0],direct=q('.dv-trace-direct')[0],logs=q('.dv-trace-logs')[0],config=q('details.dv-trace-config')[0];
  return {slots:q('.dv-trace-slot').length,slot:slot && box(slot),slotText:slot && slot.textContent.trim(),inSlot:slot?slot.querySelectorAll('.dv-trace-selected').length:0,selected:q('.dv-trace-selected').length,
   search:direct && box(direct),logs:logs && box(logs),configOpen:config && config.open,
@@ -91,11 +91,14 @@ test('desktop a log-line trace the provider did not keep says so and loads the n
  await h.logs.getByRole('button',{name:'Load trace '+MISSING,exact:true}).click();
  const report=h.root.locator('.dv-trace-direct-report');await expect(report).toContainText('Trace not found. The provider may not have kept this trace (sampling). Try the next log line.');
  await expect(report).not.toContainText('longer lookback');await expect(h.root.locator('.dv-trace-time')).toHaveJSProperty('open',false);
- // #1230 (test plan 1): the report sits at the clicked row inside the search, not after the last result; the row stays marked.
- const at=await layout(h.root);expect([at.reports.length,at.rows.length],'one report, three rows').toEqual([1,3]);
- expect(at.reports[0].inLogs,'the report is inside the search section').toBe(true);expect(at.rows.map(r=>r.chosen)).toEqual(['true','false','false']);
- expect(at.reports[0].top,'below the clicked row\'s start').toBeGreaterThan(at.rows[0].top);expect(at.reports[0].top,'above the next row').toBeLessThan(at.rows[1].top);
- expect(at.reports[0].bottom,'not after the last result').toBeLessThanOrEqual(at.rows[2].top+1);expect(at.reports[0].next,'Try the next log line is in it').toBe(1);
+ // #1230 (test plan 1; Chuck: stacked, not beside): the report sits directly under the clicked row inside the search, before
+ // the next row and not after the last result; the row stays marked.
+ const at=await layout(h.root),rep=at.reports[0],row=at.rows[0];expect([at.reports.length,at.rows.length],'one report, three rows').toEqual([1,3]);
+ expect(rep.inLogs,'the report is inside the search section').toBe(true);expect(at.rows.map(r=>r.chosen)).toEqual(['true','false','false']);
+ expect(rep.top,'below the clicked row').toBeGreaterThanOrEqual(row.bottom-1);expect(rep.top-row.bottom,'directly below it').toBeLessThanOrEqual(8);
+ expect(rep.bottom,'above the next row').toBeLessThanOrEqual(at.rows[1].top+1);expect(rep.bottom,'not after the last result').toBeLessThanOrEqual(at.rows[2].top+1);
+ expect(Math.abs(rep.left-row.left),'stacked under the row, not beside it').toBeLessThanOrEqual(2);expect(rep.right-rep.left,'as wide as the row').toBeGreaterThanOrEqual((row.right-row.left)*0.9);
+ expect(rep.next,'Try the next log line is in it').toBe(1);
  expect([at.inSlot,at.slotText],'the reserved space stays empty').toEqual([0,'Load a trace to show it here']);
  await info.attach('log-line-not-kept',{body:await h.root.screenshot(),contentType:'image/png'});
  await report.getByRole('button',{name:'Try the next log line',exact:true}).click();

@@ -23,9 +23,9 @@
    output and that provider is skipped.
 
    The snapshot (default <board>.snapshot.json next to the board; `*.snapshot.json` is ignored by
-   git) is one day of the demo story format (src/viewer/live-status-demo.js) plus `snapshotAt`.
+   git; the script refuses any path inside a git work tree that git does not ignore) is one day of the demo story format (src/viewer/live-status-demo.js) plus `snapshotAt`.
    Provider responses never reach stdout: the script prints exactly one summary line. */
-const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
 const {entrypoint}=require('./source-loader.cjs');
 
 const SNAPSHOT_KIND='flowview-live-snapshot';
@@ -233,6 +233,16 @@ function summaryLine(file,summary){
   parts.push(errors.length?errors.length+' error'+(errors.length===1?'':'s')+' ('+errors.slice(0,3).join('; ')+(errors.length>3?'; …':'')+')':'no errors');
   return 'snapshot '+file+' at '+summary.at+': '+parts.join(' · ');
 }
+/* design-viz is public: a snapshot holds real ticket titles, assignees and metric values. Inside a git work
+   tree the file must be ignored (git check-ignore), so it can never be committed by accident. Returns the
+   reason to refuse, or null. Without git there is no work tree to commit to. */
+function unsafeOut(file){
+  const dir=path.dirname(path.resolve(file));if(!fs.existsSync(dir))return 'the folder '+dir+' does not exist';
+  const inside=spawnSync('git',['-C',dir,'rev-parse','--is-inside-work-tree'],{encoding:'utf8'});
+  if(inside.error || inside.status!==0 || inside.stdout.trim()!=='true')return null;
+  const ignored=spawnSync('git',['-C',dir,'check-ignore','-q',path.resolve(file)],{encoding:'utf8'});
+  return ignored.status===0?null:file+' is inside a git work tree and git does not ignore it (name it *.snapshot.json, or write it outside the repository)';
+}
 function defaultOut(specPath){
   const dir=path.dirname(specPath),base=path.basename(specPath).replace(/\.json$/i,'').replace(/\.spec$/i,'');
   return path.join(dir,base+'.snapshot.json');
@@ -244,6 +254,8 @@ async function main(argv,env,{fetchImpl,stdout=process.stdout,transport}={}){
   if(files.length!==1 || !(timeout>0)){stdout.write('usage: node tools/live-snapshot.js <board.spec.json> [--out <file>] [--timeout <seconds>]\n');return 2;}
   const specPath=files[0],file=out || defaultOut(specPath);
   let specText;try{specText=fs.readFileSync(specPath,'utf8');JSON.parse(specText);}catch(ex){stdout.write('snapshot not written: cannot read '+specPath+' as JSON\n');return 2;}
+  // Checked before any provider call.
+  const unsafe=unsafeOut(file);if(unsafe){stdout.write('snapshot not written: '+unsafe+'\n');return 1;}
   const tracking=JSON.parse(specText),jiraSite=tracking && tracking.page && tracking.page.tracking && tracking.page.tracking.jira && tracking.page.tracking.jira.site || tracking && tracking.tracking && tracking.tracking.jira && tracking.tracking.jira.site;
   const now=()=>Date.now(),source=transport || restTransport(env,fetchImpl,now,typeof jiraSite==='string' && /^https?:\/\//.test(jiraSite)?jiraSite:null);
   const {snapshot,summary}=await takeSnapshot({specText,board:path.basename(specPath),transport:source,timeoutMs:timeout*1000,now});
@@ -253,5 +265,5 @@ async function main(argv,env,{fetchImpl,stdout=process.stdout,transport}={}){
   return 0;
 }
 
-module.exports={takeSnapshot,restTransport,mcpHandlerTransport,snapshotDay,summaryLine,defaultOut,parseTime,main,SNAPSHOT_KIND};
+module.exports={takeSnapshot,restTransport,mcpHandlerTransport,snapshotDay,summaryLine,defaultOut,unsafeOut,parseTime,main,SNAPSHOT_KIND};
 if(require.main===module)main(process.argv.slice(2),process.env).then(code=>{process.exitCode=code;},error=>{process.stdout.write('snapshot not written: '+String(error && error.message || error).split('\n')[0]+'\n');process.exitCode=1;});

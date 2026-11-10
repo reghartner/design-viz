@@ -1440,19 +1440,23 @@ provider could run.
 
 The snapshot is written next to the board as `<board>.snapshot.json` (`--out` chooses another
 path). `*.snapshot.json` is ignored by git, so real ticket titles, assignees and metric values
-are never committed, and the file is never part of a published board. Its format is one day of
+are never committed, and the file is never part of a published board. Inside a git work tree the
+script writes only a path git ignores (`git check-ignore`); any other path is refused before a
+provider is called. Its format is one day of
 the [demo story](#demo-mode) plus `snapshotAt` and the recorded `errors`:
 `{"version": 1, "kind": "flowview-live-snapshot", "snapshotAt", "board", "epics", "days": [{"label":
 "Snapshot from …", "issues": {…}, "telemetry": {"start", "stepSeconds", "carriers"}}], "errors": [{"source",
 "tool", "message"}]}`. A ticket Jira did not return is left out of `issues`, so the board shows
 it as missing.
 
-An agent with only MCP connectors and no REST credentials cannot run the script. It can make the
-same calls itself at a known cost: one `getAccessibleAtlassianResources`, then for each 50-key
-chunk of the board's tickets and for each configured epic two `searchJiraIssuesUsingJql` calls
-(one with `AND Flagged = Impediment`) with only `summary, status, assignee, updated, issuelinks,
-parent, issuetype`, and one Grafana query per bound signal over the board's window. Those
-results do pass through its context, so prefer REST credentials.
+REST credentials and this script are the zero-token route: no provider response reaches the
+agent. An agent with only MCP connectors cannot avoid that, because every tool result enters its
+context. Its low-token recipe: one `getAccessibleAtlassianResources`, one
+`searchJiraIssuesUsingJql` for `key in (<the board's tickets>) OR parent in (<its epics>)` asking
+only for `summary, status, assignee, updated, issuelinks, parent, issuetype` (one more page per
+100 issues), and one Grafana query per bound signal over the board's window. For a board with
+seven tickets, one epic and 14 signals that is 16 calls; the agent then writes the file in the
+format above.
 
 ## Over time
 

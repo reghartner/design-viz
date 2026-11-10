@@ -5,6 +5,7 @@
 | S1 | example doorbell board; the mock Atlassian and Grafana connectors in-process | the snapshot is one demo story day plus snapshotAt; liveStatusDemoMap gives the states the viewer's controller had, liveStatusDemoTelemetry the current metric values | a second format the Workbench would have to learn |
 | S2 | the CLI against a local Jira REST + Grafana HTTP server | one stdout line with counts, time and errors; the calls carry the credentials; the file holds none of them; *.snapshot.json is git-ignored | provider responses on stdout; credentials in the file |
 | S3 | JIRA_API_TOKEN unset; one Grafana query failing | the line names JIRA_API_TOKEN; the failing signal is recorded and the other signals are kept | a crash or a silent skip |
+| S4 | --out inside this repository: a path git does not ignore, then a *.snapshot.json path | the first is refused before any provider call and no file is written; the second is written | a real snapshot that could be committed |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),http=require('node:http'),os=require('node:os'),vm=require('node:vm'),{execFileSync}=require('node:child_process');
 const {entrypoint}=require('../tools/source-loader.cjs');
@@ -108,4 +109,17 @@ test('S3 a missing credential is named, and a failing query is recorded without 
   const none=await cli({},tmp());assert.equal(none.code,1);assert.equal(none.lines.length,1);assert.match(none.lines[0],/^snapshot not written: .*JIRA_EMAIL, JIRA_API_TOKEN are not set.*GRAFANA_URL, GRAFANA_TOKEN are not set/);
   assert.equal(fs.existsSync(none.out),false);
  }finally{await p.close();}
+});
+
+test('S4 inside a git work tree the script writes only a path git ignores, and refuses before any call',async()=>{
+ const p=await providers(),snap=require(SNAP);
+ const env={JIRA_SITE:p.origin,GRAFANA_URL:p.origin,...SECRET},repo=path.resolve(__dirname,'..');
+ const run=async out=>{const lines=[],stdout={write:t=>lines.push(t)};const code=await snap.main([BOARD,'--out',out,'--timeout','20'],env,{stdout});return {code,lines};};
+ const tracked=path.join(repo,'tests','live-snapshot-refused.json'),ignored=path.join(repo,'tests','live-snapshot-check.snapshot.json');
+ try{
+  const refused=await run(tracked);
+  assert.equal(refused.code,1);assert.equal(refused.lines.length,1);assert.match(refused.lines[0],/^snapshot not written: .*live-snapshot-refused\.json is inside a git work tree and git does not ignore it/);
+  assert.equal(fs.existsSync(tracked),false,'nothing written');assert.equal(p.seen.length,0,'no provider was called');
+  const written=await run(ignored);assert.equal(written.code,0);assert.ok(fs.existsSync(ignored),'an ignored path is written');
+ }finally{fs.rmSync(ignored,{force:true});fs.rmSync(tracked,{force:true});await p.close();}
 });

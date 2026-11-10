@@ -522,7 +522,9 @@
         return;
       }
       stopFocusWatch();host._traceFocusPending=null;list._traceFocusShown=pending.key;
-      revealInView(pending.item,pending.auto);
+      // The row, not the row with its opened detail: a click on a visible row never moves the page (the detail opens
+      // below it), and an off-screen row is brought to the edge by the least scroll.
+      revealInView(pending.item.querySelector('.dv-trace-span') || pending.item,pending.auto);
     }
     /* #1280: bring `node` into view by the least scroll. A scrolling ancestor below the page (the capped Edit-mode list, a
        fixed-height container holding the panel) moves first. Without one, only a reveal the reader asked for (pageOff false)

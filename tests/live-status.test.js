@@ -3660,7 +3660,8 @@ test('#1145 the day notes clear on Load, Clear trace and a field edit',async()=>
  // The Load trace day note: from a day outside the list.
  const b=dayTraceBoard({at:daysBack(30)}),{api}=b,outside=async()=>{b.traceAt(daysBack(30));assert.ok(await api.loadDirectTrace(false));await historySettle();assert.match(b.note(),/which Over time does not list/);};
  await outside();api.clearDirectTrace();assert.equal(b.note(),'','Clear trace ends it');
- await outside();api.setDirectTraceField({field:'start',value:'-3h'});assert.equal(b.note(),'','a field edit ends it');api.setDirectTraceField({field:'start',value:''});
+ // #1252: a field edit keeps the shown trace, so its note stays; Clear and a Load still end it.
+ await outside();api.setDirectTraceField({field:'start',value:'-3h'});assert.match(b.note(),/which Over time does not list/,'a field edit keeps the trace and its note');api.setDirectTraceField({field:'start',value:''});
  await outside();b.traceAt(Date.now()-60000);assert.ok(await api.loadDirectTrace(false));assert.equal(b.note(),'','a Load ends it');
  api.destroy();
 });
@@ -3680,9 +3681,10 @@ test('#1145 a parked history settles when its Load fails or is cleared',async()=
  const start=async()=>{const b=dayTraceBoard({at:daysBack(2),deferHistory:true});b.api.overTime();assert.ok(await b.api.loadDirectTrace(false),'A loads during the reader\'s Over time');
   const open=b.holdCalls(),pending=b.api.loadDirectTrace(false);for(let i=0;i<20 && b.calls.length<2;i++)await new Promise(setImmediate);assert.equal(b.calls.length,2,'B is running');
   b.release();await historySettle();assert.equal(b.api.snapshot().overTime.active,false,'the history waits for B');return {b,open,pending};};
- // B fails: the reader's click opens Over time on the default day.
+ // B fails: #1252 brings A back, so the reader's Over time opens on A's day, as for A's own Load.
  let {b,open,pending}=await start();b.traceAt(null);open();assert.equal(await pending,null,'B is not found');await historySettle();
- assert.equal(b.api.snapshot().overTime.active,true,'the reader\'s Over time opens');assert.equal(b.api.snapshot().overTime.today,true);assert.equal(b.loads(),1);b.api.destroy();
+ assert.equal(b.api.snapshot().overTime.active,true,'the reader\'s Over time opens');assert.ok(b.loaded(),'A is shown again');
+ assert.equal(b.days[b.api.snapshot().overTime.index].key,dayKeyOf(daysBack(2)),'on A\'s day');assert.equal(b.loads(),1);b.api.destroy();
  // B is cleared: the same.
  ({b,open,pending}=await start());b.api.clearDirectTrace();await historySettle();
  assert.equal(b.api.snapshot().overTime.active,true,'Clear trace keeps the reader\'s click');assert.equal(b.loads(),1);open();await pending;await historySettle();assert.equal(b.api.snapshot().overTime.active,true);b.api.destroy();
@@ -4582,9 +4584,11 @@ test('#1252 Enter in Trace ID or link runs Load trace',async()=>{
  const {h,api,m,calls}=compactHarness(['prod']),input=()=>m.body.querySelectorAll('input').find(el=>el.getAttribute('aria-label')==='Trace ID or link');
  let prevented=0;const enter=()=>input().dispatchEvent({type:'keydown',key:'Enter',preventDefault(){prevented++;}});
  enter();for(let i=0;i<6;i++)await settle();assert.equal(calls.length,0,'an empty box loads nothing');
- api.setDirectTraceField({field:'input',value:COMPACT_ID});h.flush();enter();for(let i=0;i<6;i++)await settle();h.flush();
- assert.equal(calls.length,1,'Enter loads');assert.ok(prevented>0);assert.equal(api.snapshot().trace.selected.exemplar.traceId,COMPACT_ID);
- api.destroy();
+ // The successful Load reveals the trace (scrollIntoView after getClientRects), which the test DOM does not lay out.
+ const proto=Object.getPrototypeOf(input()),had=Object.prototype.hasOwnProperty.call(proto,'getClientRects');proto.getClientRects=()=>[];
+ try{api.setDirectTraceField({field:'input',value:COMPACT_ID});h.flush();enter();for(let i=0;i<6;i++)await settle();h.flush();
+  assert.equal(calls.length,1,'Enter loads');assert.ok(prevented>0);assert.equal(api.snapshot().trace.selected.exemplar.traceId,COMPACT_ID);}
+ finally{if(!had)delete proto.getClientRects;api.destroy();}
 });
 /* #1252 item 22: a log line's time is shown in local time like the trace card, with the UTC time in its title. */
 test('#1252 log result times are local, with UTC in the title',async()=>{
@@ -4597,5 +4601,21 @@ test('#1252 log result times are local, with UTC in the title',async()=>{
  assert.equal(time.getAttribute('title'),'2026-11-07 09:42:13Z UTC');assert.equal(time.getAttribute('datetime'),'2026-11-07T09:42:13.123Z');
  const d=new Date('2026-11-07T09:42:13.123Z');assert.equal(time.textContent,h.C.liveStatusReadableTime('2026-11-07T09:42:13.123Z',true));
  assert.ok(time.textContent.includes(d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'})),'local time with seconds: '+time.textContent);assert.doesNotMatch(time.textContent,/Z$/);
+ api.destroy();
+});
+
+/* #1252 item 12 (panel): with no Grafana connector the search offers Check again; it keeps its place (aria-disabled,
+   "Checking…") while it looks, and a connector added meanwhile enables Find. */
+test('#1252 Check again finds a Grafana connector added after the panel opened',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')));let server=null,release=null;
+ const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>{if(release)await new Promise(r=>{const go=release;release=null;go(r);});return server;},queryLogs:async()=>({data:[]})}}}),api=h.ctl.liveStatus;
+ api.setStatusMode('trace');for(let i=0;i<6;i++)await settle();const m=mountStatus(h);h.flush();
+ const again=()=>m.body.querySelector('button.dv-trace-log-recheck'),findButton=()=>m.body.querySelector('.dv-trace-log-search button.dv-trace-log-find');
+ assert.ok(again(),'Check again is offered');assert.equal(again().textContent,'Check again');assert.equal(again().title,'Look for the Grafana connector again');assert.equal(findButton().disabled,true);
+ const button=again();server='Grafana';let resume;release=r=>{resume=r;};button.dispatchEvent({type:'click'});for(let i=0;i<6;i++)await settle();h.flush();
+ assert.equal(again(),button,'the same button while it looks');assert.deepEqual([!!button.disabled,button.getAttribute('aria-disabled'),button.textContent],[false,'true','Checking…']);
+ resume();for(let i=0;i<6;i++)await settle();h.flush();
+ assert.equal(again(),null,'found: no Check again');assert.equal(findButton().disabled,false,'Find is enabled');
  api.destroy();
 });

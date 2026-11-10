@@ -60,6 +60,12 @@ function traceRows(ids, edges){
   return rows;
 }
 
+// #1252: a duration in step text, rounded like the waterfall; the span facts keep the raw value.
+function traceShownMs(ms){
+  if (typeof ms !== 'number' || !isFinite(ms) || Number.isInteger(ms)) return String(ms);
+  if (ms > 0 && ms < 0.01) return '<0.01';
+  return String(Number(ms.toFixed(ms < 10 ? 2 : ms < 1000 ? 1 : 0)));
+}
 function traceSpanStats(spans, traceId){
   var extent=0, services=new Set();
   spans.forEach(function(s){ services.add(s.service); extent=Math.max(extent,s.startMs+s.ms); });
@@ -264,7 +270,7 @@ function traceToSpec(input, options){
       ['start_ms', s.startMs], ['duration_ms', s.ms], ['error', s.error ? 'recorded error' : 'not flagged']];
     if (plan.focus) facts.splice(5,0,['trace_start_ms',s.traceStartMs]);
     var st = {id: s.id, nodes: [services.get(s.service)],
-      text: '+' + s.startMs + ' ms · ' + s.service + ' · ' + s.name + ' · duration ' + s.ms + ' ms' + (s.error ? ' · recorded error' : ''),
+      text: '+' + traceShownMs(s.startMs) + ' ms · ' + s.service + ' · ' + s.name + ' · duration ' + traceShownMs(s.ms) + ' ms' + (s.error ? ' · recorded error' : ''),
       panels: {timing: {highlight: s.id}, internal:{selected:s.id}, span: {rows: facts.map(function(f){ return {id: f[0], cells: {field: f[0], value: f[1]}}; })}}};
     var parent = byId.get(s.parentId);
     if (parent && parent.service !== s.service) st.edge = services.get(parent.service) + '->' + services.get(s.service);

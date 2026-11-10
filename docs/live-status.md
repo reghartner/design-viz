@@ -2161,7 +2161,10 @@ reader can collapse it to one line naming the connection and environment
 ("Fixture Honeycomb · Production · Change trace"), and it reopens when no trace is
 shown. A load error sits by what was clicked: a log line's report (with **Try the
 next log line**) directly under that line's row, a Load trace or Verify error
-directly under those buttons. The request card (#1173) is one line: "8413cd87a9f1 · partial ·
+directly under those buttons. Enter in **Trace ID or link**, **Trace start** or
+**Trace end** runs Load trace. Typing in those fields keeps the shown trace and its
+span focus, and a Load that fails brings the shown trace back beside its error;
+only a successful Load or **Clear loaded trace** replaces it (#1252). The request card (#1173) is one line: "8413cd87a9f1 · partial ·
 Nov 9 07:19 · 55 spans · 6/7 steps matched". Warning flags (partial, unknown completeness, limit reached) come right after the
 trace ID, and the line wraps rather than clipping (#1186). It holds Returned traces and the request details. Each line opens with
 one click, and an opened section stays open until the shown trace changes. A
@@ -3198,6 +3201,10 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
  "startRfc3339": "now-2h", "endRfc3339": "now", "limit": 10, "direction": "backward", "queryType": "range"}
 ```
 
+- Without that connector the search says so and offers **Check again** (#1252). It
+  looks again on Check again, when the Trace view is entered again, on Find, and at
+  most every 30 seconds on a repaint, so a connector added in claude.ai is found
+  without a reload; a failed listing is retried the same way.
 - `$env`, `${variable}` and `$account` expand as in signals, from the board's
   active Environment. A missing variable stops the Find with its name.
 - The window is the Load trace lookback: the **Trace start** control, else the
@@ -3226,7 +3233,8 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   "Only lines with a trace ID" to see every line." Unchecked, Find sends the
   query as written and lists every line. Changing the checkbox clears the
   results without a call. It is reader state; nothing is written to the board.
-- The result lists up to 10 lines, newest first: time (UTC), the value (or the
+- The result lists up to 10 lines, newest first: time (local, with seconds; the
+  UTC time is its tooltip, #1252), the value (or the
   line text for a typed query), and the trace ID. The IDs are read from the
   line's structured metadata, then parsed labels, then stream labels, because
   Loki before 3.0 reports every label as a stream label. Unchecked, a line without the

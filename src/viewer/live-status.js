@@ -19,10 +19,11 @@ function liveStatusLogDetails(snapshot,window){
   return out;
 }
 // A date as other panel dates read, in local time ("Nov 5, 7:00 AM"); the year only when it is not this year (#1153).
-function liveStatusReadableTime(at){
+// seconds: also show seconds (log lines, #1252).
+function liveStatusReadableTime(at,seconds){
   var d=new Date(at);if(!isFinite(d.getTime()))return String(at);
   var day=d.getFullYear()===new Date().getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'};
-  return d.toLocaleDateString([],day)+', '+d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+  return d.toLocaleDateString([],day)+', '+d.toLocaleTimeString([],seconds?{hour:'numeric',minute:'2-digit',second:'2-digit'}:{hour:'numeric',minute:'2-digit'});
 }
 function liveStatusProofPresentation(snapshot,window,includeUnobserved){
   if(!snapshot)return null;
@@ -2099,12 +2100,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
     refs:refs,
     snapshot:snapshot,
     setStatusMode:function(mode){if(retired || ['jira','trace'].indexOf(mode)<0)return;if(mode!==statusMode)clearTraceFocus();statusMode=mode;statusAuto=false;close(false);paint();notify();},
-    setDirectTraceField:function(change){if(!retired && change){traceDayNote='';traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';directTrace.set(change.field,change.value);}},
+    // #1252: typing in Trace ID, start or end keeps the shown trace and its span focus.
+    setDirectTraceField:function(change){if(!retired && change){if(['input','start','end'].indexOf(change.field)<0){traceDayNote='';traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';}directTrace.set(change.field,change.value);}},
     loadDirectTrace:async function(verify,line){if(retired)return;statusAuto=false;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';traceDayNote='';var mine=++traceLoads,result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;if(!retired)traceFollow(result);}else if(!retired && mine===traceLoads)settleParked();paint();notify();return result;},
     clearDirectTrace:function(){if(retired)return;traceDayNote='';traceNotice='';clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();settleParked();},
     // #1233: change.lookup names the search box a value belongs to; findLogLines(lookup) runs that box.
     setLogLookupField:function(change){if(!retired && change)logLookup.set(change.field,change.value,change.lookup);},
     findLogLines:function(lookup){return retired?Promise.resolve(null):logLookup.find(lookup);},
+    recheckLogConnector:function(){if(!retired)logLookup.recheck();},
     // Load the chosen line's trace exactly as a pasted ID, then focus the line's span.
     loadLogTrace:async function(index){
       if(retired)return null;var row=logLookup.row(index);if(!row || !row.traceId)return null;

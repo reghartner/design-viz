@@ -57,7 +57,9 @@ test('desktop authored log lookup lists the newest matching lines and loads the 
  await h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true}).click();
  const lines=h.logs.locator('.dv-trace-log-row');await expect(lines).toHaveCount(2);
  expect(h.calls).toEqual([{server:'Grafana',tool:'query_loki_logs',args:{datasourceUid:'loki-stg',logql:'{env="stg"} |= "Handling camera stats message" | cameraModel="arch"',startRfc3339:'now-2h',endRfc3339:'now',limit:10,direction:'backward',queryType:'range'}}]);
- await expect(lines.nth(0).locator('.dv-trace-log-time')).toHaveText('2026-11-07 09:42:13Z');await expect(lines.nth(0).locator('.dv-trace-log-value')).toHaveText('arch');await expect(lines.nth(0).locator('.dv-trace-log-id')).toHaveText(ID);
+ // #1252: local time with seconds, like the trace card; UTC in the title.
+ const shownTime=await page.evaluate(()=>{const d=new Date('2026-11-07T09:42:13.123Z');return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});});
+ await expect(lines.nth(0).locator('.dv-trace-log-time')).toContainText(shownTime);await expect(lines.nth(0).locator('.dv-trace-log-time')).toHaveAttribute('title','2026-11-07 09:42:13Z UTC');await expect(lines.nth(0).locator('.dv-trace-log-value')).toHaveText('arch');await expect(lines.nth(0).locator('.dv-trace-log-id')).toHaveText(ID);
  await expect(lines.nth(1)).toContainText('This log line has no trace_id');await expect(lines.nth(1).getByRole('button')).toHaveCount(0);
  await info.attach('log-lookup-results',{body:await h.root.screenshot(),contentType:'image/png'});
  // #1145 (D9): the load searches back to the line's time − 1 h.

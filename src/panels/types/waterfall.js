@@ -20,6 +20,12 @@ PanelRegistry.extend('waterfall', {
 });
 
 /* waterfall panel: presentation model and renderer. Shared lifecycle lives in ../shared.js. */
+// #1252: a shown duration. Whole numbers stay as authored; fractions (imported spans) round like the Trace view.
+function waterfallMs(ms) {
+  if (!isFiniteNum(ms) || Number.isInteger(ms)) return String(ms);
+  if (ms > 0 && ms < 0.01) return '<0.01';
+  return String(Number(ms.toFixed(ms < 10 ? 2 : ms < 1000 ? 1 : 0)));
+}
 function waterfallModel(spans, state) {
   spans = Array.isArray(spans) ? spans : [];
   state = state || {};
@@ -61,7 +67,7 @@ function waterfallModel(spans, state) {
     totalMs: total,
     shownMs: shown,
     timed: timed,
-    totalLabel: state.total != null ? String(state.total) : shown + ' ms',
+    totalLabel: state.total != null ? String(state.total) : waterfallMs(shown) + ' ms',
   };
 }
 
@@ -106,7 +112,7 @@ PanelViews.register('waterfall', function (host, panel, state, skin, states, ste
       Math.max(r.widthPct, wm.timed ? 0 : 1.2).toFixed(2) +
       '%"></span></span>' +
       '<span class="wfms">' +
-      (r.revealed ? (r.error ? '! ' : '') + esc(String(r.ms)) + ' ms' : '&#8212;') +
+      (r.revealed ? (r.error ? '! ' : '') + esc(waterfallMs(r.ms)) + ' ms' : '&#8212;') +
       '</span></div>';
   });
   h +=

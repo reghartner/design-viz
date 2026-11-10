@@ -17,7 +17,7 @@ function matchTraceEnvironment(board,environments){
   return '';
 }
 function createTelemetryDirect(page,transport,hooks){
-  hooks=hooks || {};var dead=false,accountRetired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),offAccount=null,serial=0,abort=null,timeout=null,busy=false,exemplar=null,report=null,form={connection:'',environment:'',section:'',input:'',start:'',end:''},environmentChosen=false,lastIdentity=null,lastContext=null,lastDay='';
+  hooks=hooks || {};var dead=false,accountRetired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),offAccount=null,serial=0,abort=null,timeout=null,busy=false,exemplar=null,kept=null,report=null,form={connection:'',environment:'',section:'',input:'',start:'',end:''},environmentChosen=false,lastIdentity=null,lastContext=null,lastDay='';
   function profiles(){return FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS);}
   function sections(){return typeof hooks.sections==='function'?hooks.sections():[];}
   function boardEnvironment(){return typeof hooks.environment==='function'?hooks.environment():null;}
@@ -44,7 +44,11 @@ function createTelemetryDirect(page,transport,hooks){
     var from=at-3600000;return p.time.encoding!=='relative'?{start:new Date(from).toISOString(),end:new Date(Math.max(from,Math.min(at+3600000,now))).toISOString()}:reach(from,now);
   }
   function changed(){if(!dead && hooks.changed)hooks.changed();}
-  function cancel(){serial++;if(timeout)clearTimeout(timeout);timeout=null;if(abort)abort.abort();abort=null;busy=false;exemplar=null;report=null;}
+  // stop() retires only the request in flight; cancel() also drops the shown trace and its report.
+  // #1252: `kept` is the trace shown before a Load; it comes back if that Load fails or is stopped by an edit.
+  function stop(){serial++;if(timeout)clearTimeout(timeout);timeout=null;if(abort)abort.abort();abort=null;busy=false;}
+  function cancel(){stop();exemplar=null;report=null;kept=null;}
+  function restoreKept(){if(kept){exemplar=kept;kept=null;}}
   function clearInput(){form.input='';form.start='';form.end='';}
   // An account boundary retires this session permanently. Form edits/cancel
   // only retire a request and must never signal a shared account change.
@@ -65,7 +69,10 @@ function createTelemetryDirect(page,transport,hooks){
   // What a blank Trace start / end searches on the selected day, for the form note.
   function dayNote(ps){var d=day(),p=ps[form.connection];if(!d)return null;return {label:d.label || d.key || '',range:d.window.label || '',lookback:p && p.time.encoding==='relative'?dayTime(p,{},Date.now()).start.slice(1):null};}
   function snapshot(){var ps=sync();return {available:available(),busy:busy,form:Object.assign({},form),bounds:bounds(ps),profiles:Object.keys(ps).map(function(id){return {id:id,label:ps[id].label,lookback:ps[id].time.defaultLookback,environments:Object.keys(ps[id].environments).map(function(e){return {id:e,label:ps[id].environments[e].label || e};})};}),sections:sections().map(function(s){return {id:s.id,label:s.label};}),report:report?JSON.parse(JSON.stringify(report)):null,exemplar:exemplar,section:form.section,day:dayNote(ps)};}
-  function set(field,value){if(dead || !Object.prototype.hasOwnProperty.call(form,field) || typeof value!=='string' || value.length>4096)return;sync();if(value===form[field])return;cancel();form[field]=value;if(field==='connection' || field==='environment')clearInput();if(field==='connection'){form.environment='';environmentChosen=false;}if(field==='environment')environmentChosen=true;sync();changed();}
+  // #1252: typing the next ID, start or end retires a request in flight and an error report, but keeps the shown
+  // trace (and its Loaded report) until a new Load succeeds or Clear.
+  function set(field,value){if(dead || !Object.prototype.hasOwnProperty.call(form,field) || typeof value!=='string' || value.length>4096)return;sync();if(value===form[field])return;
+    if(field==='input' || field==='start' || field==='end'){var was=busy;stop();if(was)restoreKept();if(was || report && report.error)report=null;}else cancel();form[field]=value;if(field==='connection' || field==='environment')clearInput();if(field==='connection'){form.environment='';environmentChosen=false;}if(field==='environment')environmentChosen=true;sync();changed();}
   function errorText(e){var known={not_granted:'Connector permission was not granted.',needs_reauth:'Reconnect this connector in the host.',user_changed:'Host account changed; start a new trace request.',server_not_connected:'The configured connector is not connected.',server_not_found:'The configured connector was not found.',capability_removed:'The configured tool capability was removed.',capability_disabled:'The configured tool capability is disabled.'};return known[e && e.code] || telemetryTraceErrorText(e) || 'The host could not complete the read-only detail request.';}
   function lookbackText(r){return r.linkTime?'Trace not found in the time range of the pasted link. Paste the trace ID alone, then set Lookback.':r.lookback?'Trace not found in the last '+r.lookback+'. Try a longer lookback under Lookback.':'Trace not found between '+r.range.from.replace(/\.0+Z$/,'Z')+' and '+r.range.to.replace(/\.0+Z$/,'Z')+'. Try a wider range under Lookback.';}
   /* #1124: a trace chosen from a log line may never have been kept (sampling).
@@ -80,7 +87,8 @@ function createTelemetryDirect(page,transport,hooks){
   // line: {at, next} when the trace ID came from a log line (#1124).
   async function load(verify,line){
     line=line && typeof line==='object'?{at:typeof line.at==='string'?line.at:null,next:!!line.next}:null;
-    sync();cancel();var mine=serial,key=requestKey(),ps=profiles(),p=ps[form.connection],request=Object.assign({},form),stage='configuration',resolved=null;abort=new AbortController();var signal=abort.signal;
+    // #1252: the shown trace is kept aside during the Load and comes back beside the error if it fails.
+    sync();stop();report=null;kept=exemplar || kept;exemplar=null;var mine=serial,key=requestKey(),ps=profiles(),p=ps[form.connection],request=Object.assign({},form),stage='configuration',resolved=null;abort=new AbortController();var signal=abort.signal;
     function active(){return !dead && mine===serial && !signal.aborted && key===requestKey() && available();}
     function check(){if(!active())FlowTraceConnections.fail('cancelled','Trace request expired.');}
     function update(next){if(!active())return;report=Object.assign(report || {},next);changed();}
@@ -93,7 +101,7 @@ function createTelemetryDirect(page,transport,hooks){
       resolved=FlowTraceConnections.input(p,parsed && !Object.prototype.hasOwnProperty.call(parsed,'start') && !Object.prototype.hasOwnProperty.call(parsed,'end')?Object.assign({},request,time):request,now);
       var safeArgs={};Object.keys(resolved.args).forEach(function(k){safeArgs[k]=[p.arguments.traceId,p.arguments.start,p.arguments.end,p.arguments.environment].indexOf(k)>=0?resolved.args[k]:'[configured]';});
       busy=true;update({mode:verify?'verify':'load',stage:'schema',connection:p.label,server:p.server,tool:p.tool,environment:resolved.environment,arguments:safeArgs,requestAccepted:false,idMatched:false});
-      var deadline=Date.now()+30000;timeout=setTimeout(function(){if(mine!==serial || dead)return;serial++;abort.abort();timeout=null;busy=false;report=Object.assign(report || {},{stage:stage,error:'Trace '+stage+' request timed out. Retry with a bounded window.',code:'timeout'});changed();},30000);
+      var deadline=Date.now()+30000;timeout=setTimeout(function(){if(mine!==serial || dead)return;serial++;abort.abort();timeout=null;busy=false;restoreKept();report=Object.assign(report || {},{stage:stage,error:'Trace '+stage+' request timed out. Retry with a bounded window.',code:'timeout'});changed();},30000);
       stage='schema';var descriptor={connection:request.connection,profile:p,environment:resolved.environment};
       var tool=await transport.describe(descriptor,signal);check();FlowTraceConnections.tool(p,tool,resolved.args);
       stage='detail';update({stage:stage});var result=await transport.call(descriptor,resolved.args,signal);check();
@@ -118,11 +126,11 @@ function createTelemetryDirect(page,transport,hooks){
         check();
       }
       var e=telemetryTraceEnvelope({version:1,provider:p.provider,traceId:resolved.traceId,signal:'direct',selectionToken:'direct-'+mine,selectionReason:'Explicit trace ID loaded with '+p.label,observedAt:new Date().toISOString(),range:resolved.range,candidates:[{traceId:resolved.traceId,status:'unknown'}],spans:trace.spans,completeness:trace.completeness,warnings:trace.warnings.map(telemetryTraceErrorText).filter(Boolean),url:trace.url},p.allowedAttributes);
-      exemplar=e;busy=false;update({stage:'complete',idMatched:true,spanCount:e.spans.length,completeness:e.completeness,warnings:e.warnings});return e;
+      exemplar=e;kept=null;busy=false;update({stage:'complete',idMatched:true,spanCount:e.spans.length,completeness:e.completeness,warnings:e.warnings});return e;
     }catch(e){
       if(!dead && e && e.code==='user_changed'){if(transport && typeof transport.accountChanged==='function')transport.accountChanged();if(typeof hooks.accountChanged==='function')hooks.accountChanged();retireAccount();return null;}
       if(!dead)sync();if(dead || mine!==serial || signal.aborted || key!==requestKey())return null;
-      busy=false;report=Object.assign(report || {mode:verify?'verify':'load',requestAccepted:false,idMatched:false},{stage:e.stage || stage,error:e && e.code==='trace_not_found' && resolved?notFoundText(resolved,line):errorText(e),serial:++telemetryDirectReports,logLine:!!line});if(line && e && e.code==='trace_not_found' && resolved)report.lookbackHint=lineOutside(resolved,line);if(e.code && /^[A-Za-z0-9_.-]{1,64}$/.test(e.code))report.code=e.code;changed();return null;
+      busy=false;restoreKept();report=Object.assign(report || {mode:verify?'verify':'load',requestAccepted:false,idMatched:false},{stage:e.stage || stage,error:e && e.code==='trace_not_found' && resolved?notFoundText(resolved,line):errorText(e),serial:++telemetryDirectReports,logLine:!!line});if(line && e && e.code==='trace_not_found' && resolved)report.lookbackHint=lineOutside(resolved,line);if(e.code && /^[A-Za-z0-9_.-]{1,64}$/.test(e.code))report.code=e.code;changed();return null;
     }finally{if(mine===serial && timeout){clearTimeout(timeout);timeout=null;}}
   }
   /* #1078: a board Edit-mode change re-renders the page. The loaded trace moves to

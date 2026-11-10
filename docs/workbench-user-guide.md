@@ -28,8 +28,8 @@ Epics and descendant stories, with separate Epic counts and story coverage.
 The desktop **Demo live status** preview uses sample states without querying
 Jira, so it cannot infer parent type from a key. See [live status](live-status.md).
 
-**Status board settings** (a button at the top of Inspect and in Find objects)
-holds every board-level setting in five sections: Jira, Metrics, Traces,
+**Status board settings** (the **Board settings** button at the top of Inspect and in Find objects)
+holds the board-level settings in five sections: Jira, Metrics, Traces,
 Environments and Log searches. Each section lists its own validator warnings.
 On a diagram that is not a status board yet, **Make this a status board** adds a
 page wrapper if needed, an empty `tracking` block and a Live status panel as one

@@ -7,7 +7,7 @@
 | F2 | The same for one signal field (errors unit) in its Signal fold. | same | same, "Signal errors" fold | signal edits that reset the scroll |
 | F3 | Status board settings → Metrics (#1236): a template signal edit keeps the Template and Signal folds open and the scroll. | page template with one signal | scrollTop within 2px; both folds open | page-level folds that close on refresh |
 */
-import {test,expect,paste,prepareEditorSurface,openInspectorGroup} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface,openInspectorGroup,openStatusBoard} from '../helpers/test.mjs';
 const binding={kind:'call',signals:{rate:{grafana:'up',unit:'req/h'},errors:{grafana:'errors',unit:'req/h'}},card:{side:'below',offset:0}};
 const raw={page:{title:'Metrics folds',tracking:{telemetry:{templates:{queue:{kind:'queue',params:['topic'],signals:{lag:{grafana:'max(lag{topic="$topic"})',unit:'msgs'}}}}}},
   sections:[{id:'flow',heading:'Delivery',diagram:{nodes:{a:{title:'Sender'},b:{title:'Receiver'},c:{title:'Unbound'}},rows:[['a','b','c']],
@@ -72,7 +72,7 @@ for(const [row,foldTitle,label,value,read] of [
 
 test('F3 desktop Status board settings template signal edit keeps the Inspector scroll and its Template and Signal folds open',async({page,server})=>{
   await open(page,server);const guide=page.locator('#guide'),source=page.locator('#src');
-  await page.locator('#editor-tab-inspect').click();await page.locator('#status-board-settings').click();
+  await page.locator('#editor-tab-inspect').click();await openStatusBoard(page,'metrics');
   const control=guide.getByLabel('queue lag unit',{exact:true});await expect(control).toHaveCount(1);
   await openFold(guide,'Template queue');await openFold(fold(guide,'Template queue'),'Signal lag');await expect(control).toBeVisible();
   const before=await scrollTo(page,control);

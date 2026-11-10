@@ -1888,7 +1888,8 @@ function createBuilderInteractions(opts){
         bulkDeleteSelected();
         return;
       }
-      if (!session.target) return;
+      // Document and Status board settings are not deletable objects.
+      if (!session.target || session.target.kind === 'document' || session.target.kind === 'board') return;
       ev.preventDefault();
       if (addToStep){
         formError('finish ADD TO STEP first (DONE or Esc) — delete is paused while the mode is armed');

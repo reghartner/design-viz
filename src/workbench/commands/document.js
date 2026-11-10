@@ -47,7 +47,8 @@ function statusBoardMissing(raw){
     var d=specValueAt(raw,rec.diagram);
     return specObject(d) && Array.isArray(d.panels) && d.panels.some(function(p){return specObject(p) && p.type==='live-status';});
   });
-  return {page:!doc,tracking:!doc || !Object.prototype.hasOwnProperty.call(doc.page,'tracking'),panel:!panel};
+  var diagram=paths.some(function(rec){return specObject(specValueAt(raw,rec.diagram));});
+  return {page:!doc,tracking:!doc || !Object.prototype.hasOwnProperty.call(doc.page,'tracking'),panel:!panel,hasDiagram:diagram};
 }
 /* One plan, so one Undo step: wrap a bare diagram, add `tracking: {}`, then a Live
    status panel in the first section that has a diagram (a detail-only section last). */

@@ -3,7 +3,7 @@
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null,invalidateAlignment=null,invalidateEdgeEndpoints=null;
-  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false;
+  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false,BOARD_READY_TEXT=null;
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   var proseDraft={key:null,fields:Object.create(null)};
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
@@ -35,7 +35,7 @@ function createBuilderInspector(opts){
     var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0,sizes:same?captureTextareaSizes():null,disclosures:same?captureDisclosures():null};
     if(!same){
       OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();
-      OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;
+      OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;
     }
     retireForm();
     inspectorScrollKey=identity;invalidateEffectiveState=null;
@@ -2236,21 +2236,33 @@ function boardForm(){
       list.forEach(function(text){var li=document.createElement('li');li.textContent=text;ul.appendChild(li);});parent.appendChild(ul);
     }
     var top={appendChild:function(node){rows.push(node);return node;}};
+    // One status line after Make this a status board, until the source changes again.
+    if(BOARD_READY_TEXT!=null && BOARD_READY_TEXT===session.text()){
+      var ready=note(top,'Status board ready. Undo removes it.');ready.className+=' board-ready';ready.setAttribute('role','status');
+    }
     if(missing.page || missing.tracking || missing.panel){
       var parts=[];if(missing.page)parts.push('a page wrapper');if(missing.tracking)parts.push('an empty tracking block');if(missing.panel)parts.push('a Live status panel');
+      var blocked=missing.panel && !missing.hasDiagram?'Add a diagram first; the Live status panel sits beside a diagram.':'';
       note(top,(missing.page?'This bare diagram is not a status board yet. ':'This document is not a complete status board yet. ')+'Make this a status board adds '+
-        (parts.length>1?parts.slice(0,-1).join(', ')+' and '+parts[parts.length-1]:parts[0])+' as one Undo step. The diagram stays intact.');
+        (parts.length>1?parts.slice(0,-1).join(', ')+' and '+parts[parts.length-1]:parts[0])+' as one Undo step.'+(blocked?'':' The diagram stays intact.'));
       var make=actionButton('Make this a status board',function(){
-        return commitCascade(function(next){return planMakeStatusBoard(session.text(),next);},{after:refreshFormSoon});
+        return commitCascade(function(next){return planMakeStatusBoard(session.text(),next);},{after:function(){
+          BOARD_READY_TEXT=session.text();renderInspector();
+          var jiraSection=Array.prototype.find.call(guide.querySelectorAll('details.board-section'),function(box){return box.getAttribute('data-board-section')==='jira';});
+          var heading=jiraSection && jiraSection.querySelector('summary');if(heading)heading.focus();
+        }});
       },'board-make');
       make.title='Adds what a status board needs; Undo removes it in one step.';rows.push(make);
+      if(blocked){make.disabled=true;make.title=blocked;make.setAttribute('aria-describedby',prefix+'-board-blocked');var reason=note(top,blocked);reason.id=prefix+'-board-blocked';reason.className+=' board-blocked';}
     }
     if(!doc)return rows;
-    note(top,'Board-level live status settings, saved in the page tracking block. Tickets and metrics for one node or connection are in its Inspect → Tracking.');
+    note(top,'Saved in the page tracking block. Per-node tickets and metrics: Inspect → Tracking.');
     var warnings=statusBoardWarnings(raw,session.validate),telemetry=specObject(doc.page.tracking) && specObject(doc.page.tracking.telemetry)?doc.page.tracking.telemetry:{};
     warningList(top,warnings.board,'Status board warnings');
     function count(list){return list.length?list.length+(list.length===1?' warning':' warnings'):'';}
-    // Jira and Metrics start open; the other sections start closed unless they have warnings.
+    /* Sections start closed so all five headers fit in a desktop Inspector without scrolling; a section
+       with warnings starts open, and Metrics also starts open when the page has a telemetry block.
+       Closed headers carry a short status. */
     function section(id,title,suffix,open){
       var box=document.createElement('details');box.className='board-section';box.setAttribute('data-board-section',id);
       var summary=document.createElement('summary');summary.textContent=title+(suffix?' · '+suffix:'');box.appendChild(summary);
@@ -2258,12 +2270,18 @@ function boardForm(){
       rows.push(box);return box;
     }
     var environmentIds=specObject(telemetry.environments)?Object.keys(telemetry.environments):[];
-    var jira=section('jira','Jira',count(warnings.jira),true);
-    var metrics=section('metrics','Metrics',count(warnings.metrics),true);
+    var tracking=specObject(doc.page.tracking)?doc.page.tracking:{},jiraBlock=specObject(tracking.jira)?tracking.jira:{},jiraStatus=[];
+    if(typeof jiraBlock.site==='string'){try{jiraStatus.push(new URL(jiraBlock.site).host);}catch(ex){}}
+    jiraStatus=jiraStatus.concat(trackingEpics(doc.page));
+    var hasTelemetry=Object.prototype.hasOwnProperty.call(tracking,'telemetry');
+    var jira=section('jira','Jira',count(warnings.jira) || jiraStatus.join(' · ') || 'Not set',warnings.jira.length>0);
+    var metrics=section('metrics','Metrics',count(warnings.metrics) || (!hasTelemetry?'Not set':telemetry.enabled===false?'Off':''),hasTelemetry || warnings.metrics.length>0);
     var traces=section('traces','Traces',count(warnings.traces) || 'No settings yet',warnings.traces.length>0);
     var environments=section('environments','Environments',count(warnings.environments) || environmentIds.join(', '),warnings.environments.length>0);
     var lookups=section('lookups','Log searches',count(warnings.lookups) || 'No settings yet',warnings.lookups.length>0);
-    pageTrackingControls(doc.page,jira);warningList(jira,warnings.jira,'Jira warnings');
+    pageTrackingControls(doc.page,jira);
+    note(jira,'Dependencies, dependency link names and no-activity days: edit in JSON for now.');
+    warningList(jira,warnings.jira,'Jira warnings');
     var metricsForm=metricsSettingsControls(environments,warnings.metrics);if(metricsForm)metrics.appendChild(metricsForm);
     warningList(environments,warnings.environments,'Environments warnings');
     note(traces,'No settings yet. Trace connections choose which company trace profiles this board uses; for now, edit tracking.telemetry.traceConnections in JSON.'+

@@ -6,7 +6,7 @@
 | W2 | Status board settings (#1236; was Document settings → Tracking): once GitHub scope is visible, exactly one Metrics block is in its Metrics section (immediate count); Add template with name, kind, parameters and a first signal; one Undo/Redo; Metrics window; a connection uses the template through Signals from + Template parameter inputs; Export project keeps the page block and the carrier binding. | same `raw` | `details.board-section[data-board-section="metrics"] fieldset.metrics-settings` count is 1; `tracking.telemetry` equals `{templates:{kafka-topic}}`, then gains `window`; `edges[1].telemetry` equals `{use,topic,group}`; the export keeps both and `edges[0]` unchanged | a settings block that is not wired to `tracking.telemetry`; a template picker not fed by page templates; settings lost on export |
 | P1 | Preview metrics layout toggle (placeholder edge cards): covered in telemetry-preview.spec.mjs. | n/a | n/a | n/a |
 */
-import {test,expect,paste,prepareEditorSurface,openMetricsFold} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface,openMetricsFold,openStatusBoard} from '../helpers/test.mjs';
 import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
 
 const PROM='sum(rate(push_sent_total{app="notify"}[5m]))*3600';
@@ -62,7 +62,7 @@ test('W1 desktop connection gets a raw metrics signal with one Undo Redo, a proo
 test('desktop relative metrics windows preserve aliases and exact Undo Redo source',async({page,server},testInfo)=>{
   await open(page,server);
   const source=page.locator('#src'),guide=page.locator('#guide');
-  const settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#status-board-settings').click();};
+  const settings=async()=>{await page.locator('#editor-tab-inspect').click();await openStatusBoard(page,'jira','metrics');};
   for(const entered of [' -6h ',' now-6h ']){
     await settings();const before=await source.inputValue(),input=guide.getByLabel('Metrics window',{exact:true});
     await input.fill(entered);await input.press('Enter');
@@ -83,7 +83,7 @@ test('desktop relative metrics windows preserve aliases and exact Undo Redo sour
 test('W2 Status board settings templates round-trip through Undo Redo, a connection template binding and Export project',async({page,server},testInfo)=>{
   await open(page,server);
   const source=page.locator('#src'),guide=page.locator('#guide');
-  const settings=async()=>{await page.locator('#editor-tab-inspect').click();await page.locator('#status-board-settings').click();};
+  const settings=async()=>{await page.locator('#editor-tab-inspect').click();await openStatusBoard(page,'jira','metrics');};
   await settings();
   // Status board settings has rendered: GitHub scope (Jira section) is built in the same pass as the Metrics block.
   await expect(guide.getByLabel('GitHub scope',{exact:true})).toBeVisible();

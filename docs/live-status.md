@@ -427,13 +427,15 @@ are ignored. Each list keeps its order; use its numbered **Remove ticket** or
 and Export project keeps the references in its JSON.
 
 Board-level settings live in one desktop area, **Status board settings**. Open
-it from the **Status board settings** button at the top of Inspect (shown with or
-without a selection), from **Find objects → Status board settings**, from the
+it from the **Board settings** button at the top of Inspect (shown with or
+without a selection), from **Find objects → Board settings**, from the
 link in **Document settings**, or from a Live status panel's Inspect form. It has
 five collapsible sections: **Jira**, **Metrics**, **Traces**, **Environments**
-and **Log searches**. Jira and Metrics start open; a section with validator
-warnings starts open and its header counts them, and each section lists the
-warnings for its own `tracking` paths. Traces and Log searches show **No
+and **Log searches**. Sections start closed, with a short status in each
+header; Metrics starts open when the page has a `tracking.telemetry` block. A
+section with validator warnings starts open and its header counts them, and
+each section lists the warnings for its own `tracking` paths. Dependencies,
+dependency link names and no-activity days are edited in JSON for now. Traces and Log searches show **No
 settings yet**; edit `tracking.telemetry.traceConnections` and
 `tracking.telemetry.lookups` in JSON for now. On a document that is not yet a
 status board, **Make this a status board** adds what is missing (a page wrapper

@@ -1233,6 +1233,13 @@ function initWorkbenchLinksView(opts){
         box.appendChild(el('p','links-group','Signals'+(t?' · from template '+t.name+', read only here':'')));
         e.signals.forEach(function(sig){
           var limits=e.limits[sig] || {};
+          // A ratio limit ("max 0.5 × rate") is shown read only; Inspect edits it.
+          if(limits.maxRatioOf){
+            var ratio=el('p','links-metric-ratio',sig+' max '+(limits.max?limits.max.value:'?')+' × '+limits.maxRatioOf.value+' · ratio limit; edit in Inspect');
+            ratio.setAttribute('data-links-ratio',sig);
+            if(limits.min)field('min-'+sig,sig+' min',limits.min.value,function(v){var n=v.trim()===''?null:Number(v);metricCommit(e,{op:'proof',signal:sig,field:'min',value:n},null,base+'min-'+sig);},'no minimum');
+            box.appendChild(ratio);return;
+          }
           ['min','max'].forEach(function(f){
             var l=limits[f],input=field(f+'-'+sig,sig+' '+f,l?l.value:null,function(v){var n=v.trim()===''?null:Number(v);metricCommit(e,{op:'proof',signal:sig,field:f,value:n},null,base+f+'-'+sig);},f==='min'?'no minimum':'no maximum');
             if(l && l.from==='template' && !input.hasAttribute('aria-describedby')){
@@ -1364,7 +1371,7 @@ function initWorkbenchLinksView(opts){
       });
     }else{
       metricsModel.elements.filter(function(x){return x.kind!=='step';}).forEach(function(x){
-        var on=x.template===spec.template,why=on?null:x.group==='raw'?x.label+' has raw signals. To replace them, drag the template onto it, use Move to… on its chip, or pick the template in Signals from in its editor.':linksMetricsDropRefusal(spec.template,x);
+        var on=x.template===spec.template,why=on?null:x.imported?linksMetricsTemplateRefusal(x):x.group==='raw'?x.label+' has raw signals. To replace them, drag the template onto it, use Move to… on its chip, or pick the template in Signals from in its editor.':linksMetricsDropRefusal(spec.template,x);
         body.appendChild(option(linksElementId(x),sectionPrefix(x)+x.label,on,why,function(checked){
           if(!checked)return commit(function(text,raw,ctx){return planLinksMetricsRemove(text,raw,carrierRef(x),ctx);},{ok:'Removed '+spec.template+' from '+describe(x)+'. Undo restores it.'});
           var ok=commit(function(text,raw,ctx){return planLinksMetricsUse(text,raw,carrierRef(x),spec.template,false,ctx);},{ok:describe(x)+' now uses '+spec.template+'. Undo restores it.'});

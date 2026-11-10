@@ -322,3 +322,15 @@ test('restore guards: Metrics on, the Traces part available, a current contract 
  assert.deepEqual(viaProviders(cached),{},'G2 the providers restore nothing while the Traces part is unavailable');
  h.api.setEnabled(false);h.api.setEnabled(true);await settle();assert.equal(h.api.snapshot().map.a?.exemplars,undefined,'G2 off/on lists no example trace');
 });
+
+/* #1289 CI (telemetry-step.spec): a host provider owns its exemplars' selection tokens (canChooseExemplar decides),
+   so a reused answer keeps the host's example trace as it was; the reader can still pick a candidate. */
+test('a reused answer keeps a host provider\'s example trace, which the host still validates',async()=>{
+ const {C}=context(),p=C.normalize(pageSpec()),e=plain(envelope(C));let calls=0;
+ const api=C.createTelemetry(p,{provider:async()=>{calls++;return {a:{signals:{},exemplars:[e]}};},canChooseExemplar:()=>true,chooseExemplar:async(id,token,traceId)=>e},{carriers:fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram||{};Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,p));})});
+ api.setEnabled(true);await settle();assert.equal(calls,1);assert.equal(api.snapshot().map.a?.exemplars?.[0]?.traceId,e.traceId);
+ api.setEnabled(false);api.setEnabled(true);await settle();
+ assert.equal(calls,1,'Metrics on within 5 minutes makes no call');
+ const kept=api.snapshot().map.a?.exemplars?.[0];assert.ok(kept,'the host\'s example trace is kept');assert.equal(kept.selectionToken,e.selectionToken,'with the host\'s own token');
+ api.destroy();
+});

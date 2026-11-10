@@ -35,7 +35,8 @@ test('actual asynchronously selected imports show totals for direct and nested s
 test('history never borrows live totals, clear/off/availability/destroy retire totals independently of siblings',async({page,server})=>{
  const root=await setup(page,server,{siblings:true});await metrics(root).click();await deliver(page,'ingest->app');await expect(since(root,'ingest->app')).toContainText('total: 1200 events');
  await over(root).click();const slider=root.getByRole('slider',{name:'Day',exact:true});await slider.focus();await slider.press('Home');await expect(since(root,'ingest->app')).not.toContainText('total:');
- await slider.focus();await slider.press('End');await live(root).click();await expect(since(root,'ingest->app')).not.toContainText('total:');
+ // #1287: closing Over time within 5 minutes makes no early live call; the held live total shows again.
+ await slider.focus();await slider.press('End');await live(root).click();await expect(since(root,'ingest->app')).toContainText('total: 1200 events');
  await deliver(page,'ingest->app');await expect(since(root,'ingest->app')).toContainText('total:');await page.evaluate(()=>window.viewer.controller.telemetry.clear());await expect(root.locator('.dv-live-proof')).toHaveCount(0);
  await deliver(page,'ingest->app');await metrics(root).click();await deliver(page,'ingest->app');await expect(root.locator('.dv-live-proof')).toHaveCount(0);await expect(root.locator('[data-activity-type="telemetry"]')).toHaveCount(0);
  await metrics(root).click();await deliver(page,'ingest->app');await expect(since(root,'ingest->app')).toContainText('total:');await page.evaluate(()=>window.viewer.controller.telemetry.setAvailable(false));await deliver(page,'ingest->app');await expect(root.locator('.dv-live-proof')).toHaveCount(0);

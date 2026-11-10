@@ -103,7 +103,11 @@ test('desktop completed-but-missing raw result keeps Grafana evidence',async({pa
 test('desktop Metrics off aborts actual raw fetch and drops its late result',async({page,server,audit})=>{const h=await setup(page,server,audit,{mode:'held'});await metrics(h.root).click();await expect.poll(h.requests).toBeGreaterThan(0);await metrics(h.root).click();await expect.poll(()=>page.evaluate(()=>window.rawAborts)).toBeGreaterThan(0);h.release();await expect(h.root.locator('.dv-metrics-card')).toHaveCount(0);expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});});
 
 for(const mode of ['bad-url','redirect','http-error'])test('desktop raw transport '+mode+' is unobserved and preserves peer',async({page,server,audit})=>{const h=await setup(page,server,audit,{mode});await metrics(h.root).click();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);const s=await page.evaluate(()=>window.ctl.telemetry.snapshot());expect(s.map['shared::api'].signals.rate.value).toBe(42);expect(s.map['shared::api'].signals.latency).toBeUndefined();expect(s.status.note).toMatch(/formatted Results header/);expect(h.requests()).toBe(mode==='bad-url'?0:5);expect(h.redirectRequests()).toBe(0);expect(JSON.stringify(s)).not.toContain('SYNTHETIC_BROWSER');});
-test('desktop account change retires all mixed samples',async({page,server,audit})=>{const {root}=await setup(page,server,audit);await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.snapshot().map['shared::api']?.signals.latency?.value)).toBe(12.3456789);await metrics(root).click();await page.evaluate(()=>window.signedInChanged=true);await metrics(root).click();await expect(metrics(root)).toBeHidden();expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});expect(await page.evaluate(()=>window.ctl.liveStatus.enabled())).toBe(true);});
+test('desktop account change retires all mixed samples',async({page,server,audit})=>{const {root}=await setup(page,server,audit);await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.snapshot().map['shared::api']?.signals.latency?.value)).toBe(12.3456789);await metrics(root).click();await page.evaluate(()=>window.signedInChanged=true);const asked=await page.evaluate(()=>window.calls.length);await metrics(root).click();
+ // #1289: the host reports the account change only through a call (user_changed); Metrics on within 5 minutes reuses the
+ // answer without one. The next call (Retry here, else the 5-minute refresh) retires every sample at once.
+ await expect(metrics(root)).toHaveAttribute('aria-checked','true');expect(await page.evaluate(()=>window.calls.length)).toBe(asked);
+ await page.evaluate(()=>window.ctl.telemetry.retry());await expect(metrics(root)).toBeHidden();expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});expect(await page.evaluate(()=>window.ctl.liveStatus.enabled())).toBe(true);});
 
 for(const shape of ['direct','nested','detail'])test('actual mock '+shape+': native from and exact mixed values coexist with Jira Over time',async({page,server,audit})=>{
  const h=await setup(page,server,audit,{real:{day:11},nested:shape==='nested',detail:shape==='detail'}),root=h.root;
@@ -127,14 +131,17 @@ for(const shape of ['direct','nested','detail'])test('actual mock '+shape+': nat
  const cached=await page.evaluate(()=>window.calls.length);await slider.press('End');await assertHistoricalEvidence(page,id,'2026-10-31T00:00:00.000Z',expected(10));expect(await page.evaluate(()=>window.calls.length)).toBe(cached);
  if(shape==='detail')await root.screenshot({path:'/tmp/pr4-honeycomb-history-loaded-mock.png'});
  await root.getByRole('button',{name:'Live',exact:true}).click();await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(expected(11));
- const returned=await page.evaluate(n=>window.calls.slice(n).filter(c=>c.tool==='run_query'),cached);expect(returned.length).toBeGreaterThan(0);expect(returned.every(c=>c.input.query_spec.from==='-24h')).toBe(true);
+ // #1287: closing Over time within 5 minutes shows the held live answer and makes no early live call.
+ const returned=await page.evaluate(n=>window.calls.slice(n).filter(c=>c.tool==='run_query'),cached);expect(returned).toHaveLength(0);
  await metrics(root).click();expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});expect(await page.evaluate(()=>window.ctl.liveStatus.enabled())).toBe(true);
 });
 test('actual mock payload: page 6h window is applied; Day8 absence is not zero',async({page,server,audit})=>{
  const h=await setup(page,server,audit,{real:{day:11,transport:'payload',window:'6h'}}),id='shared::api';await metrics(h.root).click();
  await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(expected(11,'mcu->ingest',6));
  expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id].signals.latency.series.length,id)).toBe(6);expect(h.bridge.calls.filter(c=>c.name==='run_query').every(c=>c.args.query_spec.from==='-6h')).toBe(true);
- await metrics(h.root).click();h.bridge.day=7;await metrics(h.root).click();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency,id)).toBeUndefined();expect(h.requests()).toBe(0);
+ // #1289: off/on within 5 minutes reuses the 6h answer with no call; Retry (the one call-now) asks for the new day.
+ const queries=h.bridge.calls.length;await metrics(h.root).click();h.bridge.day=7;await metrics(h.root).click();expect(h.bridge.calls.length).toBe(queries);expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(expected(11,'mcu->ingest',6));
+ await page.evaluate(()=>window.ctl.telemetry.retry());await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency,id)).toBeUndefined();expect(h.requests()).toBe(0);
 });
 for(const disabled of ['page','host','missing'])test('actual mock async nested detail '+disabled+': no queries and root/host no metadata',async({page,server,audit})=>{
  const h=await setup(page,server,audit,{detail:true,disabled,real:{absent:disabled==='missing'}});await expect(metrics(h.root)).toBeHidden();expect(h.bridge.calls).toHaveLength(0);if(disabled!=='missing')expect(h.bridge.lists).toBe(0);
@@ -171,7 +178,8 @@ for(const shape of ['direct','detail','zero'])test('actual mock measurement cloc
  expect(events.find(e=>e.kind==='first-traffic')?.at).toBe('2026-10-31T00:00:00.000Z');
  if(shape==='zero')expect(events.find(e=>e.kind==='silent'),'measured zero Honeycomb cannot label a carrier silent while its Grafana rate is positive').toBeUndefined();
  await row.hover();expect(h.bridge.calls).toHaveLength(before);
- await metrics(root).click();h.bridge.day=7;await metrics(root).click();await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
+ // #1289: off/on within 5 minutes reuses the answer; Retry (the one call-now) asks for the new day.
+ await metrics(root).click();h.bridge.day=7;await metrics(root).click();await page.evaluate(()=>window.ctl.telemetry.retry());await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
  expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.rate,id)).toBeUndefined();await expect(row.locator('.dv-live-proof-point')).toHaveCount(0);await expect(row).toHaveAttribute('data-telemetry','unobserved');await expect(row).toContainText('rate: unobserved');await expect(row).toHaveAttribute('data-verdict','done-traffic-unmeasured');await expect(row).toContainText('DONE · traffic not measured');
  expect(h.requests()).toBe(0);
 });

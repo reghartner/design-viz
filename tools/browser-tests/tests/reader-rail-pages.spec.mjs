@@ -2,7 +2,7 @@
    as the "‹ Page n of m ›" pager: one marker per section in each View of each Tab.
 | row | rule | fixture | assertion | broken implementation it rejects |
 |---|---|---|---|---|
-| Q1 | The rail has one marker per document page, numbered 1..m in pager order; its count reads "n/m" and the current marker is n, on every page reached with Next. | pages(): a page section, a Tab with two Views (2 + 1 sections), a one-section Tab; 1440×900, Contents closed | marker count = m = 5; texts 1..5; per page: aria-current marker index = n-1 and .reader-rail-count = "n/m" | one marker per Tab or per section of the current View |
+| Q1 | The rail has one marker per document page, numbered 1..m in pager order; its count reads "n/m" and the current marker is n, on every page reached with Next; a detail-only section is never a marker. | pages(): a page section that opens a detail-only section, a Tab with two Views (2 + 1 sections), a one-section Tab; 1440×900, Contents closed | marker count = m = 5; texts 1..5; per page: aria-current marker index = n-1 and .reader-rail-count = "n/m" | one marker per Tab or per section of the current View |
 | Q2 | Clicking marker k lands on "Page k of m" in that page's View, Contents stays closed (#681). | same | pager text, selected View, toggle aria-expanded=false, rail visible | markers that go to a Tab's first page, or pin Contents |
 | Q3 | Keyboard: markers are reachable in order with Tab; Enter and Space navigate and focus stays on the marker. | same | focus order 1..5; Enter on 4 → "Page 4 of 5"; Space on 5 → "Page 5 of 5" | mouse-only markers |
 | Q4 | 40 pages: the rail scrolls, the current marker stays inside the list when paging, markers keep a 24 px hit target. | one Tab, 10 prose sections × 4 Views | 40 markers; list scrolls; after Next to page 40 marker 40 lies inside the list box; every marker box ≥ 24×24 | an unscrollable rail; a current marker off-list; tiny markers |
@@ -15,7 +15,10 @@ import {repo} from '../helpers/prepare.mjs';
 
 const prose=(id,heading)=>({id,heading,text:heading+' prose.'});
 function pages(){
-  return {page:{title:'Rail pages',sections:[prose('intro','Introduction'),{tabs:[
+  // The introduction opens a detail-only section: it is never a document page (#1305 reviewer minor).
+  const intro={id:'intro',heading:'Introduction',diagram:{nodes:{a:{title:'Gateway',detail:{section:'hidden',mode:'focus'}},b:{title:'Store'}},rows:[['a','b']],edges:[{from:'a',to:'b'}]}};
+  const hidden={id:'hidden',heading:'Detail only page',detailOnly:true,diagram:{nodes:{c:{title:'Inner'}},rows:[['c']]}};
+  return {page:{title:'Rail pages',sections:[intro,hidden,{tabs:[
     {label:'Alpha',defaultView:'one',views:[{id:'one',name:'View one',presentation:'standard',sections:['a1','a2']},{id:'two',name:'View two',presentation:'standard',sections:['a2']}],sections:[prose('a1','Alpha one'),prose('a2','Alpha two')]},
     {label:'Beta',sections:[prose('b1','Beta one')]}]}]}};
 }
@@ -39,6 +42,7 @@ test('Q1 Q2 the rail has one marker per document page, matches "Page n of m" on 
   const root=await openRaw(page,server,pages(),'rail-pages'),label=root.locator('.reader-page-label');
   await expect(label).toHaveText(/^Page \d+ of 5$/);await closeContents(root);
   await expect(marksOf(root)).toHaveText(['1','2','3','4','5']);
+  expect(await marksOf(root).evaluateAll(els=>els.some(el=>/Detail only page/.test(el.getAttribute('aria-label')))),'the detail-only section is not a page').toBe(false);
   const previous=root.getByRole('button',{name:'Previous page',exact:true}),next=root.getByRole('button',{name:'Next page',exact:true});
   while(!(await previous.isDisabled()))await previous.click();
   await expect(label).toHaveText('Page 1 of 5');await expectRailMatchesPager(root);

@@ -1,0 +1,220 @@
+{
+  "format": "authoring-experiment-status-v1",
+  "asOfUtc": "2026-10-01T06:37:00+00:00",
+  "purpose": "Preserve decisions and distinguish promising experiments from adopted changes. This snapshot is research provenance, not a performance promise.",
+  "promotionStatus": "No tested context-reduction strategy has cleared its entire predeclared promotion screen.",
+  "modelPolicy": {
+    "implementationAndAuthors": "Claude Opus 5.5 high",
+    "independentReviews": "GPT-5.6 SOL Medium"
+  },
+  "trials": [
+    {
+      "name": "corrected rebaseline",
+      "kind": "initial authoring, full files",
+      "status": "complete",
+      "freshCorrectness": 90.125,
+      "freshPresentation": 19.3125,
+      "contextMeanPeak": 204662.25,
+      "evidence": {
+        "name": "rebaseline-v2-results.md",
+        "sha256": "3fb3f5bd394b50fc6840e800b06bc05a9b1e670f3d5f7d4ee63562515aa1ace7",
+        "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
+      }
+    },
+    {
+      "name": "focused guidance v1",
+      "kind": "initial authoring, full files",
+      "status": "screen missed; useful routing retained experimentally",
+      "peakReductionFraction": 0.1449,
+      "presentationDifference": 0.625,
+      "correctnessDifference": 1.3125,
+      "evidence": {
+        "name": "focused-guidance-results.md",
+        "sha256": "165659f1bccfda0b12ee5e66e691a33686bd34083d98bc86942a22bd6f11ba20",
+        "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
+      },
+      "sourcePreservation": {
+        "receipt": "focused-guidance-v1/receipt.json",
+        "kind": "inert two-stage patches with verified reconstruction",
+        "verifiedChangedFiles": 11
+      }
+    },
+    {
+      "name": "focused guidance v2",
+      "kind": "initial authoring, full files",
+      "status": "do not promote; presentation regression and context screen missed",
+      "peakReductionFraction": 0.056112,
+      "presentationDifference": -1.6875,
+      "correctnessDifference": 1.625,
+      "evidence": {
+        "name": "focused-guidance-v2-2026-09-30/results.json",
+        "sha256": "60e2266e79dfe84669d8047f693e855e8c7cbff7844790f46622ba29b6be69ab",
+        "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
+      }
+    },
+    {
+      "name": "composition cue",
+      "kind": "initial authoring, full files",
+      "status": "strict comparison incomplete; sensitivity also misses presentation target",
+      "peakReductionFraction": 0.01940418412264222,
+      "presentationDifferenceSensitivityOnly": 0.875,
+      "correctnessDifferenceSensitivityOnly": -2.1875,
+      "evidence": {
+        "name": "composition-cue-results.md",
+        "sha256": "e8b51d48037031d0f8a298e71187513ea5b3332552c0b581bd8ab7c451e8f2cb",
+        "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
+      }
+    },
+    {
+      "name": "focused panel file",
+      "kind": "existing deviceapp presentation edit through registered workbench",
+      "status": "first campaign aborted because harness permissions blocked required commands; one approved output retained, another run interrupted; no quality or context comparison",
+      "authorPlan": 8,
+      "reviewerPlan": 8,
+      "freezeSha256": "b9f390d587285984fddf60bc1f4ffbce9681380e5a2403349d27b54636006d52",
+      "evidence": {
+        "name": "edit-benchmark-protocol.md",
+        "sha256": "98a69bcef69a2c07b3f71b61309e1e820ac163665be173568ebb98df52113abf",
+        "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
+      }
+    },
+    {
+      "name": "prepared focused-panel edit pipeline",
+      "kind": "registered Workbench deviceapp presentation edit",
+      "status": "stopped inconclusive at final allowed repair cycle; no scored cohort launched",
+      "repairCycles": 2,
+      "scoredAuthors": 0,
+      "scoredJudgments": 0,
+      "finalTrial": {
+        "setup": "passed",
+        "task": "successful compound prepare command not recognized by frozen observer",
+        "candidate": "exact field-order-only delta; identical field objects and byte-identical ledger",
+        "approved": false,
+        "scored": false,
+        "independentAuthorEscapeEstablished": false,
+        "reviewModel": "gpt-5.6-sol medium"
+      },
+      "freezeSha256": "4ff3bf5d983abf39592ce036074fcb26bd8c795f469cf8e3953140b3010b6acd",
+      "evidence": {
+        "reviewJsonSha256": "76532a57aa859ed35bdc747f6345c4cfe26ec472dd19197a50a9fa623c2386a2",
+        "resultSha256": "8f13fe60b9cfa5b9b83165b515f2221812aed558445e57cec82681e1e72585fb",
+        "report": "edit-pipeline-closure.md",
+        "retention": "Raw logs, frozen inputs, public diagnostic reviews and unapproved render retained locally; original trial outcomes unchanged."
+      }
+    },
+    {
+      "name": "exact-v1 contemporary feasibility trial",
+      "kind": "one unscored initial-authoring trial; historical eleven-path v1 guidance on common current runtime",
+      "status": "mechanical pass with recorded own-report command deviation; unscored precursor to the registered cohort",
+      "authors": 1,
+      "scoredAuthors": 0,
+      "scoredJudgments": 0,
+      "peakRequestContextTokens": 175697,
+      "firstSpecContextTokens": 144322,
+      "preFirstSpecGuidanceReadBytes": 131180,
+      "currentProductBase": "3799dfa25e637290ea828e6acbb1b8bcbea674f4",
+      "evidence": {
+        "report": "v1-replication-feasibility.md",
+        "trialPassSha256": "e8ddad96462f43e4c83ef838cb052d7227cae9fad21c77b4c501c8a0b9186cf0",
+        "trialResultSha256": "76d40a57c787d60ca5ea84416735beeffc2cb90626d12c3926f5e44e2e62ea1f",
+        "retention": "Exact inputs, one author, original and supplemental reviews, source/capture/metrics retained locally. No efficacy comparison."
+      }
+    },
+    {
+      "name": "exact-v1 contemporary registered cohort",
+      "kind": "initial authoring, full files; historical corrected-control versus exact eleven-path historical focused-v1 on common current runtime",
+      "status": "does not qualify; context screen missed and repeated new correctness-defect guard triggered (3 families, each 2+ focused / 0 control); strict quality contrast incomplete (one invalid control grade, no rescore)",
+      "authors": 8,
+      "acceptedAuthors": 8,
+      "gradesRetained": 40,
+      "validGrades": 39,
+      "peakReductionFraction": 0.1052,
+      "peakReductionPercentExactFromMeans": 10.5187321531,
+      "correctnessDifference": null,
+      "presentationDifference": null,
+      "repeatedDefectGuardTriggered": true,
+      "graderIntegrity": "complete; commanded reviewer model/effort verified, actual provider identity not independently observed",
+      "authorFlow": "no concrete treatment-attributable cause found in bounded public audit",
+      "currentProductBase": "3799dfa25e637290ea828e6acbb1b8bcbea674f4",
+      "freezeSha256": "5dda0ff09dc911768a830fd38b33f94aa71be70b8ac3ae70b75f201c391255ad",
+      "evidence": {
+        "report": "v1-replication-results.md",
+        "data": "v1-replication-results.json",
+        "summarySha256": "28d35c94edd1d06adda19807721f6075a1a56ac17ae6cc86073d47aabf21072f",
+        "repeatedDefectAuditSha256": "87c152c17101b70e36e8d937d2496c7a7876e1a2f4b3c842ac9438e2aff50369",
+        "graderIntegritySha256": "3256193d51dc0dbbc3f8ea3f71592685f16d889ff7f8354544b1213ae07cf929",
+        "retention": "Exact frozen-input capsule (frozen experiment inputs including evidence and reports; not portable) and opaque review-output archive retained locally; superseded v1 defect audit preserved; summaries and evidence bindings only in this PR."
+      }
+    }
+  ],
+  "rejectedBeforeTrial": [
+    "splitting append-heavy ledger without repeated-read evidence",
+    "splitting one-use batched widget reports into more calls",
+    "label edits outside the v1 locked-field contract",
+    "hiding source sidebar where showSources also removes badges and leaves existing copy stale",
+    "compact helper index as default output with details via --section, as proposed: --catalog already provides the 31-panel type/name/use/shows/file+anchor index (7,351 B), --guide provides selected panel details, and --section supplies non-panel contract headings and rejects panels",
+    "deduplicating focused helper reports: every focused author read two different report generations (guide, then section), not repeated same-report reads, and the source/emitted overlap audit found no meaningful duplication; higher aggregate bytes alone justify no helper change or trial",
+    "trimming non-widget guidance from repeat or overlap counts: 141 Reads had no within-author identical-range rereads, exact whole-response repeats are cross-author only, and two overlapping requested ranges do not prove delivered byte redundancy"
+  ],
+  "queuedHypotheses": [
+    "selected conditional quality repair: small existing catalog/guide cue plus matching agent guidance for a visible matching Screen at the invoked clip opening, including inherited visibility/state (a retained matching still qualifies; no Playing label required). Missing-clip family only; the other two 2/0 families stay unrepaired and the cue cannot clear the guard. SOL maps exact-helper and current Workbench Copy for agent / Work with agent feasibility first. Catalog stays under 8,000 B; no new required helper calls, modes or reports; reuse the proven initial-authoring flow. One inspected trial before fanout and a new prospective registration before any cohort. Not implemented, trialed or adopted; no context claim",
+    "concise Workbench command contract: draft PR293 preserved with agent guidance, measurement deferred because it shares the stopped edit harness",
+    "initial-authoring reading manifest: routing/order only, preserve presentation content and pointers",
+    "retest composition cue separately on a non-rejected base",
+    "declaration-only edits after a representative large-spec fixture justifies them"
+  ],
+  "comparisonLimit": "Different main versions, rubric revisions and reviewer cohorts mean trial deltas cannot be summed. Edit-pilot scores use a different task/rubric and are not comparable to overnight initial-authoring scores. The historical v1 and contemporary replication context deltas are not pooled.",
+  "publicationBoundary": "This PR preserves review tooling, interpretation profiles, experiment decisions, and an inert source snapshot of focused guidance v1. It does not activate focused guidance v1/v2, the composition cue, or focused panel editing.",
+  "stackPlan": [
+    {
+      "scope": "Versioned evaluation profiles, evidence/score checks, this research snapshot",
+      "dependency": "main"
+    },
+    {
+      "scope": "Opt-in focused panel editing and subsequent workflow fixes",
+      "dependency": "main; draft PR292 preserved unmeasured after edit measurement pipeline stopped inconclusive"
+    },
+    {
+      "scope": "Further context reductions, including file-and-key payload experiments",
+      "dependency": "focused panel feature, separately evaluated"
+    },
+    {
+      "scope": "Concise Workbench command contract and matching agent guidance, draft PR293",
+      "dependency": "focused panel PR292; measurement deferred, no promotion"
+    }
+  ],
+  "followupAnalysis": {
+    "report": "context-followup.md",
+    "data": "context-followup.json",
+    "newAuthorOrGradeOutcomes": false,
+    "appendedContemporarySection": "Summarizes the contemporary cohort published in v1-replication-results.md; earlier sections and context-followup.json unchanged."
+  },
+  "strategyConsult": {
+    "model": "claude-fable-5-1",
+    "adviceSha256": "e2d3592b790fc190aa8f7407af4be24b74f1872b790680ab9587e4de77466576",
+    "decision": "Stop edit repairs at the agreed bound. Defer the dependent command-contract measurement. Confirm the exact historical v1 contrast in independent initial authoring before selecting a further routing intervention.",
+    "withdrawnHypotheses": [
+      "v2 authors skipped presentation references",
+      "file-payload output allocation inferred from output minus thinking"
+    ],
+    "trialAdjudication": {
+      "adviceSha256": "5bbdaa8e69db972d70fae123ed77bd90c008e91a4dc69a6eb4156d339c454051",
+      "decision": "Reuse proven author flow for fresh comparison; retain local own-output read deviation under existing mechanical criteria and audit both arms symmetrically.",
+      "newItemSixThresholdAdopted": false
+    },
+    "contemporaryContextAdvice": {
+      "modelObserved": "claude-fable-5-1",
+      "adviceSha256": "e2db609e2eda9da5612f79e08e612ff4f2cebdd847acd4b9c17d6a567327e3e6",
+      "proposal": "compact helper index by default, with details via --section",
+      "sourceFeasibility": "rejected as stated; see rejectedBeforeTrial",
+      "postResultsConsult": {
+        "modelObserved": "claude-fable-5-1",
+        "sessionId": "957fb993-bcbd-46e9-b393-1f36a54dccb3",
+        "correctedAdviceSha256": "6db2e6c34d6aa9fe209a8a7ad3c21fabdb712973bdf83a74e2399cda70871f11",
+        "withdrawn": "bytes-to-tokens estimate, control helper-traffic assumption, reachability rule, and claim that reordering cannot change peak",
+        "attributionLimit": "recorded; no further pass over the same counters to allocate file tokens"
+      },
+      "decision": "Root selected one conditional quality-repair candidate (see queuedHypotheses); no further context cut selected."
+    }
+  }
+}

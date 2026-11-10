@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "profile": "authoring-review-v4",
+  "description": "Prospective reviewer profile. It copies authoring-review-v3 with three interpretation clarifications (an unstated charging-rate convention, a binding's representative operation, and renderer-synthesized legend copy); the rubric differs only in its profile identifier. The seven criteria, their deduction amounts and caps, host validation of correctness rows, and the five presentation dimensions are unchanged. rubric.md and interpretations.json are delivered together as the reviewer prompt. Case inputs still come from the frozen overnight bundle. Scores are not directly comparable with authoring-review-v3, authoring-review-v2 or the legacy judge2 rubric.",
+  "files": [
+    {
+      "path": "rubric.md",
+      "sha256": "6cb84e7f464528d6727e9734c9ca3708d095593d5e2b1a6018869be24cb92d1e"
+    },
+    {
+      "path": "interpretations.json",
+      "sha256": "4f007b5f75cc1bdf3323bd7ad1d338af55fce75e9e7e28ac3cee5e44f296e188"
+    }
+  ]
+}

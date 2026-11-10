@@ -145,7 +145,11 @@ test('actual mock payload: page 6h window is applied; Day8 absence is not zero',
  await expect.poll(()=>page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(expected(11,'mcu->ingest',6));
  expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id].signals.latency.series.length,id)).toBe(6);expect(h.bridge.calls.filter(c=>c.name==='run_query').every(c=>c.args.query_spec.from==='-6h')).toBe(true);
  // #1289: off/on within 5 minutes reuses the 6h answer with no call; Retry (the one call-now) asks for the new day.
- const queries=h.bridge.calls.length;await metrics(h.root).click();h.bridge.day=7;await metrics(h.root).click();expect(h.bridge.calls.length).toBe(queries);expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(expected(11,'mcu->ingest',6));
+ // The latency poll above passes while the first refresh still sends its trailing calls (other carriers' run_query,
+ // Grafana deeplinks): count from the end of that refresh. Then off/on makes no provider call and no tools listing.
+ await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);
+ const queries=h.bridge.calls.length,lists=h.bridge.lists;await metrics(h.root).click();h.bridge.day=7;await metrics(h.root).click();
+ expect(h.bridge.calls.slice(queries).map(c=>c.name),'off/on within 5 minutes calls no provider tool').toEqual([]);expect(h.bridge.lists,'and lists no tools').toBe(lists);expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency?.value,id)).toBe(expected(11,'mcu->ingest',6));
  await page.evaluate(()=>window.ctl.telemetry.retry());await expect.poll(()=>page.evaluate(()=>window.ctl.telemetry.status().busy)).toBe(false);expect(await page.evaluate(id=>window.ctl.telemetry.snapshot().map[id]?.signals.latency,id)).toBeUndefined();expect(h.requests()).toBe(0);
 });
 for(const disabled of ['page','host','missing'])test('actual mock async nested detail '+disabled+': no queries and root/host no metadata',async({page,server,audit})=>{

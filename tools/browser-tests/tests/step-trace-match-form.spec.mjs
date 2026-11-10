@@ -30,7 +30,8 @@ async function inspectStep(page){
   const form=page.locator('#guide fieldset.trace-match-editor');await expect(form).toBeVisible();
   return form;
 }
-const field=(form,name)=>form.getByRole('textbox',{name,exact:true});
+// By accessible name: inputs with a datalist of attribute names are comboboxes, not textboxes.
+const field=(form,name)=>form.getByLabel(name,{exact:true});
 
 test('1: service name and operation write traceMatch from the form; Undo restores',async({page,server})=>{
   await open(page,server,{});

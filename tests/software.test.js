@@ -256,3 +256,19 @@ test('table Change column is optional with matching widths and empty spans, with
     assert.match(C.softwarePanelHTML(p,state),/>Change</);
   }
 });
+
+/* #1252 item 21: imported fractional durations are rounded where shown (waterfall rows and total, step text);
+   the panel data keeps the raw values. */
+test('#1252 imported fractional durations are rounded in the waterfall, its total and the step text',()=>{
+  const input=clone(fixture);input[0].duration_ms=300.234111;input[1].duration_ms=5.123456789;
+  const d=C.traceToSpec(input).spec.page.blocks[0].diagram,timing=d.panels.find(p=>p.type==='waterfall');
+  assert.equal(timing.spans.find(s=>s.id==='cache').ms,5.123456789,'the data keeps the raw duration');
+  // The row tooltip keeps the exact duration, as the Trace view's does; the visible text is rounded.
+  const html=C.softwarePanelHTML(timing,{}),shown=html.replace(/title="[^"]*"/g,'');
+  assert.deepEqual(shown.match(/\d+\.\d{3,}/g),null,'no unrounded number is shown');assert.match(html,/title="[^"]*duration 5\.123456789 ms/,'the tooltip keeps the exact value');assert.match(html,/5\.12 ms/);assert.match(html,/300\.2 ms/);
+  const text=d.steps.find(s=>/idempotency lookup/.test(s.text)).text;assert.match(text,/duration 5\.12 ms/);assert.doesNotMatch(text,/\d\.\d{3,}/);
+  assert.equal(C.waterfallModel([{ms:20},{ms:30}],{}).totalLabel,'50 ms','whole numbers are unchanged');
+  // Review c1: one shared rule; the overview's observed extent is rounded too.
+  assert.equal(typeof C.waterfallMs,'undefined');assert.equal(typeof C.traceShownMs,'undefined');assert.equal(C.durationMsText(108.234111),'108.2');assert.equal(C.durationMsText(0.004),'<0.01');assert.equal(C.durationMsText(40),'40');
+  const overview=C.traceToSpec(input).spec.page.blocks[0];assert.ok(JSON.stringify(overview).includes('observed extent 300.2 ms'),'observed extent is rounded');
+});

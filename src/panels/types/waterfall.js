@@ -61,7 +61,7 @@ function waterfallModel(spans, state) {
     totalMs: total,
     shownMs: shown,
     timed: timed,
-    totalLabel: state.total != null ? String(state.total) : shown + ' ms',
+    totalLabel: state.total != null ? String(state.total) : durationMsText(shown) + ' ms',
   };
 }
 
@@ -106,7 +106,7 @@ PanelViews.register('waterfall', function (host, panel, state, skin, states, ste
       Math.max(r.widthPct, wm.timed ? 0 : 1.2).toFixed(2) +
       '%"></span></span>' +
       '<span class="wfms">' +
-      (r.revealed ? (r.error ? '! ' : '') + esc(String(r.ms)) + ' ms' : '&#8212;') +
+      (r.revealed ? (r.error ? '! ' : '') + esc(durationMsText(r.ms)) + ' ms' : '&#8212;') +
       '</span></div>';
   });
   h +=

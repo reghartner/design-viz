@@ -27,7 +27,8 @@ try {
     if (key === '--service') opts.service=value;
   }
   const sandbox = {URL};
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/trace-import.js'), 'utf8'), sandbox);
+  vm.createContext(sandbox);
+  for (const file of ['../src/core/duration.js', '../src/trace-import.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, file), 'utf8'), sandbox);
   const text=fs.readFileSync(input,'utf8');
   if (preview){
     if (output) throw new Error('--preview writes a summary to stdout; omit -o so an existing spec cannot be overwritten with preview data.');

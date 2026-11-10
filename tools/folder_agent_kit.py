@@ -47,8 +47,9 @@ def folder_agent_kit(root, runtime):
     source_path = '../src/trace-import.js'
     if source_path not in trace_cli:
         raise ValueError('Trace CLI converter path changed; update the portable kit')
-    files['tools/trace2spec.js'] = trace_cli.replace(source_path, 'trace-import.js')
+    files['tools/trace2spec.js'] = trace_cli.replace(source_path, 'trace-import.js').replace('../src/core/duration.js', 'duration.js')
     files['tools/trace-import.js'] = (root / 'src/trace-import.js').read_text()
+    files['tools/duration.js'] = (root / 'src/core/duration.js').read_text()
     # Build from these sources; never depend on an existing generated file.
     files['tools/canon/generated-runtime.cjs'] = runtime
     # Source-free composition uses the same panel-owned layout descriptors.

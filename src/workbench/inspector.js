@@ -4,8 +4,12 @@ function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null,invalidateAlignment=null,invalidateEdgeEndpoints=null;
   var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),TRACE_MATCH_DRAFTS=new Map(),TRACE_MATCH_REVEALED=new Set(),traceMatchCache=null,OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false,BOARD_READY_TEXT=null;
+  // #1255: unsaved Metrics editor New … fields for the current selection.
+  var METRICS_DRAFTS=new Map();
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   var proseDraft={key:null,fields:Object.create(null)};
+  // #1233: uncommitted New log search text in Status board settings; cleared when the selection changes.
+  var LOG_SEARCH_DRAFTS=new Map();
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
   function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;invalidateTopologyExport=null;invalidateAlignment=null;invalidateEdgeEndpoints=null;}
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
@@ -43,7 +47,9 @@ function createBuilderInspector(opts){
     if(!same){
       OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_MATCH_REVEALED.clear();
       OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;
+      LOG_SEARCH_DRAFTS.clear();
     }
+    if(!same)METRICS_DRAFTS.clear();
     retireForm();
     inspectorScrollKey=identity;invalidateEffectiveState=null;
     revealInspector();guide.hidden=false;guide.innerHTML='';
@@ -755,14 +761,23 @@ function metricsControls(){
     if(state.error)return null;
     // Pin the connection's identity so a later commit cannot land on a different edge at the same index.
     if(target.kind==='edge')target.key=state.id;
-    return createFlowMetricsEditor({document:document,state:state,controls:metricsControlKit(),listen:listen,commit:function(edit){
+    return createFlowMetricsEditor({document:document,state:state,controls:metricsControlKit(),listen:listen,drafts:METRICS_DRAFTS,commit:function(edit){
       return commitTelemetry(function(text,raw){return planCarrierTelemetry(text,raw,target,edit,session.topologyContext());});
+    }});
+  }
+/* #1233: Status board settings → Log searches (tracking.telemetry.lookups). */
+function logSearchesControls(warnings){
+    var snapshot=parseEditor();if(snapshot.error)return null;
+    var state=telemetryLookupState(snapshot.raw);state.warnings=warnings || [];
+    return createFlowLogSearches({document:document,state:state,controls:metricsControlKit(),listen:listen,drafts:LOG_SEARCH_DRAFTS,idPrefix:prefix+'-log-search',
+      later:function(fn){opts.schedule(function(){if(!disposed)fn();},0);},commit:function(edit){
+      return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }
 function metricsSettingsControls(environments,warnings){
     var snapshot=parseEditor();if(snapshot.error)return null;
     var state=telemetryPageState(snapshot.raw);if(warnings)state.warnings=warnings;
-    return createFlowMetricsSettings({document:document,state:state,controls:metricsControlKit(),listen:listen,environments:environments,commit:function(edit){
+    return createFlowMetricsSettings({document:document,state:state,controls:metricsControlKit(),listen:listen,environments:environments,drafts:METRICS_DRAFTS,commit:function(edit){
       return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }
@@ -2598,7 +2613,8 @@ function boardForm(){
     var metrics=section('metrics','Metrics',count(warnings.metrics) || (!hasTelemetry?(statusBoardHasBindings(raw)?'No page settings':'Not set'):telemetry.enabled===false?'Off':''),hasTelemetry || warnings.metrics.length>0);
     var traces=section('traces','Traces',count(warnings.traces) || 'No settings yet',warnings.traces.length>0);
     var environments=section('environments','Environments',count(warnings.environments) || environmentIds.join(', '),warnings.environments.length>0);
-    var lookups=section('lookups','Log searches',count(warnings.lookups) || 'No settings yet',warnings.lookups.length>0);
+    var lookupSet=specObject(telemetry.lookups)?Object.keys(telemetry.lookups).length:0;
+    var lookups=section('lookups','Log searches',count(warnings.lookups) || (!Object.prototype.hasOwnProperty.call(telemetry,'lookups')?'Not set':lookupSet?lookupSet+(lookupSet===1?' search':' searches'):'Typed query only'),warnings.lookups.length>0);
     pageTrackingControls(doc.page,jira);
     note(jira,'Dependencies, dependency link names and no-activity days: edit in JSON for now.');
     warningList(jira,warnings.jira,'Jira warnings');
@@ -2607,10 +2623,7 @@ function boardForm(){
     note(traces,'No settings yet. Trace connections choose which company trace profiles this board uses; for now, edit tracking.telemetry.traceConnections in JSON.'+
       (Object.prototype.hasOwnProperty.call(telemetry,'traceConnections')?' This board sets it.':''));
     warningList(traces,warnings.traces,'Traces warnings');
-    var lookupCount=specObject(telemetry.lookups)?Object.keys(telemetry.lookups).length:0;
-    note(lookups,'No settings yet. Log searches let readers find a trace from a log line in the Trace view; for now, edit tracking.telemetry.lookups in JSON.'+
-      (lookupCount?' This board has '+lookupCount+(lookupCount===1?' log search.':' log searches.'):''));
-    warningList(lookups,warnings.lookups,'Log searches warnings');
+    var lookupsForm=logSearchesControls(warnings.lookups);if(lookupsForm)lookups.appendChild(lookupsForm);
     return rows;
   }
 

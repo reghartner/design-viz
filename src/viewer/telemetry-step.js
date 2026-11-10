@@ -35,7 +35,7 @@ function telemetryPaintStep(binding,snapshot,jiraMap,jiraOn){
 // positive values distinct from zero, and expose exact milliseconds accessibly.
 function telemetryTraceDuration(ms){
   if(ms>0 && ms<.01)return '<0.01 ms';
-  return Number(ms.toFixed(ms<10?2:ms<1000?1:0)).toLocaleString('en-US')+' ms';
+  return durationMsRounded(ms).toLocaleString('en-US')+' ms';
 }
 function telemetryTraceModel(diagram,pathId,exemplar){
   var mapping=null,warning='';

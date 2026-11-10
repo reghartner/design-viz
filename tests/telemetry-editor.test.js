@@ -26,7 +26,7 @@ const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
 const repo=path.join(__dirname,'..');
 const names=['canon','validator','compatibility','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology','workbench/commands/telemetry',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/inspector','workbench/io-model']
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/log-searches-editor','workbench/inspector','workbench/io-model']
   // The RED baseline has no telemetry command or editor module; load only what exists so the contract assertions fail, not the loader.
   .filter(name=>['canon','validator'].includes(name) || fs.existsSync(path.join(repo,'src',name+'.js')));
 const plain=v=>JSON.parse(JSON.stringify(v));
@@ -628,4 +628,100 @@ test('#1228 an inherited imported connection keeps focus on Card width across th
   assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking['api->store'].telemetry.card,{width:400});
   assert.equal(ui.e.doc.activeElement,ui.control('Card width'),'focus returns to Card width after the refresh');
   assert.equal(ui.control('Card width').value,'400');
+});
+
+/* #1255 sweep (Metrics editor).
+| row | rule | fixture | assertion | broken implementation it rejects |
+|---|---|---|---|---|
+| S2a | Renaming a page template signal renames the proof limit and maxRatioOf on every carrier and overlay entry that uses the template, in any section, in the same plan; a carrier that defines a signal of the old or new name itself keeps its limits. | template kafka-topic; edge, node, an import overlay entry and an edge in a second section use it with carrier limits; two carriers with their own `lag` / `backlog` signals | each carrier `proof` uses `backlog`; own-signal carriers unchanged; one Undo restores the exact text | limits left on the old name, ignored silently; a carrier's own limit overwritten |
+| S2b | Removing a page template signal removes those carrier limits; a ratio limit on the removed signal loses maxRatioOf and its ratio max (min stays); emptied limits and proofs are dropped. A raw carrier's removed signal does the same. | same; a raw binding with a ratio | `proof` keys gone; `{min}` kept; no absolute max left behind | dangling limits; a ratio ceiling turned into an absolute ceiling |
+| S17 | An imported carrier that inherits a provider binding shows the inherited kind, labelled inherited, and Add signal saves that kind. | consumer importing provider node api (kind service) | Metrics kind value `service`, option text "service (inherited)"; overlay `kind:'service'` | the default `call` replacing the provider kind |
+| S19 | New signal / New template / New environment drafts and an unbound carrier's draft kind survive a re-render of the same selection, clear after a successful add and on a new selection, and stay after a refused add; flowMetricsDom.draft itself stores nothing (callers such as Log searches keep their own drafts). | unbound edge; page settings | values after re-render; after Add; after a refused Add; after another selection; the drafts map after typing in a plain draft | typed drafts lost on any refresh; a second draft layer that resurrects cleared values |
+*/
+const KT=()=>({use:'kafka-topic',topic:'t',group:'g',proof:{lag:{max:100},in:{maxRatioOf:'lag',max:2,min:5}}});
+function sweepBoard(){
+  const spec=board(KT(),{templates:TEMPLATES()}),d=diagramOf(spec);
+  d.nodes.ingest.telemetry={use:'kafka-topic',topic:'t',group:'g',proof:{lag:{min:1}}};
+  // Carriers that define a signal of the old or the new name themselves keep their own limits.
+  d.nodes.notify.telemetry={use:'kafka-topic',topic:'t',group:'g',signals:{backlog:{grafana:'own_backlog'}},proof:{lag:{max:100},backlog:{max:5}}};
+  d.edges.push({from:'notify',to:'ingest',label:'replay',telemetry:{use:'kafka-topic',topic:'t',group:'g',signals:{lag:{grafana:'own_lag'}},proof:{lag:{max:9}}}});
+  d.topologyImports=[{spec:'provider',export:'core',as:'shared',edgeTracking:{'api->store':{telemetry:{use:'kafka-topic',topic:'t',group:'g',proof:{lag:{max:7}}}}}}];
+  spec.page.sections.push({heading:'Second',diagram:{nodes:{x:{title:'X'},y:{title:'Y'}},rows:[['x','y']],edges:[{from:'x',to:'y',telemetry:{use:'kafka-topic',topic:'t',group:'g',proof:{lag:{max:3}}}}]}});
+  return spec;
+}
+test('#1255 S2a renaming a template signal renames carrier and overlay limits in the same plan',()=>{
+  const C=api(harness(board()).e.C),spec=sweepBoard(),text=JSON.stringify(spec,null,2);
+  const plan=C.planPageTelemetry(text,JSON.parse(text),{op:'template',template:'kafka-topic',edit:{op:'signal',name:'lag',field:'name',value:'backlog'}});
+  assert.equal(plan.error,undefined);const out=JSON.parse(plan.text),d=diagramOf(out);
+  assert.deepEqual(Object.keys(out.page.tracking.telemetry.templates['kafka-topic'].signals),['in','backlog']);
+  assert.deepEqual(d.edges[0].telemetry.proof,{backlog:{max:100},in:{maxRatioOf:'backlog',max:2,min:5}},'edge limit and ratio follow the rename');
+  assert.deepEqual(d.nodes.ingest.telemetry.proof,{backlog:{min:1}},'node limit follows the rename');
+  assert.deepEqual(d.topologyImports[0].edgeTracking['api->store'].telemetry.proof,{backlog:{max:7}},'overlay limit follows the rename');
+  assert.deepEqual(out.page.sections[1].diagram.edges[0].telemetry.proof,{backlog:{max:3}},'a carrier in another section follows the rename');
+  assert.deepEqual(d.nodes.notify.telemetry.proof,{lag:{max:100},backlog:{max:5}},'a carrier with its own backlog signal keeps both limits');
+  assert.deepEqual(d.edges[1].telemetry.proof,{lag:{max:9}},'a carrier that overrides lag itself keeps its limit');
+  // Through the editor: one Undo step restores everything.
+  const ui=harness(spec,{kind:'board'}),before=ui.text;
+  oneStep(ui,()=>ui.set('kafka-topic lag name','backlog'),{kind:'board'});
+  assert.deepEqual(diagramOf(ui.raw).edges[0].telemetry.proof.backlog,{max:100});
+  assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'one Undo restores every carrier');
+});
+test('#1255 S2b removing a template signal removes carrier limits and ratio references; raw removals drop ratio references too',()=>{
+  const C=api(harness(board()).e.C),text=JSON.stringify(sweepBoard(),null,2);
+  const plan=C.planPageTelemetry(text,JSON.parse(text),{op:'template',template:'kafka-topic',edit:{op:'removeSignal',name:'lag'}});
+  assert.equal(plan.error,undefined);const d=diagramOf(JSON.parse(plan.text));
+  assert.deepEqual(d.edges[0].telemetry.proof,{in:{min:5}},'the removed limit, its ratio reference and the ratio max are gone; min stays');
+  assert.equal(Object.hasOwn(d.nodes.ingest.telemetry,'proof'),false,'an emptied proof is dropped');
+  assert.equal(Object.hasOwn(d.topologyImports[0].edgeTracking['api->store'].telemetry,'proof'),false);
+  assert.equal(Object.hasOwn(JSON.parse(plan.text).page.sections[1].diagram.edges[0].telemetry,'proof'),false,'a carrier in another section loses the limit');
+  assert.deepEqual(d.edges[1].telemetry.proof,{lag:{max:9}},'a carrier that defines lag itself keeps its limit');
+  const raw=C.telemetryEditBinding({kind:'call',signals:{a:{grafana:'a'},b:{grafana:'b'}},proof:{a:{maxRatioOf:'b',max:2,min:1},b:{max:1}}},{op:'removeSignal',name:'b'},{});
+  assert.deepEqual(plain(raw.value.proof),{a:{min:1}},'a raw removal drops the ratio reference and its ratio max, never leaving an absolute ceiling');
+  const only=C.telemetryEditBinding({kind:'call',signals:{a:{grafana:'a'},b:{grafana:'b'}},proof:{a:{maxRatioOf:'b'}}},{op:'removeSignal',name:'b'},{});
+  assert.equal(Object.hasOwn(only.value,'proof'),false,'a limit left empty is dropped with its proof');
+});
+test('#1255 S17 an imported carrier that inherits a binding starts from the inherited kind, labelled inherited',()=>{
+  const f=topologyFixtures(),ui=harness(f.consumer);
+  ui.h.session.replaceProject(JSON.stringify(f.consumer,null,2),null,{topologyContext:f.context});
+  const node={kind:'node',section:0,id:'shared::api'};ui.select(node);ui.metrics();
+  const kind=ui.control('Metrics kind');
+  assert.equal(kind.value,'service','the inherited kind, not the default call');
+  assert.equal(kind.options.find(o=>o.value==='service').textContent,'service (inherited)');
+  ui.control('New signal name').value='local';ui.control('New signal query').value='consumer_up';
+  oneStep(ui,()=>ui.click('Add signal'),node);
+  assert.equal(diagramOf(ui.raw).topologyImports[0].nodeTracking.api.telemetry.kind,'service','Add signal saves the inherited kind');
+});
+test('#1255 S19 New signal, New template and New environment drafts survive a same-selection re-render and clear after Add or a new selection',()=>{
+  const ui=harness(board(),EDGE);ui.metrics();
+  const type=(label,value)=>{const el=ui.control(label);el.value=value;el.fire('input');};
+  ui.set('Metrics kind','queue');
+  type('New signal name','in');type('New signal query',LOKI_IN);type('New signal unit','msgs');
+  const source=ui.control('New signal source');source.value='loki';source.fire('change');
+  ui.rerender();
+  assert.deepEqual(['Metrics kind','New signal name','New signal source','New signal query','New signal unit'].map(l=>ui.control(l).value),['queue','in','loki',LOKI_IN,'msgs'],'drafts survive a re-render');
+  oneStep(ui,()=>ui.click('Add signal'));
+  assert.deepEqual(edgeOf(ui).telemetry,{kind:'queue',signals:{in:{loki:LOKI_IN,unit:'msgs'}}});
+  assert.deepEqual(['New signal name','New signal query','New signal unit'].map(l=>ui.control(l).value),['','',''],'a successful Add clears its drafts');
+  assert.equal(ui.control('New signal source').value,'grafana');
+  // A refused Add keeps what was typed.
+  type('New signal name','in');type('New signal query','again');const kept=ui.text;ui.click('Add signal');
+  assert.equal(ui.text,kept,'a duplicate name is refused');assert.match(ui.error(),/./);ui.rerender();
+  assert.deepEqual(['New signal name','New signal query'].map(l=>ui.control(l).value),['in','again'],'a refused Add keeps its drafts');
+  type('New signal name','later');ui.select({kind:'node',section:0,id:'ingest'});ui.select(EDGE);
+  assert.equal(ui.control('New signal name').value,'','a new selection starts with empty drafts');
+  // Page settings: an edit to an existing template keeps the New template and New environment drafts.
+  const page=harness(board(null,{templates:TEMPLATES()}),{kind:'board'});page.settings();
+  const put=(label,value)=>{const el=page.control(label);el.value=value;el.fire('input');};
+  put('New template name','orders');put('New template signal name','rate');put('New template signal query','up');put('New environment id','qa');
+  page.set('kafka-topic template kind','call');assert.equal(page.raw.page.tracking.telemetry.templates['kafka-topic'].kind,'call');
+  assert.deepEqual(['New template name','New template signal name','New template signal query','New environment id'].map(l=>page.control(l).value),['orders','rate','up','qa'],'page drafts survive an edit elsewhere');
+});
+test('#1255 S19 flowMetricsDom.draft stores nothing in the drafts map; only the Metrics editor fields keep drafts',()=>{
+  const ui=harness(board()),C=ui.e.C,doc=ui.e.doc,drafts=new Map();
+  const dom=C.flowMetricsDom({document:doc,drafts,controls:{row(label,control){const r=doc.createElement('label');r.appendChild(control);return r;}},listen(t,type,fn){t.addEventListener(type,fn);}});
+  const parent=doc.createElement('div'),field=dom.draft(parent,'New log search label','text',null,'');
+  field.value='Order ID';field.fire('input');field.fire('change');
+  assert.equal(drafts.size,0,'a caller-owned draft field adds no metrics: key');
+  const kept=dom.keptDraft(parent,'New signal name','text',null,'');kept.value='rate';kept.fire('input');
+  assert.deepEqual([...drafts.entries()],[['metrics:New signal name','rate']]);
 });

@@ -1544,7 +1544,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     if(boxes.length)extendFrame(unionGraphFrame(null,boxes,4));
     // Metrics can add cards and move coins without resizing the board itself.
     // Notify its screen camera only after the complete overlay geometry settles.
-    if(svg.dispatchEvent && typeof CustomEvent!=='undefined')svg.dispatchEvent(new CustomEvent('dv:boardcontentchange',{bubbles:true}));
+    // #1255: Workbench Preview metrics layout (svg._dvGrowFrame) asks a fixed-height board to grow to fit.
+    if(svg.dispatchEvent && typeof CustomEvent!=='undefined')svg.dispatchEvent(new CustomEvent('dv:boardcontentchange',{bubbles:true,detail:{grow:!!svg._dvGrowFrame}}));
   };
   refreshFrame();
   /* Ink measured before webfonts settle, or skipped while an inactive tab
@@ -2998,6 +2999,8 @@ function createBoardNavigation(board, group, legend, changed){
   var canvas=board.querySelector('.boardcanvas');if(!canvas)return null;
   var retired=false,gesture=null,suppressClick=false,paused=null,followFrame=false,fitFrame=null,publishedScale=null;
   var fitting=false,autoFit=false,fitRequest=null,fitGeometry='';
+  // #1255: the viewport height before Preview metrics layout grew it (null when not grown).
+  var grownFrom=null;
   var motion=createCameraMotion();
   function stopFit(){autoFit=false;if(fitRequest!==null)cancelAnimationFrame(fitRequest);fitRequest=null;}
   function manual(){stopFit();motion.cancel();board.dispatchEvent(new CustomEvent('dv:cameramanual'));}
@@ -3031,7 +3034,7 @@ function createBoardNavigation(board, group, legend, changed){
     var box=svg.viewBox.baseVal,ink=boardContentBounds(svg);
     if(!ink || !ink.w || !ink.h || !box.width)return;
     fitting=true;followFrame=false;fitFrame={x:ink.x+ink.w/2,y:ink.y+ink.h/2};
-    board.style.setProperty('--board-viewport-height',board.getBoundingClientRect().height/displayScale()+'px');
+    grownFrom=null;board.style.setProperty('--board-viewport-height',board.getBoundingClientRect().height/displayScale()+'px');
     board.classList.add('board-zoomed');
     // Framing can remove the Scroll row and a scrollbar, changing both usable
     // axes. Remeasure after each update rather than fitting to stale controls.
@@ -3050,7 +3053,7 @@ function createBoardNavigation(board, group, legend, changed){
     var frame=board.getBoundingClientRect(),before=svg.getBoundingClientRect(),display=displayScale();
     var x=frame.left+(board.clientLeft+board.clientWidth/2)*display,y=frame.top+(board.clientTop+legend.offsetHeight+(board.clientHeight-legend.offsetHeight)/2)*display;
     var cx=(x-before.left)/before.width,cy=(y-before.top)/before.height;
-    board.style.setProperty('--board-viewport-height',frame.height/display+'px');
+    grownFrom=null;board.style.setProperty('--board-viewport-height',frame.height/display+'px');
     board.style.setProperty('--board-zoom-width',(svg.viewBox.baseVal.width*Math.max(external ? .001 : .15,Math.min(4,next)))+'px');
     board.classList.add('board-zoomed');
     // Updating overflow controls before measuring accounts for their height.
@@ -3105,7 +3108,7 @@ function createBoardNavigation(board, group, legend, changed){
   }
   function reset(){
     stopFit();motion.cancel();cancel();followFrame=false;fitFrame=null;board.classList.remove('board-zoomed');unframe();
-    board.style.removeProperty('--board-zoom-width');board.style.removeProperty('--board-viewport-height');
+    grownFrom=null;board.style.removeProperty('--board-zoom-width');board.style.removeProperty('--board-viewport-height');
     if(paused){paused.width='';paused.height='';paused.pendingFit=false;}
   }
   function down(ev){
@@ -3177,15 +3180,28 @@ function createBoardNavigation(board, group, legend, changed){
     var scroller=outerScrollerY(delta);if(!scroller || !ev.cancelable)return;
     ev.preventDefault();scroller.scrollTop+=delta;
   }
-  function contentChanged(){if(!enabled())return;if(autoFit)requestFit();else changed();}
+  // Only this board's own SVG can grow it; the event bubbles out of boards nested in its canvas.
+  function contentChanged(ev){if(!enabled())return;if(autoFit)requestFit();else if(ev && ev.detail && ev.detail.grow && ev.target===graph())growToContent();else changed();}
+  /* #1255: a board kept at a fixed viewport height (a restored or manual camera) grows, at its
+     current zoom, until the content fits vertically. It never shrinks and never changes zoom. */
+  function growToContent(){
+    var svg=graph();changed();
+    if(!svg || !board.clientWidth || !board.classList.contains('board-zoomed'))return;
+    var ink=boardContentBounds(svg),scale=ratio();if(!ink || !scale)return;
+    var need=Math.ceil(legend.offsetHeight+ink.h*scale+2);
+    if(need>board.clientHeight){
+      if(grownFrom===null)grownFrom=board.style.getPropertyValue('--board-viewport-height');
+      board.style.setProperty('--board-viewport-height',need+(board.offsetHeight-board.clientHeight)+'px');changed();
+    }
+  }
   board.addEventListener('dv:boardcontentchange',contentChanged);
   var listeners={pointerdown:down,pointermove:move,pointerup:up,pointercancel:cancel,lostpointercapture:lost,keydown:key};
   Object.keys(listeners).forEach(function(type){board.addEventListener(type,listeners[type]);});
   board.addEventListener('click',click,true);board.addEventListener('wheel',wheel,{passive:false});window.addEventListener('blur',cancel);
-  function snapshot(){var tolerance=1/displayScale();return paused || {followFrame:followFrame,fitFrame:fitFrame,pendingFit:autoFit && !fitGeometry,width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop,endX:board.scrollLeft>0 && board.scrollLeft+board.clientWidth>=board.scrollWidth-tolerance,endY:board.scrollTop>0 && board.scrollTop+board.clientHeight>=board.scrollHeight-tolerance};}
+  function snapshot(){var tolerance=1/displayScale();return paused || {followFrame:followFrame,fitFrame:fitFrame,pendingFit:autoFit && !fitGeometry,width:board.style.getPropertyValue('--board-zoom-width'),height:grownFrom!==null?grownFrom:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop,endX:board.scrollLeft>0 && board.scrollLeft+board.clientWidth>=board.scrollWidth-tolerance,endY:board.scrollTop>0 && board.scrollTop+board.clientHeight>=board.scrollHeight-tolerance};}
   function restore(state){
     if(!state || retired)return;
-    stopFit();fitFrame=state.fitFrame || null;
+    stopFit();fitFrame=state.fitFrame || null;grownFrom=null;
     if(paused)paused=state;followFrame=state.followFrame || false;
     if(state.width){board.style.setProperty('--board-zoom-width',state.width);board.style.setProperty('--board-viewport-height',state.height);board.classList.add('board-zoomed');}
     if(enabled()){changed();
@@ -3198,6 +3214,8 @@ function createBoardNavigation(board, group, legend, changed){
     // Composition can borrow and return a board before its first layout. Only
     // that still-pending fit resumes; a saved manual camera always wins.
     if(state.pendingFit)requestFit();
+    // #1255: a restored camera keeps its zoom and scroll, but still grows to fit preview cards.
+    else if(enabled()){var svg=graph();if(svg && svg._dvGrowFrame)growToContent();}
   }
   function camera(value){
     var svg=graph();if(!enabled() || !svg || !board.clientWidth)return null;
@@ -3222,7 +3240,7 @@ function createBoardNavigation(board, group, legend, changed){
     insets=insets || {left:24,right:24,top:24,bottom:24};
     // A host revealing a detail can reserve readable space below sticky controls
     // when the initial whole-diagram fit left only a shallow board.
-    if(minContentHeight){board.classList.add('board-zoomed');board.style.setProperty('--board-viewport-height',Math.max(board.clientHeight,legend.offsetHeight+minContentHeight)+'px');changed();}
+    if(minContentHeight){grownFrom=null;board.classList.add('board-zoomed');board.style.setProperty('--board-viewport-height',Math.max(board.clientHeight,legend.offsetHeight+minContentHeight)+'px');changed();}
     var width=Math.max(1,board.clientWidth-insets.left-insets.right),height=Math.max(1,board.clientHeight-legend.offsetHeight-insets.top-insets.bottom);
     zoom(Math.min(width/extent.w,height/extent.h,1.5));
     var svg=graph(),rect=svg.getBoundingClientRect(),frame=board.getBoundingClientRect(),display=displayScale(),scale=ratio(),origin=svg.viewBox.baseVal;
@@ -3242,7 +3260,7 @@ function createBoardNavigation(board, group, legend, changed){
     // controls can add a legend row. Keep the drawn graph in its actual place.
     var ink=boardContentBounds(svg) || {x:origin.x,y:origin.y,w:origin.width,h:origin.height};
     followFrame={x:ink.x,y:ink.y,right:ink.x+ink.w,bottom:ink.y+ink.h};
-    board.style.setProperty('--board-viewport-height',b.height/display+'px');
+    grownFrom=null;board.style.setProperty('--board-viewport-height',b.height/display+'px');
     board.style.setProperty('--board-zoom-width',origin.width*r+'px');board.classList.add('board-zoomed');changed();
     if(board.clientHeight-legend.offsetHeight<=72){reset();restore(saved);return;}
     var framed=svg.getBoundingClientRect();board.scrollLeft+=(framed.left-rect.left)/display;board.scrollTop+=(framed.top-rect.top)/display;

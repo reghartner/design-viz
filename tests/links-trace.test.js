@@ -176,3 +176,15 @@ test('LT11 a clashing rename names the field the reader changed; steps carry the
   assert.equal(c.planLinksTraceRename(text,raw,g,{serviceName:'x',operation:'y'},null).field,'both');
   assert.equal(el(model(board()),'step',2).stepId,'push');
 });
+
+test('LT12 a New trace match draft stays with its step: by id, or by caption for a step with no id',()=>{
+  const m=model(board()),push=el(m,'step',2),retry=el(m,'step',3);
+  const draft={stepId:push.stepId,caption:push.caption};
+  assert.equal(c.linksTraceSameStep(draft,push),true);assert.equal(c.linksTraceSameStep(draft,retry),false);
+  const spec=board();d(spec).steps.forEach(st=>{delete st.id;});const m2=model(spec),a=el(m2,'step',2),b=el(m2,'step',3);
+  assert.equal(a.stepId,null);
+  const idless={stepId:null,caption:a.caption};
+  assert.equal(c.linksTraceSameStep(idless,a),true);
+  assert.equal(c.linksTraceSameStep(idless,b),false,'an id-less step that shifts into its place is a different step');
+  assert.equal(c.linksTraceSameStep({stepId:null,caption:''},Object.assign({},a,{caption:''})),false,'no id and no caption: never assume the same step');
+});

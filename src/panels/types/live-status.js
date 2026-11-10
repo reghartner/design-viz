@@ -163,67 +163,86 @@
     };
     // #1099: find a trace from a Loki log line. A chosen line loads through the
     // form above it (connection, environment, lookback) and focuses its span.
-    // #1230: atRow asks for a list item right under the chosen row to hold its load error; it is returned.
+    // #1233: each authored lookup is its own search box (label, value, Find) in authored order, then the typed
+    // LogQL query in its own collapsible box. The results, and a load error (#1230), sit under the box that ran.
     function logLookupBody(config,box,logs,direct,atRow){
       var section=el(config,'section','logs','dv-trace-logs');section.setAttribute('aria-label','Find a trace from a log line');
       el(section,'h4','title','dv-trace-logs-title','Find a trace from a log line');
       if(!logs.available)el(section,'p','unavailable','dv-trace-logs-status',logs.note).setAttribute('role','status');
-      // tag 'checkbox': a checkbox followed by its label text; it sends node.checked.
-      function control(key,label,tag){
-        var check=tag==='checkbox',wrap=el(section,'label',key+'-label',check?'dv-trace-check-label':'dv-trace-input-label');if(!check)el(wrap,'span','label','',label);
+      var r=logs.result,reportItem=null,findable=logs.available && !logs.busy;
+      // tag 'checkbox': a checkbox followed by its label text; it sends node.checked. `search` names the box a value belongs to.
+      function control(parent,key,label,tag,search){
+        var check=tag==='checkbox',wrap=el(parent,'label',key+'-label',check?'dv-trace-check-label':'dv-trace-input-label');if(!check)el(wrap,'span','label','dv-trace-log-label',label);
         var node=el(wrap,check?'input':tag,key,check?'dv-trace-log-'+key:'dv-trace-input');if(check){node.type='checkbox';el(wrap,'span','label','',label);}
-        node.setAttribute('aria-label',label);node.disabled=!logs.available;
-        if(!node._logChange){node._logChange=function(){var owner=host._livePanelApi;if(owner)owner.setLogLookupField({field:key,value:check?node.checked:node.value});};node.addEventListener(tag==='select' || check?'change':'input',node._logChange);}
+        node.setAttribute('aria-label',label);node.disabled=!logs.available;node._logSearch=search;
+        if(!node._logChange){node._logChange=function(){var owner=host._livePanelApi;if(owner)owner.setLogLookupField({field:key,value:check?node.checked:node.value,lookup:node._logSearch});};node.addEventListener(tag==='select' || check?'change':'input',node._logChange);}
         return node;
       }
-      // #1173: with one authored lookup (or none) there is no select; a text button switches to a typed query and back.
-      if(logs.lookups.length>1){
-        var choose=control('lookup','Log lookup','select');
-        logs.lookups.forEach(function(l){el(choose,'option',l.id,'',l.label).value=l.id;});el(choose,'option',logs.typed,'','Type a LogQL query').value=logs.typed;
-        if(choose.value!==logs.form.lookup)choose.value=logs.form.lookup;
+      // Enter in a value box runs its Find; in the multi-line query box it is Ctrl+Enter or Cmd+Enter.
+      function onEnter(node,search,modifier){
+        node._logSearch=search;node._logEnterModifier=modifier;node._logFindable=findable;
+        if(!node._logEnter){node._logEnter=function(ev){
+          if(ev.key!=='Enter' || ev.isComposing || node._logEnterModifier && !(ev.ctrlKey || ev.metaKey))return;
+          var owner=host._livePanelApi;if(ev.preventDefault)ev.preventDefault();if(owner && node._logFindable)owner.findLogLines(node._logSearch);
+        };node.addEventListener('keydown',node._logEnter);}
       }
-      var lookup=logs.lookups.find(function(l){return l.id===logs.form.lookup;});
-      if(lookup && lookup.slot){
-        var value=control('value',lookup.label,'input');value.type='text';value.maxLength=200;value.autocomplete='off';value.spellcheck=false;value.placeholder=lookup.values.length?'Type or pick a value':'Type a value';
-        if(lookup.values.length){var list=el(section,'datalist','values','');list.id=host._logValuesId || (host._logValuesId='dv-trace-log-values-'+(++logValueLists));lookup.values.forEach(function(v,i){el(list,'option',String(i),'').value=v;});value.setAttribute('list',list.id);}
-        else value.removeAttribute('list');
-        if(value.value!==logs.form.value)value.value=logs.form.value;
+      function find(parent,search,name){
+        var running=logs.busy && r && r.lookup===search,go=button(parent,'find','reader-button dv-trace-log-find',running?'Finding…':'Find log lines','findLogLines');
+        go._liveArgument=search;go.setAttribute('aria-label','Find log lines for '+name);go.disabled=!findable;
+        if(running)go.setAttribute('aria-busy','true');else go.removeAttribute('aria-busy');
+        return go;
       }
-      if(logs.lookups.length===1 && lookup && !lookup.slot)el(section,'p','lookup-name','dv-trace-log-name','Log lookup: '+lookup.label);
-      if(logs.lookups.length===1){
-        var only=logs.lookups[0],mode=el(section,'button','mode','dv-trace-log-mode',lookup?'Type a LogQL query instead':'Use '+only.label+' instead');mode.type='button';mode.disabled=!logs.available;mode._logTo=lookup?logs.typed:only.id;
-        if(!mode._logClick){mode._logClick=function(){var owner=host._livePanelApi;if(owner && !mode.disabled)owner.setLogLookupField({field:'lookup',value:mode._logTo});};mode.addEventListener('click',mode._logClick);}
-      }
-      if(!lookup){var typed=control('logql','LogQL log query','textarea');typed.maxLength=2000;typed.rows=3;typed.spellcheck=false;typed.placeholder='{env="prod"} |= "message" | field="value"';if(typed.value!==logs.form.logql)typed.value=logs.form.logql;}
-      // #1158: checked by default; Find then lists only lines with a trace ID.
-      var traced=control('traced','Only lines with a trace ID','checkbox');if(traced.checked!==logs.form.traced)traced.checked=logs.form.traced;
+      // #1158: checked by default; Find then lists only lines with a trace ID. It applies to every box.
+      var traced=control(section,'traced','Only lines with a trace ID','checkbox');if(traced.checked!==logs.form.traced)traced.checked=logs.form.traced;
       // #1141: in Over time Find searches the selected day; name it.
       if(logs.search)el(section,'p','window','dv-trace-logs-window',logs.search);
-      var find=button(el(section,'div','actions','dv-live-controls'),'find','reader-button dv-trace-log-find','Find log lines','findLogLines');find.disabled=!logs.available || logs.busy;
-      var r=logs.result;if(!r)return;
-      var text=r.error || (logs.busy?'Finding log lines…':r.note || '');
-      if(text)el(section,'p','status','dv-trace-logs-status',text).setAttribute('role','status');
-      if(r.chosenNote)el(box,'p','log-note','dv-trace-direct-status',r.chosenNote).setAttribute('role','status');
-      if(!r.rows.length)return;
-      // #1145 (D5): loading a line's trace moves the view to the trace's day.
-      if(direct.movesDay)el(section,'p','moves','dv-trace-logs-moves','Loading a trace moves the view to its date.');
-      var rows=el(section,'ol','results','dv-trace-log-results'),reportItem=null;rows.setAttribute('aria-label','Matching log lines');
-      r.rows.forEach(function(row,i){
-        var item=el(rows,'li',String(i),'dv-trace-log-row');item.setAttribute('data-chosen',String(r.chosen===i));if(atRow && r.chosen===i){reportItem=el(rows,'li','report','dv-trace-log-report');reportItem.setAttribute('role','none');}
-        el(item,'time','time','dv-trace-log-time',row.time?row.time.replace('T',' ').replace(/\.\d+Z$/,'Z'):'time unavailable');
-        el(item,'span','value','dv-trace-log-value',row.value).title=row.line;
-        if(!row.traceId){el(item,'span','missing','dv-trace-log-missing',row.missing);return;}
-        el(item,'code','trace','dv-trace-log-id',row.traceId);
-        var load=el(item,'button','load','reader-button dv-trace-log-load tbtn','Load');load.type='button';load.setAttribute('aria-label','Load trace '+row.traceId);load._logIndex=i;load.disabled=!direct.available || direct.busy;
-        if(!load._logClick){load._logClick=function(){
-          var owner=host._livePanelApi;if(!owner || load.disabled)return;var request=host._directRevealRequest=(host._directRevealRequest || 0)+1;
-          Promise.resolve(owner.loadLogTrace(load._logIndex)).then(function(result){
-            if(!live || !result || host._livePanelApi!==owner || host._directRevealRequest!==request)return;
-            var target=host.querySelector('.dv-trace-selected');if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
-          });
-        };load.addEventListener('click',load._logClick);}
+      logs.lookups.forEach(function(lookup){
+        var group=el(section,'div','search-'+lookup.id,'dv-trace-log-search');group.setAttribute('role','group');group.setAttribute('aria-label',lookup.label+' log search');group.setAttribute('data-log-search',lookup.id);
+        var line=el(group,'div','controls','dv-trace-log-search-controls');
+        if(lookup.slot){
+          var value=control(line,'value',lookup.label,'input',lookup.id),typedValue=logs.form.values[lookup.id] || '';value.type='text';value.maxLength=200;value.autocomplete='off';value.spellcheck=false;value.placeholder=lookup.values.length?'Type or pick a value':'Type a value';
+          if(lookup.values.length){var ids=host._logValuesIds || (host._logValuesIds=Object.create(null)),list=el(line,'datalist','values','');list.id=ids[lookup.id] || (ids[lookup.id]='dv-trace-log-values-'+(++logValueLists));lookup.values.forEach(function(v,i){el(list,'option',String(i),'').value=v;});value.setAttribute('list',list.id);}
+          else value.removeAttribute('list');
+          if(value.value!==typedValue)value.value=typedValue;onEnter(value,lookup.id,false);
+        }else el(line,'span','name','dv-trace-log-name',lookup.label);
+        find(line,lookup.id,lookup.label);
+        results(group,lookup.id);
       });
+      // The reader-typed query: open by default only when no lookup is authored; the reader's toggle then holds.
+      var typed=el(section,'details','typed','dv-trace-log-typed');typed.setAttribute('data-log-search',logs.typed);
+      if(!typed._logOpenInit){typed._logOpenInit=true;typed.open=host._logTypedOpen!=null?host._logTypedOpen:!logs.lookups.length;}
+      if(!typed._logToggle){typed._logToggle=function(){host._logTypedOpen=typed.open;};typed.addEventListener('toggle',typed._logToggle);}
+      el(typed,'summary','summary','dv-trace-log-typed-summary','Type a LogQL query');
+      var area=control(typed,'logql','LogQL log query','textarea',logs.typed);area.maxLength=2000;area.rows=3;area.spellcheck=false;area.placeholder='{env="prod"} |= "message" | field="value"';area.title='Ctrl+Enter or Cmd+Enter runs Find';
+      if(area.value!==logs.form.logql)area.value=logs.form.logql;onEnter(area,logs.typed,true);
+      find(el(typed,'div','actions','dv-live-controls'),logs.typed,'LogQL query');
+      results(typed,logs.typed);
       return reportItem;
+      function results(parent,search){
+        if(!r || r.lookup!==search)return;
+        var text=r.error || (logs.busy?'Finding log lines…':r.note || '');
+        if(text)el(parent,'p','status','dv-trace-logs-status',text).setAttribute('role','status');
+        if(r.chosenNote)el(parent,'p','log-note','dv-trace-direct-status',r.chosenNote).setAttribute('role','status');
+        if(!r.rows.length)return;
+        // #1145 (D5): loading a line's trace moves the view to the trace's day.
+        if(direct.movesDay)el(parent,'p','moves','dv-trace-logs-moves','Loading a trace moves the view to its date.');
+        var rows=el(parent,'ol','results','dv-trace-log-results');rows.setAttribute('aria-label','Matching log lines');
+        r.rows.forEach(function(row,i){
+          var item=el(rows,'li',String(i),'dv-trace-log-row');item.setAttribute('data-chosen',String(r.chosen===i));if(atRow && r.chosen===i){reportItem=el(rows,'li','report','dv-trace-log-report');reportItem.setAttribute('role','none');}
+          el(item,'time','time','dv-trace-log-time',row.time?row.time.replace('T',' ').replace(/\.\d+Z$/,'Z'):'time unavailable');
+          el(item,'span','value','dv-trace-log-value',row.value).title=row.line;
+          if(!row.traceId){el(item,'span','missing','dv-trace-log-missing',row.missing);return;}
+          el(item,'code','trace','dv-trace-log-id',row.traceId);
+          var load=el(item,'button','load','reader-button dv-trace-log-load tbtn','Load');load.type='button';load.setAttribute('aria-label','Load trace '+row.traceId);load._logIndex=i;load.disabled=!direct.available || direct.busy;
+          if(!load._logClick){load._logClick=function(){
+            var owner=host._livePanelApi;if(!owner || load.disabled)return;var request=host._directRevealRequest=(host._directRevealRequest || 0)+1;
+            Promise.resolve(owner.loadLogTrace(load._logIndex)).then(function(result){
+              if(!live || !result || host._livePanelApi!==owner || host._directRevealRequest!==request)return;
+              var target=host.querySelector('.dv-trace-selected');if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
+            });
+          };load.addEventListener('click',load._logClick);}
+        });
+      }
     }
     // #1173: a section's open state while a trace is shown. It lives on the panel host, keyed by the shown trace
     // ([key, traceId]), so a repaint, a re-poll or a Jira <-> Trace switch keeps what the reader opened; another trace resets it.
@@ -719,7 +738,7 @@
 .pt-live-status .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
 .dv-live-trace{font-size:12px}.dv-live-trace p{margin:6px 0;overflow-wrap:anywhere}.dv-trace-mode-status:empty{display:none}
 .dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-check-label{display:flex;align-items:center;gap:6px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
-.dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{margin-left:.4em;color:var(--dfaint)}.dv-trace-request{margin:6px 0}.dv-trace-request>summary{cursor:pointer;overflow-wrap:anywhere;font-weight:600}.dv-trace-log-mode{display:block;margin:2px 0 6px;padding:0;border:0;background:none;color:var(--dv-live-active);font:inherit;text-decoration:underline;cursor:pointer}.dv-trace-log-mode:disabled{color:var(--dfaint);cursor:default}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}
+.dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{margin-left:.4em;color:var(--dfaint)}.dv-trace-request{margin:6px 0}.dv-trace-request>summary{cursor:pointer;overflow-wrap:anywhere;font-weight:600}.dv-trace-log-search,.dv-trace-log-typed{margin:8px 0;padding:8px;border:1px solid var(--explore-border);border-radius:6px;min-width:0}.dv-trace-log-search-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 8px;min-width:0}.dv-trace-log-search-controls>.dv-trace-input-label{flex:1 1 160px;min-width:0;margin:0}.dv-trace-log-name,.dv-trace-log-label{font-weight:600;overflow-wrap:anywhere}.dv-trace-log-name{flex:1 1 auto;align-self:center;min-width:0}.dv-trace-log-typed>summary{cursor:pointer;font-weight:600;padding:2px 0}.dv-trace-log-find[aria-busy=true]{cursor:progress}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}.dv-trace-log-report>.dv-trace-direct-report{margin-top:0}.dv-trace-log-row:has(+.dv-trace-log-report){border-bottom:0}
 .dv-trace-selected{min-width:0}.dv-trace-slot{margin:10px 0;min-width:0}.dv-trace-slot-hint{margin:0;padding:10px;border:1px dashed var(--explore-border);border-radius:6px;color:var(--dfaint);font-size:11px}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}

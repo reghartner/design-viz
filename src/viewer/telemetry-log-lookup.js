@@ -2,7 +2,8 @@
    only: one query_loki_logs log query per Find, through the Grafana connector
    that offers that tool (the one loki signals use). A lookup comes from
    tracking.telemetry.lookups and fills its $value slot; the reader may instead
-   type a LogQL log query. Both expand $env, ${variables} and $account like
+   type a LogQL log query. #1233: each lookup is its own search box with its own
+   value; Find runs one box, and its results belong to that box (result.lookup). Both expand $env, ${variables} and $account like
    signals, cover the Load trace lookback and return at most 10 lines, newest
    first. Choosing a line hands its trace id and span id to the direct trace
    loader (viewer/live-status.js). Nothing is written to the board.
@@ -55,7 +56,8 @@ function createTelemetryLogLookup(page,transport,hooks){
   hooks=hooks || {};
   var holding=false,dead=false,retired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),off=null,serial=0,abort=null,timer=null,busy=false,connector=null,lastIdentity=null,result=null;
   // traced: "Only lines with a trace ID" (#1158), reader state like the rest of the form.
-  var form={lookup:'',value:'',logql:'',traced:true};
+  // form.lookup is the box that ran last (or is about to); form.value is its value; boxValues holds every box's value (#1233).
+  var form={lookup:'',value:'',logql:'',traced:true},boxValues=Object.create(null);
   function lookups(){return trackingTelemetry(page).lookups || null;}
   function supported(){return !!transport && typeof transport.logsConnector==='function' && typeof transport.queryLogs==='function';}
   // '' when enabled, else the cause: a TELEMETRY_LOG_DISABLED key, or true for an unnamed one.
@@ -66,7 +68,7 @@ function createTelemetryLogLookup(page,transport,hooks){
   function sync(){
     var key=JSON.stringify(typeof hooks.identity==='function'?hooks.identity():null),ls=lookups() || {},ids=Object.keys(ls);
     if(key!==lastIdentity){if(lastIdentity!==null && !holding){cancel();result=null;}lastIdentity=key;}
-    if(form.lookup!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,form.lookup)){form.lookup=ids.length?ids[0]:TELEMETRY_LOG_TYPED;form.value='';}
+    if(form.lookup!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,form.lookup)){form.lookup=ids.length?ids[0]:TELEMETRY_LOG_TYPED;form.value=boxValues[form.lookup] || '';}
     return ls;
   }
   // A closed view and host telemetry off name themselves; without a logs connector the
@@ -89,13 +91,24 @@ function createTelemetryLogLookup(page,transport,hooks){
     if(typeof hooks.wanted!=='function' || hooks.wanted())discover();
     var s=state();
     var searched=s==='ready' && daySearch(typeof hooks.lookback==='function'?hooks.lookback():null);
-    return {available:s==='ready',state:s,note:note(s),busy:busy,form:Object.assign({},form),typed:TELEMETRY_LOG_TYPED,search:searched?'Loki · '+searched.label:'',
+    return {available:s==='ready',state:s,note:note(s),busy:busy,form:Object.assign({},form,{values:Object.assign({},boxValues)}),typed:TELEMETRY_LOG_TYPED,search:searched?'Loki · '+searched.label:'',
       lookups:Object.keys(ls).map(function(id){var l=ls[id];return {id:id,label:l.label,slot:telemetryLookupSlot(l.query),values:(l.values || []).slice()};}),
       result:result?Object.assign(JSON.parse(JSON.stringify(result)),{next:next()}):null};
   }
-  function set(field,value){
+  // `lookup` names the box a 'value' belongs to (default: form.lookup). A box's own edit clears only its results;
+  // the shared checkbox clears any.
+  function set(field,value,lookup){
     if(dead || !telemetryOwn(form,field) || typeof value!==typeof form[field] || typeof value==='string' && value.length>2000)return;
-    sync();if(form[field]===value)return;cancel();form[field]=value;if(field==='lookup')form.value='';result=null;sync();changed();
+    var ls=sync(),at=field==='value'?typeof lookup==='string'?lookup:form.lookup:field==='logql'?TELEMETRY_LOG_TYPED:null;
+    if(field==='value'){
+      if(!telemetryOwn(ls,at) || (boxValues[at] || '')===value)return;
+      boxValues[at]=value;if(at===form.lookup)form.value=value;
+    }else if(field==='lookup'){
+      if(form.lookup===value || value!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,value))return;
+      form.lookup=value;form.value=boxValues[value] || '';
+    }else{if(form[field]===value)return;form[field]=value;}
+    if(field!=='lookup' && result && (at===null || result.lookup===at)){cancel();result=null;}
+    changed();
   }
   function errorText(e){
     var approval='Grafana access needs your approval in claude.ai; allow it, then find again.',known={approval_required:approval,consent_required:approval,not_granted:'Grafana connector permission was not granted.',
@@ -105,9 +118,12 @@ function createTelemetryLogLookup(page,transport,hooks){
     var text=e && typeof e.message==='string'?e.message.replace(/[\x00-\x1f\x7f]+/g,' ').trim():'';
     return text?(text.length>200?text.slice(0,199)+'…':text):'Grafana did not answer the log query.';
   }
-  async function find(){
+  // `lookup` is the box whose Find ran (default: form.lookup); an unknown one runs nothing.
+  async function find(lookup){
     if(dead || !lookups())return null;
-    var ls=sync();cancel();var mine=serial,controller=new AbortController(),signal=controller.signal;abort=controller;
+    var ls=sync();
+    if(typeof lookup==='string'){if(lookup!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,lookup))return null;form.lookup=lookup;form.value=boxValues[lookup] || '';}
+    cancel();var mine=serial,controller=new AbortController(),signal=controller.signal;abort=controller;
     var request=Object.assign({},form),typed=request.lookup===TELEMETRY_LOG_TYPED,lookup=typed?null:ls[request.lookup];
     function fail(message){throw {code:'input',message:message};}
     try{

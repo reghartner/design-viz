@@ -1956,3 +1956,5 @@ body.links-dragging,body.links-dragging *{cursor:grabbing !important;user-select
 .links-trace-actions{display:flex;flex-wrap:wrap;gap:6px;}
 .links-trace-danger{color:var(--links-bad);}
 .links-trace-rename .links-trace-field{flex:1 1 100%;}
+.links-view [aria-disabled="true"],.links-popover [aria-disabled="true"]{opacity:.55;cursor:not-allowed;}
+.links-pop-row .links-pop-reason{flex:1 1 100%;}

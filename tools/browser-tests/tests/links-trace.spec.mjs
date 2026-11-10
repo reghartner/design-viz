@@ -10,6 +10,7 @@
    T9 editor Esc + gone alternative + failed create | same | Esc from the Node select closes the editor; removing the match being edited closes its editor; a re-render keeps the typed service and operation, and a refused Create keeps them with the reason beside Service name | an editor stuck on "This match changed", lost typing
    T10 menu keys skip disabled | same | Move to… step 4 (it already has the same match) disables Add as alternative; ArrowDown from Replace reaches Cancel; Enter on Cancel writes nothing | arrow keys stuck on a disabled item
    T11 create draft follows its step | same | a + Add trace match draft on step 3 is dropped when a JSON edit removes step 1 and moves another step into its place | a draft that jumps to another step
+   T12 id-less step | step 3 without an id | + Add trace match is focusable, aria-disabled and described by the visible reason; clicking it writes nothing and says the reason in the status line | a disabled control that hides its reason from keyboard users
    T6 imported node | consumer importing provider api | the Node select lists API (imported) and writes nodeId canon::api in one Undo step | imported nodes missing from the select */
 import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
 import {digest} from '../../canon/drift.mjs';
@@ -125,6 +126,10 @@ test('T4 keyboard Move to… onto a step with a match asks Replace or Add as alt
     const menu=page.getByRole('menu',{name:/ingest-api · POST \/v1\/events/});await expect(menu).toBeVisible();
     await menu.getByRole('menuitem',{name:'Move to…'}).click();
     const picker=page.getByRole('dialog',{name:/Move ingest-api · POST \/v1\/events/});await expect(picker).toBeVisible();
+    // A refused target (the source step) stays focusable, says why in visible text, and is described by it.
+    const self=picker.getByRole('button',{name:'Step 1 · publish',exact:true});
+    await expect(self).toHaveAttribute('aria-disabled','true');
+    const why=page.locator('#'+await self.getAttribute('aria-describedby'));await expect(why).toBeVisible();await expect(why).toContainText('already here');
     await picker.getByRole('button',{name:'Step 2 · route',exact:true}).focus();await page.keyboard.press('Enter');
     const ask=page.getByRole('menu',{name:/Step 2 · route already has a trace match/});await expect(ask).toBeVisible();
     return ask;
@@ -274,4 +279,18 @@ test('T11 a new trace match draft is dropped when its step moves away',async({pa
   await expect.poll(async()=>steps(await source(page)).length).toBe(3);
   await expect(panel.locator('.links-trace-editor')).toHaveCount(0);
   await expect(panel.locator('[data-links-element="step:0:1"]').getByRole('button',{name:'Add trace match to Step 2 · push',exact:true})).toBeVisible();
+});
+
+test('T12 + Add trace match on a step without an id is focusable, explains why, and does nothing',async({page,server})=>{
+  const spec=JSON.parse(JSON.stringify(fixture));delete spec.page.sections[0].diagram.steps[2].id;
+  const {panel,text,links}=await open(page,server,spec);
+  await panel.getByRole('button',{name:'By element',exact:true}).click();
+  const add=panel.locator('[data-links-element="step:0:2"]').getByRole('button',{name:/^Add trace match to Step 3/});
+  await add.focus();await expect(add).toBeFocused();
+  await expect(add).toHaveAttribute('aria-disabled','true');
+  const why=page.locator('#'+await add.getAttribute('aria-describedby'));await expect(why).toBeVisible();await expect(why).toContainText('Give this step an id in Inspect first');
+  await add.click();
+  await expect(panel.locator('.links-trace-editor')).toHaveCount(0);
+  await expect(links.locator('.links-status')).toContainText('Give this step an id in Inspect first');
+  await expect(page.locator('#src')).toHaveValue(text);
 });

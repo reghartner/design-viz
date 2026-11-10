@@ -433,10 +433,7 @@ function initWorkbenchLinksView(opts){
             var reason=!x.editable?x.reason:x.kind==='step' && x.lit.indexOf(key)<0?'Lights no node or connection with '+key:x.kind!=='step' && x.inherited.indexOf(key)>=0?'Inherited from the provider (read only)':null;
             body.appendChild(option(id,sectionPrefix(x)+x.label,on,reason,function(checked){assign(x,key,!checked);},note));
           }else{
-            var why=why_[id],pick=button('links-pop-target',sectionPrefix(x)+x.label);pick.setAttribute('data-links-option',id);
-            if(why){pick.disabled=true;pick.title=why;}
-            popLife.listen(pick,'click',function(){var source=from,copy=spec.copy;closePopover(false);if(move(copy?null:source,x,key,false))focusChip(x,key);});
-            var line=el('div','links-pop-row');line.appendChild(pick);if(note)line.appendChild(el('span','links-chip-note',note));body.appendChild(line);
+            body.appendChild(pickTarget(sectionPrefix(x)+x.label,id,why_[id],function(){var source=from,copy=spec.copy;closePopover(false);if(move(copy?null:source,x,key,false))focusChip(x,key);},note));
           }
         });
       });
@@ -447,14 +444,33 @@ function initWorkbenchLinksView(opts){
     if(keep && popover.querySelector('.links-pop-list'))popover.querySelector('.links-pop-list').scrollTop=keep.scroll || 0;
     if(fresh)search.focus();
   }
+  /* A control that cannot act stays focusable: aria-disabled, its reason as visible text it
+     is described by, and a refused activation says the reason in the status line. */
+  var reasonIds=0;
+  function refusedReason(control,reason,parent){
+    var why=el('span','links-pop-reason',reason);why.id=uid+'-reason-'+(++reasonIds);
+    control.setAttribute('aria-disabled','true');control.setAttribute('aria-describedby',why.id);control.title=reason;
+    (parent || control.parentNode).appendChild(why);return why;
+  }
+  function refused(control){return control.getAttribute('aria-disabled')==='true';}
   function option(id,label,checked,reason,onChange,note){
     var line=el('div','links-pop-row');line.setAttribute('data-links-option',id);
     var lab=el('label','links-pop-option'),box=el('input');box.type='checkbox';box.checked=!!checked;
-    if(reason){box.disabled=true;lab.title=reason;}
-    popLife.listen(box,'change',function(){if(!onChange(box.checked))box.checked=!box.checked;});
+    popLife.listen(box,'change',function(){
+      if(refused(box)){box.checked=!box.checked;say('Cannot change this: '+reason);return;}
+      if(!onChange(box.checked))box.checked=!box.checked;
+    });
     lab.appendChild(box);lab.appendChild(el('span',null,label));line.appendChild(lab);
     if(note)line.appendChild(el('span','links-chip-note',note));
-    if(reason)line.appendChild(el('span','links-pop-reason',reason));
+    if(reason)refusedReason(box,reason,line);
+    return line;
+  }
+  // A Move to… / Copy to… target that the static checks refuse.
+  function pickTarget(label,id,why,onPick,note){
+    var line=el('div','links-pop-row'),pick=button('links-pop-target',label);pick.setAttribute('data-links-option',id);line.appendChild(pick);
+    if(note)line.appendChild(el('span','links-chip-note',note));
+    if(why)refusedReason(pick,why,line);
+    popLife.listen(pick,'click',function(){if(refused(pick)){say('Cannot drop here: '+why);return;}onPick();});
     return line;
   }
   function paintMenu(spec,opener){
@@ -773,9 +789,9 @@ function initWorkbenchLinksView(opts){
           e.matches.forEach(function(u){chips.appendChild(traceChip(u,e,false));});
           if(e.form && !e.matches.length){
             var addMatch=button('links-assign','+ Add trace match','Add trace match to '+e.label);
-            if(!e.stepId){addMatch.disabled=true;addMatch.title=e.label+LINKS_TRACE_NEEDS_ID;chips.appendChild(el('span','links-none',e.label+LINKS_TRACE_NEEDS_ID));}
-            rowsLife.listen(addMatch,'click',function(){state.traceCreate={id:linksElementId(e),stepId:e.stepId,caption:e.caption,serviceName:'',operation:''};state.traceEdit=null;render();var f=list.querySelector('[data-links-field="'+cssEscape(linksElementId(e)+'|new|serviceName')+'"]');if(f)f.focus();});
             chips.appendChild(addMatch);
+            if(!e.stepId)refusedReason(addMatch,e.label+LINKS_TRACE_NEEDS_ID,chips);
+            rowsLife.listen(addMatch,'click',function(){if(refused(addMatch)){say('Cannot add a trace match: '+addMatch.title);return;}state.traceCreate={id:linksElementId(e),stepId:e.stepId,caption:e.caption,serviceName:'',operation:''};state.traceEdit=null;render();var f=list.querySelector('[data-links-field="'+cssEscape(linksElementId(e)+'|new|serviceName')+'"]');if(f)f.focus();});
           }
         }else{
           if(!e.via.length)chips.appendChild(el('span','links-none','No step with a match '+(e.kind==='node'?'names it':'lights it')));
@@ -849,14 +865,11 @@ function initWorkbenchLinksView(opts){
           if(!g)return false;return commit(function(text,raw,ctx){return planLinksTraceAssign(text,raw,g,stepRef(x),!checked,ctx);},{ok:checked?assignText(x,spec.key):'Removed '+spec.key+' from '+x.label+'. Undo restores it.'});
         },assignNote));
       }else{
-        var pick=button('links-pop-target',sectionPrefix(x)+x.label);pick.setAttribute('data-links-option',id);
-        if(why[id]){pick.disabled=true;pick.title=why[id];}
-        popLife.listen(pick,'click',function(){
+        body.appendChild(pickTarget(sectionPrefix(x)+x.label,id,why[id],function(){
           var f=spec.from,c=spec.copy,src=spec.opener;
           if(x.matches.length){traceChoose(f,x,spec.key,c,src);return;}
           closePopover(false);traceMove(f,x,spec.key,null,c);
-        });
-        var line=el('div','links-pop-row');line.appendChild(pick);if(note)line.appendChild(el('span','links-chip-note',note));body.appendChild(line);
+        },note));
       }
     });
     popover.appendChild(el('p','links-pop-hint',spec.type==='trace-move'?'↑↓ move · Enter picks · a step with a match asks Replace or Add as alternative · Esc closes':'↑↓ move · Space ticks or unticks · Esc closes · each tick is one Undo step'));

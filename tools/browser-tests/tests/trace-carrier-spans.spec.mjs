@@ -95,6 +95,7 @@ test('desktop: a declarations-only board with no trace connection of its own inh
   html=html.replace(boot,'TELEMETRY_COMPANY_TRACE_CONNECTIONS='+JSON.stringify({company:PROFILE})+';\n'+boot);await writeFile(output,html);
   await page.goto(server.origin+'/trace-carrier-inherited.html');await page.waitForFunction(()=>!!window.ctl);
   const root=page.locator('body');
+  await expect(root.getByRole('combobox',{name:'Connection environment',exact:true}),'company trace profile inherited').toBeVisible();
   await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
   await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);
   expect(calls,'nothing calls the provider before Load').toEqual([]);

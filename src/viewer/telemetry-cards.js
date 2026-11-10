@@ -255,8 +255,28 @@ function telemetryCardBuild(doc,svg,carrier,binding,id,attrs,view,window){
   var height=y+3;rect.setAttribute('height',height);bar.setAttribute('d','M3 7V'+(height-7));
   return {card:card,w:w,height:height,state:metricState};
 }
-/* #1294 Outline: the verdict colour of a carrier, worst signal first; no data is 'waiting'. */
-function telemetryOutlineState(binding,view,id){return telemetryCardMetricState(binding,view.map[id],view.verdicts.carriers[id]) || 'waiting';}
+/* #1294 Outline: the verdict colour of a carrier, worst signal first: breach (error), degraded (failing),
+   no data (waiting), then healthy (held, or flowing without authored limits). */
+function telemetryOutlineState(binding,view,id){
+  var sample=view.map[id],result=view.verdicts.carriers[id],names=telemetryMetricNames(binding);
+  if(telemetryErrorFailing(binding,result).length)return 'error';
+  if(result && (result.failing || []).length)return 'failing';
+  if(!names.length || result && result.telemetry==='silent' || names.some(function(name){return telemetryReading(sample,name).value===null;}))return 'waiting';
+  return telemetryMetricProofNames(binding).length?'held':'flowing';
+}
+/* #1294: the board's frame as obstacles, so a shown outline card is placed inside it; clamp is the last resort. */
+function telemetryFrameBoxes(svg){
+  var f=svg.viewBox && svg.viewBox.baseVal;if(!f || !f.width || !f.height)return {boxes:[],clamp:function(box){return box;}};
+  var far=1e5;
+  return {boxes:[{x:f.x-far,y:f.y-far,w:far,h:3*far},{x:f.x+f.width,y:f.y-far,w:far,h:3*far},{x:f.x-far,y:f.y-far,w:3*far,h:far},{x:f.x-far,y:f.y+f.height,w:3*far,h:far}],
+    clamp:function(box){return {x:Math.max(f.x+4,Math.min(box.x,f.x+f.width-box.w-4)),y:Math.max(f.y+4,Math.min(box.y,f.y+f.height-box.h-4)),w:box.w,h:box.h};}};
+}
+/* #1294: points along a connection, so its outline card never covers its own line. */
+function telemetryPathBoxes(path){
+  var length=path.getTotalLength(),out=[];
+  for(var at=0;at<=length;at+=16){var p=path.getPointAtLength(at);out.push({x:p.x-4,y:p.y-4,w:8,h:8});}
+  return out;
+}
 /* #1294 Outline: a node card sits beside the node on the first side with free room, never over it. */
 function telemetryNodeCardPlace(nodeBox,w,h,boxes){
   var gap=14,sides=[{x:nodeBox.x+nodeBox.w+gap,y:nodeBox.y+nodeBox.h/2-h/2},{x:nodeBox.x-gap-w,y:nodeBox.y+nodeBox.h/2-h/2},{x:nodeBox.x+nodeBox.w/2-w/2,y:nodeBox.y+nodeBox.h+gap},{x:nodeBox.x+nodeBox.w/2-w/2,y:nodeBox.y-gap-h}];
@@ -270,7 +290,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
   // #1294: Outline draws a verdict-colour outline per carrier; its card is drawn hidden and shown on hover, focus or tap.
   var outline=style==='outline' && !view.preview;
   scope.querySelectorAll('svg').forEach(function(svg){
-    var boxes=[],labels=[],doc=svg.ownerDocument;
+    var boxes=[],labels=[],doc=svg.ownerDocument,frame=outline?telemetryFrameBoxes(svg):null;
     svg.querySelectorAll('.node .card,.node .icbg,.node use,.node image,.node text,.handoff-stripe,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff],.dvdelta,.node-review-badge,.comm-break,text.lbl,.dv-trace-overlay text').forEach(function(el){if(el.closest('.coin'))return;var box=boardControlBox(el,svg);if(box)boxes.push(box);if(box && el.closest('.dv-trace-overlay'))labels.push(box);});
     Array.from(svg.querySelectorAll('path.edge[data-dv-edge]')).sort(function(a,b){
       function manual(path){var edge=(diagram.edges || [])[Number(path.getAttribute('data-dv-edge'))],binding=edge && carrierTelemetry(edge,templates,null,config);return !!(binding && binding.card && binding.card.position);}
@@ -281,8 +301,9 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       if(!binding || !telemetryMetricNames(telemetryCardBinding(binding)).length || edge.hidden===true || !boardControlBox(path,svg) && !boardControlBox(liveBreak,svg))return;
       var id=edge.from+'->'+edge.to,attrs={'data-dv-edge':index};if(outline)attrs['data-metrics-style']='outline';
       var built=telemetryCardBuild(doc,svg,edge,binding,id,attrs,view,window),card=built.card,height=built.height;
-      // An outline card is shown alone, so other cards are not obstacles.
-      var placed=telemetryCardPlace(path,built.w,height,outline?{side:(binding.card || {}).side}:binding.card || {},boxes),box=placed.box;
+      // An outline card is shown alone, so other cards are not obstacles; it stays inside the frame and off its own line.
+      var placed=outline?telemetryCardPlace(path,built.w,height,{},boxes.concat(frame.boxes,telemetryPathBoxes(path))):telemetryCardPlace(path,built.w,height,binding.card || {},boxes),box=placed.box;
+      if(outline)box=placed.box=frame.clamp(box);
       card.setAttribute('data-metrics-anchor-x',placed.mid.x);card.setAttribute('data-metrics-anchor-y',placed.mid.y);
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');card.setAttribute('data-side',placed.side);
       var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-dv-edge':index,d:telemetryCardLeaderTo(placed.mid,box,labels),'pointer-events':'none','aria-hidden':'true'});
@@ -306,7 +327,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       if(!binding || !shape || node.hidden===true || !telemetryMetricNames(telemetryCardBinding(binding)).length)return;
       var nodeBox=boardControlBox(shape,svg);if(!nodeBox)return;
       var built=telemetryCardBuild(doc,svg,{label:node.title || id,telemetry:node.telemetry},binding,id,{'data-metrics-node':id,'data-metrics-style':'outline'},view,window),card=built.card;
-      var placed=telemetryNodeCardPlace(nodeBox,built.w,built.height,boxes),box=placed.box;
+      var placed=telemetryNodeCardPlace(nodeBox,built.w,built.height,boxes.concat(frame.boxes)),box=placed.box=frame.clamp(placed.box);
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');
       var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-metrics-node':id,'data-metrics-style':'outline',d:telemetryCardLeaderTo(placed.mid,box,labels),'pointer-events':'none','aria-hidden':'true'});
       svg.insertBefore(leader,card);

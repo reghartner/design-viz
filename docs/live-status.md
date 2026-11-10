@@ -837,13 +837,17 @@ While **Metrics overlay** is on, a **Cards | Outline** choice sits right of the 
 draws no cards. Each bound connection gets a wide halo under its line and each bound
 node a ring a few pixels outside its border, in the metric verdict colour: green
 healthy, amber degraded, red breach (an error signal outside its limit), grey no
-data. A carrier with several signals takes the worst one. The Jira colours stay on
-the node border and the line, so the two remain distinct. Imported and loaded-detail
+data. A carrier with several signals takes the worst one, in that order: breach,
+degraded, no data, healthy. The Jira colours stay on the node border and the line,
+so the two remain distinct. Imported and loaded-detail
 carriers are outlined the same way.
 
 Hovering or focusing an outlined carrier shows its card, the same card Cards draws,
-beside it on a side with free room. A click, Enter or Space opens the full detail
-popover on the carrier, and Escape closes it. On a touch screen the first tap shows
+beside it on a side with free room inside the board, never over the carrier. A
+connection's halo is its one carrier button (its label points to it); a node that
+already has a Jira card button keeps it, and its ring opens the same popover. A
+click, Enter or Space opens the full detail popover on the carrier, and Escape
+closes it. Tab moves from the carrier to the shown card's query links, then on. On a touch screen the first tap shows
 the card; a second tap, or a tap on the card, opens the detail. The choice is
 remembered per viewer and board in browser storage. Workbench authoring and the
 preview always draw cards. A connection halo is a `path.dv-metrics-outline`, a node

@@ -4243,16 +4243,18 @@ svg path.edge.dv-metrics-ghosted{opacity:.35;}
 .dv-metrics-card[data-metric-state] .dv-metrics-card-bar{display:none;}
 /* #1294 Outline style: a verdict-colour halo under each bound connection and a ring outside each bound node's border
    (green healthy, amber degraded, red breach, grey no data). Its card stays hidden until hover, focus or a tap. */
-.dv-metrics-outline{fill:none;stroke:var(--dv-metrics-outline,#87929e);stroke-linecap:round;stroke-linejoin:round;pointer-events:stroke;cursor:pointer;}
-.dv-metrics-outline[data-metric-state="held"],.dv-metrics-outline[data-metric-state="flowing"]{--dv-metrics-outline:#23a047;}
-.dv-metrics-outline[data-metric-state="failing"]{--dv-metrics-outline:#c88b14;}
-.dv-metrics-outline[data-metric-state="error"]{--dv-metrics-outline:#d64b68;}
-.dv-metrics-outline[data-metric-state="waiting"]{--dv-metrics-outline:#87929e;}
+.dv-metrics-outline{fill:none;stroke:var(--dv-metrics-outline,var(--dv-metrics-ghost));stroke-linecap:round;stroke-linejoin:round;pointer-events:stroke;cursor:pointer;}
+.dv-metrics-outline[data-metric-state="held"],.dv-metrics-outline[data-metric-state="flowing"]{--dv-metrics-outline:var(--dv-metrics-proven);}
+.dv-metrics-outline[data-metric-state="failing"]{--dv-metrics-outline:var(--dv-metrics-amber);}
+.dv-metrics-outline[data-metric-state="error"]{--dv-metrics-outline:var(--dv-metrics-error);}
+.dv-metrics-outline[data-metric-state="waiting"]{--dv-metrics-outline:var(--dv-metrics-ghost);}
 path.dv-metrics-outline{stroke-width:14px;stroke-opacity:.45;}
 rect.dv-metrics-outline{stroke-width:4px;}
+/* Focus: a contrasting ink outline around the carrier. Open: the outline itself turns solid and heavier. */
 .dv-metrics-outline:focus{outline:none;}
-path.dv-metrics-outline:focus-visible,path.dv-metrics-outline[aria-expanded="true"]{stroke-opacity:.8;}
-rect.dv-metrics-outline:focus-visible,rect.dv-metrics-outline[aria-expanded="true"]{stroke-width:6px;}
+.dv-metrics-outline:focus-visible{outline:2px solid var(--dink,#111);outline-offset:3px;}
+path.dv-metrics-outline[aria-expanded="true"]{stroke-opacity:.9;stroke-width:18px;}
+rect.dv-metrics-outline[aria-expanded="true"]{stroke-width:7px;}
 .dv-metrics-card[data-metrics-style="outline"]:not(.dv-metrics-peek),.dv-metrics-leader[data-metrics-style="outline"]:not(.dv-metrics-peek){visibility:hidden;}
 .dv-metrics-card[data-metrics-style="outline"].dv-metrics-peek{cursor:pointer;filter:drop-shadow(0 2px 6px rgba(20,30,50,.25));}
 .dv-live-proof-arc[data-metric-state][data-proof-bucket]{stroke:var(--dv-metric-line);}

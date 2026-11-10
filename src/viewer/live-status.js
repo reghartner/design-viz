@@ -938,13 +938,18 @@ function createLiveStatus(ctl,page,options,renderOptions){
           return;
         }
         if(outline && index==null){
-          // #1294 Outline node: its ring is the metrics button; the hidden card, when shown, opens the same detail.
-          var nodeId=outline.getAttribute('data-metrics-carrier'),nodeAppearance=!cardsView.preview && workPaint && api.enabled() && availabilityOn && references?liveStatusPresentation(edge,map):null;
+          // #1294 Outline node: a node that is already a carrier button (its Jira card) keeps that one button; the
+          // ring and the shown card open it. Otherwise the ring is the node's metrics button.
+          var nodeId=outline.getAttribute('data-metrics-carrier'),own=path.querySelector('.card.dv-live-target');
+          if(own){carrierPointer(outline,own);carrierPointer(card,own);return;}
+          var nodeAppearance=!cardsView.preview && workPaint && api.enabled() && availabilityOn && references?liveStatusPresentation(edge,map):null;
           carrierTarget(outline,nodeId,edge,nodeAppearance,binding.page.tracking,edge.title || nodeId,null,null,binding.ordinal!=null?{section:binding.ordinal,kind:'node',id:nodeId}:null,null,!workPaint);
           carrierPointer(card,outline);outlineLabel(outline,edge.title || nodeId);
           return;
         }
         var previous=path._livePointerTarget || path,c=previous._liveCarrier,target=outline || card;
+        // #1294 Outline: the halo replaces the edge's label or line as its one carrier button; they point to it.
+        if(outline && previous!==outline && previous.classList.contains('dv-live-target')){clearTarget(previous);carrierPointer(previous,outline);}
         carrierTarget(target,edge.from+'->'+edge.to,edge,appearance,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null,null,!workPaint);
         carrierPointer(path,target);carrierPointer(path.closest('svg').querySelector('path.halo[data-dv-edge="'+index+'"]'),target);
         if(outline){carrierPointer(card,outline);outlineLabel(outline,edge.label || edge.from+' → '+edge.to);}
@@ -1715,10 +1720,23 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function peekOut(ev){if(ev.pointerType==='touch' || !metricsOutlineOf(ev.target))return;if(metricsOutlineOf(ev.relatedTarget)===metricsOutlineOf(ev.target))return;metricsUnpeek();}
   function peekDown(ev){lastPointer=ev.pointerType || 'mouse';if(lastPointer==='touch' && !metricsOutlineOf(ev.target) && !(pop && pop.contains(ev.target)))metricsPeek(null);}
   function peekFocus(ev){var o=metricsOutlineOf(ev.target);if(o)metricsPeek(o);}
+  function outlineButton(o){return o.classList.contains('dv-live-target')?o:o._livePointerTarget || o;}
+  // A shown card's query links follow its carrier button in Tab order, then Tab moves on past the card.
+  function peekTab(ev){
+    if(ev.key!=='Tab' || ev.altKey || ev.ctrlKey || ev.metaKey)return;
+    var o=metricsOutlineOf(ev.target),card=o && o._metricsCard;if(!card || !card.classList.contains('dv-metrics-peek'))return;
+    var links=Array.prototype.slice.call(card.querySelectorAll('a.dv-metrics-query-link')),i=links.indexOf(ev.target),owner=outlineButton(o);if(!links.length)return;
+    if(i<0 && ev.target===owner && !ev.shiftKey){ev.preventDefault();links[0].focus();return;}
+    if(i===0 && ev.shiftKey){ev.preventDefault();owner.focus();return;}
+    if(i===links.length-1 && !ev.shiftKey){
+      var stops=Array.prototype.filter.call(view.querySelectorAll('a[href],button,input,select,textarea,[tabindex]'),function(el){return el.tabIndex>=0 && !el.disabled && !el.closest('.dv-metrics-card[data-metrics-style="outline"]') && el.getClientRects().length;}),next=stops[stops.indexOf(owner)+1];
+      if(next){ev.preventDefault();next.focus();}
+    }
+  }
   function peekBlur(ev){if(metricsOutlineOf(ev.target) && metricsOutlineOf(ev.relatedTarget)!==metricsOutlineOf(ev.target))metricsUnpeek();}
   view.addEventListener('pointerover',peekOver);view.addEventListener('pointerout',peekOut);view.addEventListener('pointerdown',peekDown,true);
-  view.addEventListener('focusin',peekFocus);view.addEventListener('focusout',peekBlur);
-  destroyListeners.push(function(){if(peekTimer)clearTimeout(peekTimer);view.removeEventListener('pointerover',peekOver);view.removeEventListener('pointerout',peekOut);view.removeEventListener('pointerdown',peekDown,true);view.removeEventListener('focusin',peekFocus);view.removeEventListener('focusout',peekBlur);});
+  view.addEventListener('focusin',peekFocus);view.addEventListener('focusout',peekBlur);view.addEventListener('keydown',peekTab,true);
+  destroyListeners.push(function(){if(peekTimer)clearTimeout(peekTimer);view.removeEventListener('pointerover',peekOver);view.removeEventListener('pointerout',peekOut);view.removeEventListener('pointerdown',peekDown,true);view.removeEventListener('focusin',peekFocus);view.removeEventListener('focusout',peekBlur);view.removeEventListener('keydown',peekTab,true);});
   function carrierClick(ev){
     if(authoring || retired || ev.defaultPrevented || ev.button>0)return;
     var tapped=lastPointer==='touch' && metricsOutlineOf(ev.target);

@@ -3,7 +3,7 @@
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null,invalidateAlignment=null,invalidateEdgeEndpoints=null;
-  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false,BOARD_READY_TEXT=null;
+  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),TRACE_MATCH_DRAFTS=new Map(),TRACE_MATCH_REVEALED=new Set(),traceMatchCache=null,OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false,BOARD_READY_TEXT=null;
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   var proseDraft={key:null,fields:Object.create(null)};
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
@@ -34,7 +34,7 @@ function createBuilderInspector(opts){
     var same=identity===inspectorScrollKey;
     var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0,sizes:same?captureTextareaSizes():null,disclosures:same?captureDisclosures():null};
     if(!same){
-      OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();
+      OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_MATCH_REVEALED.clear();
       OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;
     }
     retireForm();
@@ -1087,6 +1087,228 @@ function stepTicketFilterControl(val, ctx, t){
     });
     return box;
   }
+/* #1238: the step's traceMatch as a form (planStepTraceMatch; one Undo step
+   per edit). One alternative is the object form, two or more the array form.
+   Keys the form does not show stay in each alternative's Advanced JSON box.
+   The validator's messages for this step's traceMatch (those that go away
+   without it) sit next to the field they name. */
+function traceMatchMessages(val){
+    if(val.traceMatch===undefined || !session.validate)return [];
+    var parsed=parseEditor();if(parsed.error)return [];
+    var path=builderTargetPath(parsed.raw,session.target);if(!path)return [];
+    // Two validations per source change: re-renders of the same text and selection reuse them.
+    var key=JSON.stringify([parsed.text,parsed.topologyRevision,path]);
+    if(traceMatchCache && traceMatchCache.key===key)return traceMatchCache.messages.slice();
+    var messages=traceMatchMessagesFor(parsed,path);traceMatchCache={key:key,messages:messages};return messages.slice();
+  }
+function traceMatchMessagesFor(parsed,path){
+    var without=JSON.parse(JSON.stringify(parsed.raw)),st=specValueAt(without,path);
+    if(!st || typeof st!=='object')return [];
+    delete st.traceMatch;
+    var withIt=session.validate(parsed.raw),base=session.validate(without),rest=Object.create(null);
+    base.errors.concat(base.warnings).forEach(function(m){rest[m]=(rest[m] || 0)+1;});
+    return withIt.errors.concat(withIt.warnings).filter(function(m){if(rest[m]){rest[m]--;return false;}return /traceMatch/.test(m);});
+  }
+function traceMatchPlaced(messages,many){
+    var placed={general:[]};
+    messages.forEach(function(text){
+      var rel=text.slice(text.indexOf('traceMatch')),m=/^traceMatch(?:\[(\d+)\])?(?:\.([A-Za-z]+))?/.exec(rel);
+      var alt=m && m[1]!=null?Number(m[1]):many?null:0,field=m && m[2];
+      if(!field)field=/nodeId/.test(rel)?'nodeId':/serviceName and operation/.test(rel)?'serviceName':/occurrence and repeat/.test(rel)?'occurrence':/parentStepId|optional/.test(rel)?'advanced':null;
+      if(field && TRACE_MATCH_FORM_KEYS.indexOf(field)<0)field='advanced';
+      if(alt==null || !field){placed.general.push(rel);return;}
+      var at=placed[alt]=placed[alt] || {};(at[field]=at[field] || []).push(rel);
+    });
+    return placed;
+  }
+function traceMatchEditor(val,ctx,t){
+    var box=document.createElement('fieldset');box.className='trace-match-editor';
+    var legend=document.createElement('legend');legend.textContent='Trace match';box.appendChild(legend);
+    var list=traceMatchFormAlternatives(val.traceMatch);
+    function note(parent,text,cls){var p=document.createElement('p');p.className='fnote'+(cls?' '+cls:'');p.textContent=text;parent.appendChild(p);return p;}
+    if(!list){
+      note(box,'This trace match is not a selector object or a list of them, so it is edited as JSON.');
+      box.appendChild(frow('Trace match JSON',jsonFieldControl('traceMatch',val.traceMatch,'jsonObjArr',refreshFormSoon)));
+      return box;
+    }
+    note(box,'A loaded trace maps a span to this step when its service name and operation match exactly. Add an alternative when another span can stand for this step; the first that matches wins.');
+    var messages=traceMatchMessages(val),many=list.length>1,placed=traceMatchPlaced(messages,many),serial=0;
+    box.setAttribute('data-warning-count',String(messages.length));
+    function commit(edit){
+      var parsed=parseEditor();if(parsed.error){formError(parsed.error);return false;}
+      var plan=planStepTraceMatch(parsed.text,parsed.raw,t.section,t.index,edit);
+      if(plan.noop){refreshFormSoon();return true;}
+      if(plan.error){formError(plan.error);return false;}
+      /* A document that imports nodes refuses a source whose resolved spec is
+         invalid. Check first, so the form and the typed text stay and say why. */
+      if(session.resolve && session.topologyContext && session.topologyContext()){
+        try{session.resolve(JSON.parse(plan.text));}catch(ex){formError('This edit was not applied: '+ex.message);return false;}
+      }
+      formError('');
+      var ok=applyPlan(plan,{after:refreshFormSoon},parsed);
+      // Add-row drafts are kept per alternative position; removing one shifts the positions.
+      if(ok && edit.op==='remove-alternative')dropDrafts('attr:');
+      return ok;
+    }
+    function warn(parent,control,texts){
+      if(!texts || !texts.length)return;
+      var p=document.createElement('p');p.className='fnote trace-match-warning';p.id=prefix+'-trace-warning-'+(serial++);
+      p.setAttribute('role','note');p.textContent=texts.join(' ');parent.appendChild(p);
+      if(control){if(/^(INPUT|SELECT|TEXTAREA)$/i.test(control.tagName))control.setAttribute('aria-invalid','true');control.setAttribute('aria-describedby',p.id);}
+    }
+    function general(){
+      if(!placed.general.length)return;
+      var gen=document.createElement('ul');gen.className='metrics-warnings trace-match-warnings';gen.setAttribute('aria-label','Trace match warnings');
+      placed.general.forEach(function(text){var li=document.createElement('li');li.textContent=text;gen.appendChild(li);});box.appendChild(gen);
+    }
+    function named(control,name,title){control.setAttribute('aria-label',name);if(title)control.title=title;return control;}
+    /* Uncommitted add-row text survives a re-render of the same selection. */
+    function draft(input,key){
+      if(TRACE_MATCH_DRAFTS.has(key))input.value=TRACE_MATCH_DRAFTS.get(key);
+      listen(input,'input',function(){if(input.value)TRACE_MATCH_DRAFTS.set(key,input.value);else TRACE_MATCH_DRAFTS.delete(key);});
+      listen(input,'change',function(){if(input.value)TRACE_MATCH_DRAFTS.set(key,input.value);else TRACE_MATCH_DRAFTS.delete(key);});
+      input._flowviewHasDraft=function(){return input.value!=='';};
+      return input;
+    }
+    function dropDrafts(prefixKey){Array.from(TRACE_MATCH_DRAFTS.keys()).forEach(function(k){if(k.indexOf(prefixKey)===0)TRACE_MATCH_DRAFTS.delete(k);});}
+    var nodeIds=Object.keys((ctx.diagram && ctx.diagram.nodes) || {}).filter(function(id){return !isTextBoxNode(ctx.diagram.nodes[id]);});
+    var attributeNames=typeof FlowCanon!=='undefined' && FlowCanon.traceAttributeNames?FlowCanon.traceAttributeNames(ctx.resolvedPage):[];
+    var attrListId=prefix+'-trace-attributes';
+    if(attributeNames.length){
+      var dl=document.createElement('datalist');dl.id=attrListId;
+      attributeNames.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});box.appendChild(dl);
+    }
+    if(!list.length){
+      /* A selector needs both strings, so a new trace match starts from both in one edit. */
+      note(box,'No trace match: a loaded trace leaves this step unmapped.');
+      var drafts={};
+      [['Service name','serviceName','checkout-api','The span service.name, exactly as the trace shows it.'],['Operation','operation','POST /orders','The span name, exactly as the trace shows it.']].forEach(function(f){
+        var input=named(document.createElement('input'),'new trace match '+f[0].toLowerCase(),f[3]);input.type='text';input.className='fctl';input.placeholder=f[2];
+        drafts[f[1]]=draft(input,'create:'+f[1]);box.appendChild(frow(f[0],input));
+      });
+      function create(){var ok=commit({op:'create',serviceName:drafts.serviceName.value,operation:drafts.operation.value});if(ok!==false)dropDrafts('create:');return ok;}
+      Object.keys(drafts).forEach(function(k){listen(drafts[k],'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();create();}});});
+      var createActs=actionGroup('Trace match actions','trace-match-actions'),createButton=actionButton('Add trace match',create);
+      createButton.title='Write this step’s trace match from the service name and operation (Enter in either field also adds it).';
+      createActs.appendChild(createButton);box.appendChild(createActs);general();
+      return box;
+    }
+    list.forEach(function(m,i){
+      var group=box,lead=many?'Alternative '+(i+1)+' ':'',fieldWarnings=placed[i] || {};
+      if(many){
+        group=document.createElement('fieldset');group.className='trace-match-alternative';
+        var gl=document.createElement('legend');gl.textContent='Alternative '+(i+1)+(i===0?' (tried first)':'');group.appendChild(gl);box.appendChild(group);
+      }
+      function textRow(label,field,placeholder,title){
+        var input=named(textControl(m[field],function(v){return commit({op:'set',alternative:i,field:field,value:v});},{placeholder:placeholder}),lead+label.toLowerCase(),title);
+        group.appendChild(frow(label,input));warn(group,input,fieldWarnings[field]);
+      }
+      textRow('Service name','serviceName','checkout-api','The span service.name, exactly as the trace shows it.');
+      textRow('Operation','operation','POST /orders','The span name, exactly as the trace shows it.');
+      var nodeOptions=nodeIds.slice();
+      var nodeSelect=named(selectControl(nodeOptions,m.nodeId==null?'':m.nodeId,function(v){return commit({op:'set',alternative:i,field:'nodeId',value:v});},true),lead+'node','The node that shows this span’s conditions and timing. Imported nodes are listed by their namespaced id.');
+      Array.prototype.forEach.call(nodeSelect.options,function(option){
+        var node=option.value && ctx.diagram && ctx.diagram.nodes[option.value];
+        if(option.value==='')option.textContent='(none)';
+        else if(node)option.textContent=(node.title?node.title+' · ':'')+option.value;
+      });
+      group.appendChild(frow('Node',nodeSelect));warn(group,nodeSelect,fieldWarnings.nodeId);
+      textRow('Namespace','namespace','orders','Matches the span service.namespace attribute. Empty matches any namespace.');
+      /* Each control is disabled only while the other is set and it is not, so a
+         source holding both (a validator error) stays fixable from either one. */
+      var hasRepeat=m.repeat!=null,hasOccurrence=m.occurrence!=null;
+      var occurrence=named(textControl(m.occurrence,function(v){return commit({op:'set',alternative:i,field:'occurrence',value:v});},{placeholder:'any',commitUnchanged:true}),lead+'occurrence',
+        hasRepeat && !hasOccurrence?'Turn off Retry attempts to pick one call by order.':'Pick the Nth serial call of this service and operation (1 is the first). Empty matches a single span.');
+      occurrence.className+=' fnum';occurrence.disabled=hasRepeat && !hasOccurrence;
+      group.appendChild(frow('Occurrence',occurrence));warn(group,occurrence,fieldWarnings.occurrence);
+      var repeat=checkboxControl(m.repeat==='attempts',function(on){return commit({op:'set',alternative:i,field:'repeat',value:on});}),repeatBox=repeat.firstChild;
+      named(repeatBox,lead+'retry attempts',hasOccurrence && !hasRepeat?'Clear Occurrence to count retry attempts.':'Treat recorded retry attempts (retry.attempt 0, 1, …) under one parent as this one step.');
+      repeatBox.disabled=hasOccurrence && !hasRepeat;
+      var repeatCaption=document.createElement('span');repeatCaption.className='fnote';repeatCaption.textContent=' Retries are one step';repeat.appendChild(repeatCaption);
+      group.appendChild(frow('Retry attempts',repeat));warn(group,repeatBox,fieldWarnings.repeat);
+      /* Attributes: one row per key (name, value, type, remove) and an add row. */
+      var attrs=traceMatchFormObject(m.attributes)?m.attributes:{},attrBox=document.createElement('div');attrBox.className='rowsedit trace-match-attributes';
+      attrBox.setAttribute('role','group');attrBox.setAttribute('aria-label',lead+'attributes');
+      var TYPES=[['string','Text'],['number','Number'],['boolean','True/false']];
+      function typeSelect(current,label){
+        var sel=document.createElement('select');sel.className='fctl trace-match-attr-type';
+        TYPES.forEach(function(pair){var o=document.createElement('option');o.value=pair[0];o.textContent=pair[1];sel.appendChild(o);});
+        sel.value=current;return named(sel,label,'Value type. Honeycomb table cells are text.');
+      }
+      function booleanSelect(current,label){
+        var sel=document.createElement('select');sel.className='fctl';
+        ['true','false'].forEach(function(v){var o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});
+        sel.value=current?'true':'false';return named(sel,label);
+      }
+      Object.keys(attrs).forEach(function(key,n){
+        var line=document.createElement('div');line.className='rowline trace-match-attr';
+        var type=typeof attrs[key],rowLead=lead+'attribute '+(n+1)+' ';
+        var name=named(textControl(key,function(v){
+          if(v==null){formError('An attribute needs a name. To delete '+key+', use its × button.');return false;}
+          return commit({op:'attribute',alternative:i,key:key,name:v,value:String(attrs[key]),type:type});
+        },{placeholder:'attribute name',list:attrListId}),rowLead+'name');
+        var value;
+        if(type==='boolean'){
+          value=booleanSelect(attrs[key],rowLead+'value');
+          listen(value,'change',function(){if(commit({op:'attribute',alternative:i,key:key,name:key,value:value.value,type:type})===false)value.value=String(attrs[key]);});
+        }else value=named(textControl(String(attrs[key]),function(v){return commit({op:'attribute',alternative:i,key:key,name:key,value:v==null?'':v,type:type});},{placeholder:'value'}),rowLead+'value');
+        var types=typeSelect(type,rowLead+'type');
+        listen(types,'change',function(){
+          var text=String(attrs[key]);
+          if(types.value==='boolean' && text!=='true' && text!=='false'){formError('Value \''+text+'\' is not true or false; change the value first.');types.value=type;return;}
+          if(commit({op:'attribute',alternative:i,key:key,name:key,value:text,type:types.value})===false)types.value=type;
+        });
+        var remove=actionButton('×',function(){return commit({op:'attribute',alternative:i,key:key,name:null});},'rowx');
+        named(remove,'Remove '+lead.toLowerCase()+'attribute '+key,'Remove attribute '+key);
+        line.appendChild(name);line.appendChild(value);line.appendChild(types);line.appendChild(remove);attrBox.appendChild(line);
+      });
+      var addLine=document.createElement('div');addLine.className='rowline trace-match-attr-add';
+      var draftKey='attr:'+i+':';
+      var newName=named(document.createElement('input'),lead+'new attribute name','A supported span attribute, such as deployment.environment.name.');
+      newName.type='text';newName.className='fctl';newName.placeholder='new attribute';if(attributeNames.length)newName.setAttribute('list',attrListId);draft(newName,draftKey+'name');
+      var newValue=named(document.createElement('input'),lead+'new attribute value');newValue.type='text';newValue.className='fctl';newValue.placeholder='value';draft(newValue,draftKey+'value');
+      var newBool=booleanSelect(true,lead+'new attribute true/false value');
+      var newType=typeSelect(TRACE_MATCH_DRAFTS.get(draftKey+'type') || 'string',lead+'new attribute type');
+      // A true/false value is chosen from a list; the text box shows for text and numbers.
+      function showValue(){var bool=newType.value==='boolean';newValue.hidden=bool;newBool.hidden=!bool;}
+      listen(newType,'change',function(){TRACE_MATCH_DRAFTS.set(draftKey+'type',newType.value);showValue();});showValue();
+      function addAttribute(){
+        var ok=commit({op:'attribute',alternative:i,key:null,name:newName.value,value:newType.value==='boolean'?newBool.value:newValue.value,type:newType.value});
+        if(ok!==false){newName.value='';newValue.value='';dropDrafts(draftKey);}
+      }
+      [newName,newValue].forEach(function(input){listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addAttribute();}});});
+      var add=actionButton('Add attribute',addAttribute,'rowadd');named(add,'Add '+lead.toLowerCase()+'attribute','Add the attribute typed to the left (Enter also adds it).');
+      addLine.appendChild(newName);addLine.appendChild(newValue);addLine.appendChild(newBool);addLine.appendChild(newType);addLine.appendChild(add);attrBox.appendChild(addLine);
+      group.appendChild(frowBlock('Attributes',attrBox));warn(group,attrBox,fieldWarnings.attributes);
+      /* Advanced JSON: the alternative's other keys, replaced as one object. */
+      var advanced=document.createElement('details');advanced.className='rawjson trace-match-advanced';
+      var sum=document.createElement('summary');sum.textContent='Advanced (JSON)';advanced.appendChild(sum);
+      var extra=traceMatchFormAdvanced(m);
+      note(advanced,'Limits and selector options: maxDurationMs, maxQueueDepth, parentStepId, optional, role, panelId. The fields above are not edited here; step conditions are in Runtime conditions JSON.');
+      var area=named(textControl(Object.keys(extra).length?JSON.stringify(extra,null,2):'',function(v){
+        var parsedExtra=null;
+        if(v!=null){try{parsedExtra=JSON.parse(v);}catch(ex){formError('Advanced JSON: not valid JSON ('+ex.message+')');return false;}}
+        return commit({op:'advanced',alternative:i,value:parsedExtra});
+      },{textarea:true,placeholder:'{"maxDurationMs": 500}'}),lead+'advanced JSON');
+      advanced.appendChild(area);warn(advanced,area,fieldWarnings.advanced);
+      // Open once for each new message; after that the author's open or closed choice holds.
+      var revealKey=fieldWarnings.advanced?JSON.stringify([i,fieldWarnings.advanced]):null;
+      if(revealKey && !TRACE_MATCH_REVEALED.has(revealKey)){TRACE_MATCH_REVEALED.add(revealKey);advanced.setAttribute('data-inspector-reveal','');}
+      group.appendChild(advanced);
+      if(many){
+        var removeAlt=actionButton('Remove alternative '+(i+1),function(){return commit({op:'remove-alternative',alternative:i});});
+        removeAlt.title=list.length===2?'The other alternative becomes the single trace match.':'Remove this alternative.';
+        var acts=actionGroup('Alternative '+(i+1)+' actions','trace-match-actions');acts.appendChild(removeAlt);group.appendChild(acts);
+      }
+    });
+    general();
+    var actions=actionGroup('Trace match actions','trace-match-actions');
+    var addAlt=actionButton('Add alternative',function(){return commit({op:'add-alternative'});});
+    addAlt.title='Adds a copy of the last alternative to edit.';actions.appendChild(addAlt);
+    var clear=actionButton('Remove trace match',function(){return commit({op:'clear'});});clear.title='Remove every selector; the step is then unmapped.';actions.appendChild(clear);
+    box.appendChild(actions);
+    return box;
+  }
 function stepForm(val, ctx){
     var t = session.target, panelRows=[];
     function toggled(planFn){
@@ -1131,9 +1353,14 @@ function stepForm(val, ctx){
     resetCoin.disabled=!coinPlaced;resetCoin.setAttribute('aria-label','Reset step circle to automatic position');coinBox.appendChild(resetCoin);
     rows.push(frow('Circle position',coinBox));
     var evidence=document.createElement('details');
-    var evidenceTitle=document.createElement('summary'); evidenceTitle.textContent='Code and trace evidence';evidence.appendChild(evidenceTitle);
+    var evidenceTitle=document.createElement('summary'),matchCount=(traceMatchFormAlternatives(val.traceMatch) || [val.traceMatch]).length;
+    evidence.appendChild(evidenceTitle);
     evidence.appendChild(frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr')));
-    evidence.appendChild(frow('Trace match JSON',jsonFieldControl('traceMatch',val.traceMatch,'jsonObjArr')));
+    var matchEditor=traceMatchEditor(val,ctx,t),matchWarnings=Number(matchEditor.getAttribute('data-warning-count')) || 0;
+    // The summary says whether a trace match is set and flags its warnings; the disclosure identity ignores text after ' · '.
+    evidenceTitle.textContent='Code and trace evidence'+(matchCount>1?' · trace match, '+matchCount+' alternatives':matchCount?' · trace match set':'')+
+      (matchWarnings?' · '+matchWarnings+(matchWarnings===1?' warning':' warnings'):'');
+    evidence.appendChild(matchEditor);
     evidence.appendChild(frow('Runtime conditions JSON',jsonFieldControl('conditions',val.conditions,'jsonArr')));
     rows.push(evidence);
     ((ctx.diagram && ctx.diagram.panels) || []).forEach(function(p){

@@ -149,7 +149,7 @@ export async function prepareEditorSurface(page){
   await closeTools(page);
 }
 export async function closeTools(page){
-  for(const name of ['agent','inspect','steps','outline','json','file']){
+  for(const name of ['agent','inspect','steps','links','outline','json','file']){
     const close=page.locator('#workspace-window-'+name+' .workspace-window-close');
     if(await close.isVisible()){await page.locator('#editor-tab-'+name).click();await close.click();}
   }

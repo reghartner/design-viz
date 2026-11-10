@@ -166,3 +166,18 @@ test('W7 a snapshot that cannot be read when the preview draws is named in plain
   if(!page.isClosed())await page.evaluate(()=>{if(window.__w7)JSON.stringify=window.__w7.original;});
  }
 });
+
+/* #1275 review cycle 3: a ticket no answered Jira search covered is written `unknown`.
+| row | fixture | assertion | rejects |
+|---|---|---|---|
+| W8 unknown tickets are counted apart | W1's snapshot with UX-89 written `unknown` | the status line reads "6 tickets, 1 unknown," and "6 of this board's 7 tickets are in it." | a ticket count that silently includes tickets with no state |
+*/
+test('W8 the snapshot status line counts unknown tickets apart from the tickets with a state',async({page,server},info)=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
+ await paste(page,JSON.stringify(raw,null,2));await prepareEditorSurface(page);
+ const data=snapshotFile();data.days[0].issues['UX-89']={state:'unknown'};
+ const file=info.outputPath('doorbell.snapshot.json');await mkdir(path.dirname(file),{recursive:true});await writeFile(file,JSON.stringify(data));
+ await loadSnapshot(page,file);
+ const status=page.locator('#live-snapshot-status');await expect(status).toContainText('Showing Snapshot from');
+ await expect(status).toContainText('6 tickets, 1 unknown, 2 carriers with metrics.');await expect(status).toContainText('6 of this board\'s 7 tickets are in it.');
+});

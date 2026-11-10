@@ -502,8 +502,8 @@ signals for its carriers, the Metrics line reads "Metrics: snapshot from <time>"
 overlay is on with the snapshot's values. Like the
 demo it is preview state only: it is never saved to the spec, exported or published (Download and
 Copy SVG, which copy the preview, are refused while it shows), and opening
-another project forgets it. A status line under the File actions says what loaded (tickets,
-carriers with metrics), whether it is showing, how many of the board's tickets the snapshot holds a
+another project forgets it. A status line under the File actions says what loaded (tickets with a
+state, then `unknown` tickets when there are any, carriers with metrics), whether it is showing, how many of the board's tickets the snapshot holds a
 state for (an `unknown` ticket does not count; a warning when none, since they would all show as missing), and how many errors the agent's run
 recorded with the first one. A file that is not a snapshot, or larger than 8 MB, is refused there
 with its reason.
@@ -1471,7 +1471,8 @@ signals through `POST /api/ds/query` with the same datasource uids (#1270); and 
 through the Honeycomb Query API: it creates the query (`POST /1/queries/{dataset}`), runs it
 (`POST /1/query_results/{dataset}`) and polls the result. The viewer runs Honeycomb queries one
 after another, so they share one deadline, `--timeout`: each query polls for 80% of the time left,
-divided by the Honeycomb signals still to run (at most 10 counted), and for at most 20 s; time a
+divided by the Honeycomb signals still to run (at most 10 counted; a signal whose query the viewer
+refuses never runs and is not counted), and for at most 20 s; time a
 query does not use goes to the next. A query that does not complete in its share is one error on
 its signal that says to raise `--timeout`. The board window
 becomes the query's `time_range` and may be at most 7 days, Honeycomb's limit (a longer window is
@@ -1493,7 +1494,9 @@ buckets. Grafana CloudWatch Logs signals, traces, Honeycomb span attributes and 
 not read yet: each such signal is one recorded error (carrier id and signal name) and the run
 goes on. A failed Grafana or Honeycomb call (rate limit, network error, request timeout, query
 error) fails only its own signal and is recorded on that signal with fixed text. Two signals with
-the same query each keep their own outcome, and a CloudWatch failure is recorded only on signals of
+the same query each keep their own outcome; when the script cannot tell which of them a failed call
+belonged to (one failed, the other answered with no data), each says "(this signal or another with
+the same query)", and a CloudWatch failure is recorded only on signals of
 its statistic (an Average signal's SampleCount weight query belongs to Average); a provider's
 own error text, which can hold data, is never printed or written. Pull request states are not read either
 (no GitHub transport yet): each authored PR is one recorded error. A board that imports shared

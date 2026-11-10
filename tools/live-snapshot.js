@@ -324,7 +324,7 @@ function connectorNamespace(transport,errors,signal,answered){
     const key=server+'\u0000'+tool+'\u0000'+JSON.stringify(input || {});
     return Promise.resolve().then(()=>transport.call(server,tool,input,signal)).then(payload=>{
       if(!callFingerprints(tool,input).length)for(let i=errors.length-1;i>=0;i--)if(errors[i].key===key)errors.splice(i,1);
-      if(answered){const source=providerOf(server);answered[source]=(answered[source] || 0)+1;}
+      if(answered){const source=providerOf(server);answered[source]=(answered[source] || 0)+1;callFingerprints(tool,input).forEach(f=>{answered.calls[f]=(answered.calls[f] || 0)+1;});}
       return {payload};
     },error=>{
       if(!(error && error.unsupported) && !(signal && signal.aborted))errors.push({source:providerOf(server),tool,message:String(error && error.message || error),key,input});throw error;});
@@ -376,7 +376,7 @@ function scrub(text,secrets){
   return out.replace(/(Basic|Bearer)\s+[A-Za-z0-9+/=._%-]{8,}/g,'$1 ***');
 }
 async function takeSnapshot({specText,board='board',transport,now=()=>Date.now(),timeoutMs=60000}){
-  const run=new AbortController(),errors=[],answered={jira:0,grafana:0,honeycomb:0},doc=headlessDocument(),namespace=connectorNamespace(transport,errors,run.signal,answered);
+  const run=new AbortController(),errors=[],answered={jira:0,grafana:0,honeycomb:0,calls:Object.create(null)},doc=headlessDocument(),namespace=connectorNamespace(transport,errors,run.signal,answered);
   try{return await snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,namespace,answered});}
   finally{run.abort();}
 }
@@ -398,8 +398,16 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
   transport.missing.forEach(m=>{if(!wanted(m.provider))return;errors.push({source:m.provider,tool:null,message:m.variables.join(', ')+(m.variables.length>1?' are':' is')+' not set'+(m.note?' ('+m.note+')':'')});});
   (transport.refused || []).forEach(r=>{if(!wanted(r.provider))return;errors.push({source:r.provider,tool:null,message:r.message+'; no request was made'});});
   const hasServer=name=>transport.servers().some(s=>s.server===name);
-  // Honeycomb signals in query_spec form are not run by the adapter (telemetryHoneycombJobs), so they take no share.
-  if(typeof transport.honeycombBudget==='function')transport.honeycombBudget(Date.now()+timeoutMs,typeof C.telemetryHoneycombJobs==='function'?C.telemetryHoneycombJobs(ctl.telemetry.bindings()).length:0);
+  /* Only signals that will query take a share of the Honeycomb deadline: the adapter's jobs (query_spec-form signals
+     are not run) whose query the viewer accepts (telemetryHoneycombQuery, with the transport's run_query schema). */
+  if(typeof transport.honeycombBudget==='function'){
+    let count=0;
+    try{
+      const jobs=C.telemetryHoneycombJobs(ctl.telemetry.bindings()),contract=C.telemetryHoneycombServer(transport.servers()),config=C.telemetryProviderConfig(page,ctl);
+      count=jobs.filter(job=>{try{C.telemetryHoneycombQuery(job.query,config,contract,null);return true;}catch(ex){return false;}}).length;
+    }catch(ex){count=0;ctl.telemetry.bindings().forEach(b=>Object.keys(b.signals).forEach(name=>{if(b.signals[name].source==='honeycomb')count++;}));}
+    transport.honeycombBudget(Date.now()+timeoutMs,count);
+  }
   const hasJira=wantsJira && transport.servers().some(s=>s.tools.some(t=>(t.name || t)==='searchJiraIssuesUsingJql'));
   const hasMetrics=!!providers && transport.servers().some(s=>s.tools.some(t=>['query_prometheus','run_query'].indexOf(t.name || t)>=0));
   if(hasJira)C.wireLiveStatusClaude(ctl,page,win);
@@ -429,10 +437,15 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
      another signal with the same query failed). */
   const observedSignal=(id,name)=>{const s=evidence.map && evidence.map[id] && evidence.map[id].signals && evidence.map[id].signals[name];return !!s && typeof s.value==='number' && isFinite(s.value);};
   const fingerprints=[];bindings.forEach(b=>Object.keys(b.signals).forEach(name=>{const f=signalFingerprint(b.signals[name]);if(f)fingerprints.push({f,tool:b.id+' '+name,observed:observedSignal(b.id,name)});}));
+  /* When some calls with that query answered and more of its signals are unobserved than its calls failed (one
+     answered with no data), the failure cannot be placed: each such signal says it was this one or another. */
+  const metricErrors=errors.filter(e=>e.input && (e.source==='grafana' || e.source==='honeycomb'));
   for(let i=errors.length-1;i>=0;i--){
     const e=errors[i];if(!e.input || (e.source!=='grafana' && e.source!=='honeycomb'))continue;
-    const keys=callFingerprints(e.tool,e.input),owners=fingerprints.filter(x=>keys.indexOf(x.f)>=0);
-    if(owners.length)errors.splice(i,1,...owners.filter(owner=>!owner.observed).map(owner=>({source:e.source,tool:owner.tool,message:e.message})));
+    const keys=callFingerprints(e.tool,e.input),owners=fingerprints.filter(x=>keys.indexOf(x.f)>=0),unobserved=owners.filter(owner=>!owner.observed);
+    const failedCalls=metricErrors.filter(other=>callFingerprints(other.tool,other.input).some(f=>keys.indexOf(f)>=0)).length,answeredCalls=keys.reduce((n,f)=>n+(answered.calls[f] || 0),0);
+    const message=answeredCalls>0 && unobserved.length>failedCalls?e.message+' (this signal or another with the same query)':e.message;
+    if(owners.length)errors.splice(i,1,...unobserved.map(owner=>({source:e.source,tool:owner.tool,message})));
   }
   // PR states come from GitHub, which the script does not read yet: one error per authored PR.
   refs.prs.forEach(url=>errors.push({source:'github',tool:url,message:'pull request state is not read by the snapshot script yet'}));
@@ -531,7 +544,7 @@ async function main(argv,env,{fetchImpl,stdout=process.stdout,transport}={}){
   // Checked before any provider call.
   const unsafe=unsafeOut(file);if(unsafe){stdout.write('snapshot not written: '+unsafe+'\n');return 1;}
   const tracking=JSON.parse(specText),jiraSite=tracking && tracking.page && tracking.page.tracking && tracking.page.tracking.jira && tracking.page.tracking.jira.site || tracking && tracking.tracking && tracking.tracking.jira && tracking.tracking.jira.site;
-  const now=()=>Date.now(),source=transport || restTransport(env,fetchImpl,now,typeof jiraSite==='string' && /^https?:\/\//.test(jiraSite)?jiraSite:null,{pollMs:Math.min(20000,timeout*500)});
+  const now=()=>Date.now(),source=transport || restTransport(env,fetchImpl,now,typeof jiraSite==='string' && /^https?:\/\//.test(jiraSite)?jiraSite:null,{});
   const result=await takeSnapshot({specText,board:path.basename(specPath),transport:source,timeoutMs:timeout*1000,now});
   if(result.refused){stdout.write('snapshot not written: '+result.refused+'\n');return 1;}
   const {snapshot,summary}=result;

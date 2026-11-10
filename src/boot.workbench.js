@@ -418,7 +418,7 @@ function describeLiveSnapshot(state){
   // Plain words only: the exception text is for developers, not the author.
   if(state.failure){sayLiveSnapshot('Snapshot not shown: '+(liveSnapshotName || 'the snapshot')+' could not be read for this board.','error');return;}
   var page=workbenchPreview.page(),keys=page?Object.keys(workbenchDemoStatus(page)):[],covered=read.covers(keys),kind='info',parts=[];
-  parts.push((state.showing?'Showing ':'Loaded, not shown: ')+read.label+(liveSnapshotName?' ('+liveSnapshotName+')':'')+': '+read.tickets+' tickets, '+read.carriers+' carriers with metrics.');
+  parts.push((state.showing?'Showing ':'Loaded, not shown: ')+read.label+(liveSnapshotName?' ('+liveSnapshotName+')':'')+': '+read.tickets+' tickets, '+(read.unknown?read.unknown+' unknown, ':'')+read.carriers+' carriers with metrics.');
   if(keys.length && !covered){kind='warn';parts.push('None of this board\'s '+keys.length+' tickets are in it'+(read.board?' (it was taken of '+read.board+')':'')+', so they show as missing.');}
   else if(keys.length && covered<keys.length)parts.push(covered+' of this board\'s '+keys.length+' tickets are in it.');
   if(read.errors){kind='warn';parts.push('The agent\'s run recorded '+read.errors+' error'+(read.errors===1?'':'s')+'; first: '+read.firstError+'.');}

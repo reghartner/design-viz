@@ -57,7 +57,9 @@ test('#1186 at 1440x900 the span list fills the panel and scrolls itself; a focu
  expect(Math.abs(icons.y-line.y),'the icons sit at the top of the request line').toBeLessThan(8);expect(icons.x+icons.width,'at its right end').toBeGreaterThan(line.x+line.width-4);
  const g=await geometry();
  expect(g.box.y+g.box.height,'the list ends inside the panel').toBeLessThanOrEqual(g.card.y+g.card.height+1);
- expect(g.card.y+g.card.height-(g.box.y+g.box.height),'the list fills the rest of the panel').toBeLessThan(48);
+ // #1230: the trace sits above the search, which stays open; the list fills what the search leaves.
+ const search=await panel.locator('.dv-trace-direct').boundingBox();expect(g.box.y+g.box.height,'the list ends above the search').toBeLessThanOrEqual(search.y+1);
+ expect(search.y+search.height,'the search ends inside the panel').toBeLessThanOrEqual(g.card.y+g.card.height+1);expect(g.card.y+g.card.height-(search.y+search.height),'the list and the search below it fill the panel').toBeLessThan(48);
  expect(['auto','scroll'],'the list scrolls itself').toContain(g.overflow);expect(g.scroll,'55 spans overflow the list').toBeGreaterThan(g.client+40);
  // A span from the middle of the list: its detail opens directly under its row, inside the list.
  const row=list.locator('.dv-trace-span').nth(5);await row.scrollIntoViewIfNeeded();await row.click();

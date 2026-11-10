@@ -4046,11 +4046,13 @@ test('#1173 one-choice selects are not rendered, the help line moves to the summ
  // Two options still render a select.
  const two=compactHarness(['prod','stage']);assert.ok(two.m.body.querySelectorAll('select').some(el=>el.getAttribute('aria-label')==='Connection environment'),'two environments keep the select');two.api.destroy();
 });
-test('#1173 with a trace shown the search section and the request card are one collapsed line each, and the span list follows',async()=>{
+// #1230 (Chuck 2026-11-09): the shown trace goes in a reserved space above the search, and the search stays open.
+test('#1173 #1230 with a trace shown the request card is one collapsed line above the open search, and the span list follows it',async()=>{
  const {h,api,m}=compactHarness(['prod']),config=()=>m.body.querySelector('details.dv-trace-config'),request=()=>m.body.querySelector('details.dv-trace-request');
  assert.equal(config().open,true,'with no trace shown the search section is open');assert.equal(request(),null,'no request card yet');
+ const slot=()=>m.body.querySelector('.dv-trace-slot');assert.ok(slot(),'the reserved space');assert.equal(textOf(slot()).trim(),'Load a trace to show it here');
  api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
- assert.equal(config().open,false,'the search section collapses');
+ assert.equal(config().open,true,'the search section stays open');assert.ok(slot().querySelector('.dv-trace-selected'),'the trace is in the reserved space');
  assert.match(textOf(config().querySelector('summary')).replace(/\s+/g,' ').trim(),/^Fixture Honeycomb · Production · Change trace$/);
  assert.ok(request(),'one request card');assert.equal(request().open,false,'collapsed');
  assert.match(textOf(request().querySelector('summary')).replace(/\s+/g,' ').trim(),/^8413cd87a9f1 · partial · [^·]+ \d\d:\d\d · \d+ spans · \d+\/\d+ steps matched$/,'a partial trace says so first (#1186: flags before the date)');
@@ -4059,12 +4061,12 @@ test('#1173 with a trace shown the search section and the request card are one c
  const span=m.body.querySelector('.dv-trace-span');assert.ok(span && !closed(span),'the span list is not inside a collapsed section');
  const order=m.body.querySelectorAll('details.dv-trace-config,details.dv-trace-request,.dv-trace-spans-head,.dv-trace-waterfall').map(el=>el.className.split(' ')[0]);
  // #1186: the list header replaced the focus box.
- assert.deepEqual(order,['dv-trace-config','dv-trace-request','dv-trace-spans-head','dv-trace-waterfall'],'the waterfall comes right after the collapsed lines and its header');
- for(const el of [config(),request()])assert.equal(el.children[0].tagName,'summary','each collapsed section shows only its summary line');
- // A section the reader expanded stays expanded across repaints until the shown trace changes.
- request().open=true;config().open=true;api.setTraceShow(false);api.setTraceShow(true);h.flush();
- assert.equal(request().open,true);assert.equal(config().open,true);
- api.clearDirectTrace();h.flush();assert.equal(config().open,true);assert.equal(request(),null);
+ assert.deepEqual(order,['dv-trace-request','dv-trace-spans-head','dv-trace-waterfall','dv-trace-config'],'the waterfall comes right after the collapsed card line and its header; the search follows');
+ assert.equal(request().children[0].tagName,'summary','the collapsed card shows only its summary line');
+ // A section the reader expanded stays expanded across repaints; a search the reader collapsed stays collapsed.
+ request().open=true;config().open=false;config().dispatchEvent({type:'toggle'});api.setTraceShow(false);api.setTraceShow(true);h.flush();
+ assert.equal(request().open,true);assert.equal(config().open,false);
+ api.clearDirectTrace();h.flush();assert.equal(config().open,true,'with nothing shown again the search reopens');assert.equal(request(),null);
  api.destroy();
 });
 /* #1175: a step whose traceMatch is optional and that this trace lacks does not count against
@@ -4164,8 +4166,8 @@ test('#1173 the request summary and the coverage line agree when an optional ste
 // selection token, and survives a Jira <-> Trace switch.
 test('#1173 Verify keeps its report in view, and open sections survive a re-poll token and a view switch',async()=>{
  const {h,api,m}=compactHarness(['prod']),config=()=>m.body.querySelector('details.dv-trace-config'),request=()=>m.body.querySelector('details.dv-trace-request');
- api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();assert.equal(config().open,false);
- config().open=true;config().dispatchEvent({type:'toggle'});request().open=true;request().dispatchEvent({type:'toggle'});
+ api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();assert.equal(config().open,true,'#1230: the search stays open');
+ request().open=true;request().dispatchEvent({type:'toggle'});
  await api.loadDirectTrace(true);h.flush();
  assert.equal(config().open,true,'a Verify of the shown trace keeps the search open');assert.equal(request().open,true);
  const report=m.body.querySelector('.dv-trace-direct-report');assert.ok(report,'the verify report');assert.equal(report.closest('details.dv-trace-config'),null,'it is outside the collapsible search');
@@ -4174,7 +4176,7 @@ test('#1173 Verify keeps its report in view, and open sections survive a re-poll
  assert.equal(config().open,true,'a view switch keeps the open search');assert.equal(request().open,true,'and the open card');
  api.destroy();
 });
-test('#1173 a picked example trace collapses the search and the request card',async()=>{
+test('#1173 #1230 a picked example trace keeps the search open and collapses the request card',async()=>{
  const f=await (await import('./helpers/step-evidence.mjs')).stepFixture(),profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')));
  f.spec.page.tracking.telemetry.traceConnections={company:profile};
  const h=harness(f.spec,{},{telemetry:{directTrace:{describe:async()=>compactTool(),call:async()=>({payload:''})}}}),api=h.ctl.liveStatus,m=mountStatus(h);
@@ -4183,7 +4185,8 @@ test('#1173 a picked example trace collapses the search and the request card',as
  const config=()=>m.body.querySelector('details.dv-trace-config'),request=()=>m.body.querySelector('details.dv-trace-request');
  assert.equal(config().open,true,'nothing shown: the search is open');assert.ok(m.body.querySelector('.dv-trace-candidate'),'the examples are listed');
  const entry=api.snapshot().trace.entries[0];await api.chooseTrace({key:entry.key,traceId:entry.exemplar.traceId});h.flush();
- assert.equal(config().open,false,'a picked example collapses the search');assert.ok(request());assert.equal(request().open,false,'and the request card');
+ assert.equal(config().open,true,'a picked example keeps the search open');assert.ok(request());assert.equal(request().open,false,'the request card is collapsed');
+ assert.ok(m.body.querySelector('.dv-trace-slot > .dv-trace-selected'),'the picked trace is in the reserved space');
  api.destroy();
 });
 test('#1173 with one authored lookup, the text button switches to a typed LogQL query and back',async()=>{
@@ -4221,13 +4224,13 @@ test('#1173 a repaint never takes focus from outside the panel after a pick in t
  }finally{Element.prototype.focus=focus;api.destroy();}
 });
 
-test('#1173 after Clear the same trace loaded again starts collapsed',async()=>{
+test('#1173 after Clear the same trace loaded again starts with its card collapsed and the search open',async()=>{
  const {h,api,request,config}=await compactExamples();
  const load=async()=>{api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();};
  await load();assert.equal(api.snapshot().trace.selected.manual,true);
  request().open=true;request().dispatchEvent({type:'toggle'});config().open=true;config().dispatchEvent({type:'toggle'});
  api.clearDirectTrace();h.flush();assert.equal(request(),null);
- await load();assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(request().open,false,'the card starts collapsed');assert.equal(config().open,false,'the search starts collapsed');
+ await load();assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(request().open,false,'the card starts collapsed');assert.equal(config().open,true,'#1230: the search is open');
  api.destroy();
 });
 
@@ -4262,11 +4265,11 @@ test('#1173 another trace resets the open sections; a re-poll with the same entr
  api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:COMPACT_ID});const loading=api.loadDirectTrace(false);h.flush();
  // The card is gone during the Load; a browser leaves focus on the body.
  assert.equal(request(),null,'the card is gone while loading');h.doc.activeElement=h.doc.body;await loading;h.flush();
- assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(request().open,false,'another trace collapses the card');assert.equal(config().open,false);Element.prototype.focus=focus;assert.ok(focused && focused===request().querySelector('summary'),'focus moves to the card line');
+ assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(request().open,false,'another trace collapses the card');assert.equal(config().open,true,'#1230: the search stays open');Element.prototype.focus=focus;assert.ok(focused && focused===request().querySelector('summary'),'focus moves to the card line');
  // Back to A: its earlier open state is not restored.
  const again=api.snapshot().trace.entries.find(e=>e.key===example.key) || api.snapshot().trace.entries.find(e=>!e.manual);
  await api.chooseTrace({key:again.key,traceId:again.exemplar.traceId});h.flush();
- assert.equal(api.snapshot().trace.selected.manual,false);assert.equal(request().open,false,'returning to A starts collapsed');assert.equal(config().open,false);
+ assert.equal(api.snapshot().trace.selected.manual,false);assert.equal(request().open,false,'returning to A starts collapsed');assert.equal(config().open,true);
  api.destroy();
 });
 /* #1200: the painted card carries its metric state, identically in the Jira and Trace views, and never Jira work paint;

@@ -172,3 +172,12 @@ test('L12 entries Tracking cannot read are named; a non-list value makes the ele
   assert.deepEqual(plain(ingest.unreadable),['not a key']);assert.equal(ingest.editable,true);
   assert.equal(notify.notList,true);assert.equal(notify.editable,false);assert.match(notify.reason,/not a list/);
 });
+
+test('L13 Edit key onto an existing key asks first; with merge it joins the two',()=>{
+  const spec=board(),text=JSON.stringify(spec,null,2),raw=JSON.parse(text);
+  const ask=c.planLinksTicketRename(text,raw,'FW-45','BE-67',null);
+  assert.match(ask.error,/BE-67 already exists\. Merge FW-45 into it\?/);assert.equal(ask.merge,'BE-67');
+  const s=apply(spec,(t,r)=>c.planLinksTicketRename(t,r,'FW-45','BE-67',null,true));
+  assert.deepEqual(d(s.raw).nodes.ctrl.tickets,['https://acme.atlassian.net/browse/FW-46','BE-67']);
+  assert.deepEqual(d(s.raw).edges[1].tickets,['BE-67']);
+});

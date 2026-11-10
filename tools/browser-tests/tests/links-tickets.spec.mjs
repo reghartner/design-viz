@@ -4,8 +4,12 @@
    B2 drag + Assign | same | dragging FW-45's handle onto the ingest->notify label adds FW-45 to edges[2].tickets; one Undo restores the source; + Assign ticks node notify (one Undo step each) | a drop that writes nothing, a drop that takes two Undo steps
    B4 canvas pill | same | the canvas pill names FW-45 and its Clear ends the highlight; closing Links ends it too | a dimmed canvas with no explanation after Links closes
    B5 refused step move | ctrl with FW-45, FW-46 plus a step lighting ctrl with ticketFilter [FW-46] | dragging the FW-45 chip from ctrl onto that step marks it refused, not amber, and the drop changes nothing | a move that deletes the ticket
+   B6 keyboard + Edit key | B1 board | Enter on the FW-45 handle opens Assign; Edit key with a bad key marks the field aria-invalid with the message beside it; Edit key onto BE-67 asks to merge and Merge writes BE-67 in one Undo step | errors far from the field, a silent merge
+   B7 reveal + Esc on canvas | 40 filler steps, then a step lighting ingest | Highlight BE-67 scrolls its Steps row into view; Esc pressed on the canvas clears the highlight | a highlight off screen, Esc only working inside Links
+   B8 imported overlay | consumer importing provider api (CAN-1) with nodeTracking API-2 | the inherited CAN-1 chip has no remove; + Assign LOC-1 ticks API and writes topologyImports[0].nodeTracking.api; Undo restores | writing onto the imported node, removable inherited tickets
    B3 by element move | same | By element: step 2 row shows FW-45; dragging the FW-45 chip from the ctrl row onto the notify row moves it in one Undo step; ⌥-drag copies; Enter on a chip offers Move to… and moving by keyboard writes the same | a move that leaves the source, a copy that removes it */
 import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
+import {digest} from '../../canon/drift.mjs';
 
 const fixture={page:{title:'Doorbell',sections:[{heading:'Flow',diagram:{autoplay:false,
   nodes:{button:{title:'Doorbell button'},ctrl:{title:'Doorbell controller',tickets:['FW-45']},ingest:{title:'Event ingest',tickets:['BE-67']},notify:{title:'Notification service'}},
@@ -17,8 +21,6 @@ const diagram=raw=>raw.page.sections[0].diagram;
 
 async function open(page,server,spec=fixture){
   await page.setViewportSize({width:1440,height:1000});
-  // Open Links at the left so the right-hand canvas drop targets are not under it.
-  await page.addInitScript(()=>{try{localStorage.setItem('dv-workbench-floating-v1',JSON.stringify({tool:'inspect',windows:{links:{open:false,x:84,y:120,w:380,h:760}}}));}catch(_){}});
   await page.goto(server.origin+'/workbench.html');
   const text=JSON.stringify(spec,null,2);await paste(page,text);
   await expect(page.locator('#docview g.node[data-dv-node="ctrl"]')).toBeVisible();await closeTools(page);
@@ -41,6 +43,7 @@ test('B1 Links by ticket lists FW-45 with its node, edge and step, and highlight
   await expect(row.locator('[data-links-chip]')).toHaveCount(3);
   expect((await row.locator('[data-links-chip]').evaluateAll(list=>list.map(el=>el.getAttribute('data-links-chip')))).sort()).toEqual(['edge:0:1','node:0:ctrl','step:0:1']);
   await page.locator('#editor-tab-steps').click();await expect(page.locator('#steps-list [data-step-index="1"]')).toBeVisible();
+  await page.locator('#editor-tab-links').click();
   await row.getByRole('button',{name:'Highlight FW-45',exact:true}).click();
   const lit=()=>page.evaluate(()=>({
     nodes:[...document.querySelectorAll('#docview g.node.dv-links-lit')].map(el=>el.getAttribute('data-dv-node')).sort(),
@@ -60,7 +63,8 @@ test('B2 dragging FW-45 onto an edge attaches it in one Undo step, and + Assign 
   await expect(handle).toBeVisible();
   const box=await handle.boundingBox();expect(box.width).toBeGreaterThanOrEqual(24);expect(box.height).toBeGreaterThanOrEqual(24);
   const label=page.locator('#docview text.lbl[data-dv-edge="2"]');
-  await expect.poll(()=>label.evaluate(n=>{const r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===n || n.contains(hit);})).toBe(true);
+  // Default placement: the label may sit under the Links window; the drag looks through it.
+  await expect(label).toBeInViewport();
   await pointerTo(page,handle,label,{release:false});
   await expect(page.locator('#docview path.edge[data-dv-edge="2"].dv-links-drop')).toHaveCount(1);
   await expect(links.locator('.links-status')).toContainText('Drop to');
@@ -139,4 +143,69 @@ test('B5 dragging a ticket from a node onto a step it would vanish from is refus
   await page.mouse.up();
   await expect(page.locator('#src')).toHaveValue(second.text);
   await expect(second.links.locator('.links-error')).toContainText('would take it off the node');
+});
+
+test('B6 Enter on the handle opens Assign; Edit key errors sit beside the field; renaming onto an existing key asks to merge',async({page,server})=>{
+  const {links,text}=await open(page,server);
+  const row=links.locator('[data-links-ticket="FW-45"]');
+  await row.getByRole('button',{name:/^Drag FW-45/}).focus();await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog',{name:'Assign FW-45'})).toBeVisible();
+  await page.keyboard.press('Escape');await expect(page.getByRole('dialog',{name:'Assign FW-45'})).toBeHidden();
+  await row.getByRole('button',{name:'Edit key FW-45'}).click();
+  const field=row.getByRole('textbox',{name:'New key for FW-45'});await expect(field).toBeFocused();
+  await field.fill('fw 45');await field.press('Enter');
+  await expect(field).toHaveAttribute('aria-invalid','true');
+  const described=await field.getAttribute('aria-describedby');
+  await expect(page.locator('#'+described)).toContainText('Jira key');
+  await field.fill('BE-67');await field.press('Enter');
+  await expect(page.locator('#src')).toHaveValue(text);
+  await expect(row).toContainText('BE-67 already exists. Merge FW-45 into it?');
+  await row.getByRole('button',{name:'Merge into BE-67'}).click();
+  await expect.poll(async()=>diagram(await source(page)).nodes.ctrl.tickets).toEqual(['BE-67']);
+  expect(diagram(await source(page)).edges[1].tickets).toEqual(['BE-67']);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
+});
+
+test('B7 highlighting scrolls the Steps row into view, and Esc on the canvas clears it',async({page,server})=>{
+  const spec=JSON.parse(JSON.stringify(fixture)),d=diagram(spec);
+  for(let i=0;i<40;i++)d.steps.push({id:'filler'+i,text:'Filler step '+i,nodes:['button']});
+  d.steps.push({id:'late',text:'Ingest checks the event',nodes:['ingest']});
+  const {links}=await open(page,server,spec),late=d.steps.length-1;
+  await page.locator('#editor-tab-steps').click();await expect(page.locator('#steps-list [data-step-index="0"]')).toBeVisible();
+  await expect(page.locator('#steps-list [data-step-index="'+late+'"]')).not.toBeInViewport();
+  await page.locator('#editor-tab-links').click();
+  await links.locator('[data-links-ticket="BE-67"]').getByRole('button',{name:'Highlight BE-67',exact:true}).click();
+  const row=page.locator('#steps-list [data-step-index="'+late+'"]');
+  await expect(row).toHaveClass(/dv-links-lit/);await expect(row).toBeInViewport();
+  await expect(page.locator('#docview g.node[data-dv-node="ingest"]')).toBeInViewport();
+  await page.locator('#docview g.node[data-dv-node="button"]').click();
+  await expect(page.locator('#workspace-window-links .links-key:focus')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#docview .dv-links-lit')).toHaveCount(0);await expect(page.locator('.links-canvas-pill')).toBeHidden();
+});
+
+test('B8 imported nodes: inherited tickets stay read only and Assign writes the consumer overlay',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:1000});
+  const model=(id,dg)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},tracking:{jira:{site:'https://acme.atlassian.net'}},sections:[{id:'main',diagram:dg}]}});
+  const provider=model('provider',{nodes:{api:{title:'API',tickets:['CAN-1']},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+  const consumer=model('consumer',{autoplay:false,nodes:{local:{title:'Local worker',tickets:['LOC-1']}},rows:[['local']],
+    topologyImports:[{spec:'provider',export:'core',as:'canon',nodeTracking:{api:{tickets:['API-2']}}}],steps:[{id:'build',nodes:['canon::api','local'],text:'Build the API'}]});
+  const catalog={version:3,diagrams:[provider,consumer].map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:2,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
+  await page.route('**/diagrams.json',route=>route.fulfill({json:catalog}));
+  for(const spec of [provider,consumer])await page.route('**/'+spec.page.canon.id+'.json',route=>route.fulfill({json:spec}));
+  await page.goto(server.origin+'/workbench.html');
+  await page.locator('#welcome-file').setInputFiles({name:'consumer.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(consumer,null,2))});
+  await expect(page.locator('#docview g.node[data-dv-node="canon::api"]')).toBeVisible();await closeTools(page);
+  await page.locator('#editor-tab-links').click();const links=page.locator('#workspace-window-links');
+  const before=await page.locator('#src').inputValue();
+  const inherited=links.locator('[data-links-ticket="CAN-1"] [data-links-chip="node:0:canon::api"]');
+  await expect(inherited).toHaveCount(1);await expect(inherited).toHaveClass(/links-chip-inherited/);
+  await expect(inherited.locator('.links-chip-remove')).toHaveCount(0);
+  await links.locator('[data-links-ticket="LOC-1"]').getByRole('button',{name:'Assign LOC-1',exact:true}).click();
+  const picker=page.getByRole('dialog',{name:'Assign LOC-1'});
+  await picker.getByRole('checkbox',{name:'API',exact:true}).check();
+  await expect.poll(async()=>diagram(await source(page)).topologyImports[0].nodeTracking).toEqual({api:{tickets:['API-2','LOC-1']}});
+  expect(diagram(await source(page)).nodes['canon::api']).toBeUndefined();
+  await page.keyboard.press('Escape');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
 });

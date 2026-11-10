@@ -96,4 +96,12 @@ test('B4 desktop Log searches: add a search, one Undo removes it; values without
   const warned=section(guide,'lookups').getByLabel('order-id query',{exact:true});await expect(warned).toHaveAttribute('aria-invalid','true');
   const note=page.locator('#'+await warned.getAttribute('aria-describedby'));await expect(note).toBeVisible();await expect(note).toContainText('has suggested values but no $value slot');
   await page.screenshot({path:info.outputPath('log-searches-warning.png')});
+  // Review c1: Enter in New log search's label adds, the form refreshes, and focus moves to the new search's label.
+  const addFold=lookups.locator('details.log-search-add');if(!await addFold.evaluate(d=>d.open))await addFold.locator(':scope > summary').click();
+  await lookups.getByLabel('New log search query',{exact:true}).fill('{env="$env"} |= "device" | device="$value"');
+  const newLabel=lookups.getByLabel('New log search label',{exact:true});await newLabel.fill('Device');await newLabel.press('Enter');
+  await expect.poll(async()=>Object.keys(JSON.parse(await src.inputValue()).page.tracking.telemetry.lookups)).toEqual(['order-id','device']);
+  await expect(lookups.locator('details.log-search > summary')).toHaveText(['Log search order-id · Order ID','Log search device · Device']);
+  await expect(lookups.locator(':scope > summary')).toHaveText('Log searches · 1 warning');
+  await expect(lookups.getByLabel('device label',{exact:true})).toBeFocused();await expect(lookups.getByLabel('New log search label',{exact:true})).toHaveValue('');
 });

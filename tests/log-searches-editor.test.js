@@ -42,6 +42,8 @@ function harness(spec){
     button(label){return ui.section().querySelectorAll('button').find(b=>b.textContent===label) || null;},
     click(label){const b=ui.button(label);assert.ok(b,'button "'+label+'" exists');b.fire('click');settle();return ui;},
     folds(){return ui.section().querySelectorAll('details.log-search').map(f=>f.querySelector('summary').textContent);},
+    fold(id){return ui.section().querySelectorAll('details.log-search').find(f=>f.getAttribute('data-log-search')===id);},
+    get active(){return e.doc.activeElement;},settle,
     undoSteps(){let n=0;while(h.session.canUndo()){h.session.undo();n++;}return n;}};
   return ui;
 }
@@ -49,8 +51,12 @@ function harness(spec){
 test('L1 New log search adds tracking.telemetry.lookups.<id> from label and query, with an id made from the label, as one Undo step',()=>{
   const ui=harness(board()),before=ui.text;
   assert.ok(!/No settings yet/.test(ui.section().querySelector('summary').textContent),'the section is no longer a placeholder');
-  ui.type('New log search label','Order ID').type('New log search query',QUERY).click('Add log search');
+  ui.type('New log search label','Order ID').type('New log search query',QUERY);
+  const preview=ui.section().querySelector('p.log-search-id-preview');assert.equal(preview.textContent,'Saved as tracking.telemetry.lookups.order-id (from the label).','review c1: the id that will be made is shown');
+  assert.equal(ui.control('New log search id').getAttribute('aria-describedby'),preview.id);
+  ui.click('Add log search');
   assert.deepEqual(plain(ui.lookups),{'order-id':{label:'Order ID',query:QUERY}});
+  assert.equal(ui.fold('order-id').open,true,'review c1: the new search opens');
   assert.deepEqual(ui.folds(),['Log search order-id · Order ID'],'one fold for the new search');
   assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'one Undo removes it');assert.equal(ui.h.session.canUndo(),false);
   // An explicit id is used as typed; a second search with the same label gets its own id.
@@ -75,27 +81,37 @@ test('L3 a validator warning sits next to its field: suggested values without a 
   const ui=harness(board({lookups:{fixed:{label:'Recent errors',query:'{app="api"} |= "error"',values:['a']}}}));
   const query=ui.control('fixed query');assert.equal(query.getAttribute('aria-invalid'),'true');
   const id=query.getAttribute('aria-describedby'),note=ui.section().querySelectorAll('p').find(p=>p.id===id);
-  assert.ok(note,'the query names its note');assert.match(note.textContent,/has suggested values but no \$value slot/);
+  assert.ok(note,'the query names its note');assert.equal(note.textContent,'Has suggested values but no $value slot. The Trace view drops this search until it is fixed.','review c1: worded for the editor');
   assert.equal(note.parentNode,query.closest('.frow').parentNode,'the note is in the same fold');
   assert.ok(ui.section().querySelectorAll('details.log-search')[0].open,'a search with a warning starts open');
   const general=ui.section().querySelector('[aria-label="Log searches warnings"]');
   assert.ok(!general || !general.children.some(li=>/no \$value slot/.test(li.textContent)),'not repeated in the general list');
+  // Review c1: a value listed twice is flagged at the suggested values field.
+  const dup=harness(board({lookups:{camera:{label:'Camera',query:QUERY,values:['arch','wren','arch']}}})),values=dup.control('camera suggested values');
+  assert.equal(values.getAttribute('aria-invalid'),'true');
+  assert.equal(dup.section().querySelectorAll('p').find(p=>p.id===values.getAttribute('aria-describedby'))?.textContent,'Suggested value "arch" is listed more than once.');
 });
 
 test('L4 Move up and Move down reorder searches; the ends are disabled',()=>{
   const ui=harness(board({lookups:{a:{label:'A',query:QUERY},b:{label:'B',query:QUERY},c:{label:'C',query:QUERY}}}));
   const up=ui.button('Move log search a up'),down=ui.button('Move log search c down');assert.ok(up && down,'Move buttons exist');
   assert.equal(up.disabled,true);assert.equal(down.disabled,true);
-  ui.click('Move log search a down');assert.deepEqual(Object.keys(ui.lookups),['b','a','c']);
-  ui.click('Move log search c up');assert.deepEqual(Object.keys(ui.lookups),['b','c','a']);
+  // Review c1: focus stays on the Move button that was pressed while it can still be used, else the other one.
+  const press=label=>{const b=ui.button(label);b.focus();b.fire('click');ui.settle();};
+  press('Move log search a down');assert.deepEqual(Object.keys(ui.lookups),['b','a','c']);assert.equal(ui.active,ui.button('Move log search a down'),'focus on a\'s Move down, still enabled');
+  press('Move log search a down');assert.deepEqual(Object.keys(ui.lookups),['b','c','a']);assert.equal(ui.active,ui.button('Move log search a up'),'a is last: focus moves to its Move up');
   assert.deepEqual(plain(ui.lookups.a),{label:'A',query:QUERY},'fields are kept');
-  assert.equal(ui.undoSteps(),2);
+  // After Remove, focus goes to the next search's header, or to New log search after the last one.
+  press('Remove log search b');assert.equal(ui.active,ui.fold('c').querySelector('summary'),'the next search');
+  press('Remove log search a');assert.equal(ui.active,ui.section().querySelector('details.log-search-add').querySelector('summary'),'New log search');
+  assert.equal(ui.undoSteps(),4);
 });
 
 test('L5 Remove keeps lookups {} for the typed box; the Offer checkbox adds or drops the block and cannot drop it while searches exist',()=>{
   const ui=harness(board({lookups:{a:{label:'A',query:QUERY}}}));
   const offer=ui.control('Offer log searches in the Trace view');assert.equal(offer.checked,true);assert.equal(offer.disabled,true,'searches exist: it cannot be turned off');
   assert.ok(offer.title.includes('Remove the log searches first'));
+  const why=ui.section().querySelectorAll('p').find(p=>p.id===offer.getAttribute('aria-describedby'));assert.equal(why?.textContent,'Remove the searches below to turn this off.','review c1: a visible reason');
   ui.click('Remove log search a');assert.deepEqual(plain(ui.lookups),{},'the typed LogQL box stays');
   ui.render();const off=ui.control('Offer log searches in the Trace view');assert.equal(off.disabled,false);
   off.checked=false;off.fire('change');ui.h.flush();assert.equal(ui.lookups,undefined,'unchecked: no log search block');
@@ -107,9 +123,13 @@ test('L6 New log search drafts survive a re-render; Enter in the label adds; dra
   const ui=harness(board());
   ui.type('New log search label','Order ID').type('New log search query',QUERY);ui.render();
   assert.equal(ui.control('New log search label').value,'Order ID','the label draft survives a re-render');assert.equal(ui.control('New log search query').value,QUERY);
-  ui.control('New log search label').fire('keydown',{key:'Enter'});ui.h.flush();
-  assert.deepEqual(Object.keys(ui.lookups),['order-id'],'Enter adds');ui.render();
+  // Review c1: with the label focused, as a reader has it, Enter adds and the form refreshes on its own.
+  const typed=ui.control('New log search label');typed.focus();typed.fire('keydown',{key:'Enter'});ui.settle();
+  assert.deepEqual(Object.keys(ui.lookups),['order-id'],'Enter adds');
+  assert.deepEqual(ui.folds(),['Log search order-id · Order ID'],'the new fold is shown without a manual render');assert.equal(ui.fold('order-id').open,true);
+  assert.equal(ui.section().querySelector('summary').textContent,'Log searches · 1 search');
   assert.equal(ui.control('New log search label').value,'','drafts clear after Add');assert.equal(ui.control('New log search query').value,'');
+  assert.equal(ui.active,ui.control('order-id label'),'focus moves to the new search\'s label');
   // A refused add keeps the drafts.
   ui.type('New log search id','9bad').type('New log search label','Bad').type('New log search query',QUERY).click('Add log search');ui.render();
   assert.equal(ui.control('New log search id').value,'9bad');assert.deepEqual(Object.keys(ui.lookups),['order-id']);
@@ -134,5 +154,9 @@ test('L8 command errors name the problem',()=>{
   assert.match(edit({},{op:'lookup',name:'nope',field:'label',value:'X'}).error,/not found/i);
   assert.match(edit({lookups:{a:{label:'A',query:QUERY}}},{op:'lookup',name:'a',field:'colour',value:'X'}).error,/Unknown/);
   assert.deepEqual(edit({},{op:'addLookup',name:'constructor',label:'C',query:QUERY}).value,{lookups:{constructor:{label:'C',query:QUERY}}},'an Object.prototype name is an ordinary id');
+  assert.match(edit(true,{op:'addLookup',name:'x',label:'X',query:QUERY}).error,/not an object/,'review c1: a non-object telemetry block is refused');
+  assert.equal(C.telemetryLookupId('Número de pedido',{}),'numero-de-pedido');assert.equal(C.telemetryLookupId('Straße',{}),'strasse');
+  assert.equal(C.telemetryLookupId('注文',{}),'search-1');assert.equal(C.telemetryLookupId('注文',{'search-1':{}}),'search-2');
+  assert.ok(C.telemetryLookupId('a'.repeat(100),{}).length<=40);assert.ok(!/-$/.test(C.telemetryLookupId('x'.repeat(39)+' y',{})));
   assert.equal(C.telemetryLookupId('Order ID',{}),'order-id');assert.equal(C.telemetryLookupId('Order ID',{'order-id':{}}),'order-id-2');assert.equal(C.telemetryLookupId('42 things',{}),'search-42-things');
 });

@@ -233,6 +233,36 @@ var FlowCanon = (function(){
     });});
     return warnings;
   }
+  /* #1290: trace span declarations on a node or edge: trace.spans, keyed by a short name.
+     A declaration names spans by serviceName and either an exact operation, an
+     operationPrefix, or (with neither) its attributes; role says what the span is.
+     Returns [{key, message}]; key is null when the trace object itself is malformed. */
+  var TRACE_SPAN_ROLES={node:['process','database','cache','call','work'],edge:['send','receive']};
+  var TRACE_SPAN_FIELDS=['serviceName','operation','operationPrefix','namespace','attributes','role'];
+  function traceSpanErrors(s,kind,listed){
+    if(!object(s))return ['expected a span declaration object'];
+    var e=[],has=function(k){return Object.prototype.hasOwnProperty.call(s,k);};
+    Object.keys(s).forEach(function(k){if(TRACE_SPAN_FIELDS.indexOf(k)<0)e.push('unknown field '+k);});
+    if(typeof s.serviceName!=='string' || !s.serviceName.trim())e.push('serviceName required');
+    if(has('operation') && (typeof s.operation!=='string' || !s.operation.trim()))e.push('operation must be a nonempty string');
+    if(has('operationPrefix') && (typeof s.operationPrefix!=='string' || s.operationPrefix.trim().length<2))e.push('operationPrefix must be at least two characters');
+    if(has('operation') && has('operationPrefix'))e.push('operation and operationPrefix cannot be combined');
+    if(!has('operation') && !has('operationPrefix') && !(object(s.attributes) && Object.keys(s.attributes).length))e.push('needs operation, operationPrefix or attributes');
+    if(has('namespace') && (typeof s.namespace!=='string' || !s.namespace.trim()))e.push('namespace must be a nonempty string');
+    if(has('attributes') && (!object(s.attributes) || Object.keys(s.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !['string','number','boolean'].includes(typeof s.attributes[k]);})))e.push('attributes: use supported operational attributes only');
+    if(TRACE_SPAN_ROLES[kind].indexOf(s.role)<0)e.push('role must be one of '+TRACE_SPAN_ROLES[kind].join(', '));
+    return e;
+  }
+  function traceDeclarationErrors(trace,kind,raw,listed){
+    if(!listed)listed=profileAttributes(raw);
+    if(!object(trace) || Object.keys(trace).some(function(k){return k!=='spans';}) || !object(trace.spans))return [{key:null,message:'expected {"spans": {<name>: <span declaration>}}'}];
+    var out=[];
+    Object.keys(trace.spans).forEach(function(key){
+      if(!/^[A-Za-z][A-Za-z0-9_-]*$/.test(key))out.push({key:key,message:'span names start with a letter and use letters, digits, - and _'});
+      traceSpanErrors(trace.spans[key],kind,listed).forEach(function(message){out.push({key:key,message:message});});
+    });
+    return out;
+  }
   function validate(raw){
     var errors=[], p=pageOf(raw);
     if (!object(p)) return errors;
@@ -260,6 +290,15 @@ var FlowCanon = (function(){
       });
     });
     var listed=profileAttributes(raw);
+    sections(raw).forEach(function(sec){
+      var d=sec.diagram;
+      function spans(value,kind,at){
+        if(!object(value) || !Object.prototype.hasOwnProperty.call(value,'trace'))return;
+        traceDeclarationErrors(value.trace,kind,raw,listed).forEach(function(x){errors.push(at+'.trace'+(x.key==null?'':'.spans.'+x.key)+': '+x.message);});
+      }
+      if(object(d.nodes))Object.keys(d.nodes).forEach(function(id){spans(d.nodes[id],'node','nodes.'+id);});
+      (Array.isArray(d.edges)?d.edges:[]).forEach(function(e){if(object(e))spans(e,'edge','edges.'+e.from+'->'+e.to);});
+    });
     sections(raw).forEach(function(sec){
       var d=sec.diagram, steps=Array.isArray(d.steps)?d.steps:[], ids=new Set(steps.map(function(s){return s && s.id;}));
       if(d.referenceTrace!=null){var r=d.referenceTrace;if(!object(r) || r.version!==1 || !object(r.trace) || !object(r.trace.context) || !Array.isArray(r.trace.spans) || typeof r.trace.traceId!=='string' || !object(r.approval) || typeof r.approval.reason!=='string' || typeof r.contract!=='string')errors.push('referenceTrace: expected an approved version-1 trace mapping');}
@@ -320,6 +359,6 @@ var FlowCanon = (function(){
   }
   /* #1238: the attribute names traceMatch.attributes accepts on this page, for the Workbench form. */
   function traceAttributeNames(raw){return traceAttributes.concat(Object.keys(profileAttributes(raw)).filter(function(k){return traceAttributes.indexOf(k)<0;}));}
-  return {version:1,traceWarnings:traceWarnings,traceAttributeNames:traceAttributeNames,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
+  return {version:1,traceWarnings:traceWarnings,traceDeclarationErrors:traceDeclarationErrors,traceAttributeNames:traceAttributeNames,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
     referenceErrors:referenceErrors,locate:locate,codeUrl:codeUrl,references:references,validate:validate,links:links};
 })();

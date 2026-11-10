@@ -84,7 +84,7 @@ function inspectorEnvironment(names){
   for(const name of names)vm.runInContext(readSource(name+'.js'),C);
   function mount(spec,options={}){
     const guide=doc.body.appendChild(element()),timers=new Map(),scheduled=[];
-    let text=JSON.stringify(spec,null,2),next=0,inspector,reveals=0,selectionCalls=0,retireCalls=0;
+    let text=JSON.stringify(spec,null,2),next=0,inspector,reveals=0,selectionCalls=0,retireCalls=0,selected=null;
     const session=C.createBuilderSession({source:{read:()=>text,write:value=>text=value},render(){},
       persistence:C.createBuilderPersistence({storage:()=>({getItem:()=>null,setItem(){},removeItem(){}}),now:()=>0,schedule(){},cancel(){}}),
       invalidateProject(){inspector.retire();}});
@@ -93,11 +93,11 @@ function inspectorEnvironment(names){
       apply(plan,opt,snapshot){if(plan?.error){inspector.error(plan.error);return false;}return session.accept(plan,{snapshot,afterRender(){if(opt?.after)opt.after(plan);}});},
       schedule(fn){timers.set(++next,fn);scheduled.push(fn);return next;},cancel:id=>timers.delete(id),
       surface:{show(){},reveal(){reveals++;},hideDiff(){},retire(){retireCalls++;}},
-      selection:{select(){selectionCalls++;},range(){selectionCalls++;},rehighlight(){selectionCalls++;},remove(){},removeMany(){}},
+      selection:{select(target){selectionCalls++;selected=target;},range(){selectionCalls++;},rehighlight(){selectionCalls++;},remove(){},removeMany(){}},
       preview:{stepper:()=>options.stepper || null,targetElement:()=>null},
       modes:{adding:()=>null,connecting:()=>null,toggleAdding(){},editPathStep(){}},
       clipboard:{current:()=>null,selectHome(){selectionCalls++;},clearHome(){}}});
-    return {inspector,session,guide,timers,scheduled,get text(){return text;},get reveals(){return reveals;},get retireCalls(){return retireCalls;},get selectionCalls(){return selectionCalls;},
+    return {inspector,session,guide,timers,scheduled,get text(){return text;},get reveals(){return reveals;},get retireCalls(){return retireCalls;},get selectionCalls(){return selectionCalls;},get selected(){return selected;},
       writeSource(value){text=value;inspector.sourceChanged();},
       flush(){const run=[...timers.values()];timers.clear();run.forEach(fn=>fn());}};
   }

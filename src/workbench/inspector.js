@@ -3,7 +3,7 @@
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null,invalidateAlignment=null,invalidateEdgeEndpoints=null;
-  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),TRACE_MATCH_DRAFTS=new Map(),TRACE_MATCH_REVEALED=new Set(),traceMatchCache=null,OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false;
+  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),TRACE_MATCH_DRAFTS=new Map(),TRACE_MATCH_REVEALED=new Set(),traceMatchCache=null,OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false,BOARD_READY_TEXT=null;
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   var proseDraft={key:null,fields:Object.create(null)};
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
@@ -35,7 +35,7 @@ function createBuilderInspector(opts){
     var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0,sizes:same?captureTextareaSizes():null,disclosures:same?captureDisclosures():null};
     if(!same){
       OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_MATCH_REVEALED.clear();
-      OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;
+      OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;
     }
     retireForm();
     inspectorScrollKey=identity;invalidateEffectiveState=null;
@@ -49,7 +49,7 @@ function createBuilderInspector(opts){
       var key=fold.getAttribute('data-inspector-disclosure');
       if(fold.hasAttribute('data-inspector-reveal'))fold.open=true;
       else if(previous.disclosures && Object.prototype.hasOwnProperty.call(previous.disclosures,key))fold.open=previous.disclosures[key];
-      else if(!previous.disclosures)fold.open=false;
+      else if(!previous.disclosures)fold.open=fold.hasAttribute('data-inspector-open');
     });
     assignControlKeys();restoreTextareaSizes(previous.sizes);restoreFocus(previous.focus);guide.scrollTop=previous.scroll;
   }
@@ -502,9 +502,8 @@ function deltaControls(val){
     return fold;
   }
 
-function pageTrackingControls(val){
-    var box=document.createElement('fieldset'),legend=document.createElement('legend');
-    box.className='tracking-editor';legend.textContent='Tracking';box.appendChild(legend);
+/* #1236: the page Jira and GitHub controls, rendered into Status board settings → Jira. */
+function pageTrackingControls(val,box){
     function update(edit){
       return commitCascade(function(raw){
         var doc=builderDocumentPage(raw);if(!doc)return {error:'Add document settings first.'};
@@ -560,7 +559,6 @@ function pageTrackingControls(val){
       if(bad){formError('Use owner/repo names separated by commas, or org:name.');return false;}
       return update(function(jira,page,tracking){if(parts.length)tracking.github=github;else delete tracking.github;});
     },{placeholder:'acme/firmware, acme/backend or org:acme'})));
-    var metricsSettings=metricsSettingsControls();if(metricsSettings)box.appendChild(metricsSettings);
     return box;
   }
 
@@ -668,9 +666,10 @@ function metricsControls(){
       return commitTelemetry(function(text,raw){return planCarrierTelemetry(text,raw,target,edit,session.topologyContext());});
     }});
   }
-function metricsSettingsControls(){
+function metricsSettingsControls(environments,warnings){
     var snapshot=parseEditor();if(snapshot.error)return null;
-    return createFlowMetricsSettings({document:document,state:telemetryPageState(snapshot.raw),controls:metricsControlKit(),listen:listen,commit:function(edit){
+    var state=telemetryPageState(snapshot.raw);if(warnings)state.warnings=warnings;
+    return createFlowMetricsSettings({document:document,state:state,controls:metricsControlKit(),listen:listen,environments:environments,commit:function(edit){
       return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }
@@ -2286,6 +2285,7 @@ function panelForm(val, ctx){
     rows.push(frow('Starting visibility',visibility));
     if(panelAuthoring(val.type).branding)rows.push(brandControl(val,ctx));
     if(editor.setupRows) editor.setupRows(val,ctx.diagram,t,rows);
+    if(val.type==='live-status')rows.push(boardSettingsLink());
     return rows.concat(panelSetupRows(val));
   }
 
@@ -2446,11 +2446,90 @@ function stepTimeRows(val,ctx,t){
     return [frow('Story time',input),note];
   }
 
+/* #1236 Status board settings: the board-level live status settings in one place. */
+function boardSettingsLink(){
+    var line=document.createElement('p');line.className='fnote board-settings-link';
+    var button=actionButton('Open Status board settings',function(){selectTarget({kind:'board'},false);return true;});
+    button.title='Jira, Metrics, Traces, Environments and Log searches for this board';
+    line.appendChild(button);line.appendChild(document.createTextNode(' Jira, Metrics, Traces, Environments and Log searches.'));
+    return line;
+  }
+function boardForm(){
+    var parsed=parseEditor(),raw=parsed.raw,doc=builderDocumentPage(raw),rows=[],missing=statusBoardMissing(raw);
+    function note(parent,text){var p=document.createElement('p');p.className='fnote';p.textContent=text;parent.appendChild(p);return p;}
+    function warningList(parent,list,label){
+      if(!list.length)return;
+      var ul=document.createElement('ul');ul.className='metrics-warnings board-warnings';ul.setAttribute('aria-label',label);
+      list.forEach(function(text){var li=document.createElement('li');li.textContent=text;ul.appendChild(li);});parent.appendChild(ul);
+    }
+    var top={appendChild:function(node){rows.push(node);return node;}};
+    // One status line after Make this a status board, until the source changes again.
+    if(BOARD_READY_TEXT!=null && BOARD_READY_TEXT===session.text()){
+      var ready=note(top,'Status board ready. Undo removes it.');ready.className+=' board-ready';ready.setAttribute('role','status');
+    }
+    if(missing.page || missing.tracking || missing.panel){
+      var parts=[];if(missing.page)parts.push('a page wrapper');if(missing.tracking)parts.push('an empty tracking block');if(missing.panel)parts.push('a Live status panel');
+      var blocked=missing.panel && !missing.hasDiagram?'Add a diagram first; the Live status panel sits beside a diagram.':'';
+      note(top,(missing.page?'This bare diagram is not a status board yet. ':'This document is not a complete status board yet. ')+'Make this a status board adds '+
+        (parts.length>1?parts.slice(0,-1).join(', ')+' and '+parts[parts.length-1]:parts[0])+' as one Undo step.'+(blocked?'':' The diagram stays intact.'));
+      var make=actionButton('Make this a status board',function(){
+        return commitCascade(function(next){return planMakeStatusBoard(session.text(),next);},{after:function(){
+          BOARD_READY_TEXT=session.text();renderInspector();
+          var jiraSection=Array.prototype.find.call(guide.querySelectorAll('details.board-section'),function(box){return box.getAttribute('data-board-section')==='jira';});
+          var heading=jiraSection && jiraSection.querySelector('summary');if(heading)heading.focus();
+        }});
+      },'board-make');
+      make.title='Adds what a status board needs; Undo removes it in one step.';rows.push(make);
+      if(blocked){make.disabled=true;make.title=blocked;make.setAttribute('aria-describedby',prefix+'-board-blocked');var reason=note(top,blocked);reason.id=prefix+'-board-blocked';reason.className+=' board-blocked';}
+    }
+    if(!doc)return rows;
+    note(top,'Saved in the page tracking block. Per-node tickets and metrics: Inspect → Tracking.');
+    var warnings=statusBoardWarnings(raw,session.validate),telemetry=specObject(doc.page.tracking) && specObject(doc.page.tracking.telemetry)?doc.page.tracking.telemetry:{};
+    warningList(top,warnings.board,'Status board warnings');
+    function count(list){return list.length?list.length+(list.length===1?' warning':' warnings'):'';}
+    /* Sections start closed so all five headers fit in a desktop Inspector without scrolling; a section
+       with warnings starts open, and Metrics also starts open when the page has a telemetry block.
+       Closed headers carry a short status. */
+    function section(id,title,suffix,open){
+      var box=document.createElement('details');box.className='board-section';box.setAttribute('data-board-section',id);
+      var summary=document.createElement('summary');summary.textContent=title+(suffix?' · '+suffix:'');box.appendChild(summary);
+      if(open){box.open=true;box.setAttribute('data-inspector-open','');}
+      rows.push(box);return box;
+    }
+    var environmentIds=specObject(telemetry.environments)?Object.keys(telemetry.environments):[];
+    var tracking=specObject(doc.page.tracking)?doc.page.tracking:{},jiraBlock=specObject(tracking.jira)?tracking.jira:{},jiraStatus=[];
+    if(typeof jiraBlock.site==='string'){try{jiraStatus.push(new URL(jiraBlock.site).host);}catch(ex){}}
+    jiraStatus=jiraStatus.concat(trackingEpics(doc.page));
+    var scope=trackingGithubScope(doc.page),excluded=trackingExclusions(doc.page).length;
+    if(scope.repos.length || scope.org)jiraStatus.push('GitHub scope');
+    if(excluded)jiraStatus.push(excluded+' excluded');
+    var hasTelemetry=Object.prototype.hasOwnProperty.call(tracking,'telemetry');
+    var jira=section('jira','Jira',count(warnings.jira) || jiraStatus.join(' · ') || 'Not set',warnings.jira.length>0);
+    var metrics=section('metrics','Metrics',count(warnings.metrics) || (!hasTelemetry?(statusBoardHasBindings(raw)?'No page settings':'Not set'):telemetry.enabled===false?'Off':''),hasTelemetry || warnings.metrics.length>0);
+    var traces=section('traces','Traces',count(warnings.traces) || 'No settings yet',warnings.traces.length>0);
+    var environments=section('environments','Environments',count(warnings.environments) || environmentIds.join(', '),warnings.environments.length>0);
+    var lookups=section('lookups','Log searches',count(warnings.lookups) || 'No settings yet',warnings.lookups.length>0);
+    pageTrackingControls(doc.page,jira);
+    note(jira,'Dependencies, dependency link names and no-activity days: edit in JSON for now.');
+    warningList(jira,warnings.jira,'Jira warnings');
+    var metricsForm=metricsSettingsControls(environments,warnings.metrics);if(metricsForm)metrics.appendChild(metricsForm);
+    warningList(environments,warnings.environments,'Environments warnings');
+    note(traces,'No settings yet. Trace connections choose which company trace profiles this board uses; for now, edit tracking.telemetry.traceConnections in JSON.'+
+      (Object.prototype.hasOwnProperty.call(telemetry,'traceConnections')?' This board sets it.':''));
+    warningList(traces,warnings.traces,'Traces warnings');
+    var lookupCount=specObject(telemetry.lookups)?Object.keys(telemetry.lookups).length:0;
+    note(lookups,'No settings yet. Log searches let readers find a trace from a log line in the Trace view; for now, edit tracking.telemetry.lookups in JSON.'+
+      (lookupCount?' This board has '+lookupCount+(lookupCount===1?' log search.':' log searches.'):''));
+    warningList(lookups,warnings.lookups,'Log searches warnings');
+    return rows;
+  }
+
 function documentForm(){
     var parsed=parseEditor(),doc=builderDocumentPage(parsed.raw),rows=[];
     function note(text){var p=document.createElement('p');p.className='fnote';p.textContent=text;return p;}
     if(!doc){
       rows.push(note('This is a bare diagram. Add a page wrapper to give it a title, saved appearance and source document. The diagram stays intact.'));
+      rows.push(boardSettingsLink());
       return rows;
     }
     function setting(key,value){return commitCascade(function(raw){return planDocumentSetting(session.text(),raw,key,value);},{after:refreshFormSoon});}
@@ -2467,7 +2546,7 @@ function documentForm(){
     rows.push(frow('Claude artifact share URL',textControl(links.claudeUrl,function(v){return linkSetting('claudeUrl',v);},{placeholder:'https://claude.ai/artifact/…'})));
     rows.push(note('Use the existing diagram ID. This does not add the document to Canon. Paste the Claude artifact share URL once; the URL and artifact ID are saved with the document.'));
 
-    rows.push(pageTrackingControls(val));
+    rows.push(boardSettingsLink());
     rows.push(frow('Document title',textControl(val.title,function(v){return setting('title',v);},{placeholder:'Untitled story'})));
     rows.push(frow('Description',textControl(val.description,function(v){return setting('description',v);},{placeholder:'One line shown on library cards'})));
     var tagText=Array.isArray(val.tags)?val.tags.join(', '):val.tags;
@@ -3275,6 +3354,7 @@ function renderInspector(){
       if (t.kind === 'tab') ensureAccentDatalist();
       var rows =
         t.kind === 'document' ? documentForm() :
+        t.kind === 'board' ? boardForm() :
         t.kind === 'group' ? groupForm(val, ctx) :
         t.kind === 'node' ? nodeForm(val, ctx) :
         t.kind === 'edge' ? edgeForm(val, ctx) :
@@ -3411,7 +3491,7 @@ function renderInspector(){
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
       }
-      if (!armedHere && t.kind !== 'document' && t.kind !== 'step-controls')
+      if (!armedHere && t.kind !== 'document' && t.kind !== 'board' && t.kind !== 'step-controls')
         acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':t.kind==='crow'?'Delete field':t.kind==='bullet'?'Delete point':t.kind==='para'?'Delete paragraph':t.kind==='prose'?'Delete Section notes':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
       if(acts.children.length)guide.appendChild(acts);
       guide.appendChild(form);

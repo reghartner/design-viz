@@ -95,7 +95,7 @@ function telemetryEditBinding(binding,edit,options){
   }
   if(op==='use' && !b && !asTemplate){
     if(edit.name==null)return {value:null};
-    if(!telemetryOwn(templates,edit.name))return {error:'Template "'+edit.name+'" is not defined in Document settings → Tracking → Metrics.'};
+    if(!telemetryOwn(templates,edit.name))return {error:'Template "'+edit.name+'" is not defined in Status board settings → Metrics.'};
     var fresh={use:edit.name};
     // The template supplies the kind; the carrier's draft kind applies only when the template has none.
     if(!telemetryOwn(templates[edit.name],'kind') && TELEMETRY_KINDS.indexOf(edit.kind)>=0)fresh.kind=edit.kind;
@@ -111,7 +111,7 @@ function telemetryEditBinding(binding,edit,options){
     b.kind=edit.value;return {value:b};
   }
   if(op==='signal' || op==='removeSignal'){
-    if(usesTemplate)return {error:'This binding uses template "'+b.use+'"; edit its signals in Document settings → Tracking → Metrics.'};
+    if(usesTemplate)return {error:'This binding uses template "'+b.use+'"; edit its signals in Status board settings → Metrics.'};
     var signals=telemetryObject(b.signals)?b.signals:{},name=edit.name;
     if(!telemetryOwn(signals,name))return {error:'Signal "'+name+'" not found. Render and select it again.'};
     if(op==='removeSignal'){
@@ -217,11 +217,11 @@ function telemetryEditBinding(binding,edit,options){
     if(edit.name==null){
       if(!usesTemplate)return {value:b};
       var expanded=telemetryEffectiveBinding(b,templates);
-      if(!expanded)return {error:'Template "'+b.use+'" is not defined in Document settings → Tracking → Metrics. Use Remove metrics to start over.'};
+      if(!expanded)return {error:'Template "'+b.use+'" is not defined in Status board settings → Metrics. Use Remove metrics to start over.'};
       var raw={};['kind','signals','proof','links','card'].forEach(function(key){if(telemetryOwn(expanded,key))raw[key]=expanded[key];});
       return {value:raw};
     }
-    if(!telemetryOwn(templates,edit.name))return {error:'Template "'+edit.name+'" is not defined in Document settings → Tracking → Metrics.'};
+    if(!telemetryOwn(templates,edit.name))return {error:'Template "'+edit.name+'" is not defined in Status board settings → Metrics.'};
     if(usesTemplate && b.use===edit.name)return {value:b};
     var chosen=templates[edit.name],out={use:edit.name};
     if(!telemetryOwn(chosen,'kind') && TELEMETRY_KINDS.indexOf(b.kind)>=0)out.kind=b.kind;
@@ -310,7 +310,7 @@ function telemetryEditPage(telemetry,edit){
     if(added.error)return added;
     templates[edit.name]=added.value;t.templates=templates;return done();
   }
-  if(!telemetryOwn(templates,edit && (edit.name || edit.template)))return {error:'Template not found. Reopen Document settings.'};
+  if(!telemetryOwn(templates,edit && (edit.name || edit.template)))return {error:'Template not found. Reopen Status board settings.'};
   if(op==='removeTemplate'){delete templates[edit.name];t.templates=templates;telemetryDropEmpty(t,'templates');return done();}
   var name=edit.template,current=templates[name];
   if(!telemetryObject(current))return {error:'Template "'+name+'" is not an object; remove it or repair it in JSON.'};
@@ -425,7 +425,7 @@ function telemetryCarrierState(raw,target,context){
     templateBase:template!=null?telemetryTemplateBase(binding,templates):null,
     effective:telemetryEffectiveBinding(binding,templates),warnings:warnings};
 }
-/* Read model for Document settings → Tracking → Metrics. */
+/* Read model for Status board settings → Metrics and Environments. */
 function telemetryPageState(raw){
   var doc=builderDocumentPage(raw),page=doc && doc.page,warnings=[];
   trackingTelemetry(page,function(path,message){warnings.push('tracking.telemetry'+path+': '+message);});

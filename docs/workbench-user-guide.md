@@ -20,7 +20,7 @@ the font size or widen the box. Clearing Color restores the theme color.
 
 In the desktop Workbench, double-click a document or section heading, the selected tab name in the navigation breadcrumb, a View name, path label, node name or existing subtitle, panel title, connection label, or contract title, field name, value, meaning or note to edit it in place. Double-click step captions, paragraphs and bullets to edit their Markdown. Right-click a local group and choose **Rename** for its title; a connection's **Rename** action also adds a missing label. Add a first node subtitle in Inspect. Single-line edits save with Enter or a click outside; Markdown saves with Ctrl/Command+Enter or a click outside. Escape cancels, and each save is one Undo. Inspect remains available for all these fields and for panel body settings; **F2** opens Inspect for the selected object. An imported node's name or subtitle and an imported connection's label save as this consumer's display overrides, leaving the provider unchanged. Imported groups are provider-owned and cannot be renamed here.
 
-For a live delivery board, **Inspect → Document settings → Tracking → Parent**
+For a live delivery board, **Inspect → Status board settings → Jira → Parent**
 accepts an Epic or Initiative Jira key. Add or remove a key with one Undo/Redo;
 Export project keeps the existing `tracking.jira.epic` setting. In the connected
 viewer, Jira identifies the parent type automatically. Initiatives show their
@@ -28,7 +28,14 @@ Epics and descendant stories, with separate Epic counts and story coverage.
 The desktop **Demo live status** preview uses sample states without querying
 Jira, so it cannot infer parent type from a key. See [live status](live-status.md).
 
-**Document settings → Tracking → Metrics → Allow metrics** controls metrics
+**Status board settings** (the **Board settings** button at the top of Inspect and in Find objects)
+holds the board-level settings in five sections: Jira, Metrics, Traces,
+Environments and Log searches. Each section lists its own validator warnings.
+On a diagram that is not a status board yet, **Make this a status board** adds a
+page wrapper if needed, an empty `tracking` block and a Live status panel as one
+Undo step. Document settings and the Live status panel link to it.
+
+**Status board settings → Metrics → Allow metrics** controls metrics
 availability for the page, including imports and details, without deleting
 bindings or templates. It defaults on; reader Metrics still defaults off with a
 24h window. **Preview metrics layout** in the desktop toolbar shows synthetic

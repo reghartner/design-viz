@@ -25,12 +25,12 @@ test('G1 desktop imported connection: Add signal adds and Hide filters inherited
   await openMetricsFold(guide,'New signal');
   await guide.getByLabel('New signal name',{exact:true}).fill('local');await guide.getByLabel('New signal query',{exact:true}).fill('consumer_rate');
   await guide.getByRole('button',{name:'Add signal',exact:true}).click();
-  await expect.poll(overlay).toEqual({extends:true,signals:{local:{grafana:'consumer_rate'}}});
+  await expect.poll(overlay).toEqual({extends:true,kind:'call',signals:{local:{grafana:'consumer_rate'}}});
   await expect.poll(rows,'the added signal joins the inherited ones').toBe('errors,local,rate');
   const added=await source.inputValue();
   await card.click();await openMetricsFold(guide,'Signal errors · inherited');
   const hide=guide.getByLabel('errors hidden for this document',{exact:true});await expect(hide).not.toBeChecked();await hide.check();
-  await expect.poll(overlay).toEqual({extends:true,signals:{local:{grafana:'consumer_rate'}},hide:['errors']});
+  await expect.poll(overlay).toEqual({extends:true,kind:'call',signals:{local:{grafana:'consumer_rate'}},hide:['errors']});
   await expect.poll(rows,'the hidden inherited signal leaves the card').toBe('local,rate');
   await page.locator('#undo-builder').click();await expect(source).toHaveValue(added);await expect.poll(rows).toBe('errors,local,rate');
   await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);await expect.poll(rows).toBe('errors,rate');

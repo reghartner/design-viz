@@ -7,6 +7,8 @@
    M5 raw → template asks | same | a drop onto Event ingest (raw signals) asks Replace; Esc writes nothing; Replace writes the template | raw signals silently lost
    M6 imported | consumer importing provider api with a binding | Provider metrics lists API; unticking Show errors writes the #1266 hide overlay; a template drop onto API is refused with "Templates aren't available on imported nodes yet" | a template replacing provider metrics
    M7 keyboard | same as M1 | Enter on a chip → Move to… → http-service switches it; Enter on a handle opens Assign, a tick binds and opens the editor with the missing parameter flagged | a keyboard path that skips the flag
+   M9 template limit | kafka-topic sets lag max 50 | the lag max field shows 50 with "from template kafka-topic" beside it; typing 80 overrides it on the carrier in one Undo step | an in-force limit shown as empty
+   M10 imported, own metrics | consumer importing store with this document's raw binding (no kind) | Metrics kind shows "no kind set"; Signals from offers the templates disabled with the "not available … yet" reason | templates offered and then refused, a kind shown that is not set
    M8 sync + card kept | edge 0 card pinned at x 120, y 40, width 240 | a parameter edit in Links shows in Inspect's Metrics editor, and an edit there shows in Links, with no reload; switching edge 0 to http-service keeps its card position and width | a stale copy, a lost card pin */
 import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
 import {digest} from '../../canon/drift.mjs';
@@ -47,6 +49,7 @@ test('M1 rows list each template, Raw signals and No metrics with their carriers
   expect(await chips('template:http-service')).toEqual(['node:0:notify']);
   expect(await chips('raw')).toEqual(['node:0:ingest']);
   expect(await chips('none')).toEqual(['edge:0:1','edge:0:2','node:0:ctrl','node:0:push']);
+  await expect(panel.getByRole('searchbox',{name:'Filter templates, signals, nodes and edges',exact:true})).toHaveAttribute('placeholder','Filter templates, signals, nodes, edges');
   await expect(metricRow(panel,'template:kafka-topic')).toContainText('step 1');
   await page.locator('#editor-tab-steps').click();await expect(page.locator('#steps-list [data-step-index="0"]')).toBeVisible();
   await page.locator('#editor-tab-links').click();
@@ -81,7 +84,8 @@ test('M4 inline parameter and limit edits are one Undo step each; Remove metrics
   const {panel,text}=await open(page,server);
   await metricRow(panel,'template:kafka-topic').getByRole('button',{name:'Edit metrics on '+CTRL_EDGE,exact:true}).click();
   const editor=()=>panel.getByRole('group',{name:'Metrics on '+CTRL_EDGE,exact:true});
-  const topic=editor().getByRole('textbox',{name:'topic',exact:true});await topic.fill('doorbell-ring');await topic.press('Enter');
+  // A trailing space is trimmed, as Inspect does.
+  const topic=editor().getByRole('textbox',{name:'topic',exact:true});await topic.fill('doorbell-ring ');await topic.press('Enter');
   await expect.poll(async()=>diagram(await source(page)).edges[0].telemetry.topic).toBe('doorbell-ring');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
   const max=editor().getByRole('textbox',{name:'lag max',exact:true});await max.fill('100');await max.press('Enter');
@@ -140,6 +144,8 @@ test('M7 keyboard: Move to… switches template; Enter on a handle opens Assign 
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
   await metricRow(panel,'template:http-service').getByRole('button',{name:'Drag http-service to a node or connection',exact:true}).focus();await page.keyboard.press('Enter');
   const assign=page.getByRole('dialog',{name:'Assign http-service',exact:true});await expect(assign).toBeVisible();
+  const rawBox=assign.getByRole('checkbox',{name:'Event ingest',exact:true});await expect(rawBox).toHaveAttribute('aria-disabled','true');
+  await expect(page.locator('#'+await rawBox.getAttribute('aria-describedby'))).toContainText('use Move to… on its chip');
   await assign.getByRole('checkbox',{name:'Push gateway',exact:true}).check();
   await expect.poll(async()=>diagram(await source(page)).nodes.push.telemetry).toEqual({use:'http-service'});
   await page.keyboard.press('Escape');
@@ -164,4 +170,39 @@ test('M8 Links and Inspect show each other\'s edits with no reload; switching te
   await editor().getByRole('combobox',{name:'Signals from',exact:true}).selectOption('http-service');
   await expect.poll(async()=>diagram(await source(page)).edges[0].telemetry.use).toBe('http-service');
   expect(diagram(await source(page)).edges[0].telemetry.card).toEqual({position:{x:120,y:40},width:240});
+});
+
+test('M9 a limit the template sets shows as in force, with its source, and can be overridden',async({page,server})=>{
+  const spec=JSON.parse(JSON.stringify(fixture));spec.page.tracking.telemetry.templates['kafka-topic'].proof={lag:{max:50}};
+  const {panel,text}=await open(page,server,spec);
+  await metricRow(panel,'template:kafka-topic').getByRole('button',{name:'Edit metrics on '+CTRL_EDGE,exact:true}).click();
+  const max=panel.getByRole('group',{name:'Metrics on '+CTRL_EDGE,exact:true}).getByRole('textbox',{name:'lag max',exact:true});
+  await expect(max).toHaveValue('50');
+  await expect(page.locator('#'+await max.getAttribute('aria-describedby'))).toContainText('from template kafka-topic');
+  await max.fill('80');await max.press('Enter');
+  await expect.poll(async()=>diagram(await source(page)).edges[0].telemetry.proof).toEqual({lag:{max:80}});
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
+});
+
+test('M10 an imported carrier with this document\'s own metrics: no kind shows as such, and templates are offered disabled with the reason',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:1000});
+  const model=(id,dg,tracking)=>({page:Object.assign({title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'}},tracking?{tracking}:{},{sections:[{id:'main',diagram:dg}]})});
+  const provider=model('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+  const consumer=model('consumer',{autoplay:false,nodes:{local:{title:'Local worker'}},rows:[['local']],topologyImports:[{spec:'provider',export:'core',as:'canon',nodeTracking:{store:{telemetry:{signals:{depth:{grafana:'sum(depth)'}}}}}}],steps:[{id:'call',nodes:['canon::api']}],
+    panels:[{id:'status',type:'live-status',title:'Delivery status'}]},fixture.page.tracking);
+  const catalog={version:3,diagrams:[provider,consumer].map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:2,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
+  await page.route('**/diagrams.json',route=>route.fulfill({json:catalog}));
+  for(const spec of [provider,consumer])await page.route('**/'+spec.page.canon.id+'.json',route=>route.fulfill({json:spec}));
+  await page.goto(server.origin+'/workbench.html');
+  await page.locator('#welcome-file').setInputFiles({name:'consumer.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(consumer,null,2))});
+  await expect(page.locator('#docview g.node[data-dv-node="canon::store"]')).toBeVisible();await closeTools(page);
+  await page.locator('#editor-tab-links').click();const links=page.locator('#workspace-window-links');
+  await links.getByRole('tab',{name:/^Metrics/}).click();const panel=links.getByRole('tabpanel');
+  await metricRow(panel,'raw').getByRole('button',{name:'Edit metrics on node Store',exact:true}).click();
+  const editor=panel.getByRole('group',{name:'Metrics on node Store',exact:true});
+  const kind=editor.getByRole('combobox',{name:'Metrics kind',exact:true});
+  await expect(kind).toHaveValue('');await expect(kind.locator('option:checked')).toHaveText('no kind set');
+  const uses=editor.getByRole('combobox',{name:'Signals from',exact:true});
+  expect(await uses.locator('option').evaluateAll(list=>list.filter(o=>o.value).map(o=>o.disabled))).toEqual([true,true]);
+  await expect(page.locator('#'+await uses.getAttribute('aria-describedby'))).toContainText('Templates aren’t available on imported nodes yet');
 });

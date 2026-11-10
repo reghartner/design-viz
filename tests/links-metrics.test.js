@@ -121,3 +121,12 @@ test('LM7 perf guard: rows and every drag hover over 400 carriers run no planner
     const text=JSON.stringify(spec);c.planLinksMetricsUse(text,JSON.parse(text),NODE('n1'),'kafka-topic',false,null);assert.ok(calls.n>=1,'the drop runs the planner');
   }finally{names.forEach(n=>{c[n]=saved[n];});}
 });
+
+test('LM8 limits in force: a template limit shows with its source; a carrier value overrides it',()=>{
+  const spec=board();spec.page.tracking.telemetry.templates['kafka-topic'].proof={lag:{max:50}};
+  assert.deepEqual(plain(c.validate(c.normalize(spec)).errors),[]);
+  assert.deepEqual(plain(el(model(spec),'edge',0).limits.lag.max),{value:50,from:'template'});
+  const s=apply(spec,(t,r)=>c.planCarrierTelemetry(t,r,EDGE(0,'ctrl->ingest'),{op:'proof',signal:'lag',field:'max',value:80},null));
+  assert.deepEqual(plain(el(model(s.raw),'edge',0).limits.lag.max),{value:80,from:'carrier'});
+  assert.deepEqual(plain(el(model(board()),'node','ingest').limits),{},'no limits: nothing in force');
+});

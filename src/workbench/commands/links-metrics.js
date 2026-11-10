@@ -4,6 +4,20 @@
    through planCarrierTelemetry, the Inspect Metrics editor's planner, so each
    edit is one source change (one Undo step) and the same JSON. */
 
+/* {signal:{min:{value,from:'template'|'carrier'}, max:{…}}} for the limits in force on a binding. */
+function linksMetricsLimits(b,templates,template){
+  var out={};if(!telemetryObject(b))return out;
+  var effective=telemetryOwn(b,'use')?telemetryEffectiveBinding(b,templates):b,own=telemetryObject(b.proof)?b.proof:{};
+  var proof=effective && telemetryObject(effective.proof)?effective.proof:{};
+  Object.keys(proof).forEach(function(sig){
+    var limit=telemetryObject(proof[sig])?proof[sig]:{},mine=telemetryObject(own[sig])?own[sig]:{};
+    ['min','max','maxRatioOf'].forEach(function(field){
+      if(!telemetryOwn(limit,field))return;
+      (out[sig] || (out[sig]={}))[field]={value:limit[field],from:telemetryOwn(mine,field)?'carrier':template?'template':'carrier'};
+    });
+  });
+  return out;
+}
 function linksMetricsTemplateRefusal(e){
   return 'Templates aren’t available on imported '+(e.kind==='edge'?'connections':'nodes')+' yet; add signals in Inspect.';
 }
@@ -49,6 +63,8 @@ function linksMetricsModel(text,raw,context){
         e.group='raw';e.template=null;e.missingParams=[];e.signals=Object.keys(b.signals);e.rawSignals=true;
       }else{e.group='none';e.template=null;e.missingParams=[];e.signals=[];}
       if(!e.inheritedSignals){e.inheritedSignals=[];e.hidden=[];e.added=[];}
+      // Limits in force, as Inspect shows them: a template's own limits apply unless the carrier sets its own.
+      e.limits=linksMetricsLimits(b,pageTemplates,e.template);
       // Static drop checks look templates up through the model.
       Object.defineProperty(e,'model',{value:model,enumerable:false});
       (buckets[e.group] || (buckets[e.group]=[])).push(e);model.elements.push(e);

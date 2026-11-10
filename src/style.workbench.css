@@ -1984,3 +1984,4 @@ body.links-dragging,body.links-dragging *{cursor:grabbing !important;user-select
 .links-preview-ignored{border-style:dashed;}
 .links-preview-skip{font-size:11px;color:var(--links-warn);}
 .links-log-general{display:flex;flex-direction:column;gap:2px;padding:6px 8px;border:1px solid var(--links-warn);border-radius:6px;}
+.links-metric-from{margin:0 0 2px 116px;font-size:11px;color:var(--sub);}

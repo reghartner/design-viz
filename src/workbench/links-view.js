@@ -10,9 +10,9 @@ function initWorkbenchLinksView(opts){
   var life=createWorkbenchLifetime(),rowsLife=createWorkbenchLifetime(),popLife=createWorkbenchLifetime();
   life.own(function(){rowsLife.destroy();popLife.destroy();});
   var TABS=[['tickets','Tickets'],['metrics','Metrics'],['trace','Trace match'],['logs','Log searches']];
-  var state={tab:'tickets',by:'ticket',traceBy:'match',show:'all',filter:'',drafts:[],highlight:null,popover:null,drag:null,editing:null,adding:false,traceEdit:null,traceCreate:null,traceRename:null};
-  var LIVE_TABS=['tickets','trace'];
-  var traceModel=null,traceKey=null,traceById=Object.create(null),traceByKey=Object.create(null),modelRev=0,byId=Object.create(null),byKey=Object.create(null),visible=false,filterTimer=null,dryRuns=Object.create(null),model=null,modelKey=null,stale=false,suppressClick=false,uid='links-'+Math.random().toString(36).slice(2);
+  var state={logEdit:null,logAdding:false,logDraft:{},logDrag:null,tab:'tickets',by:'ticket',traceBy:'match',show:'all',filter:'',drafts:[],highlight:null,popover:null,drag:null,editing:null,adding:false,traceEdit:null,traceCreate:null,traceRename:null};
+  var LIVE_TABS=['tickets','trace','logs'];
+  var logsModel=null,traceModel=null,traceKey=null,traceById=Object.create(null),traceByKey=Object.create(null),modelRev=0,byId=Object.create(null),byKey=Object.create(null),visible=false,filterTimer=null,dryRuns=Object.create(null),model=null,modelKey=null,stale=false,suppressClick=false,uid='links-'+Math.random().toString(36).slice(2);
 
   function el(tag,cls,text){var n=doc.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;}
   function button(cls,text,label,title){var b=el('button',cls,text);b.type='button';if(label)b.setAttribute('aria-label',label);if(title)b.title=title;return b;}
@@ -79,7 +79,8 @@ function initWorkbenchLinksView(opts){
     if(name===state.tab)return;
     closePopover(false);cancelDrag(null);if(state.highlight)setHighlight(null);
     state.tab=name;fail('');say('');
-    if(LIVE_TABS.indexOf(name)>=0){panels[name].appendChild(toolbar);panels[name].appendChild(list);panels[name].appendChild(footer);render();}
+    if(name==='logs'){panels.logs.appendChild(footer);renderLogs();}
+    else if(LIVE_TABS.indexOf(name)>=0){panels[name].appendChild(toolbar);panels[name].appendChild(list);panels[name].appendChild(footer);render();}
     else paintTabs();
   }
   function paintTabs(){
@@ -92,6 +93,9 @@ function initWorkbenchLinksView(opts){
     var traces=traceModel && !traceModel.error?traceModel.groups.length:null;
     tabButtons.trace.querySelector('.links-tab-count').textContent=traces==null?'':String(traces);
     if(traces==null)tabButtons.trace.removeAttribute('aria-label');else tabButtons.trace.setAttribute('aria-label','Trace match ('+traces+')');
+    var logs=logsModel && logsModel.valid?logsModel.rows.length:null;
+    tabButtons.logs.querySelector('.links-tab-count').textContent=logs==null?'':String(logs);
+    if(logs==null)tabButtons.logs.removeAttribute('aria-label');else tabButtons.logs.setAttribute('aria-label','Log searches ('+logs+')');
   }
   function say(text){status.textContent=text || '';}
   function fail(text){error.textContent=text || '';error.hidden=!text;}
@@ -110,7 +114,7 @@ function initWorkbenchLinksView(opts){
   function context(){return session.topologyContext?session.topologyContext():null;}
   function ensureModel(){
     var s=snapshot();
-    if(s.error){stale=true;model={error:'Fix the JSON source to see links.'};return model;}
+    if(s.error){stale=true;logsModel=null;model={error:'Fix the JSON source to see links.'};return model;}
     stale=s.renderedText!=null && s.renderedText!==s.text;
     var key=JSON.stringify([s.project,s.text,s.topologyRevision]);
     if(key!==modelKey){
@@ -121,6 +125,7 @@ function initWorkbenchLinksView(opts){
     }
     // The Trace match model is built with the Tickets model, so both tab counts show.
     if(key!==traceKey){
+      try{logsModel=linksLogSearchModel(s.raw);}catch(ex){logsModel=null;}
       traceKey=key;traceModel=linksTraceModel(s.text,s.raw,context());traceById=Object.create(null);traceByKey=Object.create(null);
       if(!traceModel.error){traceModel.elements.forEach(function(e){traceById[linksElementId(e)]=e;});traceModel.groups.forEach(function(g){traceByKey[g.key]=g;});}
     }
@@ -321,6 +326,7 @@ function initWorkbenchLinksView(opts){
     if(!shown)list.appendChild(el('p','links-empty',state.filter?'Nothing matches the filter.':'This document has no nodes, connections or steps yet.'));
   }
   function render(){
+    if(state.tab==='logs'){renderLogs();return;}
     var focusKey=focusSignature();
     rowsLife.destroy();rowsLife=createWorkbenchLifetime();list.innerHTML='';
     var current=ensureModel();if(!model.error)state.drafts=state.drafts.filter(function(d){return !ticketRow(d.key);});
@@ -348,7 +354,7 @@ function initWorkbenchLinksView(opts){
       row:r && (r.getAttribute('data-links-ticket') || r.getAttribute('data-links-element') || r.getAttribute('data-links-trace')),option:o && o.getAttribute('data-links-option'),inPopover:!!(popover && popover.contains(a))};
   }
   function restoreFocus(sig){
-    if(!sig)return;var scope=sig.inPopover?popover:list,found=null;if(!scope)return;
+    if(!sig)return;var scope=sig.inPopover?popover:state.tab==='logs'?logsBox:list,found=null;if(!scope)return;
     var cls=String(sig.cls || '').split(' ')[0];
     if(sig.option){var opt=scope.querySelector('[data-links-option="'+cssEscape(sig.option)+'"]');found=opt && (opt.matches('button')?opt:opt.querySelector('input'));}
     if(!found && sig.field)found=scope.querySelector('[data-links-field="'+cssEscape(sig.field)+'"]');
@@ -878,6 +884,208 @@ function initWorkbenchLinksView(opts){
     popLife.listen(popover,'keydown',popKeys);place(opener);search.focus();
   }
 
+  /* ---------- Log searches tab (#1243 part 3) ---------- */
+  var logsBox=el('div','links-logs');panels.logs.appendChild(logsBox);
+  var KIND_TEXT={list:'Pick from list',typed:'Typed',fixed:'No value'};
+  function logRow(id){return logsModel && logsModel.rows.find(function(r){return r.id===id;}) || null;}
+  function logCommit(planFor,done,fieldInput){
+    var ok=commit(planFor,done);
+    if(!ok && fieldInput && error.textContent){
+      var msg=error.textContent;fail('');
+      var again=logsBox.querySelector('[data-links-field="'+cssEscape(fieldInput)+'"]');if(again)fieldError(again,msg);
+    }
+    return ok;
+  }
+  function logEdit(row,field,value,fieldId){
+    return logCommit(function(text,raw){return planPageTelemetry(text,raw,{op:'lookup',name:row.id,field:field,value:value});},{ok:'Saved '+row.label+'. Undo restores it.'},fieldId);
+  }
+  function logMove(row,toIndex){
+    var ok=commit(function(text,raw){return planLinksLogSearchMove(text,raw,row.id,toIndex);},{ok:'Moved '+row.label+' to place '+(toIndex+1)+' in the Trace view. Undo restores it.'});
+    return ok;
+  }
+  function logField(id,label,value,onCommit,o){
+    o=o || {};
+    var row=el('label','links-trace-field links-log-field');row.appendChild(el('span','links-trace-label',label));
+    var input=el(o.textarea?'textarea':'input','fctl links-trace-input');input.value=value==null?'':String(value);
+    input.setAttribute('aria-label',label);input.setAttribute('data-links-field',id);if(o.placeholder)input.placeholder=o.placeholder;if(o.textarea)input.rows=o.rows || 2;
+    row.appendChild(input);
+    function save(){if(input.value!==(value==null?'':String(value)))onCommit(input.value,input);}
+    rowsLife.listen(input,'keydown',function(ev){
+      if(ev.key==='Enter' && !o.textarea && !o.draft && !ev.isComposing){ev.preventDefault();save();}
+      if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();state.logEdit=null;state.logAdding=false;renderLogs();var b=logsBox.querySelector('.links-log-new');if(b)b.focus();}
+    });
+    if(!o.draft)rowsLife.listen(input,'change',save);
+    else rowsLife.listen(input,'input',function(){state.logDraft[o.draft]=input.value;if(o.onInput)o.onInput();});
+    return row;
+  }
+  function logButton(cls,text,label,reason,onClick,title){
+    var b=button(cls,text,label,title);
+    rowsLife.listen(b,'click',function(){if(refused(b)){say('Cannot do that: '+b.title);return;}onClick();});
+    return b;
+  }
+  function logEditor(r){
+    var box=el('div','links-trace-editor links-log-editor');box.setAttribute('role','group');box.setAttribute('aria-label','Log search '+r.id);
+    var base='log|'+r.id+'|';
+    box.appendChild(logField(base+'label','Label',r.label,function(v){return logEdit(r,'label',v,base+'label');},{placeholder:'Shown on the search box, e.g. Order ID'}));
+    box.appendChild(logField(base+'query','Query',r.query,function(v){return logEdit(r,'query',v,base+'query');},{textarea:true,placeholder:'{env="$env"} |= "order placed" | order_id="$value"'}));
+    var kinds=el('div','links-segment links-log-kinds');kinds.setAttribute('role','group');kinds.setAttribute('aria-label','Viewer value');
+    var cap=el('span','links-segment-label','Viewer value');cap.setAttribute('aria-hidden','true');kinds.appendChild(cap);
+    [['list','Pick from list'],['typed','Typed'],['fixed','None']].forEach(function(k){
+      var b=logButton('links-seg',k[1],null,null,function(){
+        if(k[0]==='list'){var v=logsBox.querySelector('[data-links-field="'+cssEscape(base+'values')+'"]');if(v)v.focus();if(r.kind!=='list')say('Add suggested values, one per line, to make a pick list.');return;}
+        commit(function(text,raw){return planLinksLogSearchKind(text,raw,r.id,k[0]);},{ok:'Viewers of '+r.label+' now '+(k[0]==='typed'?'type a value':'only press Find')+'. Undo restores it.',same:r.label+' is already '+k[1]+'.'});
+      });
+      b.setAttribute('aria-pressed',String(r.kind===k[0]));kinds.appendChild(b);
+      var why=k[0]==='list'?null:linksLogSearchKindRefusal(r,k[0]);if(why && r.kind!==k[0])refusedReason(b,why,kinds);
+    });
+    box.appendChild(kinds);
+    box.appendChild(logField(base+'values','Suggested values',r.values.join('\n'),function(v){var list=v.split('\n').map(function(x){return x.trim();}).filter(Boolean);return logEdit(r,'values',list.length?list:null,base+'values');},{textarea:true,rows:3,placeholder:'One value per line (optional); makes a pick list'}));
+    box.appendChild(logField(base+'datasource','Loki datasource UID',r.datasource,function(v){return logEdit(r,'datasource',v,base+'datasource');},{placeholder:'From Metrics → Grafana Loki UID'}));
+    box.appendChild(logField(base+'traceId','Trace ID field',r.traceId,function(v){return logEdit(r,'traceId',v,base+'traceId');},{placeholder:'trace_id'}));
+    box.appendChild(logField(base+'spanId','Span ID field',r.spanId,function(v){return logEdit(r,'spanId',v,base+'spanId');},{placeholder:'span_id'}));
+    var actions=el('div','links-trace-actions');
+    actions.appendChild(logButton('bbtn links-trace-danger','Remove log search','Remove log search '+r.label,null,function(){
+      var at=r.index;state.logEdit=null;
+      if(commit(function(text,raw){return planPageTelemetry(text,raw,{op:'removeLookup',name:r.id});},{ok:'Removed '+r.label+'. Undo restores it.'})){
+        var rows=logsBox.querySelectorAll('[data-links-log]'),near=rows[at] || rows[at-1];var f=near?near.querySelector('.links-log-edit'):logsBox.querySelector('.links-log-new');if(f)f.focus();
+      }
+    }));
+    actions.appendChild(logButton('bbtn','Done',null,null,function(){state.logEdit=null;renderLogs();var e=logsBox.querySelector('[data-links-log="'+cssEscape(r.id)+'"] .links-log-edit');if(e)e.focus();}));
+    box.appendChild(actions);
+    box.appendChild(el('p','links-pop-hint','Enter (or leaving a text box) saves; each save is one Undo step. Esc closes. The same searches are in Status board settings → Log searches.'));
+    rowsLife.listen(box,'keydown',function(ev){if(ev.key==='Escape' && !ev.defaultPrevented){ev.preventDefault();ev.stopPropagation();state.logEdit=null;renderLogs();var e=logsBox.querySelector('[data-links-log="'+cssEscape(r.id)+'"] .links-log-edit');if(e)e.focus();}});
+    return box;
+  }
+  function logNewForm(){
+    var box=el('div','links-trace-editor links-log-editor');box.setAttribute('role','group');box.setAttribute('aria-label','New log search');
+    var d=state.logDraft,preview=el('p','links-pop-hint links-log-id-preview');preview.id=uid+'-log-id';
+    function nextId(){return (d.id || '').trim() || telemetryLookupId(d.label || '',logsModel.lookups || {});}
+    function paint(){
+      var typed=(d.id || '').trim(),bad=typed && !telemetryNamePattern.test(typed)?'"'+typed+'" cannot be an id: start with a letter and use letters, digits, - and _.':typed && logRow(typed)?'Log search "'+typed+'" already exists; choose another id.':'';
+      preview.textContent=bad || ((d.label || '').trim() || typed?'Will be saved as tracking.telemetry.lookups.'+nextId()+(typed?'':' (made from the label)')+'.':'The id is made from the label unless you type one.');
+    }
+    var label=logField('log|new|label','Label',d.label,null,{draft:'label',onInput:paint,placeholder:'Order ID'});
+    var query=logField('log|new|query','Query',d.query,null,{draft:'query',textarea:true,placeholder:'{env="$env"} |= "order placed" | order_id="$value"'});
+    var id=logField('log|new|id','Id (optional)',d.id,null,{draft:'id',onInput:paint,placeholder:'Made from the label'});
+    id.querySelector('input').setAttribute('aria-describedby',preview.id);
+    box.appendChild(label);box.appendChild(query);box.appendChild(id);box.appendChild(preview);paint();
+    function submit(){
+      var name=nextId(),lab=(d.label || '').trim(),q=d.query || '';
+      if(!lab){fieldError(label.querySelector('input'),'Enter a label for the new log search.');return;}
+      if(!q.trim()){fieldError(query.querySelector('textarea'),'Enter a LogQL query for the new log search.');return;}
+      var ok=logCommit(function(text,raw){return planPageTelemetry(text,raw,{op:'addLookup',name:name,label:lab,query:q});},{ok:'Added '+lab+' as the last search. Undo removes it.'},'log|new|id');
+      if(ok){state.logAdding=false;state.logDraft={};renderLogs();var e=logsBox.querySelector('[data-links-log="'+cssEscape(name)+'"] .links-log-edit');if(e)e.focus();}
+    }
+    [label,id].forEach(function(f){rowsLife.listen(f.querySelector('input'),'keydown',function(ev){if(ev.key==='Enter' && !ev.isComposing){ev.preventDefault();submit();}});});
+    var actions=el('div','links-trace-actions');
+    actions.appendChild(logButton('bbtn','Add log search',null,null,submit));
+    actions.appendChild(logButton('bbtn','Cancel',null,null,function(){state.logAdding=false;state.logDraft={};renderLogs();var b=logsBox.querySelector('.links-log-new');if(b)b.focus();}));
+    box.appendChild(actions);
+    return box;
+  }
+  function logPreview(){
+    var region=el('section','links-preview');region.setAttribute('role','region');region.setAttribute('aria-label','Trace view preview (read only)');
+    region.appendChild(el('p','links-group','Trace view preview (read only) · what a viewer sees, in this order'));
+    var boxes=el('div','links-preview-boxes');region.appendChild(boxes);
+    logsModel.rows.forEach(function(r){
+      var b=el('div','links-preview-box');b.appendChild(el('span','links-preview-label',r.label));
+      b.appendChild(el('span','links-preview-control links-preview-'+r.kind,r.kind==='list'?(r.values[0] || '')+' ▾':r.kind==='typed'?'Type a value':'Find'));
+      boxes.appendChild(b);
+    });
+    if(!logsModel.rows.length)boxes.appendChild(el('p','links-none','No log searches yet: the Trace view shows no search box.'));
+    return region;
+  }
+  function renderLogs(){
+    var focusKey=focusSignature();
+    rowsLife.destroy();rowsLife=createWorkbenchLifetime();logsBox.innerHTML='';
+    ensureModel();paintTabs();
+    if(!logsModel){logsBox.appendChild(el('p','links-empty','Fix the JSON source to see log searches.'));return;}
+    logsBox.appendChild(el('p','links-pop-hint','Board-wide searches readers run in the Trace view, in this order. Drag a row’s ⠿ handle, or use Earlier and Later, to reorder. The same list is in Status board settings → Log searches.'));
+    if(stale)logsBox.appendChild(el('p','links-empty links-stale','The source changed. Click Render to refresh before editing.'));
+    if(!logsModel.valid){logsBox.appendChild(el('p','links-empty',LINKS_LOG_NOT_OBJECT));return;}
+    var offerRow=el('label','links-log-offer'),offer=el('input');offer.type='checkbox';offer.checked=logsModel.present;offerRow.appendChild(offer);offerRow.appendChild(el('span',null,'Offer log searches in the Trace view'));
+    logsBox.appendChild(offerRow);
+    if(logsModel.rows.length)refusedReason(offer,'Remove the searches below first; then this turns the Trace view’s log search off.',logsBox);
+    rowsLife.listen(offer,'change',function(){
+      if(refused(offer)){offer.checked=!offer.checked;say('Cannot turn this off: '+offer.title);return;}
+      if(!commit(function(text,raw){return planPageTelemetry(text,raw,{op:'lookupsEnabled',value:offer.checked});},{ok:offer.checked?'The Trace view offers a typed LogQL query box. Undo restores it.':'The Trace view offers no log search. Undo restores it.'}))offer.checked=!offer.checked;
+    });
+    var rows=el('div','links-list links-log-list');rows.setAttribute('role','list');rows.setAttribute('aria-label','Log searches');logsBox.appendChild(rows);
+    logsModel.rows.forEach(function(r,i){
+      var line=el('div','links-row links-ticket-row links-log-row');line.setAttribute('role','listitem');line.setAttribute('data-links-log',r.id);
+      var head=el('div','links-row-head');line.appendChild(head);
+      var handle=button('links-handle','⠿','Drag '+r.label+' to reorder','Drag up or down to change the Trace view order. Alt+↑ / Alt+↓ moves it one place.');
+      rowsLife.listen(handle,'pointerdown',function(ev){startLogDrag(ev,handle,r);});
+      rowsLife.listen(handle,'keydown',function(ev){if(ev.altKey && (ev.key==='ArrowUp' || ev.key==='ArrowDown')){ev.preventDefault();var to=i+(ev.key==='ArrowUp'?-1:1);if(to<0 || to>=logsModel.rows.length){say(r.label+' is already '+(to<0?'first':'last')+'.');return;}if(logMove(r,to)){var h=logsBox.querySelector('[data-links-log="'+cssEscape(r.id)+'"] .links-handle');if(h)h.focus();}}});
+      head.appendChild(handle);
+      head.appendChild(el('span','links-log-number',String(i+1)));
+      head.appendChild(el('strong','links-log-label',r.label));
+      head.appendChild(el('code','links-log-id',r.id));
+      head.appendChild(el('span','links-log-kind',KIND_TEXT[r.kind]));
+      var earlier=logButton('bbtn links-log-move','↑ Earlier','Move '+r.label+' earlier',null,function(){if(logMove(r,i-1)){var b=logsBox.querySelector('[data-links-log="'+cssEscape(r.id)+'"] .links-log-move');if(b)b.focus();}},'Show this search one box earlier in the Trace view');
+      var later=logButton('bbtn links-log-move','↓ Later','Move '+r.label+' later',null,function(){if(logMove(r,i+1)){var b=logsBox.querySelectorAll('[data-links-log="'+cssEscape(r.id)+'"] .links-log-move')[1];if(b)b.focus();}},'Show this search one box later in the Trace view');
+      head.appendChild(earlier);head.appendChild(later);
+      if(i===0)refusedReason(earlier,'Already the first search in the Trace view.',head);
+      if(i===logsModel.rows.length-1)refusedReason(later,'Already the last search in the Trace view.',head);
+      var edit=button('bbtn links-log-edit','Edit','Edit '+r.label,'Edit this search here');edit.setAttribute('aria-expanded',String(state.logEdit===r.id));
+      rowsLife.listen(edit,'click',function(){state.logEdit=state.logEdit===r.id?null:r.id;state.logAdding=false;renderLogs();var f=logsBox.querySelector('[data-links-field="'+cssEscape('log|'+r.id+'|label')+'"]');if(f && state.logEdit)f.focus();});
+      head.appendChild(edit);
+      line.appendChild(el('code','links-log-query',r.query));
+      if(state.logEdit===r.id)line.appendChild(logEditor(r));
+      rows.appendChild(line);
+    });
+    if(!logsModel.rows.length)rows.appendChild(el('p','links-empty','No log searches yet. Choose + New log search.'));
+    var add=button('bbtn links-log-new','+ New log search',null,'Add a search readers can run in the Trace view');
+    rowsLife.listen(add,'click',function(){state.logAdding=true;state.logEdit=null;renderLogs();var f=logsBox.querySelector('[data-links-field="log|new|label"]');if(f)f.focus();});
+    logsBox.appendChild(add);
+    if(state.logAdding)logsBox.appendChild(logNewForm());
+    logsBox.appendChild(logPreview());
+    restoreFocus(focusKey);
+  }
+  /* Drag a row's handle between rows; the gap under the pointer shows where it lands. */
+  function startLogDrag(ev,handle,r){
+    if(ev.button!==0 || !ev.isPrimary || state.logDrag)return;
+    if(stale){fail('The source changed. Click Render before editing.');return;}
+    var d=state.logDrag={id:ev.pointerId,handle:handle,row:r,x:ev.clientX,y:ev.clientY,active:false,target:null,marked:null};
+    try{handle.setPointerCapture(ev.pointerId);}catch(_){}
+    d.off=[life.listen(handle,'pointermove',logDragMove),life.listen(handle,'pointerup',logDragEnd),life.listen(handle,'pointercancel',function(){cancelLogDrag('Drag cancelled. Nothing changed.');}),
+      life.listen(handle,'lostpointercapture',function(){if(state.logDrag===d)cancelLogDrag(d.active?'Drag cancelled. Nothing changed.':null);})];
+  }
+  function logGapAt(x,y){
+    var rows=Array.prototype.slice.call(logsBox.querySelectorAll('[data-links-log]'));
+    for(var i=0;i<rows.length;i++){var b=rows[i].getBoundingClientRect();if(y>=b.top && y<=b.bottom && x>=b.left && x<=b.right)return {gap:y<b.top+b.height/2?i:i+1,row:rows[i],before:y<b.top+b.height/2};}
+    return null;
+  }
+  function paintLogDrop(){
+    var d=state.logDrag;if(d.marked){d.marked.classList.remove('links-log-drop-before','links-log-drop-after','links-log-drop-refused');d.marked=null;}
+    if(!d.target){say('Dragging '+d.row.label+'. Drop between rows to reorder. Esc cancels.');return;}
+    var t=linksLogSearchDropTarget(logsModel,d.row.id,d.target.gap);
+    d.marked=d.target.row;d.marked.classList.add(t.refusal?'links-log-drop-refused':d.target.before?'links-log-drop-before':'links-log-drop-after');
+    say(t.refusal?'Cannot drop here: '+t.refusal:'Drop to move '+d.row.label+' to place '+(t.toIndex+1)+'.');
+  }
+  function logDragMove(ev){
+    var d=state.logDrag;if(!d || ev.pointerId!==d.id)return;
+    if(!d.active){if(Math.abs(ev.clientX-d.x)+Math.abs(ev.clientY-d.y)<5)return;d.active=true;fail('');doc.body.classList.add('links-dragging');}
+    ev.preventDefault();d.target=logGapAt(ev.clientX,ev.clientY);paintLogDrop();
+  }
+  function endLogDrag(){
+    var d=state.logDrag;if(!d)return null;state.logDrag=null;(d.off || []).forEach(function(off){off();});
+    try{if(d.handle.hasPointerCapture && d.handle.hasPointerCapture(d.id))d.handle.releasePointerCapture(d.id);}catch(_){}
+    if(d.marked)d.marked.classList.remove('links-log-drop-before','links-log-drop-after','links-log-drop-refused');doc.body.classList.remove('links-dragging');
+    return d;
+  }
+  function logDragEnd(ev){
+    var d=state.logDrag;if(!d || ev.pointerId!==d.id)return;
+    if(!d.active){endLogDrag();return;}
+    var target=logGapAt(ev.clientX,ev.clientY);endLogDrag();
+    if(!target){say('Nothing changed: drop between rows.');return;}
+    var t=linksLogSearchDropTarget(logsModel,d.row.id,target.gap);
+    if(t.refusal){say('Nothing changed: '+t.refusal);return;}
+    if(logMove(d.row,t.toIndex)){var h=logsBox.querySelector('[data-links-log="'+cssEscape(d.row.id)+'"] .links-handle');if(h)h.focus();}
+  }
+  function cancelLogDrag(message){if(!state.logDrag)return;endLogDrag();if(message)say(message);}
+  life.listen(win,'keydown',function(ev){if(state.logDrag && ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancelLogDrag('Drag cancelled. Nothing changed.');}},true);
+
   /* ---------- highlight ---------- */
   function highlightLinks(){
     var h=state.highlight;if(!h || !model || model.error)return [];
@@ -1112,7 +1320,7 @@ function initWorkbenchLinksView(opts){
     var was=visible;visible=!!ev.detail.open;
     if(visible){if(!was)refresh();return;}
     // Closing (or hiding) the Links window ends its highlight and any drag or popover.
-    else{cancelDrag(null);closePopover(false);if(state.highlight)setHighlight(null);}
+    else{cancelDrag(null);cancelLogDrag(null);closePopover(false);if(state.highlight)setHighlight(null);}
   });
   visible=shown();paintTabs();render();
   return {refresh:life.guard(refresh),

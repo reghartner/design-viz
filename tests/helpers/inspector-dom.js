@@ -87,10 +87,12 @@ function inspectorEnvironment(names){
     let text=JSON.stringify(spec,null,2),next=0,inspector,reveals=0,selectionCalls=0,retireCalls=0,selected=null;
     const session=C.createBuilderSession({source:{read:()=>text,write:value=>text=value},render(){},
       persistence:C.createBuilderPersistence({storage:()=>({getItem:()=>null,setItem(){},removeItem(){}}),now:()=>0,schedule(){},cancel(){}}),
-      invalidateProject(){inspector.retire();}});
+      invalidateProject(){inspector.retire();},
+      // As in the builder: a refused edit without its own handler replaces the Inspector with the message.
+      editError(message){inspector.message(message);}});
     session.target={kind:'panel',section:0,index:0};
     inspector=C.createBuilderInspector({document:doc,guide,session,
-      apply(plan,opt,snapshot){if(plan?.error){inspector.error(plan.error);return false;}return session.accept(plan,{snapshot,afterRender(){if(opt?.after)opt.after(plan);}});},
+      apply(plan,opt,snapshot){if(plan?.error){inspector.error(plan.error);return false;}return session.accept(plan,{snapshot,editError:opt?.editError,afterRender(){if(opt?.after)opt.after(plan);}});},
       schedule(fn){timers.set(++next,fn);scheduled.push(fn);return next;},cancel:id=>timers.delete(id),
       surface:{show(){},reveal(){reveals++;},hideDiff(){},retire(){retireCalls++;}},
       selection:{select(target){selectionCalls++;selected=target;},range(){selectionCalls++;},rehighlight(){selectionCalls++;},remove(){},removeMany(){}},

@@ -413,7 +413,8 @@ test('Allow metrics pure plans preserve bare/wrapped page bytes, reject malforme
     for(const value of [false,true]){
       const plan=C.planPageTelemetry(text,raw,{op:'enabled',value});assert.equal(plan.error,undefined);
       const next=JSON.parse(plan.text),page=next.page || next;
-      assert.deepEqual(page.tracking,{...spec.page.tracking,telemetry:{...spec.page.tracking.telemetry,enabled:value}});
+      // #1254 item 9: true is the default and is not written; false is.
+      assert.deepEqual(page.tracking,value?spec.page.tracking:{...spec.page.tracking,telemetry:{...spec.page.tracking.telemetry,enabled:false}});
       assert.deepEqual(page.sections,spec.page.sections);assert.ok(plan.text.startsWith(' \n'));assert.ok(plan.text.endsWith('\n '));
       assert.equal(C.planPageTelemetry(plan.text,next,{op:'enabled',value}).text,plan.text);
     }

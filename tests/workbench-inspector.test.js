@@ -732,9 +732,10 @@ test('GitHub scope edits touch only tracking.github; an absent tracking.jira sta
   h.inspector.render();field('GitHub scope').value='org:acme';field('GitHub scope').fire('change');h.flush();
   assert.deepEqual(tracking(),{github:{org:'acme'}});
   h.inspector.render();field('GitHub scope').value='';field('GitHub scope').fire('change');h.flush();
-  assert.deepEqual(tracking(),{},'clearing the scope removes tracking.github and adds nothing');
+  // #1254 item 9: an emptied tracking block on a page without a Live status panel is removed.
+  assert.equal(tracking(),undefined,'clearing the scope removes tracking.github and the emptied tracking block');
   h.inspector.render();field('GitHub scope').value='bad scope!';field('GitHub scope').fire('change');h.flush();
-  assert.deepEqual(tracking(),{});assert.match(h.guide.querySelector('.ierr').textContent,/owner\/repo/);
+  assert.equal(tracking(),undefined);assert.match(h.guide.querySelector('.ierr').textContent,/owner\/repo/);
   h.inspector.render();field('Jira site').value='https://acme.atlassian.net';field('Jira site').fire('change');h.flush();
   assert.deepEqual(tracking(),{jira:{site:'https://acme.atlassian.net/'}},'a Jira edit still creates the jira block');
   h.inspector.render();field('GitHub scope').value='acme/firmware';field('GitHub scope').fire('change');h.flush();

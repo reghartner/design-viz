@@ -807,7 +807,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // Over time (#929): while `over` is set, `map` is the chosen day and `over.live` is the map to return to.
   var overSource=null,over=null,overLoading=false,overProgress='',overError='',overRequest=0;
   // Connector evidence for the panel header (#769): who supplies the map, whether a fetch is in flight, when it last answered.
-  var LIVE_STATUS_CONNECTIONS=['none','disconnected','approval','connecting','connected','error','demo'];
+  // 'snapshot' (#1265): the Workbench shows an agent's saved snapshot; it is neither live nor the demo.
+  var LIVE_STATUS_CONNECTIONS=['none','disconnected','approval','connecting','connected','error','demo','snapshot'];
   var demoMode=!!(options.demo && typeof options.demo.mount==='function');
   var connection={state:provider?(demoMode?'demo':'connecting'):'none',busy:false,checkedAt:null,source:demoMode?'Demo':provider?'Host':'',github:{state:'none',busy:false}};
   // GitHub is a second, optional connector (#756): its state rides beside the Jira state and never replaces it.
@@ -1261,7 +1262,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var evidence=telemetry.snapshot(),status=evidence.status;
     return {environment:evidence.environment,environments:evidence.environments,proof:liveStatusProofPresentation(evidence,telemetryWindow),logDetails:liveStatusLogDetails(evidence,telemetryWindow),available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
       refreshedAt:status.refreshedAt,note:status.note,checkedText:status.refreshedAt?'refreshed '+clockTime(status.refreshedAt):'',
-      source:telemetrySource(),window:telemetryWindow};
+      source:telemetrySource(),window:telemetryWindow,snapshot:telemetryOptions && typeof telemetryOptions.snapshot==='string'?telemetryOptions.snapshot:''};
   }
   function snapshot(){
     refreshDependencies();

@@ -687,6 +687,19 @@ function initWorkbenchBuilder(opts){
       life.own(function(){finish(null);});dialog.showModal();select.focus();
     });
   }
+  /* #1265: an agent's <board>.snapshot.json beside the opened board is offered in the preview, never turned on.
+     Read only; a folder without one, or one the preview cannot read, changes nothing. */
+  async function offerLiveSnapshot(directory,spec,binding){
+    if(!opts.offerLiveSnapshot || typeof spec!=='string')return;
+    try{
+      var parts=spec.split('/').filter(Boolean),folder=directory;
+      for(var i=0;i<parts.length-1;i++)folder=await folder.getDirectoryHandle(parts[i]);
+      var name=parts[parts.length-1].replace(/\.spec\.json$|\.json$/i,'')+'.snapshot.json',file=await(await folder.getFileHandle(name)).getFile();
+      if(file.size>8*1024*1024)return;
+      var text=await file.text();
+      if(life.alive() && workingFile.attached()===binding)opts.offerLiveSnapshot(text,name);
+    }catch(ex){}
+  }
   async function chooseWorkingFolder(){
     if(!workingBrowser.pickDirectory){inspectorMessage('Writable folder access requires desktop Chrome or Edge over HTTPS. Browser recovery remains available.');return;}
     var token=++workingOperation,expected=session.snapshot(),client=null,binding=null,startup=null,unlock=null;
@@ -722,6 +735,7 @@ function initWorkbenchBuilder(opts){
       if(workingFile.attached()!==binding)return;
       workingFile.report(binding,'saved');
       workingHeartbeat=life.delay(function(){renewWorkingFolder(binding);},1000);
+      offerLiveSnapshot(directory,found.spec,binding);
     }catch(ex){if(binding && workingFile.attached()===binding)workingFile.report(binding,'failed',ex.message);
       else if(life.alive() && ex.name!=='AbortError')inspectorMessage('Could not open the working folder. '+ex.message);
     }finally{if(unlock)unlock();}
@@ -968,6 +982,8 @@ function initWorkbenchBuilder(opts){
     svgExport:function(){
       var snapshot=session.snapshot(),preview=opts.ctl && opts.ctl(),page=opts.page && opts.page();
       if(snapshot.renderedText==null || !preview || !page)return {error:'SVG export is unavailable because there is no usable diagram preview.'};
+      // #1265: the SVG is copied from the preview, so it would carry a snapshot's real ticket states and metric values.
+      if(preview.liveSnapshot)return {error:'SVG export is off while the preview shows a snapshot of real Jira and metrics data. Uncheck “Snapshot from …” beside Preview, then export.'};
       var invalid=!!snapshot.error;
       if(!invalid && snapshot.raw){try{invalid=session.validate(snapshot.raw).errors.length>0;}catch(ex){invalid=true;}}
       if(snapshot.renderedText!==snapshot.text && !invalid)return {error:'SVG export stopped because the rendered preview is stale. Render the current source, then try again.'};

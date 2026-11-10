@@ -447,6 +447,56 @@ function telemetryExpand(raw,templates,invalid){
   });
   return out;
 }
+/* #1266: a consumer overlay on an imported carrier. `{extends:true, ...}` merges with the
+   inherited (provider) binding through FlowTopology.mergeTelemetry (canon-topology.js); an
+   overlay without `extends` replaces the inherited binding (the original rule). */
+var TELEMETRY_MERGE_FIELDS=['extends','kind','signals','hide','proof','links','card'];
+function telemetryMergeOverlay(overlay){return telemetryObject(overlay) && overlay.extends===true;}
+// Metrics rule for a removed or hidden signal: its limit goes, and so does any ratio limit based on it.
+function telemetryDropSignal(binding,name){
+  if(telemetryObject(binding.signals))delete binding.signals[name];
+  if(!telemetryObject(binding.proof))return;
+  delete binding.proof[name];
+  Object.keys(binding.proof).forEach(function(key){
+    var limit=binding.proof[key];if(!telemetryObject(limit) || limit.maxRatioOf!==name)return;
+    // max next to maxRatioOf is a ratio: it goes with its base signal; min stays.
+    delete limit.maxRatioOf;delete limit.max;if(!Object.keys(limit).length)delete binding.proof[key];
+  });
+  if(!Object.keys(binding.proof).length)delete binding.proof;
+}
+/* Shape warnings for a merge overlay as authored; the merged binding is validated where it resolves. */
+function telemetryMergeOverlayWarnings(overlay,invalid,inheritedNames){
+  var warn=telemetryWarn(invalid);
+  telemetryUnknown(overlay,TELEMETRY_MERGE_FIELDS,warn);
+  if(telemetryOwn(overlay,'kind') && TELEMETRY_KINDS.indexOf(overlay.kind)<0)warn('.kind','must be one of '+TELEMETRY_KINDS.join(', ')+' — ignored');
+  if(telemetryOwn(overlay,'hide') && !(Array.isArray(overlay.hide) && overlay.hide.every(function(name){return typeof name==='string' && telemetryNamePattern.test(name);})))warn('.hide','must be an array of inherited signal names — ignored');
+  ['signals','proof','links','card'].forEach(function(field){
+    if(!telemetryOwn(overlay,field))return;
+    if(!telemetryObject(overlay[field])){warn('.'+field,'must be an object — ignored');return;}
+    if(field==='signals' || field==='proof')Object.keys(overlay[field]).forEach(function(name){
+      var entry=overlay[field][name];if(entry!==null && !telemetryObject(entry))warn('.'+field+'.'+name,'must be an object of changed fields or null — ignored');
+    });
+  });
+  /* #1266 review: the authored document does not know the provider's signal names. An entry that
+     names a source, or any entry when inheritedNames says it is new, is a whole local signal and gets
+     the full signal checks; any other entry is a field change and gets field-name checks. */
+  var signals=telemetryObject(overlay.signals)?overlay.signals:{},kind=TELEMETRY_KINDS.indexOf(overlay.kind)>=0?overlay.kind:'call';
+  Object.keys(signals).forEach(function(name){
+    var entry=signals[name];if(!telemetryObject(entry))return;
+    var added=Array.isArray(inheritedNames)?inheritedNames.indexOf(name)<0:TELEMETRY_SOURCES.some(function(source){return telemetryOwn(entry,source) && entry[source]!==null;});
+    var prefix='.signals.'+name;
+    if(added){
+      var whole={};Object.keys(entry).forEach(function(key){if(entry[key]!==null)whole[key]=entry[key];});
+      var one={};one[name]=whole;
+      carrierTelemetry({telemetry:{kind:kind,signals:one}},{},function(path,message){if(path.indexOf(prefix)===0)warn(path,message);});
+    }else telemetryUnknown(entry,TELEMETRY_SOURCES.concat(['unit','scope','label','showOnCard','role','missingMeansZero','links','window']),warn,prefix);
+  });
+  // A limit needs its signal: an added one here, or (when the provider's names are known) an inherited one.
+  if(telemetryObject(overlay.proof))Object.keys(overlay.proof).forEach(function(name){
+    if(overlay.proof[name]===null || telemetryOwn(signals,name))return;
+    if(Array.isArray(inheritedNames)?inheritedNames.indexOf(name)<0:false)warn('.proof.'+name,'names no signal of this binding or the provider — limit ignored');
+  });
+}
 function carrierTelemetry(obj,templates,invalid,environment){
   var warn=telemetryWarn(invalid);
   if(!telemetryObject(obj) || !telemetryOwn(obj,'telemetry'))return null;

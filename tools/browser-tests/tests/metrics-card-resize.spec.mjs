@@ -122,13 +122,13 @@ test('R5 desktop inherited imported connection handle drag saves the consumer ov
   await page.evaluate(({provider,consumer})=>{window.resizeImportContext={version:1,id:'consumer',specs:[provider,consumer]};window.__editorTest.builder.loadText(JSON.stringify(consumer),window.resizeImportContext);},{provider,consumer});
   await toggle(page).check();
   const card=page.locator('#docview .dv-metrics-card[data-metrics-card="direct::a->direct::b"]'),source=page.locator('#src'),guide=page.locator('#guide');
-  await card.click();await page.locator('#editor-tab-inspect').click();await expect(guide.locator('.metrics-inherited')).toContainText('(read only)');
+  await card.click();await page.locator('#editor-tab-inspect').click();await expect(guide.locator('.metrics-inherited')).toContainText('Inherited metrics from');
   const before=await source.inputValue();
   const top=await guide.evaluate(el=>{el.scrollTop=Math.min(200,el.scrollHeight-el.clientHeight);return el.scrollTop;});expect(top).toBeGreaterThan(40);
   await dragHandle(page,card,'se',40);
   const overlay=text=>JSON.parse(text).page.sections[0].diagram.topologyImports[0].edgeTracking?.['a->b']?.telemetry;
   await expect.poll(async()=>overlay(await source.inputValue())?.card?.width).toBe(280);
-  expect(overlay(await source.inputValue()).signals).toEqual(binding.signals);
+  expect(overlay(await source.inputValue()).extends,'#1266: a merge overlay that stores only the card change').toBe(true);expect(overlay(await source.inputValue()).signals).toBeUndefined();
   expect(await page.evaluate(()=>window.resizeImportContext.specs[0])).toEqual(provider);
   await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
   expect(Math.abs(await guide.evaluate(el=>el.scrollTop)-top),'Inspector scroll kept across the resize refresh').toBeLessThanOrEqual(2);

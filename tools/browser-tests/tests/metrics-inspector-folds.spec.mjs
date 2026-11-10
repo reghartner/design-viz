@@ -41,7 +41,7 @@ test('F0 desktop inherited imported connection Card width commit keeps the Inspe
   await page.getByRole('checkbox',{name:'Preview metrics layout',exact:true}).check();
   await page.locator('#docview .dv-metrics-card[data-metrics-card="direct::a->direct::b"]').click();await page.locator('#editor-tab-inspect').click();
   const guide=page.locator('#guide'),source=page.locator('#src'),control=guide.getByLabel('Card width',{exact:true});
-  await expect(guide.locator('.metrics-inherited')).toContainText('(read only)');await expect(control).toHaveCount(1);
+  await expect(guide.locator('.metrics-inherited')).toContainText('Inherited metrics from');await expect(control).toHaveCount(1);
   await openFold(guide,'Card');await expect(control).toBeVisible();
   const before=await scrollTo(page,control);
   await control.click();await control.fill('300');await control.press('Enter');

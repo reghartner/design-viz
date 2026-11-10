@@ -334,9 +334,22 @@ any valid signal leaves the carrier unbound. Text boxes never carry telemetry.
 A board with bindings needs a live-status panel, like a board with tickets.
 
 Imported Canon topology accepts the same field in
-`topologyImports[].nodeTracking` and `edgeTracking`. A consumer binding replaces
-the provider's binding for that carrier as a whole; signals never merge across
-specs. A provider binding that uses one of the provider page's templates is
+`topologyImports[].nodeTracking` and `edgeTracking`. A consumer binding marked
+`"extends": true` merges with the provider's binding (#1266): `signals` adds new
+signals or changes only the named fields of inherited ones (`null` removes a
+field), `hide` lists inherited signals to leave out together with their limits and
+any ratio limit based on them, `proof`, `links` and `card` change only the named
+fields, and `kind` replaces the inherited kind when set. For example
+`{"extends": true, "signals": {"lag": {"grafana": "max(lag)"}}, "hide": ["errors"]}`.
+Later provider changes still reach the consumer unless hidden or changed there. A
+signal entry that names a source replaces the inherited source, so a signal always
+has one. Hiding every signal leaves the carrier unbound in this document. A hide for
+a signal the provider no longer has is kept in case it returns. A consumer binding
+without `extends` replaces the provider's binding as a whole, as before; the
+Workbench writes `extends` on every imported carrier, also before its provider has a
+binding. It stores a kind only when it differs from the provider's, so provider kind
+changes keep flowing; if the provider later removes its whole binding, the editor
+reports the missing kind and **Set kind here** stores one in one step. A provider binding that uses one of the provider page's templates is
 expanded with those templates before it reaches the consumer. When the provider
 cannot expand it (an unknown template or a missing parameter), the binding is
 dropped and the imported carrier is unbound, even if the consumer defines a
@@ -469,12 +482,31 @@ sample states in sorted ticket order. It starts off when a project opens, except
 from the built-in **Epic status board** template (**Start new project → Delivery
 status**), which opens with it on. It stays preview-only across ordinary edits and
 skin changes; it never saves status to the spec or contacts Jira.
+
 This offline preview treats the configured parent as a direct Epic: an opaque
 Jira key alone cannot establish its type. Automatic initiative detection requires
 Jira metadata. A standalone demo timeline or host provider can supply the runtime
 hierarchy metadata below to preview an initiative without contacting Jira.
 Live colors require a viewer with the live-status overlay and a status provider.
 PRs stay icons; the demo timeline supplies their GitHub detail.
+
+An agent's snapshot of the board's real Jira status and metrics (`tools/live-snapshot.js`, #1265)
+is a second preview choice. Load it with **File → Load snapshot…**; a `<board>.snapshot.json`
+beside a board opened with **Choose working folder…** is offered too. A **Snapshot from <time>**
+checkbox then sits beside **Demo live status**: checked after Load snapshot, unchecked when only
+offered, and checking one turns the other off; unchecking Snapshot brings back what was on before it
+(Demo live status, Preview metrics layout). While it is on, the Epic status connection line
+reads "Snapshot from <time>" (with the year when it is not this year, and the time zone; a pale blue
+dot), and **Preview metrics layout** is off. When the board allows metrics and the snapshot holds
+signals for its carriers, the Metrics line reads "Metrics: snapshot from <time>" and the Metrics
+overlay is on with the snapshot's values. Like the
+demo it is preview state only: it is never saved to the spec, exported or published (Download and
+Copy SVG, which copy the preview, are refused while it shows), and opening
+another project forgets it. A status line under the File actions says what loaded (tickets,
+carriers with metrics), whether it is showing, how many of the board's tickets the snapshot holds
+(a warning when none, since they would all show as missing), and how many errors the agent's run
+recorded with the first one. A file that is not a snapshot, or larger than 8 MB, is refused there
+with its reason.
 
 ### Step trace match
 
@@ -541,12 +573,17 @@ into editable raw signals.
 1000) place its metrics card. **Card title** replaces the connection label on the card
 and **Card width** (140 to 480; default 240) sets its width; empty restores the default. The validator's warnings for the binding are listed
 under the controls with the same text. An imported node or connection shows the
-provider's binding read only. Its **Metrics kind** starts at the inherited kind, marked
-(inherited). An inherited connection still shows the four card
-controls; its first card edit saves the inherited binding with that change in the
-consumer's `edgeTracking` entry, one Undo step. A binding saved there is stored in the consumer's
-`nodeTracking` or `edgeTracking` entry and replaces the inherited binding for this
-consumer only; **Remove metrics** restores the inherited one.
+provider's binding merged with this document's changes. Inherited signals are tagged
+"inherited": **Add signal** adds to them, a "hidden for this document" checkbox hides
+one (with its limits) and a hidden list shows it again, and editing an inherited
+field stores only that change (**Revert … to inherited** removes it). Card and link
+edits store only the changed field. Each step is one Undo; the changes live in the
+consumer's `nodeTracking` or `edgeTracking` entry as an `extends` binding, and
+**Revert all metrics to inherited** removes them. Its **Metrics kind** starts at the
+inherited kind, marked (inherited). A consumer that saved a whole replacing binding
+before merging existed keeps it; **Merge with provider** converts it in one Undo step
+into the same metrics stored as changes (provider signals it dropped become hidden),
+and **Remove metrics** restores the inherited one.
 
 **Status board settings → Metrics** edits the page
 `tracking.telemetry` block: the Grafana Prometheus, Loki, Tempo and SQL datasource
@@ -707,7 +744,9 @@ fields keep their existing requirements.
 Telemetry bindings declare `flow.telemetry`, also introduced in Flowview 0.2.0.
 A `telemetry` field on any node or edge, in a `nodeTracking` or `edgeTracking`
 overlay entry, or a page `tracking.telemetry` field declares it automatically,
-even when its content is invalid.
+even when its content is invalid. An overlay binding with `"extends": true` also declares
+`flow.telemetry-merge`, so a runtime without merging reports it as unavailable when the
+export carries its features.
 
 ## Rendering
 

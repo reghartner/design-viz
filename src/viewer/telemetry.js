@@ -458,22 +458,25 @@ function createTelemetry(page,options,hooks){
      that names a failure is not reused, so turning Metrics off and on still tries again after a failure. A trace
      exemplar's selection token belongs to the session that loaded it: options.restoreExemplars registers the cached
      exemplar again under a fresh token (no call); one it cannot restore is left out until the next refresh. */
-  var answers=Object.create(null);
+  var answers=Object.create(null),lastCallKeys=null;
   function envKey(){return environment || '';}
   function forgetAnswers(){answers=Object.create(null);}
   function startLive(){
     var key=envKey(),hit=answers[key],now=Date.now();
     if(hit && now-hit.at<delay && hit.keys===JSON.stringify(bindingKeys()) && hit.config===JSON.stringify(api.config())){
+      // A host provider owns its tokens (its canChooseExemplar decides), so its exemplars are kept as they were.
       var reused=copy(hit.value),restored={};
-      if(typeof options.restoreExemplars==='function'){try{restored=options.restoreExemplars(copy(hit.value)) || {};}catch(ex){restored={};}}
-      Object.keys(reused).forEach(function(id){if(!reused[id] || typeof reused[id]!=='object')return;delete reused[id].exemplars;if(restored[id])reused[id].exemplars=[restored[id]];});
+      if(typeof options.restoreExemplars==='function'){
+        try{restored=options.restoreExemplars(copy(hit.value)) || {};}catch(ex){restored={};}
+        Object.keys(reused).forEach(function(id){if(!reused[id] || typeof reused[id]!=='object')return;delete reused[id].exemplars;if(restored[id])reused[id].exemplars=[restored[id]];});
+      }
       store(reused,JSON.parse(hit.keys));setStatus({state:'ok',busy:false,refreshedAt:hit.refreshedAt,note:''});poller.start(delay-(now-hit.at));return;
     }
     poller.start();
   }
   // Each call owns its transient progress; retired generations cannot repaint.
   var poller=provider?liveStatusPoller(function(signal){
-    clearPending();var generation=requestGeneration,noted='',bound=bindings(),keys=bindingKeys(),env=envKey(),config=JSON.stringify(api.config());
+    clearPending();var generation=requestGeneration,noted='',bound=bindings(),keys=bindingKeys(),env=envKey(),config=JSON.stringify(api.config());lastCallKeys=JSON.stringify(keys);
     function current(id,name){var binding=bound.find(function(b){return b.id===id;});return !retired && enabled && available && !signal.aborted && generation===requestGeneration && keys[id]===bindingKeys()[id] && binding && binding.signals[name] && !proofVerdicts.isTraceSignal(binding.signals[name]);}
     var report={note:function(text){noted=typeof text==='string'?text:'';if(!retired && enabled && !signal.aborted && generation===requestGeneration){if(past)liveStatus=Object.assign({},liveStatus,{note:noted});else setStatus({note:noted});notify();}},
       pending:function(id,name){if(!current(id,name))return;if(!pending[id])pending[id]=Object.create(null);pendingKeys[id]=keys[id];pending[id][name]=true;notify();},
@@ -660,7 +663,9 @@ function createTelemetry(page,options,hooks){
       if(retired || !enabled || past || before!==JSON.stringify(bindings()) || liveMap[id]!==sample)throw new Error('Trace selection expired.');
       sample.exemplars=[telemetryTraceEnvelope(result,traceAllowed(result && result.provider))];notify();return copy(sample.exemplars[0]);
     },
-    retractExemplars:function(){[liveMap,map].forEach(function(m){Object.keys(m).forEach(function(id){delete m[id].exemplars;if(!Object.keys(m[id].signals).length)delete m[id];});});notify();},
+    // #1289: a retracted exemplar never comes back with a reused answer either.
+    retractExemplars:function(){Object.keys(answers).forEach(function(key){var v=answers[key].value;Object.keys(v).forEach(function(id){if(v[id] && typeof v[id]==='object')delete v[id].exemplars;});});
+      [liveMap,map].forEach(function(m){Object.keys(m).forEach(function(id){delete m[id].exemplars;if(!Object.keys(m[id].signals).length)delete m[id];});});notify();},
     openHistory:function(days,index){
       if(retired)return;cancelHistory();liveStatus=copy(status);past={days:days,index:index,map:{}};map=Object.create(null);
       if(poller)poller.pause();
@@ -672,7 +677,8 @@ function createTelemetry(page,options,hooks){
     closeHistory:function(){
       if(!past || retired)return;cancelHistory();past=null;map=enabled?liveMap:Object.create(null);
       if(enabled && heldObservation){heldObservation=false;observed();}
-      if(enabled){if(liveStatus)setStatus(liveStatus);if(poller)poller.resume();}liveStatus=null;notify();
+      // A carrier added while Over time was open has no live answer yet: refresh at once; otherwise wait out the 5 minutes.
+      if(enabled){if(liveStatus)setStatus(liveStatus);if(poller){if(lastCallKeys!==null && lastCallKeys!==JSON.stringify(bindingKeys())){poller.stop();poller.start();}else poller.resume();}}liveStatus=null;notify();
     },
     bindings:function(){return copy(bindings());},
     // Runtime detail identity: identical authored bindings can belong to a replacement load.

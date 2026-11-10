@@ -332,5 +332,7 @@ test('a reused answer keeps a host provider\'s example trace, which the host sti
  api.setEnabled(false);api.setEnabled(true);await settle();
  assert.equal(calls,1,'Metrics on within 5 minutes makes no call');
  const kept=api.snapshot().map.a?.exemplars?.[0];assert.ok(kept,'the host\'s example trace is kept');assert.equal(kept.selectionToken,e.selectionToken,'with the host\'s own token');
- api.destroy();
+ // A retracted example trace never comes back with a reused answer.
+ api.retractExemplars();assert.equal(api.snapshot().map.a,undefined);api.setEnabled(false);api.setEnabled(true);await settle();
+ assert.equal(calls,1);assert.equal(api.snapshot().map.a?.exemplars,undefined,'retracted stays retracted');api.destroy();
 });

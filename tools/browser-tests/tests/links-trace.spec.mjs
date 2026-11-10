@@ -8,7 +8,7 @@
    T7 drag wording | same | a chip drag names its source step and asks for a step, never undefined or nodes/connections; a handle drop on a step with another match says "as an alternative" before and after the write | a status naming undefined, a silent alternative
    T8 refused rename | same | clearing Operation and pressing Rename keeps the typed values, marks Operation aria-invalid with the reason beside it, and writes nothing | lost typing, an error under the wrong field
    T9 editor Esc + gone alternative + failed create | same | Esc from the Node select closes the editor; removing the match being edited closes its editor; a re-render keeps the typed service and operation, and a refused Create keeps them with the reason beside Service name | an editor stuck on "This match changed", lost typing
-   T10 menu keys skip disabled | same | Move to… step 4 (it already has the same match) disables Add as alternative; ArrowDown from Replace reaches Cancel; Enter on Cancel writes nothing | arrow keys stuck on a disabled item
+   T10 refused menu choice | same | Move to… step 4 (it already has the same match) marks Add as alternative aria-disabled with its described reason; ArrowDown reaches it, Enter on it writes nothing and keeps the menu, ArrowDown reaches Cancel, Enter writes nothing | arrow keys stuck, a refused choice that writes or hides its reason
    T11 create draft follows its step | same | a + Add trace match draft on step 3 is dropped when a JSON edit removes step 1 and moves another step into its place | a draft that jumps to another step
    T12 id-less step | step 3 without an id | + Add trace match is focusable, aria-disabled and described by the visible reason; clicking it writes nothing and says the reason in the status line | a disabled control that hides its reason from keyboard users
    T6 imported node | consumer importing provider api | the Node select lists API (imported) and writes nodeId canon::api in one Undo step | imported nodes missing from the select */
@@ -256,15 +256,21 @@ test('T9 inline editor: Esc from the Node select closes it, removing its match c
   await expect(kept.getByRole('textbox',{name:'Service name',exact:true})).toHaveAttribute('aria-invalid','true');
 });
 
-test('T10 arrow keys in the Replace / Add as alternative menu skip the disabled item',async({page,server})=>{
+test('T10 a refused Add as alternative is reachable by the arrow keys, says why, and Enter on it writes nothing',async({page,server})=>{
   const {panel,text}=await open(page,server);
   await panel.getByRole('button',{name:'By element',exact:true}).click();
   await panel.locator('[data-links-element="step:0:1"] [data-links-trace-chip="'+KEY+'"] .links-chip-main').focus();await page.keyboard.press('Enter');
   await page.getByRole('menu',{name:new RegExp(KEY)}).getByRole('menuitem',{name:'Move to…'}).click();
   await page.getByRole('dialog',{name:new RegExp('Move '+KEY)}).getByRole('button',{name:'Step 4 · retry',exact:true}).click();
   const ask=page.getByRole('menu',{name:/Step 4 · retry already has a trace match/});await expect(ask).toBeVisible();
-  await expect(ask.getByRole('menuitem',{name:'Add as alternative'})).toBeDisabled();
+  const alternative=ask.getByRole('menuitem',{name:'Add as alternative'});
+  await expect(alternative).toHaveAttribute('aria-disabled','true');
+  const why=page.locator('#'+await alternative.getAttribute('aria-describedby'));await expect(why).toBeVisible();await expect(why).toContainText('already has '+KEY);
   await expect(ask.getByRole('menuitem',{name:'Replace'})).toBeFocused();
+  // The refused choice is reachable by the arrow keys; Enter on it writes nothing and keeps the menu open.
+  await page.keyboard.press('ArrowDown');await expect(alternative).toBeFocused();
+  await page.keyboard.press('Enter');await expect(ask).toBeVisible();await expect(page.locator('#src')).toHaveValue(text);
+  await expect(page.locator('#workspace-window-links .links-status')).toContainText('Cannot add as an alternative');
   await page.keyboard.press('ArrowDown');await expect(ask.getByRole('menuitem',{name:'Cancel'})).toBeFocused();
   await page.keyboard.press('Enter');await expect(ask).toBeHidden();
   await expect(page.locator('#src')).toHaveValue(text);
@@ -289,7 +295,8 @@ test('T12 + Add trace match on a step without an id is focusable, explains why, 
   await add.focus();await expect(add).toBeFocused();
   await expect(add).toHaveAttribute('aria-disabled','true');
   const why=page.locator('#'+await add.getAttribute('aria-describedby'));await expect(why).toBeVisible();await expect(why).toContainText('Give this step an id in Inspect first');
-  await add.click();
+  // An aria-disabled control is refused by its handler; activate it the way a keyboard user does.
+  await page.keyboard.press('Enter');
   await expect(panel.locator('.links-trace-editor')).toHaveCount(0);
   await expect(links.locator('.links-status')).toContainText('Give this step an id in Inspect first');
   await expect(page.locator('#src')).toHaveValue(text);

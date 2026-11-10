@@ -133,6 +133,7 @@ function createFlowMetricsEditor(o){
   if(s.imported)d.note(box,'Inherited metrics from '+s.provider+': '+(!s.inherited?'none. A binding saved here applies only in this document.':
     s.merge?telemetrySummary(s.inherited)+'. Signals you add here are added to the provider\'s in this document; you can hide or change inherited ones. The provider is unchanged.':
     telemetrySummary(s.inherited)+'. This document replaces it with its own binding (saved before merging was available); Remove metrics restores the inherited binding.'),'metrics-inherited');
+  if(s.imported && s.inherited && !s.merge && b)box.appendChild(c.action('Merge with provider',function(){return commit({op:'mergeWithProvider'});})).setAttribute('title','Keep these metrics exactly as they are, stored as changes to the provider binding, so later provider changes reach this document.');
   // An imported carrier that inherits a provider binding is bound; only a carrier with neither is unbound.
   if(!b && !s.inherited)d.note(box,'Unbound: no metrics overlay and no proof verdict. Choose a kind, then add a signal'+(templateNames.length?' or pick a template':'')+'.','metrics-status');
   // An unbound carrier's kind is a draft: it is written with the first signal or template.

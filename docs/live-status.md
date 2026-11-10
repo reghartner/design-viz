@@ -556,7 +556,9 @@ edits store only the changed field. Each step is one Undo; the changes live in t
 consumer's `nodeTracking` or `edgeTracking` entry as an `extends` binding, and
 **Revert all metrics to inherited** removes them. Its **Metrics kind** starts at the
 inherited kind, marked (inherited). A consumer that saved a whole replacing binding
-before merging existed keeps it; **Remove metrics** restores the inherited one.
+before merging existed keeps it; **Merge with provider** converts it in one Undo step
+into the same metrics stored as changes (provider signals it dropped become hidden),
+and **Remove metrics** restores the inherited one.
 
 **Status board settings → Metrics** edits the page
 `tracking.telemetry` block: the Grafana Prometheus, Loki, Tempo and SQL datasource

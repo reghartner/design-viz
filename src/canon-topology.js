@@ -96,6 +96,43 @@ var FlowTopology = (function(){
     if(Object.prototype.hasOwnProperty.call(value,'existsWhen') && value.existsWhen!=='tickets-done')fail(at,'existsWhen must be tickets-done');
     trackingRefs(value,function(field,index){fail(at,'invalid '+field+(index===null?' array':' entry '+index));});
   }
+  /* #1266: a consumer overlay on an imported value: the import carries the provider's value,
+     and an importer may add, change or hide parts of it. Reusable for other imported kinds:
+     rules.fields maps each overlay field to 'replace' (the overlay value replaces), 'fields'
+     (a field patch; null deletes a field) or 'entries' (keyed entries, each a field patch;
+     a null entry is dropped through rules.drop, as is each name in the overlay's `hide`).
+     Objects left empty are removed. */
+  function patchFields(target,patch){
+    Object.keys(patch).forEach(function(key){if(patch[key]===null)delete target[key];else target[key]=clone(patch[key]);});
+    return target;
+  }
+  function mergeOverlay(base,overlay,rules){
+    var out=object(base)?clone(base):{};
+    function drop(field,key){if(rules.drop)rules.drop(out,field,key);else if(object(out[field]))delete out[field][key];}
+    if(rules.hide && Array.isArray(overlay.hide))overlay.hide.forEach(function(key){if(typeof key==='string')drop(rules.hide,key);});
+    Object.keys(rules.fields).forEach(function(field){
+      if(!own(overlay,field))return;
+      var rule=rules.fields[field],patch=overlay[field];
+      if(rule==='replace'){out[field]=clone(patch);return;}
+      if(!object(patch))return;
+      var target=object(out[field])?out[field]:{};out[field]=target;
+      if(rule==='fields')patchFields(target,patch);
+      else Object.keys(patch).forEach(function(key){
+        var entry=patch[key];
+        if(entry===null){drop(field,key);return;}
+        if(!object(entry))return;
+        var merged=patchFields(object(target[key])?target[key]:{},entry);
+        if(Object.keys(merged).length)target[key]=merged;else delete target[key];
+      });
+      if(object(out[field]) && !Object.keys(out[field]).length)delete out[field];
+    });
+    return out;
+  }
+  // Metrics on top of the generic merge: a hidden or removed signal takes its limit and any
+  // ratio limit based on it (telemetryDropSignal); kind replaces; the rest patch per field.
+  var TELEMETRY_OVERLAY_RULES={hide:'signals',fields:{kind:'replace',signals:'entries',proof:'entries',links:'fields',card:'fields'},
+    drop:function(out,field,key){if(field==='signals')telemetryDropSignal(out,key);else if(object(out[field]))delete out[field][key];}};
+  function mergeTelemetry(inherited,overlay){return mergeOverlay(inherited,overlay,TELEMETRY_OVERLAY_RULES);}
   function applyTracking(value,addition){
     if(!addition)return;
     if(addition.missingWork===true)value.missingWork=true;
@@ -105,7 +142,7 @@ var FlowTopology = (function(){
     ['tickets','prs'].forEach(function(field){if(merged[field].length)value[field]=merged[field];});
     // #1266: an `extends` overlay merges with the inherited binding; any other consumer binding
     // replaces it (the original rule, so existing documents keep their meaning).
-    if(own(addition,'telemetry'))value.telemetry=telemetryMergeOverlay(addition.telemetry)?telemetryMergeImported(value.telemetry,addition.telemetry):clone(addition.telemetry);
+    if(own(addition,'telemetry'))value.telemetry=telemetryMergeOverlay(addition.telemetry)?mergeTelemetry(value.telemetry,addition.telemetry):clone(addition.telemetry);
   }
   // Provider `use` bindings name the provider page's templates and expand only
   // with them, while that page is known. A binding the provider cannot expand
@@ -486,7 +523,7 @@ var FlowTopology = (function(){
     if(context.ephemeral){if(authoredIdentity)result.page.documentLinks.id=authoredIdentity;if(authoredCanon)result.page.canon=authoredCanon;else delete result.page.canon;}
     return mode==='wrapped'?result:mode==='diagram'?result.page.sections[0].diagram:result.page;
   }
-  return {validateDeclarations:function(specs){materializeSources(specs,true);},validateTracking:validateTracking,
+  return {validateDeclarations:function(specs){materializeSources(specs,true);},validateTracking:validateTracking,mergeOverlay:mergeOverlay,mergeTelemetry:mergeTelemetry,
     telemetryDrops:function(d){return (telemetryDrops.get(d) || []).map(function(drop){return clone(drop);});},mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
 })();
 FlowCanon.materializeTopology=FlowTopology.materialize;

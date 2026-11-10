@@ -401,6 +401,7 @@ function telemetryInheritedBinding(text,raw,target,t,context){
 /* An imported carrier that inherits a binding edits a merge overlay ({extends:true,…}); a carrier
    with an older replacing overlay keeps editing that whole binding. */
 function telemetryMergeMode(t,inherited){return !!inherited && (!t.hasField || telemetryMergeOverlay(t.binding));}
+function telemetryCanonical(v){return JSON.stringify(v,function(key,value){return telemetryObject(value)?Object.keys(value).sort().reduce(function(out,k){out[k]=value[k];return out;},{}):value;});}
 function telemetryFieldDiff(base,next){
   var diff={},changed=false;base=telemetryObject(base)?base:{};next=telemetryObject(next)?next:{};
   Object.keys(next).forEach(function(key){if(JSON.stringify(base[key])!==JSON.stringify(next[key])){diff[key]=telemetryClone(next[key]);changed=true;}});
@@ -408,7 +409,7 @@ function telemetryFieldDiff(base,next){
   return changed?diff:null;
 }
 /* The smallest merge overlay that turns the inherited binding into effective:
-   telemetryMergeImported(inherited, overlay) deep-equals effective. */
+   FlowTopology.mergeTelemetry(inherited, overlay) deep-equals effective. */
 function telemetryDiffImported(inherited,effective){
   effective=telemetryObject(effective)?effective:{};
   var inheritedSignals=telemetryObject(inherited.signals)?Object.keys(inherited.signals):[],signals=telemetryObject(effective.signals)?effective.signals:{};
@@ -444,7 +445,7 @@ function telemetryEditMerge(inherited,overlay,edit,options){
     }
     if(hidden.length)o.hide=hidden;else delete o.hide;
   }else{
-    var result=telemetryEditBinding(telemetryMergeImported(inherited,o),edit,options);if(result.error)return result;
+    var result=telemetryEditBinding(FlowTopology.mergeTelemetry(inherited,o),edit,options);if(result.error)return result;
     o=telemetryDiffImported(inherited,result.value);
   }
   return {value:Object.keys(o).length>1?o:null};
@@ -452,6 +453,16 @@ function telemetryEditMerge(inherited,overlay,edit,options){
 function planCarrierTelemetry(text,raw,target,edit,context){
   var t=telemetryCarrierTarget(text,raw,target,context);if(t.error)return t;
   var inherited=telemetryInheritedBinding(text,raw,target,t,context);
+  // #1266: convert an older replacing overlay into the merge overlay with exactly the same result.
+  if(edit && edit.op==='mergeWithProvider'){
+    if(!inherited || !t.hasField || telemetryMergeOverlay(t.binding))return {error:'Only a document binding that replaces an inherited one can be merged with the provider.'};
+    var whole=telemetryObject(t.binding) && telemetryOwn(t.binding,'use')?telemetryExpand(t.binding,telemetryPageTemplates(raw)):telemetryObject(t.binding)?t.binding:null;
+    if(!whole)return {error:'This binding cannot be expanded here; fix it before merging with the provider.'};
+    var converted=telemetryDiffImported(inherited,whole);
+    // Key order aside (signal rows follow the provider's order, then additions), the result is the same.
+    if(telemetryCanonical(FlowTopology.mergeTelemetry(inherited,converted))!==telemetryCanonical(whole))return {error:'This binding cannot be stored as changes to the provider binding without changing its meaning.'};
+    return planTopologyTracking(text,raw,target.section,target.kind,t.id,'telemetry',Object.keys(converted).length>1?converted:null,Object.keys(converted).length<=1,context,target.index);
+  }
   if(telemetryMergeMode(t,inherited)){
     var merged=telemetryEditMerge(inherited,t.binding,edit,{templates:telemetryPageTemplates(raw)});if(merged.error)return merged;
     if(JSON.stringify(merged.value)===JSON.stringify(t.hasField?t.binding:null))return {text:text};
@@ -599,7 +610,7 @@ function telemetryCarrierState(raw,target,context){
     merge={overlay:telemetryMergeOverlay(binding)?binding:null,inheritedNames:inheritedNames,
       hidden:inheritedNames.filter(function(name){return Array.isArray(overlayBinding.hide) && overlayBinding.hide.indexOf(name)>=0;}),
       overridden:inheritedNames.filter(function(name){return telemetryObject(overlayBinding.signals) && telemetryOwn(overlayBinding.signals,name) || telemetryObject(overlayBinding.proof) && telemetryOwn(overlayBinding.proof,name);})};
-    binding=telemetryMergeImported(inherited,overlayBinding);
+    binding=FlowTopology.mergeTelemetry(inherited,overlayBinding);
   }
   var template=binding && telemetryOwn(binding,'use')?binding.use:null;
   return {id:t.id,imported:!!t.owner,provider:t.owner?t.owner.spec+' / '+t.owner.export:null,edge:target.kind==='edge',binding:binding,inherited:inherited,merge:merge,templates:templates,

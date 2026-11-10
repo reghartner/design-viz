@@ -448,16 +448,11 @@ function telemetryExpand(raw,templates,invalid){
   return out;
 }
 /* #1266: a consumer overlay on an imported carrier. `{extends:true, ...}` merges with the
-   inherited (provider) binding: kind replaces when set; `hide` removes inherited signals with
-   their limits and any ratio limit based on them; signals, proof, links and card patch per
-   entry and field (null deletes a field; a signal name the provider lacks is a new local
-   signal). An overlay without `extends` replaces the inherited binding (the original rule). */
+   inherited (provider) binding through FlowTopology.mergeTelemetry (canon-topology.js); an
+   overlay without `extends` replaces the inherited binding (the original rule). */
 var TELEMETRY_MERGE_FIELDS=['extends','kind','signals','hide','proof','links','card'];
 function telemetryMergeOverlay(overlay){return telemetryObject(overlay) && overlay.extends===true;}
-function telemetryPatch(target,patch){
-  Object.keys(patch).forEach(function(key){if(patch[key]===null)delete target[key];else target[key]=telemetryClone(patch[key]);});
-  return target;
-}
+// Metrics rule for a removed or hidden signal: its limit goes, and so does any ratio limit based on it.
 function telemetryDropSignal(binding,name){
   if(telemetryObject(binding.signals))delete binding.signals[name];
   if(!telemetryObject(binding.proof))return;
@@ -467,25 +462,7 @@ function telemetryDropSignal(binding,name){
     // max next to maxRatioOf is a ratio: it goes with its base signal; min stays.
     delete limit.maxRatioOf;delete limit.max;if(!Object.keys(limit).length)delete binding.proof[key];
   });
-}
-function telemetryMergeImported(inherited,overlay){
-  var out=telemetryObject(inherited)?telemetryClone(inherited):{};
-  if(telemetryOwn(overlay,'kind'))out.kind=telemetryClone(overlay.kind);
-  (Array.isArray(overlay.hide)?overlay.hide:[]).forEach(function(name){if(typeof name==='string')telemetryDropSignal(out,name);});
-  ['signals','proof','links','card'].forEach(function(field){
-    var patch=overlay[field];if(!telemetryObject(patch))return;
-    var target=telemetryObject(out[field])?out[field]:{};
-    if(field==='links' || field==='card')telemetryPatch(target,patch);
-    else Object.keys(patch).forEach(function(name){
-      var entry=patch[name];
-      if(entry===null){if(field==='signals')telemetryDropSignal(out,name);else delete target[name];return;}
-      if(!telemetryObject(entry))return;
-      var merged=telemetryPatch(telemetryObject(target[name])?target[name]:{},entry);
-      if(Object.keys(merged).length)target[name]=merged;else delete target[name];
-    });
-    if(Object.keys(target).length)out[field]=target;else delete out[field];
-  });
-  return out;
+  if(!Object.keys(binding.proof).length)delete binding.proof;
 }
 /* Shape warnings for a merge overlay as authored; the merged binding is validated where it resolves. */
 function telemetryMergeOverlayWarnings(overlay,invalid){

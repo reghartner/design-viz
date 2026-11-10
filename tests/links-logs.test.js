@@ -96,3 +96,24 @@ test('LL6 a drop target is the index the search lands on; its own gaps change no
   assert.match(c.linksLogSearchDropTarget(m,'camera',1).refusal,/already here/);
   assert.match(c.linksLogSearchDropTarget(m,'nope',1).refusal,/not found/);
 });
+
+test('LL7 a search is marked dropped from the validator text itself: unknown field, bad id, non-object entry, bad fields key',()=>{
+  const spec=board(),l=spec.page.tracking.telemetry.lookups;
+  l.camera.label='Camera model '.repeat(7).trim();
+  l.hint={label:'Hint',query:'{a="$value"}',placeholder:'e.g. DB-1'};
+  l['Bad id']={label:'Bad',query:'{a="b"}'};
+  l.broken='not an object';
+  l.span={label:'Span',query:'{a="$value"}',fields:{traceId:'trace_id',other:'x'}};
+  assert.deepEqual(plain(c.validate(c.normalize(spec)).errors),[],'warnings only: the board still opens');
+  const warnings=c.validate(c.normalize(spec)).warnings.filter(w=>w.indexOf('tracking.telemetry.lookups')===0);
+  const m=model(spec),got=c.linksLogSearchIgnored(warnings,m.rows.map(r=>r.id));
+  assert.deepEqual(Object.keys(got.byId).sort(),['Bad id','broken','camera','hint','span']);
+  assert.deepEqual(plain(got.byId.camera),['the label must be plain text of 1–80 characters']);
+  assert.deepEqual(plain(got.byId.hint),['placeholder is not a log search field']);
+  assert.match(got.byId['Bad id'][0],/^its id must start with a letter/);
+  assert.match(got.byId.broken[0],/^the search must be an object/);
+  assert.deepEqual(plain(got.byId.span),['fields.other is not a log search field']);
+  assert.deepEqual(plain(got.general),[]);
+  const general=c.linksLogSearchIgnored(['tracking.telemetry.lookups: must be an object of named log lookups — ignored'],['camera']);
+  assert.deepEqual(plain(general.general),['tracking.telemetry.lookups: must be an object of named log lookups — ignored']);
+});

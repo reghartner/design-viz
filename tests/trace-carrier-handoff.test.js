@@ -8,13 +8,13 @@
 |---|---|
 | H1 | Async publish: send 100-102, receiver (linked child) 109-149: the connection reads 9 ms and the worker node 40 ms. |
 | H2 | Sync call: client 0-30, server child 5-25: 5 ms, the latency only. |
-| H3 | A receiver whose parent is not in the trace pairs when it is the only such receiver starting at or after the send, and the title says so in plain words; two such receivers do not pair. |
+| H3 | A receiver whose parent is not in the trace (or a root receiver) pairs when it is the only such receiver starting at or after the send, and the title says which in plain words; two such receivers do not pair; clock skew is named. |
 | H4 | Two hand-offs: "… across 2 hand-offs" (union of the hand-off intervals). |
 | H5 | No receiver: "send only · 2 ms", and the title says no receiver was found and that the send span's own time is shown. |
 | H6 | A connection's own receive declaration replaces the receiving node's process span. |
 | H7 | A receiver descending from another send never pairs with this one. |
 | H8 | A receive with no send: a label only when the connection itself declares receive (Chuck 2026-11-10 default a). |
-| H9 | A step traceMatch row for a declared connection moves into the title with its time; undeclared connections keep today's step rows. |
+| H9 | A step traceMatch row for a declared connection moves into the title with its time, budget and conditions, and the label keeps its worst tone; undeclared connections keep today's step rows. |
 | H10 | A consumer connection into an imported node pairs with the provider's process declaration; an imported connection follows the consumer's send patch; nested re-exports too. |
 | H11 | Focus levels and outlines include connection rows; a board with declarations only on connections draws connection labels. |
 | H12 | A pass-through queue node: each connection is timed on its own (default b). |
@@ -62,6 +62,15 @@ test('H3 H5 H7 a receiver without its parent pairs only when it is the only cand
   let t=edgeLabel(model(board(),orphan),'api->worker');
   assert.equal(t.text,'9 ms');
   assert.match(t.title,/The receiving span's parent is not in this trace; it was paired as the only receiving span that started after the send\./);
+  // A receiver with no parent at all starts its own trace tree; the title says that instead.
+  t=edgeLabel(model(board(),[span('pub',null,'api','publish orders',100,2),span('proc',null,'worker','process orders',109,40)]),'api->worker');
+  assert.equal(t.text,'9 ms');
+  assert.match(t.title,/The receiving span has no parent span \(it starts its own trace tree\); it was paired as the only receiving span that started after the send\./);
+  assert.doesNotMatch(t.title,/parent is not in this trace/);
+  // Clock skew: a receiver that descends from the send but starts before it.
+  t=edgeLabel(model(board(),[span('pub',null,'api','publish orders',100,2),span('proc','pub','worker','process orders',98,40)]),'api->worker');
+  assert.equal(t.text,'0 ms');
+  assert.match(t.title,/The receiving span starts before its send span, so the services' clocks disagree; that hand-off counts as 0 ms\./);
   // Two such receivers: nothing tells which one, so no pair.
   const two=orphan.concat([span('proc2','other-missing','worker','process orders',120,10)]);
   t=edgeLabel(model(board(),two),'api->worker');
@@ -104,11 +113,27 @@ test('H9 a step row on a declared connection moves into the title; undeclared co
   assert.equal(m.edges['api->worker'].length,1,'one label on the connection');
   const t=edgeLabel(m,'api->worker');
   assert.equal(t.text,'9 ms');
-  assert.match(t.title,/Step publish: 40 ms \(the receiving span's own time, as before\)/,'the old number stays readable');
+  assert.match(t.title,/ Step publish, process orders: 40 ms\./,'the old number stays readable');
   assert.equal(m.rows.find(r=>r.id==='publish').label,'40 ms','the step row itself is unchanged in the Status list');
   // Without declarations the connection keeps today's receiving-span time.
   m=model(board({send:null,worker:null,steps}),ASYNC());
   assert.equal(edgeLabel(m,'api->worker').text,'40 ms');
+  // A declared send never hides a step's warning or error: the label keeps the worst tone and
+  // the title keeps the step's conditions and budget.
+  const busy=[span('pub',null,'api','publish orders',100,2),
+    span('proc',null,'worker','process orders',110,100,{links:[{traceId:'t1',spanId:'pub'}],attributes:{'messaging.queue.depth':40,'flow.delivery_failed':true}})];
+  const queued=[{id:'pub',text:'Publish',edge:'api->worker',traceMatch:{serviceName:'worker',operation:'process orders',maxQueueDepth:10}}];
+  const before=model(board({send:null,worker:null,steps:queued}),busy).edges['api->worker'][0];
+  assert.equal(before.tone,'error','undeclared: the step row is an error');
+  m=model(board({steps:queued}),busy);
+  assert.equal(m.edges['api->worker'][0].tone,'error','declared: still an error');
+  const declared=edgeLabel(m,'api->worker');assert.equal(declared.text,'10 ms');
+  assert.match(declared.title,/Step pub, process orders: 100 ms; Delivery failed \(explicit telemetry\); Queue buildup · 40 messages\./);
+  const budget=[{id:'work',text:'Work',edge:'api->worker',traceMatch:{serviceName:'worker',operation:'process orders',nodeId:'worker',maxDurationMs:50}}];
+  const slow=[span('pub',null,'api','publish orders',100,2),span('proc',null,'worker','process orders',110,100,{links:[{traceId:'t1',spanId:'pub'}]})];
+  m=model(board({steps:budget}),slow);
+  assert.equal(m.edges['api->worker'][0].tone,'warning','a slow step keeps the connection amber');
+  assert.match(edgeLabel(m,'api->worker').title,/Step work, process orders: 100 ms \/ 50 ms budget; Slow operation · 100 ms \/ 50 ms budget\./);
 });
 
 test('H10 imported connections and receivers follow the resolved consumer',()=>{
@@ -136,8 +161,8 @@ test('H10 imported connections and receivers follow the resolved consumer',()=>{
 
 test('H11 H12 focus levels include connection rows; connections-only boards draw; queue nodes time each connection',()=>{
   const m=model(board(),ASYNC());
-  assert.equal(V.telemetryTraceLevels(m,null).edges[0].level,'below');
-  assert.equal(V.telemetryTraceLevels(m,{spanId:'pub'}).edges[0].level,'current');
+  assert.equal(V.telemetryTraceLevels(m,null).edges[0]?.level,'below');
+  assert.equal(V.telemetryTraceLevels(m,{spanId:'pub'}).edges[0]?.level,'current');
   // Declarations only on the connection and its receiving node's process: the connection is drawn.
   const only=board({worker:PROCESS});assert.ok(model(only,ASYNC()).edges['api->worker']);
   // api -> topic -> worker: the topic declares nothing; each connection is on its own.

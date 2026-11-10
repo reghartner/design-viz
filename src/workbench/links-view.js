@@ -892,13 +892,17 @@ function initWorkbenchLinksView(opts){
   var logWarnCache={rev:-1,value:null};
   function logWarnings(){
     if(logWarnCache.rev===modelRev && logWarnCache.value)return logWarnCache.value;
-    var s=snapshot(),out={byId:Object.create(null),general:[]};
-    if(!s.error && logsModel && logsModel.valid && session.validate){
-      try{out=logSearchWarnings(statusBoardWarnings(s.raw,session.validate).lookups,logsModel.rows.map(function(r){return r.id;}));}catch(ex){}
+    var s=snapshot(),out={byId:Object.create(null),general:[],ignored:{byId:Object.create(null),general:[]}};
+    if(!s.error && logsModel && session.validate){
+      try{
+        var list=statusBoardWarnings(s.raw,session.validate).lookups,ids=logsModel.rows.map(function(r){return r.id;});
+        out=logSearchWarnings(list,ids);out.ignored=linksLogSearchIgnored(list,ids);
+      }catch(ex){}
     }
     logWarnCache={rev:modelRev,value:out};return out;
   }
-  function ignoredReason(r){var w=logWarnings().byId[r.id];if(!w)return null;var k=Object.keys(w)[0];return w[k][0];}
+  // Every reason the validator drops this search, in plain words, or null.
+  function ignoredReason(r){var w=logWarnings().ignored.byId[r.id];return w && w.length?w.join('; ')+'.':null;}
   var noteIds=0;
   function warnField(row,input,texts){
     if(!texts || !texts.length)return;
@@ -965,7 +969,9 @@ function initWorkbenchLinksView(opts){
     box.appendChild(logField(base+'datasource','Loki datasource UID',r.datasource,function(v){return logEdit(r,'datasource',v,base+'datasource');},{placeholder:'From Metrics → Grafana Loki UID'}));
     box.appendChild(logField(base+'traceId','Trace ID field',r.traceId,function(v){return logEdit(r,'traceId',v,base+'traceId');},{placeholder:'trace_id'}));
     box.appendChild(logField(base+'spanId','Span ID field',r.spanId,function(v){return logEdit(r,'spanId',v,base+'spanId');},{placeholder:'span_id'}));
-    var w=logWarnings().byId[r.id] || {};
+    var w=Object.assign({},logWarnings().byId[r.id] || {});
+    var repeated=r.values.filter(function(v,i){return r.values.indexOf(v)<i;}).filter(function(v,i,all){return all.indexOf(v)===i;});
+    if(repeated.length)w.values=(w.values || []).concat(['Suggested '+(repeated.length===1?'value '+JSON.stringify(repeated[0])+' is':'values '+repeated.map(function(v){return JSON.stringify(v);}).join(', ')+' are')+' listed more than once.']);
     ['label','query','values','datasource','traceId','spanId'].forEach(function(f){
       var input=box.querySelector('[data-links-field="'+cssEscape(base+f)+'"]');if(input)warnField(input.parentNode,input,w[f]);
     });
@@ -1064,6 +1070,13 @@ function initWorkbenchLinksView(opts){
       rows.appendChild(line);
     });
     if(!logsModel.rows.length)rows.appendChild(el('p','links-empty','No log searches yet. Choose + New log search.'));
+    var general=logWarnings().ignored.general;
+    if(general.length){
+      var box=el('div','links-log-general');box.setAttribute('role','note');box.setAttribute('aria-label','Log searches warnings');
+      box.appendChild(el('p','links-group','Log searches warnings · '+general.length));
+      general.forEach(function(text){box.appendChild(el('p','links-log-warning',text));});
+      logsBox.appendChild(box);
+    }
     var add=button('bbtn links-log-new','+ New log search',null,'Add a search readers can run in the Trace view');
     rowsLife.listen(add,'click',function(){state.logAdding=true;state.logEdit=null;renderLogs();var f=logsBox.querySelector('[data-links-field="log|new|label"]');if(f)f.focus();});
     logsBox.appendChild(add);

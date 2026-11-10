@@ -59,3 +59,38 @@ function planLinksLogSearchKind(text,raw,id,kind){
   if(kind==='list' || !row.values.length && !(s.lookups[id] && s.lookups[id].values!=null))return {text:text};
   return planPageTelemetry(text,raw,{op:'lookup',name:id,field:'values',value:null});
 }
+/* Which searches the Trace view drops, straight from the validator's text: a
+   warning "tracking.telemetry.lookups.<id>[.path]: … — lookup ignored" drops
+   <id> (prefix matching also covers ids that fail the id pattern). Returns
+   {byId:{id:[reason]}, general:[warning]} with reasons in plain words. */
+var LINKS_LOG_PREFIX='tracking.telemetry.lookups';
+function linksLogSearchSubject(path,message){
+  var m;
+  if(!path)return /^lookup ids/.test(message)?'its id must start with a letter and use only letters, digits, - and _':'the search '+message;
+  if(path==='.label')return 'the label '+message;
+  if(path==='.query')return 'the query '+message;
+  if(path==='.values')return 'the suggested values '+message;
+  if((m=/^\.values\[(\d+)\]$/.exec(path)))return 'suggested value '+(Number(m[1])+1)+' '+message;
+  if(path==='.datasource')return 'the Loki datasource UID '+message;
+  if(path==='.fields')return 'the trace and span ID fields '+message;
+  if(path==='.fields.traceId')return 'the trace ID field '+message;
+  if(path==='.fields.spanId')return 'the span ID field '+message;
+  if(message==='unknown field')return path.slice(1)+' is not a log search field';
+  return path.slice(1)+' '+message;
+}
+function linksLogSearchIgnored(warnings,ids){
+  var out={byId:Object.create(null),general:[]},sorted=(ids || []).slice().sort(function(a,b){return b.length-a.length;});
+  (warnings || []).forEach(function(text){
+    var id=null;
+    if(text.indexOf(LINKS_LOG_PREFIX+'.')===0){
+      var rest=text.slice(LINKS_LOG_PREFIX.length+1);
+      id=sorted.find(function(k){return rest.indexOf(k)===0 && /^[.:[]/.test(rest.charAt(k.length));}) || null;
+    }
+    var ignored=/ — lookup ignored$/.test(text);
+    if(!id || !ignored){out.general.push(text);return;}
+    var after=text.slice(LINKS_LOG_PREFIX.length+1+id.length),colon=after.indexOf(': ');
+    var path=colon>=0?after.slice(0,colon):'',message=(colon>=0?after.slice(colon+2):after).replace(/ — lookup ignored$/,'');
+    (out.byId[id] || (out.byId[id]=[])).push(linksLogSearchSubject(path,message));
+  });
+  return out;
+}

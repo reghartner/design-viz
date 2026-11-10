@@ -7,7 +7,7 @@
    L4 inline edit | same | Edit camera, change Query, Tab out: one Undo step; an empty Label is refused beside Label with aria-invalid and nothing written | errors far from the field
    L5 Viewer value | same | Typed on camera clears its suggested values in one Undo step; None on device is aria-disabled with "Remove $value from the query", and Enter on it writes nothing | a None that leaves a dangling $value
    L6 add + remove | same | + New log search (label Order ID, query with $value) adds lookups.order-id last; Remove log search Order ID removes it; one Undo each | ids not made from the label
-   L8 ignored searches | camera label 90 characters, device value with a quote, errors with values but no $value (0 validator errors, 3 warnings) | each row says "Not shown in the Trace view: …"; the preview names them instead of drawing boxes; the editor marks the faulty field aria-invalid with the warning beside it; Pick from list on a search without $value is aria-disabled with its reason and Enter writes nothing; after Typed, focus stays on Typed | a preview that draws searches the Trace view drops, a pick list that gets a search dropped
+   L8 ignored searches | camera label 90 characters, device value with a quote, errors with values but no $value, hint with an unknown field, an id with a space (0 validator errors, 5 warnings) | each row says "Not shown in the Trace view: …" in plain words; the preview names them instead of drawing boxes; the editor marks the faulty field aria-invalid with the warning beside it; Pick from list on a search without $value is aria-disabled with its reason and Enter writes nothing; after Typed, focus stays on Typed | a preview that draws searches the Trace view drops, a pick list that gets a search dropped
    L7 two-way sync | same | a Query edit in Links shows in Status board settings → Log searches; a label edit there shows in the Links row, with no reload | a stale copy in either place */
 import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
 
@@ -149,11 +149,16 @@ test('L7 an edit in Links shows in Status board settings, and an edit there show
 test('L8 searches the Trace view would drop are named, not drawn; warnings sit beside their field; Pick from list needs $value',async({page,server})=>{
   const spec=JSON.parse(JSON.stringify(fixture)),l=spec.page.tracking.telemetry.lookups;
   l.camera.label='Camera model '.repeat(7).trim();l.device.values=['a"b'];l.errors.values=['ERROR'];
+  // An unknown field (as in mockup m5) and an id the validator rejects drop a search too.
+  l.hint={label:'Hint',query:'{a="$value"}',placeholder:'e.g. DB-1'};l['Bad id']={label:'Bad',query:'{a="b"}'};
   const {panel,text}=await open(page,server,spec);
-  for(const id of ['camera','device','errors'])await expect(row(panel,id).locator('.links-log-ignored')).toContainText('Not shown in the Trace view');
+  for(const id of ['camera','device','errors','hint','Bad id'])await expect(row(panel,id).locator('.links-log-ignored')).toContainText('Not shown in the Trace view');
+  await expect(row(panel,'camera').locator('.links-log-ignored')).toHaveText('Not shown in the Trace view: the label must be plain text of 1–80 characters.');
   await expect(row(panel,'errors').locator('.links-log-ignored')).toContainText('no $value slot');
+  await expect(row(panel,'hint').locator('.links-log-ignored')).toContainText('placeholder is not a log search field');
+  await expect(row(panel,'Bad id').locator('.links-log-ignored')).toContainText('its id must start with a letter');
   const preview=panel.getByRole('region',{name:'Trace view preview (read only)'});
-  await expect(preview.locator('.links-preview-ignored')).toHaveCount(3);await expect(preview.locator('.links-preview-control')).toHaveCount(0);
+  await expect(preview.locator('.links-preview-ignored')).toHaveCount(5);await expect(preview.locator('.links-preview-control')).toHaveCount(0);
   await row(panel,'errors').getByRole('button',{name:'Edit Recent errors',exact:true}).click();
   const form=panel.getByRole('group',{name:'Log search errors',exact:true});
   const query=form.getByRole('textbox',{name:'Query',exact:true});

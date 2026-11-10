@@ -39,8 +39,8 @@ test('#1173 at 1440x900 a loaded trace\'s span list starts beside the diagram, a
  const frame=await section.locator('.section-layout-tile[data-layout-key="diagram"]').boundingBox(),row=await first.boundingBox(),body=await panel.locator('.dv-live-trace').boundingBox();
  await page.screenshot({path:info.outputPath('trace-compact-1440x900.png')});
  expect(row.y,'the first span row starts above the diagram frame\'s bottom edge ('+Math.round(frame.y+frame.height)+')').toBeLessThan(frame.y+frame.height);
- // Only the controls row, the two collapsed lines and the focus box come before the span list (about 200 px; the expanded
- // search report, request details and Clear rows took over 300).
+ // Only the controls row and the collapsed request line come before the span list; the open search follows it (#1230).
+ // Expanded request details before the list took over 300 px.
  expect(row.y-body.y,'the span list follows the collapsed lines directly').toBeLessThan(260);
 });
 /* #1186 stage 2 (Chuck approved the mockup 2026-11-09): the span list fills the rest of the panel and scrolls inside it,

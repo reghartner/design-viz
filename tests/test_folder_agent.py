@@ -418,6 +418,9 @@ class FolderAgentTests(unittest.TestCase):
         self.assertNotIn('../src/trace-import.js', trace_cli)
         self.assertEqual((self.folder/'authoring/tools/trace-import.js').read_text(),
                          (ROOT/'src/trace-import.js').read_text())
+        # #1252: the CLI also loads the shared duration rounding beside the converter.
+        self.assertNotIn('../src/core/duration.js', trace_cli)
+        self.assertEqual((self.folder/'authoring/tools/duration.js').read_text(), (ROOT/'src/core/duration.js').read_text())
         skill = (self.folder/'authoring/.claude/skills/hld-to-page/SKILL.md').read_text()
         self.assertIn('tools/authoring-packet.py', skill)
         workflow = (self.folder/'authoring/.claude/skills/hld-to-page/references/authoring-workflow.md').read_text()

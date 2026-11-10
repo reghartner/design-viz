@@ -79,7 +79,11 @@ function createTelemetryTraces(page,win,now,bound){
       }
       if(!active(entry.epoch))telemetryTraceFail('Trace session cancelled.');
       return telemetryTraceEnvelope({version:1,provider:source,traceId:candidate.traceId,signal:entry.job.name,selectionReason:reason+'; first explicit trace signal in authored order',selectionToken:entry.token,observedAt:new Date(clock()).toISOString(),range:entry.range,candidates:entry.candidates,spans:trace.spans,completeness:trace.completeness,warnings:entry.warnings.concat(trace.warnings),url:trace.url || candidate.url || null},allowed);
-    })().catch(function(error){throw telemetryProviderStepError(error,entry.contract.detail.name+' trace detail');});entry.details.set(candidate.traceId,request);return request;
+    })().catch(function(error){
+      // #1252: only a success is cached; a failed detail is asked again on the next poll or Retry.
+      if(entry.details.get(candidate.traceId)===request)entry.details.delete(candidate.traceId);
+      throw telemetryProviderStepError(error,entry.contract.detail.name+' trace detail');
+    });entry.details.set(candidate.traceId,request);return request;
   }
   async function load(job,mcp,config){
     var key=JSON.stringify([job.binding,config]),entry=entries.get(job.id);if(entry && entry.key===key)return entry.promise;
@@ -90,7 +94,7 @@ function createTelemetryTraces(page,win,now,bound){
       var found;try{found=job.signal.source==='tempo'?telemetryTempoCandidates(result):telemetryHoneycombCandidates(result);}catch(error){throw telemetryProviderStepError(error,entry.contract.search.name+' trace search result');}entry.candidates=found.candidates;entry.warnings=found.warnings;if(found.range)entry.range=found.range;
       var chosen=telemetryTraceSelect(entry.candidates);if(!chosen.candidate)return null;
       entry.selected=await detail(entry,chosen.candidate,chosen.reason);return entry.selected;
-    })();return entry.promise;
+    })().catch(function(error){if(entries.get(job.id)===entry)entries.delete(job.id);throw error;});return entry.promise;
   }
   async function provider(bindings,signal,report){
     var map=Object.create(null),notes=[];if(signal.aborted || retired)return map;

@@ -1410,6 +1410,50 @@ the Day 10 firmware 2.4.1 deploy, the route queue lagging on Day 11, and the pus
 silent after its tickets turn Done on Day 9. Its silence is authored as explicit
 zero samples, so it is distinguishable from unavailable telemetry.
 
+## Agent snapshot (#1265)
+
+The Workbench never calls Jira or a metrics provider. To look at real data without publishing,
+ask your agent for a snapshot, for example "take a live snapshot of diagrams/doorbell/doorbell.spec.json".
+The agent runs one command:
+
+```
+node tools/live-snapshot.js <board.spec.json> [--out <file>] [--timeout <seconds>]
+```
+
+The script runs the viewer's own Jira and Grafana adapters on a headless copy of the board, so
+it makes the calls a published board makes, and sends each call to the provider's REST API:
+Jira search and issue reads (`POST /rest/api/3/search/jql`, `GET /rest/api/3/issue/{key}`),
+and Grafana Prometheus and Loki range queries through the board's datasource uids
+(`/api/datasources/proxy/uid/{uid}/…`) plus `/api/annotations`. Grafana SQL and CloudWatch
+signals, Honeycomb, traces and log searches are not read yet; each such signal is recorded as an
+error and the run goes on. It takes today's state only (no Over time history).
+
+Credentials come from the environment and are never written to the snapshot:
+`JIRA_EMAIL` and `JIRA_API_TOKEN` (an Atlassian API token; the site is the board's
+`tracking.jira.site`, or `JIRA_SITE`), and `GRAFANA_URL` with `GRAFANA_TOKEN` (a service
+account token). A provider whose variables are missing is skipped and its variables are named.
+
+Provider responses never reach the agent: the script prints exactly one line, for example
+`snapshot diagrams/doorbell/doorbell.snapshot.json at 2026-11-10T11:02:00.000Z: 7 tickets (0 missing) ·
+6 carriers, 11 of 14 signals · no errors`. It exits 1 without writing a file when neither
+provider could run.
+
+The snapshot is written next to the board as `<board>.snapshot.json` (`--out` chooses another
+path). `*.snapshot.json` is ignored by git, so real ticket titles, assignees and metric values
+are never committed, and the file is never part of a published board. Its format is one day of
+the [demo story](#demo-mode) plus `snapshotAt` and the recorded `errors`:
+`{"version": 1, "kind": "flowview-live-snapshot", "snapshotAt", "board", "epics", "days": [{"label":
+"Snapshot from …", "issues": {…}, "telemetry": {"start", "stepSeconds", "carriers"}}], "errors": [{"source",
+"tool", "message"}]}`. A ticket Jira did not return is left out of `issues`, so the board shows
+it as missing.
+
+An agent with only MCP connectors and no REST credentials cannot run the script. It can make the
+same calls itself at a known cost: one `getAccessibleAtlassianResources`, then for each 50-key
+chunk of the board's tickets and for each configured epic two `searchJiraIssuesUsingJql` calls
+(one with `AND Flagged = Impediment`) with only `summary, status, assignee, updated, issuelinks,
+parent, issuetype`, and one Grafana query per bound signal over the board's window. Those
+results do pass through its context, so prefer REST credentials.
+
 ## Over time
 
 Over time lets a reader move through past days on a board. It overlays each

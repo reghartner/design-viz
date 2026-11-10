@@ -84,6 +84,8 @@ test('S2 the CLI calls the REST APIs with the credentials, prints one line and n
   assert.equal(snapshot.days[0].issues['UX-89'],undefined,'a ticket Jira did not return is left out (the board shows it missing)');
   assert.equal(snapshot.days[0].issues['HW-123'].state,'done');
   const C=runtime(),telemetry=plain(C.liveStatusDemoTelemetry(snapshot.days[0]));assert.equal(telemetry.ingest.signals.rate.value,14,'the current value');assert.deepEqual(telemetry.ingest.signals.rate.series.map(p=>p[1]),[10,12,14]);
+  // It is a valid demo timeline: tools/inject.py --timeline accepts it, so a local built page can show it with #live=demo.
+  execFileSync('python3',['-c','import sys;sys.path.insert(0,"tools");import inject;inject.load_timeline(sys.argv[1])',r.out]);
   // A snapshot never enters git.
   const ignored=execFileSync('git',['check-ignore','-v','diagrams/demo/board.snapshot.json'],{encoding:'utf8'});assert.match(ignored,/snapshot\.json/);
  }finally{await p.close();}

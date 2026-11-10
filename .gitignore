@@ -60,3 +60,6 @@ node_modules/
 /deploy/aws/cloud-config.json
 /deploy/aws/samconfig.toml
 /deploy/aws/dist/
+
+# Agent snapshots of real Jira and metrics data (#1265): never committed.
+*.snapshot.json

@@ -52,7 +52,10 @@ test('L1 New log search adds tracking.telemetry.lookups.<id> from label and quer
   const ui=harness(board()),before=ui.text;
   assert.ok(!/No settings yet/.test(ui.section().querySelector('summary').textContent),'the section is no longer a placeholder');
   ui.type('New log search label','Order ID').type('New log search query',QUERY);
-  const preview=ui.section().querySelector('p.log-search-id-preview');assert.equal(preview.textContent,'Saved as tracking.telemetry.lookups.order-id (from the label).','review c1: the id that will be made is shown');
+  const preview=ui.section().querySelector('p.log-search-id-preview');assert.equal(preview.textContent,'Will be saved as tracking.telemetry.lookups.order-id (from the label).','review c1: the id that will be made is shown');
+  assert.equal(preview.getAttribute('aria-live'),null,'review c2: not announced on every keystroke');
+  ui.type('New log search id','9bad');assert.equal(preview.textContent,'"9bad" cannot be an id: start with a letter and use letters, digits, - and _.','review c2: a refused id is marked');
+  assert.equal(ui.control('New log search id').getAttribute('aria-invalid'),'true');ui.type('New log search id','');assert.equal(ui.control('New log search id').getAttribute('aria-invalid'),null);
   assert.equal(ui.control('New log search id').getAttribute('aria-describedby'),preview.id);
   ui.click('Add log search');
   assert.deepEqual(plain(ui.lookups),{'order-id':{label:'Order ID',query:QUERY}});

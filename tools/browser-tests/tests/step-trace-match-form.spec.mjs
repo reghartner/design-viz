@@ -73,6 +73,9 @@ test('2: Add alternative makes the alternatives array; removing one returns the 
 test('3: an attribute row writes attributes.<key>; JSON-only fields survive form edits; the Node list writes imported nodes',async({page,server})=>{
   await open(page,server,{traceMatch:{serviceName:'orders-db',operation:'INSERT orders',...JSON_ONLY}});
   let form=await inspectStep(page);
+  // Advanced (JSON) starts closed; its summary opens it.
+  await expect(form.getByRole('textbox',{name:'advanced JSON',exact:true})).toBeHidden();
+  await form.locator('details.trace-match-advanced > summary').click();
   await expect(form.getByRole('textbox',{name:'advanced JSON',exact:true})).toHaveValue(JSON.stringify(JSON_ONLY,null,2));
   await field(form,'new attribute name').fill('deployment.environment.name');
   await field(form,'new attribute value').fill('prod');await field(form,'new attribute value').press('Enter');

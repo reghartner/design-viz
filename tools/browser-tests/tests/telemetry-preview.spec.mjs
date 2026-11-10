@@ -162,13 +162,13 @@ test('P7 local/direct/nested bindings and inherited read-only forms keep provide
  await toggle(page).check();await expect(cards(page)).toHaveCount(3);
  expect(await cards(page).evaluateAll(els=>els.map(e=>e.dataset.metricsCard).sort())).toEqual(['direct::a->direct::b','outer::inner::a->outer::inner::b','x->y']);
  const inherited=page.locator('#docview .dv-metrics-card[data-metrics-card="direct::a->direct::b"]');await inherited.click();await page.locator('#editor-tab-inspect').click();
- const guide=page.locator('#guide');await expect(guide.locator('.metrics-inherited')).toContainText('provider / core (read only)');await expect(guide.getByLabel('rate query',{exact:true})).toHaveCount(0);await expect(guide.getByLabel('Card side',{exact:true})).toHaveValue('below');
+ const guide=page.locator('#guide');await expect(guide.locator('.metrics-inherited')).toContainText('Inherited metrics from provider / core');await expect(guide.getByLabel('rate query',{exact:true})).toHaveCount(1);await expect(guide.getByLabel('Card side',{exact:true})).toHaveValue('below');
  const before=await page.locator('#src').inputValue();await openMetricsFold(guide,'New signal');await guide.getByLabel('New signal name',{exact:true}).fill('localRate');await guide.getByLabel('New signal query',{exact:true}).fill('consumer_rate');await guide.getByRole('button',{name:'Add signal',exact:true}).click();
  await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.topologyImports[0].edgeTracking?.['a->b']?.telemetry?.signals?.localRate).toEqual({grafana:'consumer_rate'});
  const after=await page.locator('#src').inputValue();await expect(cards(page)).toHaveCount(3);await inherited.click();await openMetricsFold(guide,'Card');await guide.getByLabel('Card side',{exact:true}).selectOption('above');await expect(inherited).toHaveAttribute('data-side','above');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(after);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(cards(page)).toHaveCount(3);
  expect(await page.evaluate(()=>window.metricsImportContext.specs[0])).toEqual(provider);
- await page.locator('#docview g.node[data-dv-node="outer::inner::a"]').click();await expect(guide.locator('.metrics-inherited')).toContainText('(read only)');await expect(guide.getByLabel('rate query',{exact:true})).toHaveCount(0);
+ await page.locator('#docview g.node[data-dv-node="outer::inner::a"]').click();await expect(guide.locator('.metrics-inherited')).toContainText('Inherited metrics from');await expect(guide.getByLabel('rate query',{exact:true})).toHaveCount(1);
  await settings(page);await page.getByRole('checkbox',{name:'Allow metrics',exact:true}).uncheck();await expect(cards(page)).toHaveCount(0);await page.locator('#undo-builder').click();await expect(cards(page)).toHaveCount(3);
  expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
 });
@@ -252,7 +252,13 @@ test('manual card cancellation and stale gestures never publish; direct and nest
   const card=page.locator('#docview .dv-metrics-card[data-metrics-card="'+id+'"]'),initial=await positionOf(card),before=await page.locator('#src').inputValue();
   await card.scrollIntoViewIfNeeded();await dragCard(page,card,40,25);
   const next=JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.topologyImports[ordinal].edgeTracking[key].telemetry;
-  expect(next).toEqual({...binding,card:{...binding.card,position:{x:initial.x+40,y:initial.y+25}}});
+  // #1266: the overlay stores only the moved position. The re-rendered card is the resolved
+  // binding: the provider's signals and side with the new position.
+  const position={x:initial.x+40,y:initial.y+25};
+  expect(next).toEqual({extends:true,card:{position}});
+  await expect.poll(()=>positionOf(card)).toEqual(position);
+  expect(await card.evaluate(el=>[...new Set([...el.querySelectorAll('.dv-metrics-card-label[data-signal]')].map(t=>t.getAttribute('data-signal')))].sort())).toEqual(Object.keys(binding.signals).sort());
+  await expect(card).toHaveAttribute('data-side',binding.card.side);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();
  }
  expect(await page.evaluate(()=>window.metricsImportContext.specs[0])).toEqual(provider);expect(await page.evaluate(()=>window.metricsImportContext.specs[1])).toEqual(middle);
@@ -337,16 +343,16 @@ test('#1112 an inherited imported connection without an overlay sets Card width 
  const inherited=page.locator('#docview .dv-metrics-card[data-metrics-card="direct::a->direct::b"]'),source=page.locator('#src'),guide=page.locator('#guide');
  const overlay=text=>JSON.parse(text).page.sections[0].diagram.topologyImports[0].edgeTracking;
  const before=await source.inputValue();expect(overlay(before)).toBeUndefined();expect((await box(inherited)).w).toBe(240);
- await inherited.click();await page.locator('#editor-tab-inspect').click();await expect(guide.locator('.metrics-inherited')).toContainText('provider / core (read only)');
+ await inherited.click();await page.locator('#editor-tab-inspect').click();await expect(guide.locator('.metrics-inherited')).toContainText('Inherited metrics from provider / core');
  const width=guide.getByLabel('Card width',{exact:true});await expect(width).toHaveValue('');await expect(guide.getByLabel('Card title',{exact:true})).toHaveValue('');
  await openMetricsFold(guide,'Card');await width.fill('400');await width.press('Enter');
- await expect.poll(async()=>overlay(await source.inputValue())?.['a->b']?.telemetry?.card).toEqual({side:'below',offset:0,width:400});
- expect(overlay(await source.inputValue())['a->b'].telemetry.signals).toEqual(binding.signals);
+ // #1266: the overlay stores only the card change; the provider binding keeps flowing.
+ await expect.poll(async()=>overlay(await source.inputValue())?.['a->b']?.telemetry).toEqual({extends:true,card:{width:400}});
  await expect.poll(async()=>(await box(inherited)).w).toBe(400);
  expect(await page.evaluate(()=>window.metricsImportContext.specs[0])).toEqual(provider);
  const created=await source.inputValue();
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect.poll(async()=>(await box(inherited)).w).toBe(240);
  await page.locator('#redo-builder').click();await expect(source).toHaveValue(created);
- expect(overlay(await source.inputValue())['a->b'].telemetry.card).toEqual({side:'below',offset:0,width:400});await expect.poll(async()=>(await box(inherited)).w).toBe(400);
+ expect(overlay(await source.inputValue())['a->b'].telemetry).toEqual({extends:true,card:{width:400}});await expect.poll(async()=>(await box(inherited)).w).toBe(400);
  expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
 });

@@ -39,16 +39,32 @@ function flowMetricsDom(o){
   var sourceOptions=TELEMETRY_SOURCES.map(function(source){return [source,TELEMETRY_SOURCE_LABELS[source]];});
   /* Signal rows and the Add signal group, shared by carrier raw bindings and
      page templates. prefix names the owner in every label ('' or 'kafka-topic '). */
-  function signalEditors(parent,binding,prefix,commit,extra){
+  // The checkbox itself carries the accessible name, so getByLabel/screen readers reach the input.
+  function hideToggle(parent,label,checked,name,commit){
+    var wrap=row(parent,label,c.checkbox(checked,function(v){return commit({op:'hide',name:name,value:v});})),input=wrap.querySelector('input');
+    if(input){input.setAttribute('aria-label',label);wrap.removeAttribute('aria-label');}
+    wrap.setAttribute('title',checked?'Show this inherited signal again in this document.':'Hide this inherited signal and its limits in this document only. The provider keeps it.');
+    return wrap;
+  }
+  /* merge (#1266): an imported carrier's merge state. Inherited signals are tagged, can be hidden
+     for this document and keep their provider name; edits store only the changed fields. */
+  function signalEditors(parent,binding,prefix,commit,extra,merge){
     var signals=telemetryObject(binding.signals)?binding.signals:{},names=Object.keys(signals);
     names.forEach(function(name){
-      var entry=signals[name],source=telemetrySignalSource(entry),box=fold(parent,'metrics-signal','Signal '+name);
-      row(box,prefix+name+' name',c.text(name,function(v){
+      var inherited=!!merge && merge.inheritedNames.indexOf(name)>=0,overridden=inherited && merge.overridden.indexOf(name)>=0;
+      // The disclosure key is the title before ' · ', so the tag never changes a fold's open state.
+      var entry=signals[name],source=telemetrySignalSource(entry),box=fold(parent,'metrics-signal','Signal '+name+(merge?inherited?' · inherited'+(overridden?', changed here':''):' · added here':''));
+      if(inherited){
+        hideToggle(box,prefix+name+' hidden for this document',false,name,commit);
+        note(box,overridden?'Fields you change here are stored in this document; the rest follow the provider. Revert '+name+' to inherited removes your changes.':'Inherited from the provider. A field you change is stored in this document; the rest keep following the provider.');
+      }
+      var nameControl=row(box,prefix+name+' name',c.text(name,function(v){
         var ok=commit({op:'signal',name:name,field:'name',value:v});
         // The fold's disclosure key is its title: retitle it now so the refresh keeps the renamed signal's fold open.
         if(ok && v)box.querySelector('summary').textContent='Signal '+v;
         return ok;
       },{required:'A signal needs a name; use Remove signal to delete it.'}));
+      if(inherited){nameControl.readOnly=true;nameControl.setAttribute('title','Inherited signal names come from the provider.');}
       row(box,prefix+name+' source',relabel(c.select(TELEMETRY_SOURCES,source || '',function(v){return commit({op:'signal',name:name,field:'source',value:v});}),TELEMETRY_SOURCE_LABELS));
       row(box,prefix+name+' query',c.text(source?telemetryQueryText(source,entry[source]):'',function(v){return commit({op:'signal',name:name,field:'query',value:v});},{textarea:true,placeholder:source==='honeycomb'?'{"calculations":[{"op":"COUNT"}],"filters":[]}':'Query text'}));
       row(box,prefix+name+' unit',c.text(telemetryObject(entry)?entry.unit:null,function(v){return commit({op:'signal',name:name,field:'unit',value:v});},{placeholder:'req/h, msgs, ms'}));
@@ -60,8 +76,18 @@ function flowMetricsDom(o){
       // #1194: scope "" hides the scope line; unchecking removes the key, so the generated scope returns.
       row(box,prefix+name+' hide scope',c.checkbox(telemetryObject(entry) && entry.scope==='',function(v){return commit({op:'signal',name:name,field:'scope',value:v?'':null});}));
       proofEditors(box,binding.proof,names,name,prefix,commit);
-      box.appendChild(c.action(prefix?'Remove '+prefix+'signal '+name:'Remove signal '+name,function(){return commit({op:'removeSignal',name:name});}));
+      if(overridden)box.appendChild(c.action('Revert '+name+' to inherited',function(){return commit({op:'revert',name:name});}));
+      if(!inherited)box.appendChild(c.action(prefix?'Remove '+prefix+'signal '+name:'Remove signal '+name,function(){return commit({op:'removeSignal',name:name});}));
     });
+    if(merge && (merge.hidden.length || merge.staleHidden.length)){
+      var hidden=fold(parent,'metrics-hidden','Hidden inherited signals');
+      note(hidden,'Hidden in this document only; the provider still has them. Uncheck to show one again.');
+      merge.hidden.forEach(function(name){hideToggle(hidden,prefix+name+' hidden for this document',true,name,commit);});
+      if(merge.staleHidden.length){
+        note(hidden,'Not in the provider now; kept hidden in case it returns. Uncheck to forget the hide.');
+        merge.staleHidden.forEach(function(name){hideToggle(hidden,prefix+name+' hidden for this document',true,name,commit);});
+      }
+    }
     var add=fold(parent,'metrics-add',prefix?'New '+prefix+'signal':'New signal'),label=prefix?prefix+'new signal':'New signal';
     var nameInput=keptDraft(add,label+' name','text',null,''),source=keptDraft(add,label+' source','select',sourceOptions,'grafana');
     var query=keptDraft(add,label+' query','textarea',null,''),unit=keptDraft(add,label+' unit','text',null,'');
@@ -108,7 +134,20 @@ function createFlowMetricsEditor(o){
     d.note(cardBox,'Drag the card in Preview metrics layout, or focus it and use Arrow keys (10 units; Shift moves 50). Drag a corner handle or press Alt+Left/Right to change its width; resizing pins the card where you see it. Manual placement overrides Card side and offset; Reset card to automatic restores them. Card width is 140–480 units (default 240); an empty Card title shows the connection label. Readers see the saved placement when Metrics is on.');
     return cardBox;
   }
-  if(s.imported)d.note(box,'Inherited metrics from '+s.provider+' (read only): '+(s.inherited?telemetrySummary(s.inherited)+'. A binding saved here replaces it in this consumer.':'none. A binding saved here applies only in this consumer.'),'metrics-inherited');
+  if(s.imported)d.note(box,'Inherited metrics from '+s.provider+': '+(!s.inherited?'none yet. Signals added here are kept as additions, so a binding the provider adds later merges with them.':
+    s.merge?telemetrySummary(s.inherited)+'. Signals you add here are added to the provider\'s in this document; you can hide or change inherited ones. The provider is unchanged.':
+    telemetrySummary(s.inherited)+'. This document replaces it with its own binding (saved before merging was available); Remove metrics restores the inherited binding.'),'metrics-inherited');
+  // #1266: additions on a carrier whose provider no longer has a binding need their own kind.
+  if(s.merge && b && telemetryObject(b.signals) && Object.keys(b.signals).length && TELEMETRY_KINDS.indexOf(b.kind)<0){
+    d.note(box,'The provider no longer has a metrics binding here, so this document\'s signals need their own kind. Set kind here stores the selected Metrics kind.','metrics-status');
+    box.appendChild(c.action('Set kind here',function(){return commit({op:'kind',value:TELEMETRY_KINDS.indexOf(kind.value)>=0?kind.value:'call'});})).setAttribute('title','Store the selected Metrics kind in this document so its signals stay a valid binding.');
+  }
+  if(s.merge && s.merge.allHidden)d.note(box,'All inherited signals are hidden for this document, so it shows no metrics here. Show one again under Hidden inherited signals, or add a signal.','metrics-status');
+  if(s.imported && s.inherited && !s.merge && b){
+    var effects=s.mergeEffects || [],about='Store these metrics as changes to the provider binding, so later provider changes reach this document'+(effects.length?'. Also: '+effects.join('; '):'')+'.';
+    if(effects.length)d.note(box,'Merge with provider: '+effects.join('; ')+'.');
+    box.appendChild(c.action('Merge with provider',function(){return commit({op:'mergeWithProvider'});})).setAttribute('title',about);
+  }
   // An imported carrier that inherits a provider binding is bound; only a carrier with neither is unbound.
   if(!b && !s.inherited)d.note(box,'Unbound: no metrics overlay and no proof verdict. Choose a kind, then add a signal'+(templateNames.length?' or pick a template':'')+'.','metrics-status');
   // An unbound carrier's kind is a draft: it is written with the first signal or template.
@@ -121,8 +160,11 @@ function createFlowMetricsEditor(o){
   },!!b && template);
   var kindLabels={'':'(template kind'+(s.templateBase && typeof s.templateBase.kind==='string'?': '+s.templateBase.kind:'')+')'};
   if(inheritedKind)kindLabels[inheritedKind]=inheritedKind+' (inherited)';
+  if(s.merge && telemetryObject(s.inherited) && TELEMETRY_KINDS.indexOf(s.inherited.kind)>=0)kindLabels[s.inherited.kind]=s.inherited.kind+' (inherited)';
   d.row(box,'Metrics kind',d.relabel(kind,kindLabels));
-  if(templateNames.length || template){
+  // #1266: templates replace a binding, so an imported (merging) carrier explains why it has none.
+  if(s.merge && templateNames.length)d.note(box,'Templates cannot be used here: this binding merges with the provider\'s, and a template would replace it. To use a template\'s signals, add them with New signal.','metrics-template-note');
+  if(!s.merge && (templateNames.length || template)){
     d.row(box,'Signals from',d.relabel(c.select(templateNames,template?s.template:'',function(v){var ok=commit({op:'use',name:v,kind:draftKind});if(ok && v)d.forget(['Metrics kind']);return ok;},true),{'':'Raw signals'}));
   }
   if(template){
@@ -137,13 +179,14 @@ function createFlowMetricsEditor(o){
       names.forEach(function(name){d.proofEditors(d.fold(box,'metrics-signal','Signal '+name),effective.proof,names,name,'',commit);});
     }
   }else{
-    d.signalEditors(box,b || {},'',commit,function(edit){edit.kind=draftKind;});
+    d.signalEditors(box,b || {},'',commit,function(edit){edit.kind=draftKind;},s.merge);
   }
   if(b){
     d.note(box,'Proof limits: min is a floor and max a ceiling; with ratio of, max is the highest allowed ratio to that signal.');
     d.linkEditors(d.fold(box,'metrics-links','Links'),b.links,'',commit,s.templateBase && s.templateBase.links);
     if(s.edge)cardRows(b.card);
-    box.appendChild(c.action('Remove metrics',function(){return commit({op:'remove'});}));
+    if(!s.merge)box.appendChild(c.action('Remove metrics',function(){return commit({op:'remove'});}));
+    else if(s.merge.overlay)box.appendChild(c.action('Revert all metrics to inherited',function(){return commit({op:'remove'});})).setAttribute('title','Remove this document\'s additions, hidden signals and changes; the provider binding applies unchanged.');
   }else if(s.edge && s.inherited){
     // The first card edit of an inherited connection saves this consumer's copy of the binding.
     d.note(cardRows(s.inherited.card),'A card edit saves the inherited binding with that change as this consumer\'s override; the provider is unchanged.');

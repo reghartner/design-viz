@@ -793,7 +793,12 @@ function validate(page){
     if(!d.topologyProvenance)(Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp,i){
       if(!specObject(imp))return;
       ['nodeTracking','edgeTracking'].forEach(function(field){
-        if(specObject(imp[field]))Object.keys(imp[field]).forEach(function(key){bound(imp[field][key],DP+'.topologyImports['+i+'].'+field+'.'+key);});
+        if(specObject(imp[field]))Object.keys(imp[field]).forEach(function(key){
+          var entry=imp[field][key],at=DP+'.topologyImports['+i+'].'+field+'.'+key;
+          // #1266: a merge overlay is a patch; its merged binding is validated on the resolved carrier.
+          if(specObject(entry) && telemetryMergeOverlay(entry.telemetry)){hasTelemetry=true;telemetryMergeOverlayWarnings(entry.telemetry,function(path,message){warnings.push(at+'.telemetry'+path+': '+message);});}
+          else bound(entry,at);
+        });
       });
     });
   });

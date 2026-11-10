@@ -16,7 +16,7 @@ function board(){
   getScreenCTM:()=>identity,createSVGPoint:()=>({x:0,y:0,matrixTransform(){return {x:this.x,y:this.y};}})};
  const attrs={'data-metrics-section':'0','data-dv-edge':'0','data-metrics-card':'a->b','data-metrics-anchor-x':'0','data-metrics-anchor-y':'0'};
  // An 80x40 card whose top-left is 60 below the edge midpoint (0,0); the label sits between them.
- const card={isConnected:true,ownerSVGElement:svg,getAttribute:k=>attrs[k],setAttribute(k,v){attrs[k]=v;},closest(sel){return sel==='a'?null:this;},
+ const card={isConnected:true,ownerSVGElement:svg,getAttribute:k=>attrs[k],setAttribute(k,v){attrs[k]=v;},closest(sel){return sel==='a' || sel==='.dv-metrics-resize'?null:this;},
   transform:{baseVal:{consolidate:()=>({matrix:{e:-40,f:60}})}},querySelector:()=>({getAttribute:k=>k==='width'?'80':'40'}),
   classList:{add(){},remove(){}},focus(){},setPointerCapture(){},hasPointerCapture:()=>false};
  const view=Object.assign(events(),{ownerDocument:events(),querySelectorAll:()=>[]}),win=events(),snapshot={text:'{}',raw:{},project:'p'},selected=[];

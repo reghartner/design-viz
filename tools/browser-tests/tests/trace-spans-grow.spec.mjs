@@ -6,8 +6,8 @@ import {repo} from '../helpers/prepare.mjs';
 /* #1280 (Chuck 2026-11-10): "That shouldn't have a scroll bar. That should just stretch as long as the spans stretch."
 | row | rule | fixture | assertion | broken implementation it rejects |
 |---|---|---|---|---|
-| G1 | In a plain panel the Spans list has no scroll of its own; every row is reached by scrolling what holds the panel | 60-span trace, board without a section layout | waterfall scrollHeight <= clientHeight + 1; the last row, scrolled into view, is inside every clipping ancestor and the viewport and is hit by elementFromPoint | a capped list (max-height 240px, overflow auto) |
-| G2 | The same in a section-layout tile: the tile body scrolls, not the list | 60 spans, panel in a section-layout tile | the same, and the tile body's scrollHeight > clientHeight | a list stretched to the tile and scrolling inside it (flex 1 1 0, contain size) |
+| G2 | Chuck's case (2026-11-10, "i am always going to use a stretching layout"): in the Standard section layout the Live status tile grows to its content, so the 60-span list grows, the panel body has no inner scroll either, the tile holds every row and the page reaches the last one | 60 spans, panel in a section-layout tile | waterfall and panel body scrollHeight <= clientHeight + 1; tile bottom >= the list's bottom; the last row, scrolled into view, is inside every clipping ancestor and the viewport and is hit by elementFromPoint | a list stretched to the tile and scrolling inside it (flex 1 1 0, contain size) |
+| G1 | The same with no section layout (plain panel): the list has no scroll of its own | 60-span trace, board without a section layout | waterfall scrollHeight <= clientHeight + 1; the last row reachable | a capped list (max-height 240px, overflow auto) |
 | G3 | A short trace adds no empty space under its last row, in both layouts | 3-span trace | waterfall bottom - last row bottom <= its 8px padding + 2 | a fill rule or min-height on the list |
 | G4 | A span focused from the diagram far down the list is brought into view by the scroll that now holds it | 60 spans, tile and plain | the focused row is visible by the all-ancestors check | a reveal that still scrolls only the list |
 Desktop only. Page functions start at host.shadowRoot || host and check the counts they find. */
@@ -64,20 +64,23 @@ const measure=(panel,which)=>panel.evaluate((p,which)=>{
   }
   const hit=(r.elementFromPoint?r:document).elementFromPoint(x,y);return !!hit && (hit===el || el.contains(hit));
  }
- const body=p.querySelector('.pbody') || p.closest('.pbody'),scroller=list.closest('.pbody') || body;
- return {lists:1,items:items.length,scroll:list.scrollHeight,client:list.clientHeight,overflow:getComputedStyle(list).overflowY,gap:lb.bottom-last.bottom,
-  body:scroller?{scroll:scroller.scrollHeight,client:scroller.clientHeight}:null,rowVisible:visible(row),rowId:row.getAttribute('data-span-id')};
+ const scroller=list.closest('.pbody') || p.querySelector('.pbody'),tile=p.closest('.section-layout-tile');
+ return {lists:1,items:items.length,scroll:list.scrollHeight,client:list.clientHeight,overflow:getComputedStyle(list).overflowY,gap:lb.bottom-last.bottom,listBottom:lb.bottom,
+  body:scroller?{scroll:scroller.scrollHeight,client:scroller.clientHeight}:null,tileBottom:tile?tile.getBoundingClientRect().bottom:null,rowVisible:visible(row),rowId:row.getAttribute('data-span-id')};
 },which);
 const reveal=(panel,index)=>panel.evaluate((p,index)=>{const r=p.shadowRoot || p,items=r.querySelectorAll('.dv-trace-waterfall > .dv-trace-span-item');items[index<0?items.length+index:index].querySelector('.dv-trace-span').scrollIntoView({block:'center'});},index);
 
-for(const tile of [false,true]){
- const where=tile?'a section-layout tile':'a plain panel';
- test('#1280 G1/G2 in '+where+' the 60-span list has no scroll of its own and its last row is reached by scrolling the panel',async({page,server},info)=>{
+for(const tile of [true,false]){
+ const where=tile?'the stretching section layout':'a plain panel';
+ test('#1280 '+(tile?'G2':'G1')+' in '+where+' the 60-span list has no scroll of its own and its last row is reached',async({page,server},info)=>{
   const panel=await open(page,server,{tile,payload:sixty()});
   let m=await measure(panel,-1);expect([m.lists,m.items],'one list of 60 rows').toEqual([1,60]);
   expect(m.scroll,'no inner scroll: scrollHeight '+m.scroll+' vs clientHeight '+m.client+' (overflow '+m.overflow+')').toBeLessThanOrEqual(m.client+1);
-  if(tile){expect(m.body,'the tile body').not.toBeNull();expect(m.body.scroll,'the tile body scrolls instead').toBeGreaterThan(m.body.client+40);}
-  await reveal(panel,-1);m=await measure(panel,-1);expect(m.rowVisible,'the last row is visible after scrolling what holds the panel').toBe(true);
+  if(tile){
+   // The tile grows to the panel's content in whole rows after the trace renders.
+   await expect.poll(async()=>{const t=await measure(panel,-1);return t.body && t.body.scroll<=t.body.client+1 && t.tileBottom>=t.listBottom;},{message:'the tile grows: no panel-body scroll, the tile holds the whole list'}).toBe(true);
+  }
+  await reveal(panel,-1);m=await measure(panel,-1);expect(m.rowVisible,'the last row is visible after scrolling the page').toBe(true);
   await page.screenshot({path:info.outputPath('trace-spans-grow-'+(tile?'tile':'plain')+'.png')});
  });
  test('#1280 G3 in '+where+' a three-span trace adds no empty space under its last row',async({page,server})=>{

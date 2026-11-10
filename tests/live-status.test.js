@@ -4562,3 +4562,160 @@ test('#1194 an authored empty scope is kept and hides the scope on the card; whi
  assert.equal(content.scope,'','the card content carries no scope');
  h.ctl.liveStatus.destroy();
 });
+
+/* #1253 sweep: the Jira view, its popover and the artifact Edit mode. */
+// Records each focus() and makes it the document's active element, as a browser does. Compare elements with
+// assert.ok(a===b): a failing assert.equal on two elements makes the test runner serialize both trees.
+function trackFocus(){
+ const proto=Element.prototype,original=proto.focus,seen={el:null};
+ proto.focus=function(){seen.el=this;let root=this;while(root.parentNode)root=root.parentNode;if(root.ownerDocument)root.ownerDocument.activeElement=this;};
+ seen.restore=()=>{proto.focus=original;};return seen;
+}
+// The fake DOM matches only the last part of a selector, so a node's card is found in two steps.
+const cardOf=(h,id)=>h.view.querySelector('[data-dv-node="'+id+'"]').querySelector('.card');
+const carrierClick=(h,target)=>h.view.dispatchEvent({type:'click',target,button:0,preventDefault(){},stopPropagation(){}});
+test('#1253 item 4 a repaint keeps an open Jira popover open, refreshes its lines and keeps focus in it',()=>{
+ const focus=trackFocus();try{
+  const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);
+  const card=()=>cardOf(h,'b');carrierClick(h,card());
+  const pop=h.view.querySelector('.dv-live-popover'),pill=key=>pop.querySelectorAll('.dv-live-ticket[data-live-ticket="'+key+'"]')[0].querySelector('.dv-live-ticket-state').textContent;
+  const waiting=()=>pop.querySelectorAll('.dv-live-waiting-detail').map(el=>el.textContent);
+  assert.equal(pop.hidden,false);assert.equal(pill('BB-2'),'todo');assert.deepEqual(waiting(),['Waiting on EE-1 · blocked'],'precondition: BB-2 waits on EE-1');
+  assert.ok(focus.el===pop.querySelector('.node-link-close'),'opening focuses Close');
+  // A Jira refresh changes BB-2 and clears its upstream.
+  const next=plain(fixed);next['BB-2'].state='active';next['EE-1'].state='done';api.apply(next);
+  assert.equal(pop.hidden,false,'the refresh leaves the popover open');assert.equal(card().getAttribute('aria-expanded'),'true');
+  assert.equal(pill('BB-2'),'active','the state line follows the refresh');assert.deepEqual(waiting(),[],'the waiting line follows the refresh');
+  assert.ok(pop.contains(focus.el) && focus.el===pop.querySelector('.node-link-close'),'focus stays on Close');
+  // Step changes (autoplay) and Live toggles repaint too.
+  h.ctl.sections[0].sectionEl.dispatchEvent({type:'dv:stepchange'});h.flush();assert.equal(pop.hidden,false,'a step change leaves it open');
+  api.setEnabled(false);api.setEnabled(true);assert.equal(pop.hidden,false,'a Live toggle leaves it open');
+  // It closes only when its carrier is gone.
+  h.view.querySelector('[data-dv-node="b"]').remove();h.ctl.sections[0].sectionEl.dispatchEvent({type:'dv:pathrender'});h.flush();
+  assert.equal(pop.hidden,true,'a carrier that is gone closes its popover');
+  api.destroy();
+ }finally{focus.restore();}
+});
+test('#1253 item 5 Play does not stop at a step whose ticket did not exist yet on the Over time day',async()=>{
+ const raw=overFixture();raw.page.sections[0].diagram.steps.push({id:'alpha',nodes:['a'],lane:'APP'});
+ const h=harness(raw);mountStatus(h);const api=h.ctl.liveStatus;let beforeAdvance=null;
+ h.ctl.sections[0].stepper={path:()=>h.C.diagramPathList(h.ctl.page.sections[0].diagram)[0].id,sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;},onBeforeAdvance(fn){beforeAdvance=fn;return ()=>{};}};
+ api.apply(overToday());await overOpen(h,0);h.flush();
+ assert.equal(api.snapshot().states['AA-1'].noTicket,true,'precondition: AA-1 did not exist on the first day');
+ assert.equal(api.snapshot().firstBlocker,false,'precondition: First blocker finds nothing to stop at');
+ assert.equal(beforeAdvance(2),true,'a ticket that did not exist yet does not stop Play');
+ api.overTimeDay(1);h.flush();assert.equal(beforeAdvance(2),false,'a blocked ticket still stops Play');
+ api.destroy();
+});
+test('#1253 item 6 Edit is off while history loads, and a load that ends in Edit mode shows no past day',async()=>{
+ let active=false,starts=0;const editor={state:()=>({editable:true,blocked:'',active,pending:0,saving:false,readOnly:false,notice:null}),onChange:()=>()=>{},rememberMap(){},lastMap:()=>null,question:()=>null,start(){starts++;active=true;}};
+ const h=harness(overFixture(),{},{boardEditor:editor});mountStatus(h);const api=overReady(h.ctl.liveStatus);api.apply(overToday());
+ const edit=()=>h.view.querySelector('button.dv-live-edit'),reason=()=>h.view.querySelector('.dv-live-edit-reason');
+ let resolve;api.setHistory({load:()=>new Promise(done=>{resolve=done;})});
+ overButton(h).dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.loading,true);
+ assert.equal(edit().disabled,true,'Edit waits while history loads');assert.equal(reason().hidden,false);assert.equal(reason().textContent,'Editing is off while history loads.');
+ edit().dispatchEvent({type:'click'});api.editStart();assert.equal(starts,0,'Edit mode cannot start while history loads');
+ resolve({days:overDays()});await historySettle();assert.equal(api.snapshot().overTime.active,true);assert.equal(reason().textContent,'Editing is off while a past day is shown.');
+ api.overTimeClose();await historySettle();assert.equal(edit().disabled,false);
+ // Edit mode can still start without the button (a conflict replay turns it on): the load then shows no past day.
+ api.setHistory({load:()=>new Promise(done=>{resolve=done;})});api.overTime();await historySettle();assert.equal(api.snapshot().overTime.loading,true);
+ active=true;resolve({days:overDays()});await historySettle();h.flush();
+ const over=api.snapshot().overTime;assert.equal(over.active,false,'no past day is shown while editing');assert.equal(over.loading,false);
+ assert.match(over.error,/editing/i,'the reader is told why Over time did not open');
+ assert.equal(h.view.querySelector('[data-dv-node="a"]').classList.contains('dv-live-done'),true,'the board keeps today\'s colours');
+ api.destroy();
+});
+test('#1253 item 10 without a Jira provider the panel names what live status needs and lists the authored tickets and PRs',()=>{
+ const raw=fixture();raw.page.sections[0].diagram.nodes.a.prs=['https://code.test/pull/7'];
+ const h=harness(raw),{body}=mountStatus(h);assert.equal(h.ctl.liveStatus.snapshot().connection.state,'none','precondition: no provider');
+ const text=textOf(body);
+ assert.match(text,/Live ticket status needs a host with a Jira connector \(claude\.ai\)\./);
+ for(const key of ['AA-1','BB-1','BB-2','CC-1','CC-2','EE-1','ZZ-1'])assert.ok(text.includes(key),key+' is listed');
+ const hrefs=body.querySelectorAll('a').map(el=>el.getAttribute('href'));
+ assert.ok(hrefs.includes('https://jira.test/browse/AA-1'),'a ticket links to Jira');assert.ok(hrefs.includes('https://code.test/pull/7'),'an authored PR is listed');
+ // The note goes when a host supplies status.
+ h.ctl.liveStatus.apply(fixed);assert.doesNotMatch(textOf(body),/needs a host with a Jira connector/);
+ const p=harness(fixture(),{provider:()=>new Promise(()=>{})}),m=mountStatus(p);assert.doesNotMatch(textOf(m.body),/needs a host with a Jira connector/,'a host provider is connecting');
+ h.ctl.liveStatus.destroy();p.ctl.liveStatus.destroy();
+});
+test('#1253 item 14 Over time keeps keyboard focus while history loads, then moves it to the day slider',async()=>{
+ const focus=trackFocus();try{
+  const h=harness(overFixture());mountStatus(h);const api=overReady(h.ctl.liveStatus);api.apply(overToday());
+  let resolve,loads=0;api.setHistory({load:()=>{loads++;return new Promise(done=>{resolve=done;});}});
+  const button=overButton(h);button.focus();button.dispatchEvent({type:'click'});await historySettle();
+  assert.equal(api.snapshot().overTime.loading,true);
+  assert.equal(button.disabled,false,'a disabled button would drop keyboard focus');assert.equal(button.getAttribute('aria-disabled'),'true');
+  assert.ok(h.doc.activeElement===button);button.dispatchEvent({type:'click'});await historySettle();assert.equal(loads,1,'a click while loading starts nothing');
+  resolve({days:overDays()});await historySettle();
+  const slider=h.view.querySelector('input.dv-live-over-time-slider');assert.ok(slider);assert.ok(h.doc.activeElement===slider,'focus moves to the day slider');
+  api.destroy();
+ }finally{focus.restore();}
+});
+test('#1253 item 20 an empty Activity section says None yet',()=>{
+ const h=harness(fixture()),api=h.ctl.liveStatus;api.apply(fixed);const {body}=mountStatus(h);
+ const section=()=>{const heading=body.querySelectorAll('h3').find(el=>el.textContent==='Activity'),parent=heading.parentNode,at=parent.children.indexOf(heading);return parent.children.slice(at+1,at+3).map(textOf).join(' ');};
+ assert.equal(api.snapshot().activity.length,0,'precondition: the first apply logs nothing');
+ assert.match(section(),/None yet/);
+ const next=plain(fixed);next['AA-1'].state='done';api.apply(next);assert.equal(api.snapshot().activity.length,1);assert.doesNotMatch(section(),/None yet/);
+ api.destroy();
+});
+
+/* A real board editor (src/viewer/board-edit.js) whose render re-renders the board: the old controller and
+   panel are destroyed and a new pair is built from the new text, as boot.flowview.js rerender does. */
+async function editBoard(raw=fixture()){
+ const S={console,URL};vm.runInNewContext(entrypoint('standalone').body,S);
+ const store=new Map(),published=[],board={published};
+ const win={console,location:{pathname:'/board/'},addEventListener(){},removeEventListener(){},
+  sessionStorage:{getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
+  claude:{use:async name=>name==='artifact'?{publish:async files=>{published.push(files['flowspec.json'].content);}}:name==='user'?{canEdit:async()=>true,me:async()=>({id:'u1',name:'Reader'})}:null}};
+ const mount=text=>{
+  if(board.h){board.h.ctl.liveStatus.destroy();board.m.destroy();}
+  board.h=harness(JSON.parse(text),{},{boardEditor:board.editor});board.m=mountStatus(board.h);return null;
+ };
+ const text=JSON.stringify(raw,null,2);board.editor=S.createBoardEditor({win,text,specFile:'flowspec.json',render:mount});
+ mount(text);board.h.ctl.liveStatus.apply(fixed);await settle();await settle();
+ board.control=name=>board.m.body.querySelector('button.dv-live-'+name);
+ board.runTimers=()=>runTimers(board.h);
+ return board;
+}
+test('#1253 item 14 Edit, Done, Save and Discard hand keyboard focus to the control that replaces them',async()=>{
+ const focus=trackFocus();try{
+  const b=await editBoard(),visible=el=>el && !el.hidden && !el.disabled;
+  assert.ok(visible(b.control('edit')),'precondition: Edit is offered');
+  b.control('edit').focus();b.control('edit').dispatchEvent({type:'click'});
+  assert.equal(b.editor.state().active,true);assert.equal(b.control('edit').hidden,true);
+  assert.ok(focus.el===b.control('edit-done'),'Edit hands focus to Done');
+  b.control('edit-done').dispatchEvent({type:'click'});assert.equal(b.editor.state().active,false);
+  assert.ok(focus.el===b.control('edit'),'Done hands focus to Edit');
+  b.control('edit').dispatchEvent({type:'click'});assert.equal(b.editor.add({section:0,kind:'node',id:'a'},'NEW-1'),true);
+  assert.ok(visible(b.control('save')));b.control('save').focus();b.control('save').dispatchEvent({type:'click'});
+  assert.ok(focus.el===b.control('save'),'Save keeps focus while it saves');
+  await settle();await settle();assert.equal(b.published.length,1,'saved');
+  assert.ok(visible(b.control('edit')));assert.ok(focus.el===b.control('edit'),'after Save, focus is on Edit in the re-rendered board');
+  b.control('edit').dispatchEvent({type:'click'});b.editor.add({section:0,kind:'node',id:'a'},'NEW-2');
+  b.control('discard').focus();b.control('discard').dispatchEvent({type:'click'});assert.equal(b.editor.state().pending,0);
+  assert.ok(focus.el===b.control('edit'),'after Discard, focus is on Edit in the re-rendered board');
+  b.h.ctl.liveStatus.destroy();
+ }finally{focus.restore();}
+});
+test('#1253 item 15 Remove and Clear Missing work return focus to the edited carrier after the board re-renders',async()=>{
+ const focus=trackFocus();try{
+  const raw=fixture();raw.page.sections[0].diagram.nodes.c.missingWork=true;
+  const b=await editBoard(raw);b.control('edit').dispatchEvent({type:'click'});
+  const press=el=>el.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});
+  carrierClick(b.h,cardOf(b.h,'b'));
+  let pop=b.h.view.querySelector('.dv-live-popover');press(pop.querySelectorAll('button.dv-live-remove').find(el=>el.getAttribute('aria-label').startsWith('Remove BB-2 ')));b.runTimers();
+  assert.equal(b.editor.state().pending,1,'BB-2 was removed');
+  assert.ok(focus.el===cardOf(b.h,'b'),'focus is on the edited node in the new render');
+  carrierClick(b.h,cardOf(b.h,'c'));
+  pop=b.h.view.querySelector('.dv-live-popover');press(pop.querySelector('button.dv-live-clear-missing'));b.runTimers();
+  assert.equal(b.editor.state().pending,2,'the marker was cleared');
+  assert.ok(focus.el===cardOf(b.h,'c'),'focus is on the cleared node');
+  // Removing the last ticket leaves no popover button on the carrier: focus goes to Save, which shows the new count.
+  carrierClick(b.h,cardOf(b.h,'a'));
+  pop=b.h.view.querySelector('.dv-live-popover');press(pop.querySelector('button.dv-live-remove'));b.runTimers();
+  assert.equal(b.editor.state().pending,3);assert.equal(cardOf(b.h,'a').classList.contains('dv-live-target'),false,'precondition: node a is no longer a ticket button');
+  assert.ok(focus.el===b.control('save'),'focus falls back to Save');assert.equal(b.control('save').textContent,'Save 3 changes');
+  b.h.ctl.liveStatus.destroy();
+ }finally{focus.restore();}
+});

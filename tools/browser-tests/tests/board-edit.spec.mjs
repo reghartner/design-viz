@@ -468,3 +468,51 @@ test('E20 outside Edit mode and for read-only viewers a marked carrier popover h
   await viewer.close();
  }
 });
+
+/* #1253 items 14 and 15: keyboard focus after an Edit-mode control hides itself or the board re-renders.
+| row | fixture | assertion (scoped) | rejects |
+|---|---|---|---|
+| E21 edit controls hand focus on | boardSpec | Enter on Edit focuses Done; Enter on Done focuses Edit; after a drop, Enter on Save focuses Edit once the save re-renders the board; after another drop, Enter on Discard focuses Edit | focus left on <body> after the pressed control hides |
+| E22 popover edits return focus to the carrier | boardSpec with A holding AA-1 and EX-1 | Enter on Remove AA-1 in A's popover focuses A's card in the re-rendered board; Remove EX-1 (A's last ticket) focuses "Save 2 changes" | focus left on <body> after the re-render |
+Both fail at the baseline on the focus assertion: no code moves focus. */
+// The focused element, through any shadow roots.
+const focusedControl=page=>page.evaluate(()=>{
+ let at=document.activeElement;while(at && at.shadowRoot && at.shadowRoot.activeElement)at=at.shadowRoot.activeElement;
+ if(!at)return null;const node=at.closest('[data-dv-node]');
+ return {tag:at.tagName.toLowerCase(),text:(at.textContent || '').trim(),node:node?node.getAttribute('data-dv-node'):null,card:at.classList.contains('card')};
+});
+test('E21 #1253 Edit, Done, Save and Discard hand keyboard focus to the control that replaces them',async({page,server})=>{
+ const board=await buildBoard(server,'focus-controls',boardSpec());await mockRuntime(page);
+ const {root,panel}=await openBoard(page,board);
+ await editButton(panel).press('Enter');
+ await expect(panel.getByRole('button',{name:'Done',exact:true})).toBeVisible();
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Done'});
+ await panel.getByRole('button',{name:'Done',exact:true}).press('Enter');
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Edit'});
+ await editButton(panel).press('Enter');
+ await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(root,'b')));
+ await expect(saveButton(panel)).toHaveText('Save 1 change');
+ await saveButton(panel).press('Enter');
+ await expect.poll(()=>publishes(page).then(list=>list.length)).toBe(1);
+ await expect(editButton(panel)).toBeVisible();
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Edit'});
+ await editButton(panel).press('Enter');
+ await dragTicket(page,panel,'AA-1',await cardPoint(nodeCard(root,'b')));
+ await discardButton(panel).press('Enter');
+ await expect(discardButton(panel)).toHaveCount(0);
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Edit'});
+});
+test('E22 #1253 Remove in a carrier popover returns keyboard focus to the carrier after the board re-renders',async({page,server})=>{
+ const spec=boardSpec();diagramAt(spec).nodes.a.tickets=['AA-1','EX-1'];
+ const board=await buildBoard(server,'focus-remove',spec);await mockRuntime(page);
+ const {root,panel}=await openBoard(page,board);await startEditing(panel);
+ await nodeCard(root,'a').press('Enter');let pop=popover(page);await expect(pop).toBeVisible();
+ await pop.getByRole('button',{name:'Remove AA-1 from Alpha service',exact:true}).press('Enter');
+ await expect(saveButton(panel)).toHaveText('Save 1 change');
+ await expect.poll(()=>focusedControl(page)).toMatchObject({node:'a',card:true});
+ // Removing A's last ticket leaves no ticket button on A: focus goes to Save, which shows the count.
+ await page.keyboard.press('Enter');pop=popover(page);await expect(pop).toBeVisible();
+ await pop.getByRole('button',{name:'Remove EX-1 from Alpha service',exact:true}).press('Enter');
+ await expect(saveButton(panel)).toHaveText('Save 2 changes');
+ await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Save 2 changes'});
+});

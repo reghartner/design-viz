@@ -1,0 +1,34 @@
+{
+  "page": {
+    "title": "Order board over the order platform",
+    "canon": {"version":1,"id":"orders-board","kind":"canonical","owner":"group:default/commerce"},
+    "sections": [{
+      "id": "board", "heading": "Placing an order",
+      "diagram": {
+        "topologyImports": [{"spec":"orders-platform", "export":"core", "as":"orders",
+          "nodeTracking": {"worker": {"trace": {
+            "spans": {
+              "process": {"operation":"process orders v2"},
+              "audit": {"serviceName":"order-worker", "operation":"audit write", "role":"database"}
+            },
+            "hide": ["cache"]
+          }}},
+          "edgeTracking": {"api->worker": {"trace": {"spans": {
+            "send": {"namespace":"eu"}
+          }}}}
+        }],
+        "nodes": {"shop": {"title":"Shop front", "trace":{"spans":{
+          "process": {"serviceName":"shop-web", "operation":"GET /checkout", "role":"process"}
+        }}}},
+        "rows": [["shop"]],
+        "edges": [{"from":"shop", "to":"orders::api", "label":"Place order", "trace":{"spans":{
+          "send": {"serviceName":"shop-web", "operation":"POST /orders", "role":"send"}
+        }}}],
+        "steps": [
+          {"id":"place", "edge":"shop->orders::api", "text":"The shop sends the order"},
+          {"id":"publish", "edge":"orders::api->orders::worker", "text":"The API publishes it to the worker"}
+        ]
+      }
+    }]
+  }
+}

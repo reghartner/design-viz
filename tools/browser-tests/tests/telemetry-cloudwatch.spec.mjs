@@ -1,7 +1,7 @@
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste,prepareEditorSurface,openMetricsFold} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface,openMetricsFold,openStatusBoard} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {cueSpec} from '../helpers/telemetry-cards.mjs';
 
@@ -17,7 +17,7 @@ test('desktop CloudWatch editor round-trip and local/imported zero versus unobse
  await openMetricsFold(guide,'Signal rate');const before=await source.inputValue(),field=guide.getByLabel('rate query',{exact:true});await field.fill(JSON.stringify(edited));await field.press('Tab');
  await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.edges[0].telemetry.signals.rate.cloudwatch).toEqual(edited);
  const after=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);
- await page.locator('#document-settings').click();await expect(guide.getByLabel('Grafana CloudWatch UID',{exact:true})).toHaveValue('cw-monitor');await expect(guide.getByLabel('stg CloudWatch account ID',{exact:true})).toHaveValue('646998985045');
+ await openStatusBoard(page,'metrics','environments');await expect(guide.getByLabel('Grafana CloudWatch UID',{exact:true})).toHaveValue('cw-monitor');await expect(guide.getByLabel('stg CloudWatch account ID',{exact:true})).toHaveValue('646998985045');
  const input=path.join(server.root,'cloudwatch.spec.json'),output=path.join(server.root,'cloudwatch.html');await writeFile(input,after);execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output],{stdio:'pipe'});
  await page.addInitScript(()=>{
   window.cloudwatchEmpty=false;window.cloudwatchCalls=[];

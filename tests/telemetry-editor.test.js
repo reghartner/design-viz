@@ -13,12 +13,12 @@
 | M7 | Card side (right/left/above/below) and Card offset (-1000..1000) only for connections; invalid refused; empty removes the key, then `card`. | same connection; node ingest | Card side options are exactly `['',right,left,above,below]`; offset 2000 refused; node form has no Card side row | showing edge placement on nodes; an unbounded offset |
 | M8 | Imported carriers (node and connection): the inherited binding is read only and names its provider; local edits write the consumer overlay `topologyImports[i].nodeTracking/edgeTracking[key].telemetry` (tickets kept, provider unchanged); removing it restores the inherited binding. | provider with node `api` and edge `api->store` bindings; consumer importing them as `shared` with node overlay tickets | state `inherited` deepEquals the provider binding; the inspector note names `provider / core` and the binding; overlay entries deepEqual the edits; the resolved carrier carries the inherited binding again after Remove metrics; provider JSON unchanged | writing into the provider; dropping overlay tickets; copying the inherited binding into the overlay; showing an inherited carrier as Unbound |
 | M9 | Inline validation lists the #937 parser warnings for the carrier, the same text the validator emits at that carrier, including provider bindings the resolver dropped. | connection with a two-source signal, an unknown limit, a non-http link; provider node with an unexpandable `use` | the `Metrics warnings` list deepEquals the validator warnings at that carrier with the carrier prefix removed | hand-written messages that drift from the validator; missing provider drops |
-| M10 | Document settings → Tracking → Metrics edits page `tracking.telemetry`: Grafana Prometheus/Loki/Tempo/SQL UIDs, Honeycomb environment/dataset, window (duration) and refresh (≥ 60000 ms). Empty values remove keys; an empty block removes `tracking.telemetry`; Jira settings are untouched. Page warnings are listed. | page with `tracking.jira`; a page with an invalid window and UID | each field lands at its key and `tracking.jira` is deepEqual-unchanged; bad window/refresh refused; clearing all leaves `tracking` deepEqual `{jira}`; warnings deepEqual the validator's `tracking.telemetry` warnings | rewriting `tracking.jira`; leaving `telemetry:{}`; accepting `refreshMs:1000` |
+| M10 | Status board settings → Metrics (#1236; was Document settings → Tracking → Metrics) edits page `tracking.telemetry`: Grafana Prometheus/Loki/Tempo/SQL UIDs, Honeycomb environment/dataset, window (duration) and refresh (≥ 60000 ms). Empty values remove keys; an empty block removes `tracking.telemetry`; Jira settings are untouched. Page warnings are listed. | page with `tracking.jira`; a page with an invalid window and UID | each field lands at its key and `tracking.jira` is deepEqual-unchanged; bad window/refresh refused; clearing all leaves `tracking` deepEqual `{jira}`; warnings deepEqual the validator's `tracking.telemetry` warnings | rewriting `tracking.jira`; leaving `telemetry:{}`; accepting `refreshMs:1000` |
 | M11 | Templates editor: add (name, kind, parameters, first signal); rename a template signal (its limit follows), change its source and query; edit kind/parameters/proof/links; remove a signal (never the last); remove a template (refused while a carrier uses it). Every edit is undoable and preserved by export. | document target on `board()` | the template deepEquals the expected object after each step; export `templates` deepEquals the source; the last-signal and in-use removals are refused with messages | orphaned limits after a rename; a source change that drops the query; templates the parser would drop; orphaning carriers |
 | M12 | Each edit is one Undo step; Undo and Redo restore the exact prior and next source text. A no-op edit adds no history. | every edit above | `oneStep`: text changes, Undo restores the exact prior text, Redo the exact next text; a trimmed no-op then Undo reverts the previous real edit | multi-step edits; phantom history entries |
 | M13 | Export project round-trip: the stamped export keeps carrier, overlay and page telemetry exactly and declares flow.telemetry. | editor-written edge template binding, node Honeycomb signal, page window, consumer overlay | `stampText` export deepEquals authored `tracking` and `sections`; `flow.telemetry` declared | an export that strips `telemetry` or template parameters |
 | M14 | Text boxes show no Metrics sub-section and the planner refuses them. | text-box node `note` | no `fieldset.metrics-editor`; the plan error names text boxes | binding telemetry to text boxes |
-| M15 | docs/live-status.md "Workbench" describes the Metrics editor and the Document settings block. | docs file | the Workbench section contains every control name | missing docs |
+| M15 | docs/live-status.md "Workbench" describes the Metrics editor and the Status board settings block. | docs file | the Workbench section contains every control name | missing docs |
 | P1 | Preview metrics layout toggle: desktop browser coverage in telemetry-preview.spec.mjs. | n/a | n/a | n/a |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
@@ -55,7 +55,7 @@ function harness(spec,target){
     select(t){h.session.target=t;h.inspector.render();return ui;},
     get text(){return h.text;},get raw(){return JSON.parse(h.text);},
     metrics(){const box=h.guide.querySelector('fieldset.metrics-editor');assert.ok(box,'M1: Inspect → Tracking gains a Metrics sub-section');return box;},
-    settings(){const box=h.guide.querySelector('fieldset.metrics-settings');assert.ok(box,'M10: Document settings → Tracking gains a Metrics block');return box;},
+    settings(){const box=h.guide.querySelector('fieldset.metrics-settings');assert.ok(box,'M10: Status board settings → Metrics holds the page Metrics block');return box;},
     row(label){const row=h.guide.querySelectorAll('.frow').find(r=>r.querySelector('.flab')?.textContent===label);return row?row.children[1]:null;},
     control(label){const el=ui.row(label);assert.ok(el,'control "'+label+'" exists');return el;},
     set(label,value){const el=ui.control(label);el.value=value;el.fire('change');h.flush();return ui;},
@@ -169,7 +169,7 @@ test('M5 M7 Signals from switches to a page template with parameters and proof o
   oneStep(ui,()=>ui.set('Signals from','kafka-topic'));
   assert.deepEqual(edgeOf(ui).telemetry,{use:'kafka-topic'},'the template supplies the kind; the draft kind is not written');
   assert.ok(ui.warnings().some(w=>/^telemetry\.topic: template "kafka-topic" needs this parameter/.test(w)),'missing parameters are reported inline');
-  assert.equal(ui.row('New signal name'),null,'template signals are edited in Document settings');
+  assert.equal(ui.row('New signal name'),null,'template signals are edited in Status board settings');
   assert.match(ui.metrics().querySelectorAll('p').map(p=>p.textContent).join(' '),/Template signals: in \(grafana, msg\/h\), lag \(grafana, msgs\)/);
   oneStep(ui,()=>ui.set('Template parameter topic','device-events'));oneStep(ui,()=>ui.set('Template parameter group','notify'));
   assert.deepEqual(edgeOf(ui).telemetry,{use:'kafka-topic',topic:'device-events',group:'notify'});assert.deepEqual(ui.warnings(),[]);
@@ -294,8 +294,8 @@ test('M8 the inspector shows an imported carrier inherited binding read only and
 });
 
 test('M10 M12 Document settings edit the page telemetry block, validate window and refresh, and leave Jira untouched',()=>{
-  const DOC={kind:'document'},ui=harness(board(),DOC),box=ui.settings();
-  assert.ok(box.closest('fieldset.tracking-editor'),'the block sits in Document settings → Tracking');
+  const DOC={kind:'board'},ui=harness(board(),DOC),box=ui.settings();
+  assert.equal(box.closest('details.board-section')?.getAttribute('data-board-section'),'metrics','the block sits in Status board settings → Metrics');
   const tracking=()=>ui.raw.page.tracking,jira={site:'https://acme.atlassian.net',epic:'DOOR-100'};
   for(const [label,group,key,value] of [['Grafana Prometheus UID','grafana','prometheus','prom-main'],['Grafana Loki UID','grafana','loki','loki-main'],['Grafana Tempo UID','grafana','tempo','tempo-main'],['Grafana SQL UID','grafana','sql','lake'],['Honeycomb environment','honeycomb','environment','prod'],['Honeycomb dataset','honeycomb','dataset','doorbell-prod']]){
     oneStep(ui,()=>ui.set(label,value),DOC);assert.equal(tracking().telemetry[group][key],value);assert.deepEqual(tracking().jira,jira);
@@ -321,7 +321,7 @@ test('M10 M12 Document settings edit the page telemetry block, validate window a
 });
 
 test('M11 M12 the templates editor adds, edits and removes templates; a template in use cannot be removed',()=>{
-  const DOC={kind:'document'},ui=harness(board(),DOC);ui.settings();
+  const DOC={kind:'board'},ui=harness(board(),DOC);ui.settings();
   const tpl=()=>ui.raw.page.tracking.telemetry.templates;
   const add=(name,kind,params,signal,source,query,unit)=>{ui.control('New template name').value=name;ui.control('New template kind').value=kind;ui.control('New template parameters').value=params;
     ui.control('New template signal name').value=signal;ui.control('New template signal source').value=source;ui.control('New template signal query').value=query;ui.control('New template signal unit').value=unit;ui.click('Add template');};
@@ -370,7 +370,7 @@ test('M13 Export project keeps carrier, overlay and page telemetry written by th
   const ui=harness(board(null,{templates:TEMPLATES()}),EDGE),C=api(ui.e.C);ui.metrics();
   ui.set('Signals from','kafka-topic');ui.select(EDGE);ui.set('Template parameter topic','device-events');ui.select(EDGE);ui.set('Template parameter group','notify');ui.select(EDGE);ui.set('Card side','above');
   ui.select({kind:'node',section:0,id:'ingest'});ui.control('New signal name').value='rate';ui.control('New signal source').value='honeycomb';ui.control('New signal query').value='{"calc":"COUNT","where":"service.name = ingest"}';ui.set('Metrics kind','service');ui.click('Add signal');
-  ui.select({kind:'document'});ui.set('Metrics window','1h');
+  ui.select({kind:'board'});ui.set('Metrics window','1h');
   const authored=ui.raw,exported=JSON.parse(C.FlowviewCompatibility.stampText(ui.text,authored));
   assert.ok(exported.page.flowview.features.includes('flow.telemetry'));
   assert.deepEqual(exported.page.tracking,authored.page.tracking);assert.deepEqual(exported.page.sections,authored.page.sections);
@@ -387,13 +387,13 @@ test('M13 Export project keeps carrier, overlay and page telemetry written by th
 
 test('M15 docs describe the Workbench Metrics editor',()=>{
   const doc=fs.readFileSync(path.join(repo,'docs/live-status.md'),'utf8'),start=doc.indexOf('\n## Workbench'),end=doc.indexOf('\n## ',start+5),section=doc.slice(start,end);
-  for(const phrase of ['Metrics','Add signal','Signals from','Template parameter','Remove metrics','Card side','Document settings → Tracking → Metrics','Add template','Undo','Export project','read only'])
+  for(const phrase of ['Metrics','Add signal','Signals from','Template parameter','Remove metrics','Card side','Status board settings → Metrics','Add template','Undo','Export project','read only'])
     assert.ok(section.includes(phrase),'Workbench section mentions '+phrase);
 });
 
 test('Allow metrics preserves authored settings and bindings with one Undo, no-op and retired-form protection',()=>{
   const spec=board({kind:'call',signals:{rate:{grafana:'up'}}},{templates:TEMPLATES(),future:{keep:['unknown']},window:'24h'});
-  const target={kind:'document'},ui=harness(spec,target),original=ui.text;
+  const target={kind:'board'},ui=harness(spec,target),original=ui.text;
   const toggle=()=>ui.control('Allow metrics').querySelector('input');
   assert.equal(toggle().checked,true,'absence permits availability');
   const set=value=>{toggle().checked=value;toggle().fire('change');ui.h.flush();};
@@ -427,8 +427,8 @@ test('Allow metrics pure plans preserve bare/wrapped page bytes, reject malforme
 });
 
 test('environment profiles are desktop controls with one Undo, defaults, inherited fields and export',()=>{
-  const ui=harness(board(null,{grafana:{prometheus:'prom-$env'}}),{kind:'document'});
-  const step=act=>oneStep(ui,act,{kind:'document'});
+  const ui=harness(board(null,{grafana:{prometheus:'prom-$env'}}),{kind:'board'});
+  const step=act=>oneStep(ui,act,{kind:'board'});
   function add(id){ui.set('New environment id',id);step(()=>ui.click('Add environment'));}
   add('qa');add('stg');add('prd');
   step(()=>ui.set('Default environment','prd'));
@@ -591,21 +591,25 @@ test('#1228 the Metrics editor folds each signal, New signal, Links and Card; fo
   assert.deepEqual(folds().map(f=>f.open),[false,false,false,false,false],'a new selection starts every fold closed');
 });
 
-test('#1228 Document settings → Tracking → Metrics folds Environments, each template and New template; template signal folds nest inside and keep their open state',()=>{
+test('#1228 Status board settings → Metrics folds each template and New template (#1236: Environments is its own section); template signal folds nest inside and keep their open state',()=>{
   const page={templates:TEMPLATES(),environments:{qa:{grafana:{prometheus:'prom-qa'}}}};
-  const ui=harness(board(null,page),{kind:'document'});
+  const ui=harness(board(null,page),{kind:'board'});
   const box=()=>ui.settings(),title=f=>f.querySelector('summary').textContent;
-  const top=()=>box().querySelectorAll('details.metrics-fold').filter(f=>!f.parentNode.closest('details'));
+  const top=()=>box().querySelectorAll('details.metrics-fold').filter(f=>!f.parentNode.closest('details.metrics-fold'));
   const find=(list,name)=>list.find(f=>title(f)===name);
-  const outer=el=>{let found=null;for(let d=el.closest('details');d;d=d.parentNode && d.parentNode.closest('details'))found=d;return found;};
-  assert.deepEqual(top().map(title),['Environments','Template kafka-topic','New template']);
+  const outer=el=>{let found=null;for(let d=el.closest('details.metrics-fold');d;d=d.parentNode && d.parentNode.closest('details.metrics-fold'))found=d;return found;};
+  const section=el=>el.closest('details.board-section')?.getAttribute('data-board-section');
+  assert.deepEqual(top().map(title),['Template kafka-topic','New template']);
   const template=()=>find(top(),'Template kafka-topic'),nested=()=>template().querySelectorAll('details.metrics-fold');
   assert.deepEqual(nested().map(title),['Signal in','Signal lag','New kafka-topic signal']);
-  for(const [label,owner] of [['qa Grafana Prometheus UID','Environments'],['New environment id','Environments'],['kafka-topic template kind','Template kafka-topic'],['New template name','New template']])
+  for(const label of ['qa Grafana Prometheus UID','New environment id'])assert.equal(section(ui.control(label)),'environments',label+' is in the Environments section');
+  for(const [label,owner] of [['kafka-topic template kind','Template kafka-topic'],['New template name','New template']])
     assert.equal(outer(ui.control(label)),find(top(),owner),label+' is in the '+owner+' fold');
   assert.equal(ui.control('kafka-topic lag unit').closest('details'),find(nested(),'Signal lag'));
-  for(const label of ['Allow metrics','Grafana Prometheus UID','Metrics window'])assert.equal(ui.control(label).closest('details'),null,label+' stays outside the folds');
-  assert.deepEqual(box().querySelectorAll('details.metrics-fold').map(f=>f.open),[false,false,false,false,false,false]);
+  for(const label of ['Allow metrics','Grafana Prometheus UID','Metrics window']){
+    assert.equal(ui.control(label).closest('details.metrics-fold'),null,label+' stays outside the folds');assert.equal(section(ui.control(label)),'metrics');
+  }
+  assert.deepEqual(box().querySelectorAll('details.metrics-fold').map(f=>f.open),[false,false,false,false,false]);
   template().open=true;find(nested(),'Signal lag').open=true;
   ui.set('kafka-topic lag unit','items');assert.equal(ui.raw.page.tracking.telemetry.templates['kafka-topic'].signals.lag.unit,'items');
   assert.equal(template().open,true);assert.equal(find(nested(),'Signal lag').open,true);assert.equal(find(nested(),'Signal in').open,false);

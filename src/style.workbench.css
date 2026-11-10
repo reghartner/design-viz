@@ -825,6 +825,13 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .metrics-fold{min-width:0;margin:6px 0;}
 .metrics-fold>.frow,.metrics-fold>.fnote{margin-top:6px;}
 .metrics-fold .metrics-fold{margin-left:8px;}
+/* #1236 Status board settings: one top-level fold per section; the summary carries a short status. */
+.board-section{min-width:0;margin:3px 0;}
+.board-section>summary{font-weight:650;}
+.board-section>.frow,.board-section>.fnote,.board-section>div,.board-section>ul{margin-top:6px;}
+.board-section>fieldset.metrics-settings{min-width:0;margin:0;padding:0;border:0;}
+.board-settings-link{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+.board-make{margin:6px 0;}
 /* builder: selection highlight on the rendered page (svg + widget cards) */
 .docview .grp, .docview .node, .docview .edge, .docview .halo, .docview .coin,
 .docview .pwidget, .docview .sec-text[data-dv-para],
@@ -1566,7 +1573,10 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 }
 
 
-.document-settings-entry{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);}
+/* #1236: three entries share one row in the desktop Inspect window (about 380px wide); the bar stays
+   shorter than before so the Inspector's own actions keep their room at short heights. */
+.document-settings-entry{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);}
+.document-settings-entry>.bbtn{min-height:28px;padding-left:6px;padding-right:6px;}
 .document-source-heading{margin-top:10px;font-size:12px;}
 .document-advanced{margin-top:10px;font-size:12px;}
 .document-advanced>summary{cursor:pointer;margin-bottom:8px;}

@@ -348,7 +348,7 @@ the Workbench or on the shared board keep the consumer binding as authored.
 
 Telemetry profiles are opt-in. Documents without them keep their shared
 configuration and do not substitute `$env` or automatically query production.
-In desktop **Document settings → Tracking → Metrics → Environments**, add
+In desktop **Status board settings → Environments**, add
 `qa`, `stg`, and `prd` (or other ids), choose **Default environment**, and set
 per-environment Grafana UIDs/base URL and Honeycomb environment/dataset values. Each
 control is one Undo step; export preserves the authored profiles. Removing the
@@ -426,7 +426,23 @@ are ignored. Each list keeps its order; use its numbered **Remove ticket** or
 **Remove PR** button to remove an entry. Each add or removal has one Undo/Redo,
 and Export project keeps the references in its JSON.
 
-With no node selected, open **Inspect → Document settings → Tracking** to edit
+Board-level settings live in one desktop area, **Status board settings**. Open
+it from the **Board settings** button at the top of Inspect (shown with or
+without a selection), from **Find objects → Board settings**, from the
+link in **Document settings**, or from a Live status panel's Inspect form. It has
+five collapsible sections: **Jira**, **Metrics**, **Traces**, **Environments**
+and **Log searches**. Sections start closed, with a short status in each
+header; Metrics starts open when the page has a `tracking.telemetry` block. A
+section with validator warnings starts open and its header counts them, and
+each section lists the warnings for its own `tracking` paths. Dependencies,
+dependency link names and no-activity days are edited in JSON for now. Traces and Log searches show **No
+settings yet**; edit `tracking.telemetry.traceConnections` and
+`tracking.telemetry.lookups` in JSON for now. On a document that is not yet a
+status board, **Make this a status board** adds what is missing (a page wrapper
+for a bare diagram, an empty `tracking` block and a Live status panel) as one
+Undo step.
+
+In **Status board settings → Jira**, edit
 **Jira site**, **Parent**, **Exclude story** and **GitHub scope**. Enter an Epic or Initiative key in Parent and press Enter; use
 **Remove parent 1**, **Remove parent 2**, and so on to remove keys. Enter a story
 key in **Exclude story** and press Enter; **Remove excluded story 1** removes it
@@ -498,12 +514,12 @@ fields, proof limits (**min**, **max** and **ratio of** another signal) and a
 names it. Removing the last signal removes the binding; **Remove metrics**
 removes it at once. Each signal, **New signal**, the links and the
 connection's **Card** controls sit in collapsible sections that start closed on a
-new selection and stay open while you edit the same carrier; Document settings
-folds **Environments**, each template and **New template** the same way.
+new selection and stay open while you edit the same carrier; Status board
+settings → Metrics folds each template and **New template** the same way.
 
 When the page has templates, **Signals from** switches between raw signals and a
 template. A template binding gets one **Template parameter** input per declared
-`$param`. Its signals are listed read only and edited in Document settings. A
+`$param`. Its signals are listed read only and edited in Status board settings. A
 proof limit set on the carrier overlays the template's limit for that signal
 only, and setting it back to the template value removes the override. Choosing
 **Raw signals** again expands the template, with the carrier's parameter values,
@@ -520,7 +536,7 @@ consumer's `edgeTracking` entry, one Undo step. A binding saved there is stored 
 `nodeTracking` or `edgeTracking` entry and replaces the inherited binding for this
 consumer only; **Remove metrics** restores the inherited one.
 
-With no node selected, **Document settings → Tracking → Metrics** edits the page
+**Status board settings → Metrics** edits the page
 `tracking.telemetry` block: the Grafana Prometheus, Loki, Tempo and SQL datasource
 UIDs, the Honeycomb environment and dataset, **Metrics window** (such as `1h`) and
 **Metrics refresh ms** (60000 or more). **Allow metrics** controls availability on
@@ -821,7 +837,7 @@ configured, **Blockers and dependency chains**, and Activity. The exclusions
 list links each configured story to Jira and shows its available title and state,
 plus whether it remains excluded or was included by a manual attachment, another
 source, or a dependency. It is visible before a connector responds too. Edit the
-list in desktop Document settings; the reader contains no exclusion controls. Teams are identified by each Tickets row's lane colour
+list in desktop Status board settings → Jira; the reader contains no exclusion controls. Teams are identified by each Tickets row's lane colour
 stripe and the lane names in Blockers. Status-board step captions omit the team lane chip,
 even with Live disabled; ordinary diagrams retain their authored lane context.
 Without ticket or epic references the panel opens on the Trace view (see the header above).
@@ -1989,7 +2005,7 @@ answer or by a search hit for the same URL) and discovered ones after (source
 summary when present; otherwise the links derive it. Nothing from GitHub alters
 a carrier's `dv-live-*` class, the counts, the ring or Activity.
 
-The Workbench edits the scope under **Document settings → Tracking → GitHub
+The Workbench edits the scope under **Status board settings → Jira → GitHub
 scope**. Demo mode and the mock server never contact GitHub: the example
 timeline carries `prs.links` from Day 8 so the icons show offline, and the
 [mock GitHub MCP](../deploy/cloudflare/mock-github-mcp/README.md) serves the

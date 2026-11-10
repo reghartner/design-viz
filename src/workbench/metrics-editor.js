@@ -1,6 +1,6 @@
 /* Desktop Workbench Metrics editor (#941): Inspect → Tracking → Metrics for a
-   node or connection, and Document settings → Tracking → Metrics for the page
-   block. Read models and edits live in workbench/commands/telemetry.js; source,
+   node or connection, and Status board settings → Metrics and Environments for
+   the page block (#1236). Read models and edits live in workbench/commands/telemetry.js; source,
    history and form lifetime stay inspector-owned, so every control calls
    o.commit(edit) and one accepted edit is one Undo step. Nothing here runs a
    query or draws on the canvas; preview rendering has its own owner. */
@@ -111,13 +111,13 @@ function createFlowMetricsEditor(o){
   }
   if(template){
     var chosen=s.templates[s.template],effective=s.effective;
-    if(!chosen || !effective)d.note(box,'Template "'+s.template+'" is not defined in Document settings → Tracking → Metrics. Choose another template, or use Remove metrics.');
+    if(!chosen || !effective)d.note(box,'Template "'+s.template+'" is not defined in Status board settings → Metrics. Choose another template, or use Remove metrics.');
     else{
       (Array.isArray(chosen.params)?chosen.params:[]).forEach(function(p){
         d.row(box,'Template parameter '+p,c.text(typeof b[p]==='string'?b[p]:'',function(v){return commit({op:'param',name:p,value:v});},{placeholder:p}));
       });
       var signals=telemetryObject(effective.signals)?effective.signals:{},names=Object.keys(signals);
-      d.note(box,'Template signals: '+(names.map(function(name){var source=telemetrySignalSource(signals[name]),unit=signals[name] && signals[name].unit;return name+' ('+(source || 'no source')+(telemetryText(unit)?', '+unit:'')+')';}).join(', ') || 'none')+'. Edit them in Document settings → Tracking → Metrics; limits set here apply only to this carrier.');
+      d.note(box,'Template signals: '+(names.map(function(name){var source=telemetrySignalSource(signals[name]),unit=signals[name] && signals[name].unit;return name+' ('+(source || 'no source')+(telemetryText(unit)?', '+unit:'')+')';}).join(', ') || 'none')+'. Edit them in Status board settings → Metrics; limits set here apply only to this carrier.');
       names.forEach(function(name){d.proofEditors(d.fold(box,'metrics-signal','Signal '+name),effective.proof,names,name,'',commit);});
     }
   }else{
@@ -139,7 +139,7 @@ function createFlowMetricsEditor(o){
 /* o: {document, state: telemetryPageState(raw), controls, listen, commit(edit)} */
 function createFlowMetricsSettings(o){
   var d=flowMetricsDom(o),c=o.controls,s=o.state,commit=o.commit,t=s.telemetry || {};
-  var box=d.el('fieldset','metrics-settings');box.appendChild(d.el('legend',null,'Metrics'));
+  var box=d.el('fieldset','metrics-settings');
   var allow=c.checkbox(t.enabled!==false,function(value){return commit({op:'enabled',value:value});});
   allow.querySelector('input').setAttribute('aria-label','Allow metrics');
   d.row(box,'Allow metrics',allow);
@@ -152,7 +152,8 @@ function createFlowMetricsSettings(o){
   });
   d.row(box,'Shared metrics variables',c.text(t.variables?JSON.stringify(t.variables):null,function(v){return commit({op:'variables',value:v});},{textarea:true,placeholder:'{"iotAccount":"123456789012"}'}));
   var profiles=telemetryObject(t.environments)?t.environments:{},environmentIds=Object.keys(profiles);
-  var environments=d.fold(box,'metrics-environments','Environments');
+  // #1236: Status board settings passes its Environments section as o.environments.
+  var environments=o.environments?o.environments.appendChild(d.el('div','metrics-environments')):d.fold(box,'metrics-environments','Environments');
   d.note(environments,'Optional deployment profiles, such as qa, stg and prd. Blank values inherit shared settings. Readers can switch environments in Live status. Use $env or ${env} in queries, links and datasource values. Use ${name} for named variables in any signal string; profile variables override shared defaults.');
   if(environmentIds.length)d.row(environments,'Default environment',c.select(environmentIds,t.environment || environmentIds[0],function(v){return commit({op:'environment',value:v});}));
   environmentIds.forEach(function(id){

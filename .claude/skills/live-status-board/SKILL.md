@@ -91,7 +91,7 @@ cannot detect type without Jira; explicit runtime/demo metadata is documented in
 `docs/live-status.md`. “Diagram ready to demo” remains about primary-path carriers.
 
 Use `tracking.jira.exclude: ["DOOR-108"]` for inherited stories outside the
-board's purpose. Desktop **Document settings → Tracking → Exclude story** adds
+board's purpose. Desktop **Status board settings → Jira → Exclude story** adds
 keys; remove controls undo exclusions. Each edit has one Undo/Redo and survives
 export. Invalid keys or a non-array value warn and are ignored.
 

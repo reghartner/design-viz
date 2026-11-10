@@ -103,8 +103,9 @@ function createTelemetryCardLayoutEditor(opts){
     var card=cardFrom(ev);if(!card || ev.button!==0 || ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey)return;
     cancelNudge();var c=context(card),p=c && point(c,ev);if(!p)return;
     ev.preventDefault();ev.stopImmediatePropagation();opts.pause();card.focus({preventScroll:true});
-    // A corner handle only resizes; the rest of the card only moves.
-    var handle=ev.target.closest('.dv-metrics-resize');
+    // A corner handle only resizes; the rest of the card only moves. Size the handles for the
+    // current zoom first, then hit-test the pointer against them.
+    var handle=handleAt(card,ev);
     gesture={c:c,start:p,x:ev.clientX,y:ev.clientY,id:ev.pointerId,moved:false,position:c.origin,
       resize:handle?{west:handle.getAttribute('data-corner')[1]==='w',width:c.width}:null};
     if(card.setPointerCapture)card.setPointerCapture(ev.pointerId);
@@ -152,9 +153,22 @@ function createTelemetryCardLayoutEditor(opts){
     var step=ev.shiftKey?50:10;nudge.position.x+=delta[0]*step;nudge.position.y+=delta[1]*step;nudge.keys.add(ev.key);preview(nudge.c,nudge.position);
   },true);
   life.listen(win,'keyup',function(ev){if(!nudge || !nudge.keys.has(ev.key))return;ev.preventDefault();nudge.keys.delete(ev.key);if(nudge.keys.size)return;finishNudge();},true);
-  // Handles keep their on-screen size at the current zoom.
-  function sizeHandles(ev){var card=cardFrom(ev),rect=card && card.querySelector('.dv-metrics-card-box');if(rect && !card.classList.contains('dv-metrics-resizing'))telemetryCardPlaceHandles(card,Number(rect.getAttribute('width')));}
-  life.listen(view,'pointerover',sizeHandles,true);life.listen(view,'focusin',sizeHandles,true);
+  // Handles keep their on-screen size at the current zoom: re-measured on hover, focus, a pointer
+  // move after a zoom (wheel zoom with the pointer resting on the card) and pointerdown.
+  function sizeCard(card,force){
+    var rect=card && card.querySelector && card.querySelector('.dv-metrics-card-box');if(!rect || card.classList.contains('dv-metrics-resizing'))return;
+    if(!force){var m=card.ownerSVGElement && card.ownerSVGElement.getScreenCTM && card.ownerSVGElement.getScreenCTM();if(m && String(m.a)===card.getAttribute('data-metrics-handle-scale'))return;}
+    telemetryCardPlaceHandles(card,Number(rect.getAttribute('width')));
+  }
+  function sizeHandles(ev){if(!gesture)sizeCard(cardFrom(ev),ev.type!=='pointermove');}
+  function handleAt(card,ev){
+    if(!card.querySelectorAll)return ev.target.closest && ev.target.closest('.dv-metrics-resize');
+    sizeCard(card,true);
+    return Array.prototype.find.call(card.querySelectorAll('.dv-metrics-resize'),function(g){
+      var r=g.querySelector('.dv-metrics-resize-hit').getBoundingClientRect();return ev.clientX>=r.left && ev.clientX<=r.right && ev.clientY>=r.top && ev.clientY<=r.bottom;
+    }) || null;
+  }
+  life.listen(view,'pointerover',sizeHandles,true);life.listen(view,'focusin',sizeHandles,true);life.listen(view,'pointermove',sizeHandles,true);
   life.listen(view.ownerDocument,'focusin',function(ev){if(nudge && ev.target!==nudge.c.card)cancelNudge();},true);
   life.listen(win,'keydown',function(ev){if(ev.key==='Escape' && (gesture || nudge)){ev.preventDefault();ev.stopImmediatePropagation();cancel();consume();}},true);
   life.listen(win,'pointercancel',cancel);life.listen(win,'blur',cancel);life.listen(opts.src,'input',cancel);

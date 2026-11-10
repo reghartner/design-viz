@@ -166,9 +166,9 @@ function telemetryTraceLabelBoxes(svg){
   return Array.from(svg.querySelectorAll('.dv-trace-overlay text')).map(function(el){return boardControlBox(el,svg);}).filter(Boolean);
 }
 /* #1242 Workbench-only width handles for an editable card (readers never call this).
-   Each corner has a drawn square inside a transparent hit area, sized in screen pixels:
-   the hit area is 20px (never under 16px, and at most 40% of the card's smaller side
-   when that still leaves 16px) and the square 8px at the current zoom. */
+   Each corner has a drawn square inside a transparent hit area, sized for the current
+   zoom: the hit area is always 16–20px on screen (20px unless 40% of the card's smaller
+   side is less, never under 16px) and the square is 8px. */
 var TELEMETRY_CARD_HANDLE_HIT=20,TELEMETRY_CARD_HANDLE_MIN=16,TELEMETRY_CARD_HANDLE_MARK=8;
 function telemetryCardResizeHandles(card){
   var doc=card.ownerDocument,box=card.querySelector('.dv-metrics-card-box');if(!box)return;
@@ -185,6 +185,7 @@ function telemetryCardPlaceHandles(card,w){
   var box=card.querySelector('.dv-metrics-card-box'),h=box?Number(box.getAttribute('height')):0,svg=card.ownerSVGElement,scale=1;
   try{var m=svg && svg.getScreenCTM && svg.getScreenCTM();if(m && m.a>0)scale=m.a;}catch(ignored){}
   var hit=Math.min(TELEMETRY_CARD_HANDLE_HIT/scale,Math.max(TELEMETRY_CARD_HANDLE_MIN/scale,Math.min(w,h)*0.4)),mark=TELEMETRY_CARD_HANDLE_MARK/scale;
+  card.setAttribute('data-metrics-handle-scale',scale);
   card.querySelectorAll('.dv-metrics-resize').forEach(function(g){
     var corner=g.getAttribute('data-corner'),r=g.querySelector('.dv-metrics-resize-hit'),q=g.querySelector('.dv-metrics-resize-mark');
     g.setAttribute('transform','translate('+(corner[1]==='w'?0:w)+' '+(corner[0]==='n'?0:h)+')');

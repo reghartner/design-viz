@@ -3,7 +3,7 @@
 |---|---|---|---|---|
 | R1 | Dragging the bottom-right handle 60 units right grows card.width by 60 while showing the live width; the automatically placed card is pinned with its left edge where it was; one Undo restores; the Card width field shows the new width. | one bound connection, card below | `card.width` 300 and `position` = previewed top-left, left edge within 2, readout "Width 300" during the drag, Card width input "300", Undo exact text | a card that re-centres away from the pointer on release, multi-step history, no live feedback |
 | R2 | Dragging past 480 clamps to 480; a left-handle drag on a manually placed card keeps its right edge within 2 units and is one Undo step. | same, then a manual position | width 480; right edge before/after; one Undo restores the exact text | unclamped widths, a left drag that moves the right edge |
-| R3 | Alt+Right on a focused card adds 10 and Shift+Alt+Left takes 50, keeping the left edge; releasing Alt while Right repeats saves the pending width; Escape during a drag cancels it with no source change. | same | width 250, 200, 210; left edge within 2; source unchanged after Escape | no keyboard path, a mode switch that drops the pending change, Escape that commits |
+| R3 | Alt+Right on a focused card adds 10 and Shift+Alt+Left takes 50, keeping the left edge; releasing Alt while Right repeats saves the pending width, and pressing Alt during a held move saves the move as its own step; Escape during a drag cancels it with no source change. | same | width 250, 200, 210, a move then 220 as two Undo steps; left edge within 2; source unchanged after Escape | no keyboard path, a mode switch that drops the pending change, Escape that commits |
 | R4 | Handles have a 16–20px on-screen hit area and the ew-resize cursor; dragging the card body still moves it. | same | hit rect size on screen, cursor ew-resize; body drag changes `position` and keeps width | tiny hit targets, a body drag that resizes |
 | R7 | A left-handle drag on an automatically placed card keeps its right edge and pins it, in one Undo step. | same | right edge within 2, `position` written, Undo exact text | a left drag that re-centres the card |
 | R5 | An inherited imported connection: a handle drag saves the consumer override in one Undo step; the Inspector keeps its scroll. | consumer importing a provider binding | `edgeTracking['a->b'].telemetry.card.width`; Undo restores; `#guide` scrollTop within 2 | resize that edits the provider or loses the Inspector scroll |
@@ -92,10 +92,19 @@ test('R3 desktop Alt+Left/Right changes the focused card width; Escape cancels a
   await card.focus();await page.keyboard.down('Alt');await page.keyboard.down('ArrowRight');await page.keyboard.up('Alt');await page.keyboard.down('ArrowRight');await page.keyboard.up('ArrowRight');
   await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.width).toBe(210);
   expect(edge(await source.inputValue()).telemetry.card.position,'the switch did not also move the card').toEqual(position);
+  // The opposite switch: pressing Alt during a held move saves the move, then the width is a separate step.
+  const beforeMove=await source.inputValue();
+  await card.focus();await page.keyboard.down('ArrowRight');await page.keyboard.down('Alt');await page.keyboard.down('ArrowRight');await page.keyboard.down('ArrowRight');await page.keyboard.up('ArrowRight');await page.keyboard.up('Alt');
+  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.width).toBe(220);
+  expect(edge(await source.inputValue()).telemetry.card.position).toEqual({x:position.x+10,y:position.y});
+  await page.locator('#undo-builder').click();
+  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.width,'one Undo removes only the width step').toBe(210);
+  expect(edge(await source.inputValue()).telemetry.card.position,'the move was saved as its own step').toEqual({x:position.x+10,y:position.y});
+  await page.locator('#undo-builder').click();await expect(source).toHaveValue(beforeMove);
   const before=await source.inputValue();
-  await dragHandle(page,card,'se',80,{release:false});await expect(card.locator('.dv-metrics-resize-readout')).toHaveText('Width 280');
+  await dragHandle(page,card,'se',80,{release:false});await expect(card.locator('.dv-metrics-resize-readout')).toHaveText('Width 290');
   await page.keyboard.press('Escape');await page.mouse.up();
-  await expect(source).toHaveValue(before);await expect.poll(async()=>(await geometry(card)).w).toBe(200);
+  await expect(source).toHaveValue(before);await expect.poll(async()=>(await geometry(card)).w).toBe(210);
   await expect(card.locator('.dv-metrics-resize-readout')).toHaveCount(0);
 });
 

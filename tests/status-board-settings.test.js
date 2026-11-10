@@ -8,7 +8,7 @@
 | S3 | Make this a status board on a bare diagram wraps it in a page, adds an empty tracking block and a Live status panel as one Undo step; the diagram is otherwise unchanged. Afterwards a status line says so and focus moves to the Jira section header. | bare {nodes,rows,edges} diagram | page.tracking deepEqual {}; diagram deepEqual original plus panels [live-status]; role=status "Status board ready. Undo removes it."; focused element is the Jira summary; one Undo restores the exact bare text; the button is gone after the change | several Undo steps; a lost or rewritten diagram; a panel without tracking |
 | S4 | Make this a status board adds only what is missing, and is not offered on a complete board. | page without tracking; page with tracking but no panel; full board | only the missing part is added; no button on the full board | duplicate panels; overwriting authored tracking |
 | S5 | Traces and Log searches say "No settings yet". | live-status board | the two sections contain the text | empty or missing sections |
-| S7 | Sections start closed so all five headers fit; Metrics starts open only with a page telemetry block; a section with warnings starts open; closed headers carry a short status. | board without telemetry; board with telemetry | open states; Jira header names the site host and parent | Jira or Metrics forms that always push the other headers out of view |
+| S7 | Sections start closed so all five headers fit; Metrics starts open only with a page telemetry block; a section with warnings starts open; closed headers carry a short status. | board without telemetry; board with telemetry; GitHub scope and exclusions only; carrier binding without page telemetry | open states; Jira header names the site host, parent, GitHub scope and exclusion count; Metrics says Not set / No page settings | Jira or Metrics forms that always push the other headers out of view |
 | S8 | On a page with no diagram, Make this a status board is disabled and says why next to it. | page with one text-only section | disabled button; visible note "Add a diagram first" linked by aria-describedby; no "The diagram stays intact" | a button that always fails with an error |
 | S6 | Document settings no longer holds the Tracking controls; it keeps one link that opens Status board settings. The Live status panel's Inspect form links there too. | live-status board | no Jira site / metrics-settings under {kind:'document'}; "Open Status board settings" in Document settings and in the panel form selects {kind:'board'} | Tracking still duplicated in Document settings; no way back to the board area |
 */
@@ -131,6 +131,10 @@ test('S7 sections start closed except Metrics with a telemetry block; closed hea
   ui=harness(board({jira:{site:'https://acme.atlassian.net'},telemetry:{grafana:{prometheus:'prom'}}}),BOARD);
   assert.deepEqual(ui.sections().map(s=>s.open),[false,true,false,false,false],'a page telemetry block opens Metrics');
   ui=harness(board({}),BOARD);assert.equal(ui.title(ui.section('jira')),'Jira · Not set');
+  ui=harness(board({github:{repos:['acme/api']},jira:{exclude:['DOOR-7','DOOR-8']}}),BOARD);
+  assert.equal(ui.title(ui.section('jira')),'Jira · GitHub scope · 2 excluded','GitHub scope and exclusions count as Jira settings');
+  const bound=board();bound.page.sections[0].diagram.edges[0].telemetry={kind:'call',signals:{rate:{grafana:'up'}}};
+  ui=harness(bound,BOARD);assert.equal(ui.title(ui.section('metrics')),'Metrics · No page settings','carrier bindings without page settings');
 });
 
 test('S8 on a page with no diagram, Make this a status board is disabled with its reason shown next to it',()=>{

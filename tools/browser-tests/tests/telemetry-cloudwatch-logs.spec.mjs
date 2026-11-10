@@ -1,7 +1,7 @@
 import {writeFile,readFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface,openMetricsFold} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {cueSpec,importedDetailSpec} from '../helpers/telemetry-cards.mjs';
 
@@ -15,10 +15,10 @@ test('desktop Logs editor variables round-trip, imported cards and Proof show co
  await page.locator('#docview text.lbl[data-dv-edge="0"]').click();await page.locator('#editor-tab-inspect').click();
  const guide=page.locator('#guide'),source=page.locator('#src');await expect(guide.getByLabel('rate source',{exact:true})).toHaveValue('cloudwatchLogs');
  const edited={...logs,query:logs.query+' ',breakdown:{...logs.breakdown,labelField:'deviceId',labelTitle:'Device',query:'filter deviceType = "${deviceFilter}" | '+logs.query.replace('stats count() as n','parse @message /device_id=(?<deviceId>[^ ]+)/ | stats count() as n, latest(reason) as sampleReason by deviceId | sort n desc | limit 20')}};
- let before=await source.inputValue();const field=guide.getByLabel('rate query',{exact:true});await field.fill(JSON.stringify(edited));await field.press('Tab');
+ await openMetricsFold(guide,'Signal rate');let before=await source.inputValue();const field=guide.getByLabel('rate query',{exact:true});await field.fill(JSON.stringify(edited));await field.press('Tab');
  await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.edges[0].telemetry.signals.rate.cloudwatchLogs).toEqual(edited);
  let after=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);
- await page.locator('#document-settings').click();const variables=guide.getByLabel('stg metrics variables',{exact:true});await expect(variables).toHaveValue(JSON.stringify(spec.page.tracking.telemetry.environments.stg.variables));
+ await page.locator('#document-settings').click();await openMetricsFold(guide,'Environments');const variables=guide.getByLabel('stg metrics variables',{exact:true});await expect(variables).toHaveValue(JSON.stringify(spec.page.tracking.telemetry.environments.stg.variables));
  before=await source.inputValue();await variables.fill(JSON.stringify({...spec.page.tracking.telemetry.environments.stg.variables,topic:'camera_message_power_state'}));await variables.press('Tab');
  await expect.poll(async()=>JSON.parse(await source.inputValue()).page.tracking.telemetry.environments.stg.variables.topic).toBe('camera_message_power_state');
  after=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);

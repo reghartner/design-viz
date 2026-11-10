@@ -1,7 +1,7 @@
 /* Desktop #941: real controls plus production named-assembly owners. No connector
    is installed by authoring. Exact counts, geometry, history and retired callbacks
    are observed at the DOM/session boundaries, never by replacing the painter. */
-import {test,expect,paste,prepareEditorSurface,trackResources} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface,trackResources,openMetricsFold} from '../helpers/test.mjs';
 import {readFile} from 'node:fs/promises';
 import {projectFiles,useProjectDownloads} from '../helpers/project-export.mjs';
 import {importedDetailSpec,nestedSpec} from '../helpers/telemetry-cards.mjs';
@@ -39,10 +39,10 @@ test('P1 desktop preview cards are explicit synthetic selection targets; side/of
  await page.getByRole('checkbox',{name:'Demo live status',exact:true}).uncheck();await expect(cards(page)).toHaveCount(1);await expect(source).toHaveValue(before);
  const initial=await box(cards(page));await cards(page).click();await page.locator('#editor-tab-inspect').click();
  await expect(page.locator('#guide').getByLabel('Card side',{exact:true})).toHaveValue('below');await expect(page.locator('.dv-live-popover:visible')).toHaveCount(0);
- await page.locator('#guide').getByLabel('Card side',{exact:true}).selectOption('above');
+ await openMetricsFold(page.locator('#guide'),'Card');await page.locator('#guide').getByLabel('Card side',{exact:true}).selectOption('above');
  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.side).toBe('above');await expect(cards(page)).toHaveAttribute('data-side','above');
  const sideText=await source.inputValue(),above=await box(cards(page));expect(above.y).toBeLessThan(initial.y);
- await cards(page).click();const offset=page.locator('#guide').getByLabel('Card offset',{exact:true});await offset.fill('240');await offset.press('Enter');
+ await cards(page).click();await openMetricsFold(page.locator('#guide'),'Card');const offset=page.locator('#guide').getByLabel('Card offset',{exact:true});await offset.fill('240');await offset.press('Enter');
  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.offset).toBe(240);const edited=await source.inputValue(),shifted=await box(cards(page));expect(shifted.x).not.toBe(above.x);
  await toggle(page).uncheck();await expect(cards(page)).toHaveCount(0);await toggle(page).check();await expect(cards(page)).toHaveCount(1);await expect(source).toHaveValue(edited);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(sideText);await expect.poll(()=>box(cards(page))).toEqual(above);
@@ -163,9 +163,9 @@ test('P7 local/direct/nested bindings and inherited read-only forms keep provide
  expect(await cards(page).evaluateAll(els=>els.map(e=>e.dataset.metricsCard).sort())).toEqual(['direct::a->direct::b','outer::inner::a->outer::inner::b','x->y']);
  const inherited=page.locator('#docview .dv-metrics-card[data-metrics-card="direct::a->direct::b"]');await inherited.click();await page.locator('#editor-tab-inspect').click();
  const guide=page.locator('#guide');await expect(guide.locator('.metrics-inherited')).toContainText('provider / core (read only)');await expect(guide.getByLabel('rate query',{exact:true})).toHaveCount(0);await expect(guide.getByLabel('Card side',{exact:true})).toHaveValue('below');
- const before=await page.locator('#src').inputValue();await guide.getByLabel('New signal name',{exact:true}).fill('localRate');await guide.getByLabel('New signal query',{exact:true}).fill('consumer_rate');await guide.getByRole('button',{name:'Add signal',exact:true}).click();
+ const before=await page.locator('#src').inputValue();await openMetricsFold(guide,'New signal');await guide.getByLabel('New signal name',{exact:true}).fill('localRate');await guide.getByLabel('New signal query',{exact:true}).fill('consumer_rate');await guide.getByRole('button',{name:'Add signal',exact:true}).click();
  await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.topologyImports[0].edgeTracking?.['a->b']?.telemetry?.signals?.localRate).toEqual({grafana:'consumer_rate'});
- const after=await page.locator('#src').inputValue();await expect(cards(page)).toHaveCount(3);await inherited.click();await guide.getByLabel('Card side',{exact:true}).selectOption('above');await expect(inherited).toHaveAttribute('data-side','above');
+ const after=await page.locator('#src').inputValue();await expect(cards(page)).toHaveCount(3);await inherited.click();await openMetricsFold(guide,'Card');await guide.getByLabel('Card side',{exact:true}).selectOption('above');await expect(inherited).toHaveAttribute('data-side','above');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(after);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(cards(page)).toHaveCount(3);
  expect(await page.evaluate(()=>window.metricsImportContext.specs[0])).toEqual(provider);
  await page.locator('#docview g.node[data-dv-node="outer::inner::a"]').click();await expect(guide.locator('.metrics-inherited')).toContainText('(read only)');await expect(guide.getByLabel('rate query',{exact:true})).toHaveCount(0);
@@ -239,7 +239,7 @@ test('manual card drag/nudge preserves zoom coordinates, atomic history, export/
  await page.evaluate(spec=>window.__editorTest.builder.loadText(JSON.stringify(spec)),saved);await toggle(page).check();await expect.poll(()=>positionOf(card)).toEqual(position);
  await page.evaluate(spec=>{const host=document.createElement('div');host.id='manual-reader';host.style.width='1400px';document.body.append(host);window.manualReader=window.__editorTest.renderPage(host,window.__editorTest.normalize(spec),'pastel',null,{autoplay:false,telemetry:{provider:()=>({'a->b':{signals:{rate:{value:234567},errors:{value:0}}}})}});window.manualReader.telemetry.setEnabled(true);},saved);
  const reader=page.locator('#manual-reader .dv-metrics-card');await expect(reader).toHaveCount(1);await expect.poll(()=>positionOf(reader)).toEqual(position);await expect(reader).not.toHaveAttribute('data-metrics-section');
- await page.evaluate(()=>window.manualReader.destroy());await card.click();await page.locator('#editor-tab-inspect').click();await page.getByRole('button',{name:'Reset card to automatic',exact:true}).click();
+ await page.evaluate(()=>window.manualReader.destroy());await card.click();await page.locator('#editor-tab-inspect').click();await openMetricsFold(page.locator('#guide'),'Card');await page.getByRole('button',{name:'Reset card to automatic',exact:true}).click();
  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card).toEqual(binding.card);
  await page.locator('#undo-builder').click();await expect.poll(()=>positionOf(card)).toEqual(position);
  await page.locator('#docview').screenshot({path:testInfo.outputPath('manual-card-desktop.png')});expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
@@ -316,15 +316,15 @@ test('#1112 Inspect sets the card title and width; the preview card redraws at t
  await cards(page).click();await page.locator('#editor-tab-inspect').click();
  const title=guide.getByLabel('Card title',{exact:true}),width=guide.getByLabel('Card width',{exact:true});
  await expect(title).toHaveValue('');await expect(width).toHaveValue('');
- await title.fill(name);await title.press('Enter');
+ await openMetricsFold(guide,'Card');await title.fill(name);await title.press('Enter');
  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.title).toBe(name);
  await expect(cards(page).locator('.dv-metrics-card-title')).toHaveText(name);const titled=await source.inputValue();
  await expect(cards(page)).toHaveAttribute('aria-label',/^Camera stats consumer · RabbitMQ\. Drag metrics card to move\./);
- await cards(page).click();await width.fill('420');await width.press('Enter');
+ await cards(page).click();await openMetricsFold(guide,'Card');await width.fill('420');await width.press('Enter');
  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.width).toBe(420);
  await expect.poll(async()=>(await box(cards(page))).w).toBe(420);const sized=await source.inputValue();
  expect(edge(sized).telemetry.card).toEqual({side:'below',offset:0,title:name,width:420});
- await cards(page).click();await width.fill('900');await width.press('Enter');
+ await cards(page).click();await openMetricsFold(guide,'Card');await width.fill('900');await width.press('Enter');
  await expect(guide.locator('.ierr')).toContainText('140 and 480');await expect(source).toHaveValue(sized);expect((await box(cards(page))).w).toBe(420);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(titled);await expect.poll(async()=>(await box(cards(page))).w).toBe(240);
  await page.locator('#redo-builder').click();await expect(source).toHaveValue(sized);await expect.poll(async()=>(await box(cards(page))).w).toBe(420);
@@ -339,7 +339,7 @@ test('#1112 an inherited imported connection without an overlay sets Card width 
  const before=await source.inputValue();expect(overlay(before)).toBeUndefined();expect((await box(inherited)).w).toBe(240);
  await inherited.click();await page.locator('#editor-tab-inspect').click();await expect(guide.locator('.metrics-inherited')).toContainText('provider / core (read only)');
  const width=guide.getByLabel('Card width',{exact:true});await expect(width).toHaveValue('');await expect(guide.getByLabel('Card title',{exact:true})).toHaveValue('');
- await width.fill('400');await width.press('Enter');
+ await openMetricsFold(guide,'Card');await width.fill('400');await width.press('Enter');
  await expect.poll(async()=>overlay(await source.inputValue())?.['a->b']?.telemetry?.card).toEqual({side:'below',offset:0,width:400});
  expect(overlay(await source.inputValue())['a->b'].telemetry.signals).toEqual(binding.signals);
  await expect.poll(async()=>(await box(inherited)).w).toBe(400);

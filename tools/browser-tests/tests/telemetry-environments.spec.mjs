@@ -1,7 +1,7 @@
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface,openMetricsFold} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {cueSpec} from '../helpers/telemetry-cards.mjs';
 
@@ -13,9 +13,9 @@ test('desktop environment profiles author with Undo and switch local/imported re
  await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();
  const guide=page.locator('#guide'),source=page.locator('#src');
  const before=await source.inputValue();
- await guide.getByLabel('New environment id',{exact:true}).fill('qa');await guide.getByRole('button',{name:'Add environment',exact:true}).click();
+ await openMetricsFold(guide,'Environments');await guide.getByLabel('New environment id',{exact:true}).fill('qa');await guide.getByRole('button',{name:'Add environment',exact:true}).click();
  const after=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);
- await page.locator('#document-settings').click();
+ await page.locator('#document-settings').click();await openMetricsFold(guide,'Environments');
  for(const id of ['stg','prd']){await guide.getByLabel('New environment id',{exact:true}).fill(id);await guide.getByRole('button',{name:'Add environment',exact:true}).click();}
  await guide.getByLabel('Default environment',{exact:true}).selectOption('stg');
  const uid=guide.getByLabel('prd Grafana Prometheus UID',{exact:true});await uid.fill('production-prom');await uid.press('Enter');

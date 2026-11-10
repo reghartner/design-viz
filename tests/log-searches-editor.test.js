@@ -28,16 +28,19 @@ function board(telemetry){
 }
 function harness(spec){
   const e=inspectorEnvironment(names),h=e.mount(spec);h.session.target=BOARD;h.inspector.render();
+  // A commit's form refresh can schedule a second refresh; run timers until none is left.
+  const settle=()=>{for(let i=0;i<10 && h.timers.size;i++)h.flush();};
   const ui={e,h,
-    render(){h.inspector.render();return ui;},
+    // Undo and redo can clear the selection; the test reselects Status board settings like a reader would.
+    render(){h.session.target=BOARD;h.inspector.render();return ui;},
     get text(){return h.text;},get raw(){return JSON.parse(h.text);},get lookups(){const t=JSON.parse(h.text).page.tracking.telemetry;return t && t.lookups;},
     section(){return h.guide.querySelectorAll('details.board-section').find(s=>s.getAttribute('data-board-section')==='lookups');},
     row(label){const row=ui.section().querySelectorAll('.frow').find(r=>r.querySelector('.flab')?.textContent===label);return row?row.children[1]:null;},
     control(label){const el=ui.row(label);assert.ok(el,'control "'+label+'" exists');return el.matches && el.matches('input,select,textarea')?el:(el.querySelector('input,select,textarea') || el);},
     type(label,value){const el=ui.control(label);el.value=value;el.fire('input');return ui;},
-    set(label,value){const el=ui.control(label);el.value=value;el.fire('change');h.flush();return ui;},
+    set(label,value){const el=ui.control(label);el.value=value;el.fire('change');settle();return ui;},
     button(label){return ui.section().querySelectorAll('button').find(b=>b.textContent===label) || null;},
-    click(label){const b=ui.button(label);assert.ok(b,'button "'+label+'" exists');b.fire('click');h.flush();return ui;},
+    click(label){const b=ui.button(label);assert.ok(b,'button "'+label+'" exists');b.fire('click');settle();return ui;},
     folds(){return ui.section().querySelectorAll('details.log-search').map(f=>f.querySelector('summary').textContent);},
     undoSteps(){let n=0;while(h.session.canUndo()){h.session.undo();n++;}return n;}};
   return ui;

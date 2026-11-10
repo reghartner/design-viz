@@ -81,7 +81,7 @@ function createTelemetryLogLookup(page,transport,hooks){
     var again=connector && connector.state==='absent' && Date.now()-connector.at>=TELEMETRY_LOG_RECHECK_MS;
     if(connector && !again || dead || retired || !supported() || disabled())return connector && connector.pending;
     var mine=connector={state:'checking',again:!!again};
-    mine.pending=Promise.resolve().then(function(){return transport.logsConnector();}).then(function(server){return server?'ready':'absent';},function(){return 'absent';}).then(function(next){if(dead || connector!==mine)return;connector={state:next,at:Date.now()};changed();});
+    mine.pending=Promise.resolve().then(function(){return transport.logsConnector();}).then(function(server){return server?'ready':'absent';},function(){return 'absent';}).then(function(next){if(dead || connector!==mine)return;var now=Date.now();connector={state:next,at:now,checked:mine.again && next==='absent'?now:null};changed();});
     return mine.pending;
   }
   function recheck(){if(dead || !connector || connector.state!=='absent')return;connector.at=-Infinity;discover();changed();}
@@ -97,7 +97,8 @@ function createTelemetryLogLookup(page,transport,hooks){
     var s=state();
     var searched=s==='ready' && daySearch(typeof hooks.lookback==='function'?hooks.lookback():null);
     // recheck: 'idle' offers Check again; 'busy' while a second look runs, so the button keeps its place and focus.
-    return {available:s==='ready',state:s,note:note(s),busy:busy,recheck:s==='absent'?'idle':s==='checking' && connector && connector.again?'busy':'',form:Object.assign({},form,{values:Object.assign(Object.create(null),boxValues)}),typed:TELEMETRY_LOG_TYPED,search:searched?'Loki · '+searched.label:'',
+    return {available:s==='ready',state:s,note:note(s),busy:busy,recheck:s==='absent'?'idle':s==='checking' && connector && connector.again?'busy':'',
+      checked:s==='absent' && connector && connector.checked?'Still not found (checked '+new Date(connector.checked).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'})+').':'',form:Object.assign({},form,{values:Object.assign(Object.create(null),boxValues)}),typed:TELEMETRY_LOG_TYPED,search:searched?'Loki · '+searched.label:'',
       lookups:Object.keys(ls).map(function(id){var l=ls[id];return {id:id,label:l.label,slot:telemetryLookupSlot(l.query),values:(l.values || []).slice()};}),
       result:result?Object.assign(JSON.parse(JSON.stringify(result)),{next:next()}):null};
   }

@@ -4576,6 +4576,7 @@ test('#1252 typing in Trace ID keeps the loaded trace and its focus; a failed Lo
   assert.ok(m.body.querySelector('.dv-trace-slot .dv-trace-selected'),field+': still drawn');}
  api.setDirectTraceField({field:'start',value:''});api.setDirectTraceField({field:'input',value:'f'.repeat(32)});assert.equal(await api.loadDirectTrace(false),null,'a trace whose ID does not match fails');h.flush();
  selected=api.snapshot().trace.selected;assert.ok(selected && selected.exemplar.traceId===COMPACT_ID,'the failed Load keeps the shown trace');assert.ok(api.snapshot().trace.direct.report.error,'and reports its error');
+ assert.equal(selected.focus && selected.focus.spanId,span,'review c1: and its span focus');
  api.clearDirectTrace();h.flush();assert.equal(api.snapshot().trace.selected,null,'Clear removes it');assert.equal(calls.length,2);
  api.destroy();
 });
@@ -4587,7 +4588,13 @@ test('#1252 Enter in Trace ID or link runs Load trace',async()=>{
  // The successful Load reveals the trace (scrollIntoView after getClientRects), which the test DOM does not lay out.
  const proto=Object.getPrototypeOf(input()),had=Object.prototype.hasOwnProperty.call(proto,'getClientRects');proto.getClientRects=()=>[];
  try{api.setDirectTraceField({field:'input',value:COMPACT_ID});h.flush();enter();for(let i=0;i<6;i++)await settle();h.flush();
-  assert.equal(calls.length,1,'Enter loads');assert.ok(prevented>0);assert.equal(api.snapshot().trace.selected.exemplar.traceId,COMPACT_ID);}
+  assert.equal(calls.length,1,'Enter loads');assert.ok(prevented>0);assert.equal(api.snapshot().trace.selected.exemplar.traceId,COMPACT_ID);
+  // Review c1: Enter in Trace start and Trace end loads too; a held key's repeats and Enter during a Load do not.
+  const field=name=>m.body.querySelectorAll('input').find(el=>el.getAttribute('aria-label')===name);
+  for(const name of ['Trace start','Trace end']){const before=calls.length;field(name).dispatchEvent({type:'keydown',key:'Enter',preventDefault(){}});for(let i=0;i<6;i++)await settle();h.flush();assert.equal(calls.length,before+1,'Enter in '+name+' loads');}
+  input().dispatchEvent({type:'keydown',key:'Enter',repeat:true,preventDefault(){}});for(let i=0;i<6;i++)await settle();assert.equal(calls.length,3,'a repeated key does not load again');
+  const busy=api.loadDirectTrace(false);h.flush();assert.equal(api.snapshot().trace.direct.busy,true);input().dispatchEvent({type:'keydown',key:'Enter',preventDefault(){}});await busy;for(let i=0;i<6;i++)await settle();
+  assert.equal(calls.length,4,'Enter while a Load runs does nothing');}
  finally{if(!had)delete proto.getClientRects;api.destroy();}
 });
 /* #1252 item 22: a log line's time is shown in local time like the trace card, with the UTC time in its title. */
@@ -4598,7 +4605,7 @@ test('#1252 log result times are local, with UTC in the title',async()=>{
  const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async()=>({data:[line]})}}}),api=h.ctl.liveStatus;
  api.setStatusMode('trace');for(let i=0;i<6;i++)await settle();const m=mountStatus(h);api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();h.flush();
  const time=m.body.querySelector('.dv-trace-log-row .dv-trace-log-time');assert.ok(time,'one row');
- assert.equal(time.getAttribute('title'),'2026-11-07 09:42:13Z UTC');assert.equal(time.getAttribute('datetime'),'2026-11-07T09:42:13.123Z');
+ assert.equal(time.getAttribute('title'),'2026-11-07 09:42:13 UTC','UTC said once');assert.equal(time.getAttribute('datetime'),'2026-11-07T09:42:13.123Z');
  const d=new Date('2026-11-07T09:42:13.123Z');assert.equal(time.textContent,h.C.liveStatusReadableTime('2026-11-07T09:42:13.123Z',true));
  assert.ok(time.textContent.includes(d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'})),'local time with seconds: '+time.textContent);assert.doesNotMatch(time.textContent,/Z$/);
  api.destroy();
@@ -4613,9 +4620,30 @@ test('#1252 Check again finds a Grafana connector added after the panel opened',
  api.setStatusMode('trace');for(let i=0;i<6;i++)await settle();const m=mountStatus(h);h.flush();
  const again=()=>m.body.querySelector('button.dv-trace-log-recheck'),findButton=()=>m.body.querySelector('.dv-trace-log-search button.dv-trace-log-find');
  assert.ok(again(),'Check again is offered');assert.equal(again().textContent,'Check again');assert.equal(again().title,'Look for the Grafana connector again');assert.equal(findButton().disabled,true);
+ // Review c1: a look that still finds nothing says so, with the time.
+ again().dispatchEvent({type:'click'});for(let i=0;i<6;i++)await settle();h.flush();
+ const checked=m.body.querySelectorAll('.dv-trace-logs p').find(p=>/^Still not found \(checked \d\d:\d\d:\d\d/.test(p.textContent));assert.ok(checked,'Still not found (checked HH:MM:SS)');assert.equal(checked.getAttribute('role'),'status');
  const button=again();server='Grafana';let resume;release=r=>{resume=r;};button.dispatchEvent({type:'click'});for(let i=0;i<6;i++)await settle();h.flush();
  assert.equal(again(),button,'the same button while it looks');assert.deepEqual([!!button.disabled,button.getAttribute('aria-disabled'),button.textContent],[false,'true','Checking…']);
  resume();for(let i=0;i<6;i++)await settle();h.flush();
  assert.equal(again(),null,'found: no Check again');assert.equal(findButton().disabled,false,'Find is enabled');
+ api.destroy();
+});
+
+/* #1256 review c1 MAJOR: Cancel request during a Load stops it and brings the shown trace back with its span focus;
+   with nothing loading, Clear loaded trace still clears. */
+test('#1252 Cancel request during a Load keeps the shown trace and its focus; Clear clears',async()=>{
+ const recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),calls=[];let hold=null;
+ const h=harness(compactBoard(['prod']),{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>compactTool(),call:async(request,args)=>{calls.push(args);if(hold)await hold.promise;return {payload:recorded};}}}}),api=h.ctl.liveStatus,m=mountStatus(h);
+ api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
+ let selected=api.snapshot().trace.selected;const span=selected.exemplar.spans[1].id;assert.equal(api.selectTraceSpan({context:selected.context,spanId:span}),true);
+ hold={};hold.promise=new Promise(r=>hold.release=r);api.setDirectTraceField({field:'input',value:'5ab0'.repeat(8)});const pending=api.loadDirectTrace(false);for(let i=0;i<6;i++)await settle();h.flush();
+ assert.equal(api.snapshot().trace.direct.busy,true,'B is loading');
+ const cancel=m.body.querySelectorAll('button').find(b=>b.textContent==='Cancel request');assert.ok(cancel,'Cancel request is offered');cancel.dispatchEvent({type:'click'});
+ const release=hold.release;hold=null;release();assert.equal(await pending,null,'B is stopped');for(let i=0;i<6;i++)await settle();h.flush();
+ selected=api.snapshot().trace.selected;assert.ok(selected && selected.manual && selected.exemplar.traceId===COMPACT_ID,'A is shown again');
+ assert.equal(selected.focus && selected.focus.spanId,span,'with its span focus');assert.equal(api.snapshot().trace.direct.report,null,'no report');
+ const clear=m.body.querySelectorAll('button').find(b=>b.textContent==='Clear loaded trace');assert.ok(clear);clear.dispatchEvent({type:'click'});h.flush();
+ assert.equal(api.snapshot().trace.selected,null,'idle: Clear loaded trace clears');assert.equal(calls.length,2);
  api.destroy();
 });

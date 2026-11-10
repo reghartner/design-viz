@@ -4,6 +4,7 @@
     "panels/registry.js",
     "icons/library.js",
     "validator.js",
+    "core/duration.js",
     "core/navigation.js",
     "core/document.js",
     "core/contracts.js",

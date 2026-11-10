@@ -1081,6 +1081,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
       traceObjectId(b.page),traceObjectId(b.section),traceObjectId(b.section.diagram),b.el?traceObjectId(b.el):0,b.stepper?traceObjectId(b.stepper):0]);
   }
   function clearTraceFocus(){traceFocus=null;traceFocusEpoch++;traceChooser=null;}
+  // #1252: the loaded trace's span focus, kept across a Load that does not replace it.
+  function shownDirectFocus(){var e=directTrace.snapshot().exemplar;return traceFocus && e && e.spans.some(function(s){return s.id===traceFocus.spanId;})?{traceId:e.traceId,spanId:traceFocus.spanId,choiceKey:traceFocus.choiceKey}:null;}
+  function restoreDirectFocus(saved){
+    var e=saved && directTrace.snapshot().exemplar;if(!e || e.traceId!==saved.traceId)return;
+    var entry=traceSources().entries.find(function(x){return x.manual && x.exemplar.traceId===saved.traceId;});
+    if(entry)traceFocus={context:traceContext(entry),spanId:saved.spanId,choiceKey:saved.choiceKey};
+  }
   /* #1078: in board Edit mode, the steps of the trace's own diagram a span can be
      mapped to; null outside Edit mode. A step that has a traceMatch is marked
      `mapped` (#1177): the dropdown leaves it out, a drop or the chooser replaces it. */
@@ -2102,7 +2109,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     setStatusMode:function(mode){if(retired || ['jira','trace'].indexOf(mode)<0)return;if(mode!==statusMode)clearTraceFocus();statusMode=mode;statusAuto=false;close(false);paint();notify();},
     // #1252: typing in Trace ID, start or end keeps the shown trace and its span focus.
     setDirectTraceField:function(change){if(!retired && change){if(['input','start','end'].indexOf(change.field)<0){traceDayNote='';traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';}directTrace.set(change.field,change.value);}},
-    loadDirectTrace:async function(verify,line){if(retired)return;statusAuto=false;traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';traceDayNote='';var mine=++traceLoads,result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;if(!retired)traceFollow(result);}else if(!retired && mine===traceLoads)settleParked();paint();notify();return result;},
+    // #1252: a Load that fails, is cancelled or is stopped by an edit brings the shown trace back with its span focus.
+    loadDirectTrace:async function(verify,line){if(retired)return;statusAuto=false;var saved=shownDirectFocus();traceRequest++;clearTraceFocus();traceSelection=null;traceInitial=true;traceNotice='';traceDayNote='';var mine=++traceLoads,result=await directTrace.load(!!verify,line);if(result){traceSelection=null;traceInitial=true;if(!retired)traceFollow(result);}else if(!retired && mine===traceLoads){restoreDirectFocus(saved);settleParked();}paint();notify();return result;},
     clearDirectTrace:function(){if(retired)return;traceDayNote='';traceNotice='';clearTraceFocus();traceSelection=null;traceInitial=true;directTrace.clear();settleParked();},
     // #1233: change.lookup names the search box a value belongs to; findLogLines(lookup) runs that box.
     setLogLookupField:function(change){if(!retired && change)logLookup.set(change.field,change.value,change.lookup);},

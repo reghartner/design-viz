@@ -60,12 +60,6 @@ function traceRows(ids, edges){
   return rows;
 }
 
-// #1252: a duration in step text, rounded like the waterfall; the span facts keep the raw value.
-function traceShownMs(ms){
-  if (typeof ms !== 'number' || !isFinite(ms) || Number.isInteger(ms)) return String(ms);
-  if (ms > 0 && ms < 0.01) return '<0.01';
-  return String(Number(ms.toFixed(ms < 10 ? 2 : ms < 1000 ? 1 : 0)));
-}
 function traceSpanStats(spans, traceId){
   var extent=0, services=new Set();
   spans.forEach(function(s){ services.add(s.service); extent=Math.max(extent,s.startMs+s.ms); });
@@ -226,7 +220,7 @@ function tracePreview(input, options){
     warnings=warnings.map(function(w){ return 'Source export: '+w; });
     warnings.unshift('Focused '+focus.kind+' '+focus.value+': '+spans.length+' of '+sourceSpans.length+' source spans included; '+focus.omittedSpans+' omitted. All exported descendants of included spans are retained.');
     if (boundary.length) warnings.push(boundary.length+' included span(s) have parents outside this focus. Original parent IDs are retained; no replacement parent or service arrow was invented.');
-    warnings.push('Timing origin is +'+offset+' ms from the earliest source span. Durations and relative timing are unchanged.');
+    warnings.push('Timing origin is +'+durationMsText(offset)+' ms from the earliest source span. Durations and relative timing are unchanged.');
     spans=spans.map(function(s){ return Object.assign({},s,{traceStartMs:s.startMs,startMs:round(s.startMs-offset)}); });
   }
   var stats=traceSpanStats(spans,selected);
@@ -270,7 +264,7 @@ function traceToSpec(input, options){
       ['start_ms', s.startMs], ['duration_ms', s.ms], ['error', s.error ? 'recorded error' : 'not flagged']];
     if (plan.focus) facts.splice(5,0,['trace_start_ms',s.traceStartMs]);
     var st = {id: s.id, nodes: [services.get(s.service)],
-      text: '+' + traceShownMs(s.startMs) + ' ms · ' + s.service + ' · ' + s.name + ' · duration ' + traceShownMs(s.ms) + ' ms' + (s.error ? ' · recorded error' : ''),
+      text: '+' + durationMsText(s.startMs) + ' ms · ' + s.service + ' · ' + s.name + ' · duration ' + durationMsText(s.ms) + ' ms' + (s.error ? ' · recorded error' : ''),
       panels: {timing: {highlight: s.id}, internal:{selected:s.id}, span: {rows: facts.map(function(f){ return {id: f[0], cells: {field: f[0], value: f[1]}}; })}}};
     var parent = byId.get(s.parentId);
     if (parent && parent.service !== s.service) st.edge = services.get(parent.service) + '->' + services.get(s.service);
@@ -279,7 +273,7 @@ function traceToSpec(input, options){
   });
   var rows = traceRows(ids, edges);
   var section = {heading: 'Observed request', accent: 'cyan', text: [
-    'Imported trace ' + selected + ': ' + spans.length + ' spans across ' + services.size + ' services; observed extent ' + elapsed + ' ms.',
+    'Imported trace ' + selected + ': ' + spans.length + ' spans across ' + services.size + ' services; observed extent ' + durationMsText(elapsed) + ' ms.',
     'Inspect spans in start-time order. Overlapping bars retain their original offsets; parent spans include child time. The total is elapsed extent, not a sum of durations. Arrows mean span parent relationships, not a verified network protocol.',
     'This is one recorded execution, not an HLD or a complete service inventory. Unflagged spans are not proof of success.'],
     bullets: warnings.slice(), diagram: {view: 'step', nodes: nodes, rows: rows, edges: edges, panels: [timing, internal, details], steps: steps}};

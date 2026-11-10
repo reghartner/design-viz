@@ -2178,9 +2178,10 @@ reader can collapse it to one line naming the connection and environment
 shown. A load error sits by what was clicked: a log line's report (with **Try the
 next log line**) directly under that line's row, a Load trace or Verify error
 directly under those buttons. Enter in **Trace ID or link**, **Trace start** or
-**Trace end** runs Load trace. Typing in those fields keeps the shown trace and its
-span focus, and a Load that fails brings the shown trace back beside its error;
-only a successful Load or **Clear loaded trace** replaces it (#1252). The request card (#1173) is one line: "8413cd87a9f1 · partial ·
+**Trace end** runs Load trace (a held key does not repeat it, nor does Enter while a
+Load runs). Typing in those fields keeps the shown trace and its span focus. A Load
+that fails, or **Cancel request** while it runs, brings the shown trace back with its
+span focus; only a successful Load or **Clear loaded trace** replaces it (#1252). The request card (#1173) is one line: "8413cd87a9f1 · partial ·
 Nov 9 07:19 · 55 spans · 6/7 steps matched". Warning flags (partial, unknown completeness, limit reached) come right after the
 trace ID, and the line wraps rather than clipping (#1186). It holds Returned traces and the request details. Each line opens with
 one click, and an opened section stays open until the shown trace changes. A
@@ -3218,9 +3219,10 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
 ```
 
 - Without that connector the search says so and offers **Check again** (#1252). It
-  looks again on Check again, when the Trace view is entered again, on Find, and at
-  most every 30 seconds on a repaint, so a connector added in claude.ai is found
-  without a reload; a failed listing is retried the same way.
+  looks again on Check again, when the Trace view is entered again, and at most
+  every 30 seconds on a repaint, so a connector added in claude.ai is found without
+  a reload; a failed listing is retried the same way. A look that still finds none
+  says "Still not found (checked 10:42:13)." with the local time.
 - `$env`, `${variable}` and `$account` expand as in signals, from the board's
   active Environment. A missing variable stops the Find with its name.
 - The window is the Load trace lookback: the **Trace start** control, else the

@@ -145,5 +145,5 @@ function createTelemetryDirect(page,transport,hooks){
     exemplar=state.exemplar;report=state.report;return true;
   }
   if(transport && typeof transport.onAccountChanged==='function')offAccount=transport.onAccountChanged(retireAccount);
-  return {snapshot:snapshot,set:set,load:load,carry:carry,restore:restore,clear:function(){cancel();changed();},destroy:function(){cancel();dead=true;if(offAccount)offAccount();}};
+  return {snapshot:snapshot,set:set,load:load,carry:carry,restore:restore,clear:function(){if(busy){stop();restoreKept();report=null;}else cancel();changed();},destroy:function(){cancel();dead=true;if(offAccount)offAccount();}};
 }

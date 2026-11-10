@@ -171,7 +171,8 @@
       if(!logs.available)el(section,'p','unavailable','dv-trace-logs-status',logs.note).setAttribute('role','status');
       // #1252: after adding the connector in claude.ai, Check again looks for it without a reload.
       if(logs.recheck){var again=button(section,'recheck','reader-button dv-trace-log-recheck',logs.recheck==='busy'?'Checking…':'Check again','recheckLogConnector');again.title='Look for the Grafana connector again';
-        if(logs.recheck==='busy'){again.setAttribute('aria-busy','true');again.setAttribute('aria-disabled','true');}else{again.removeAttribute('aria-busy');again.removeAttribute('aria-disabled');}}
+        if(logs.recheck==='busy'){again.setAttribute('aria-busy','true');again.setAttribute('aria-disabled','true');}else{again.removeAttribute('aria-busy');again.removeAttribute('aria-disabled');}
+        if(logs.checked)el(section,'p','checked','dv-trace-logs-status',logs.checked).setAttribute('role','status');}
       var r=logs.result,reportItem=null,findable=logs.available && !logs.busy;
       // tag 'checkbox': a checkbox followed by its label text; it sends node.checked. `search` names the box a value belongs to.
       function control(parent,key,label,tag,search){
@@ -235,7 +236,7 @@
           var item=el(rows,'li',String(i),'dv-trace-log-row');item.setAttribute('data-chosen',String(r.chosen===i));if(atRow && r.chosen===i){reportItem=el(rows,'li','report','dv-trace-log-report');reportItem.setAttribute('role','none');}
           // #1252: local time like the trace card it loads; the UTC time is in the title.
           var stamp=el(item,'time','time','dv-trace-log-time',row.time?liveStatusReadableTime(row.time,true):'time unavailable');
-          if(row.time){stamp.setAttribute('datetime',row.time);stamp.setAttribute('title',row.time.replace('T',' ').replace(/\.\d+Z$/,'Z')+' UTC');}else{stamp.removeAttribute('datetime');stamp.removeAttribute('title');}
+          if(row.time){stamp.setAttribute('datetime',row.time);stamp.setAttribute('title',row.time.replace('T',' ').replace(/(?:\.\d+)?Z$/,' UTC'));}else{stamp.removeAttribute('datetime');stamp.removeAttribute('title');}
           el(item,'span','value','dv-trace-log-value',row.value).title=row.line;
           if(!row.traceId){el(item,'span','missing','dv-trace-log-missing',row.missing);return;}
           el(item,'code','trace','dv-trace-log-id',row.traceId);
@@ -283,7 +284,7 @@
         if(control.value!==direct.form[key])control.value=direct.form[key];
         if(!control._directChange){control._directChange=function(){var owner=host._livePanelApi;if(owner)owner.setDirectTraceField({field:key,value:control.value});};control.addEventListener(options?'change':'input',control._directChange);}
         // #1252: Enter in a text field runs Load trace when the button is enabled.
-        if(!options && !control._directEnter){control._directEnter=function(ev){if(ev.key!=='Enter' || ev.isComposing)return;var go=host._directLoadButton;if(ev.preventDefault)ev.preventDefault();if(go && !go.disabled && go._directLoadAction)go._directLoadAction();};control.addEventListener('keydown',control._directEnter);}
+        if(!options && !control._directEnter){control._directEnter=function(ev){if(ev.key!=='Enter' || ev.isComposing)return;var go=host._directLoadButton;if(ev.preventDefault)ev.preventDefault();if(ev.repeat || !go || go.disabled || go._directBusy || !go._directLoadAction)return;go._directLoadAction();};control.addEventListener('keydown',control._directEnter);}
         return control;
       }
       // #1173: a select with one choice is not drawn; its value still applies and the summary names it.
@@ -302,7 +303,7 @@
       el(time,'p','help','','Leave blank to use link bounds or '+(direct.day?'the selected day.':'the connection lookback.'));
       field(time,'start','Trace start',null,'-2h or UTC ISO timestamp');field(time,'end','Trace end',null,'UTC ISO timestamp (absolute start only)');
       var controls=el(config,'div','actions','dv-live-controls');
-      var load=host._directLoadButton=el(controls,'button','load','reader-button dv-trace-load tbtn','Load trace');load.type='button';load.disabled=!direct.available || !direct.form.input.trim();
+      var load=host._directLoadButton=el(controls,'button','load','reader-button dv-trace-load tbtn','Load trace');load.type='button';load.disabled=!direct.available || !direct.form.input.trim();load._directBusy=!!direct.busy;
       // Reveal only the successful gesture's own panel, after its render. A
       // routine repaint, Verify, cancellation or remount must not move the view.
       load._directLoadAction=function(){

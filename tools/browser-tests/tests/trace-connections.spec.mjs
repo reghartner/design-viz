@@ -10,7 +10,26 @@ const schema=()=>({name:'get_trace',annotations:{readOnlyHint:true,destructiveHi
 const clone=x=>JSON.parse(JSON.stringify(x));
 // #1136: a board without ticket references opens on the Trace view and shows no Jira | Trace switch.
 async function onTrace(root){await expect(root.getByRole('button',{name:/^(Jira|Trace)( · \d+)?$/})).toHaveCount(0);await expect(root.locator('.dv-live-trace')).toBeVisible();}
-async function observeTraceReveals(page){await page.evaluate(()=>{window.traceReveals=[];const original=Element.prototype.scrollIntoView;Element.prototype.scrollIntoView=function(...args){if(this.matches('.dv-trace-selected'))window.traceReveals.push(this);return original.apply(this,args);};});}
+// #1280: the successful Load reveals the selected trace's request line (its top) by the least scroll of this document or
+// a scrolling container. It is observed by position: before the Load the Load button is scrolled to the top, so the line
+// (which goes in the space above the search) starts off screen; after it the line is in view. Afterwards no row click,
+// Verify, cancel or late answer moves any scroll position. A tall spacer keeps the page scrollable throughout.
+async function scrollLoadToTop(page,root){
+ await page.evaluate(()=>{if(!document.getElementById('dv-reveal-spacer')){const s=document.createElement('div');s.id='dv-reveal-spacer';s.style.height='5000px';document.body.appendChild(s);}});
+ await root.getByRole('button',{name:'Load trace',exact:true}).evaluate(b=>b.scrollIntoView({block:'start'}));
+}
+// Some scroll position (the page or a scrolling ancestor) went up: the reveal moved the view to the line above.
+const movedUp=(before,after)=>{const a=before.split(',').map(Number),b=after.split(',').map(Number);return a.length===b.length && b.some((v,i)=>v<a[i]);};
+const scrollState=root=>root.evaluate(el=>{const out=[Math.round(window.scrollY)];for(let a=el;a;a=a.parentElement || (a.parentNode && a.parentNode.host) || null){if(a.nodeType===1 && /(auto|scroll)/.test(getComputedStyle(a).overflowY))out.push(Math.round(a.scrollTop));}return out.join(',');});
+// The request line's centre is inside every clipping ancestor and the viewport, and is hit there.
+const lineInView=root=>root.locator('.dv-trace-selected .dv-trace-request-line').evaluate(el=>{
+ const b=el.getBoundingClientRect(),x=b.left+b.width/2,y=b.top+b.height/2;if(!b.height || x<0 || y<0 || x>innerWidth || y>innerHeight)return false;
+ for(let a=el.parentElement || (el.parentNode && el.parentNode.host);a && a!==document;a=a.parentElement || (a.parentNode && a.parentNode.host) || null){
+  if(a.nodeType!==1)continue;const st=getComputedStyle(a);if(st.overflowX==='visible' && st.overflowY==='visible')continue;
+  const c=a.getBoundingClientRect();if(x<c.left || x>c.right || y<c.top || y>c.bottom)return false;
+ }
+ const r=el.getRootNode(),hit=(r.elementFromPoint?r:document).elementFromPoint(x,y);return !!hit && (hit===el || el.contains(hit));
+});
 async function openTraceConfiguration(root){const config=root.locator('.dv-trace-config');if(!await config.evaluate(node=>node.open))await config.locator(':scope > summary').click();await expect(config).toHaveJSProperty('open',true);}
 // #1230: a loaded trace sits in the reserved space above the search, which stays open below it.
 async function expectCompactTrace(root){
@@ -45,18 +64,35 @@ async function portable(page,server,{held=false,absolute=false,inherited=false,d
  return {root,calls,permissions,choices,selected,release(){hold=false;releases.splice(0).forEach(fn=>fn());},tools,respond(value){payload=value;}};
 }
 test('desktop inherited-company direct-only read-only load maps local and nested imported nodes in the exact loaded section, with zero search/numeric calls',async({page,server},info)=>{
- const h=await portable(page,server,{inherited:true});await observeTraceReveals(page);expect(h.calls).toHaveLength(0);expect(h.permissions).toHaveLength(0);expect(await page.evaluate(()=>window.ctl.telemetry.enabled())).toBe(false);
+ const h=await portable(page,server,{inherited:true});expect(h.calls).toHaveLength(0);expect(h.permissions).toHaveLength(0);expect(await page.evaluate(()=>window.ctl.telemetry.enabled())).toBe(false);
  const time=h.root.locator('.dv-trace-time');await expect(time).toHaveJSProperty('open',false);await time.locator('summary').click();await h.root.getByRole('textbox',{name:'Trace start',exact:true}).fill('-2h');await time.locator('summary').click();
  const input=h.root.getByRole('textbox',{name:'Trace ID or link',exact:true});await input.fill(ID);expect(h.calls).toHaveLength(0);expect(h.permissions).toHaveLength(0);
- await h.root.getByRole('button',{name:'Load trace',exact:true}).click();await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);await expect(h.root.locator('.dv-trace-span')).toHaveCount(55);
+ await scrollLoadToTop(page,h.root);const beforeLoad=await scrollState(h.root);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);await expect(h.root.locator('.dv-trace-span')).toHaveCount(55);
  expect(h.calls).toEqual([{server:PROFILE.server,tool:'get_trace',args:{view_mode:'full',trace_id:ID,from:'-2h',environment_slug:'production',team_slug:'example-team'}}]);expect(h.permissions).toEqual(['mcp:'+PROFILE.server]);
  for(const id of ['local','outer::inner::b'])await expect(h.root.locator('g.node[data-dv-node="'+id+'"]')).toHaveAttribute('data-trace-tone','observed');
  await expect(h.root.locator('.dv-trace-direct-status')).toContainText('ID matched');await expect(h.root.locator('.dv-trace-direct-report')).toContainText('partial completeness');await expectCompactTrace(h.root);
  expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});expect(await page.evaluate(()=>window.ctl.telemetry.enabled())).toBe(false);expect(await page.evaluate(()=>JSON.stringify(window.directDetail)===window.sourceBefore)).toBe(true);
- expect(await h.root.evaluate(root=>window.traceReveals.length===1 && root.contains(window.traceReveals[0]))).toBe(true);await info.attach('direct-loaded-imported-viewport',{body:await page.screenshot(),contentType:'image/png'});
- await h.root.locator('.dv-trace-span').first().click();expect(await page.evaluate(()=>window.traceReveals.length)).toBe(1);
+ await expect.poll(()=>lineInView(h.root),{message:'the Load revealed its own trace: the request line is in view'}).toBe(true);
+ expect(movedUp(beforeLoad,await scrollState(h.root)),'review c6: the reveal scrolled up to the line ('+beforeLoad+' -> '+await scrollState(h.root)+')').toBe(true);await info.attach('direct-loaded-imported-viewport',{body:await page.screenshot(),contentType:'image/png'});
+ // Review c6: with the request line scrolled off screen first, a click on a row in view moves nothing (no second reveal),
+ // and the row's detail opens directly below it. CI run 42886692965: the row is centred, not put under the fixed page
+ // bar, where Playwright would scroll before clicking.
+ const clicked=h.root.locator('.dv-trace-span').nth(20);await clicked.evaluate(el=>el.scrollIntoView({block:'center'}));
+ expect(await lineInView(h.root),'precondition: the request line is off screen').toBe(false);
+ const beforeClick=await scrollState(h.root),rowBefore=await clicked.boundingBox();await clicked.click();
+ await expect(clicked).toHaveAttribute('aria-pressed','true');expect(await scrollState(h.root),'a row click does not move the page').toBe(beforeClick);
+ const rowAfter=await clicked.boundingBox(),detail=await h.root.locator('.dv-trace-span-detail').boundingBox();
+ expect(Math.abs(rowAfter.y-rowBefore.y),'the row stays where it was').toBeLessThanOrEqual(1);expect(Math.abs(detail.y-(rowAfter.y+rowAfter.height)),'its detail opens directly below').toBeLessThan(10);
+ // Review c8: the reader's fixed navigation bar is the page's top edge. A row scrolled under it is not counted as in view,
+ // and a top-aligned reveal brings it to just below the bar.
+ const under=h.root.locator('.dv-trace-span').nth(40);await under.evaluate(el=>el.scrollIntoView({block:'start'}));
+ const bar=await page.getByRole('navigation',{name:'Document navigation'}).boundingBox();expect(bar,'the reader\'s navigation bar').not.toBeNull();
+ expect((await under.boundingBox()).y,'precondition: the row is under the bar').toBeLessThan(bar.y+bar.height);
+ await page.evaluate(id=>{const t=window.ctl.liveStatus.snapshot().trace.selected;window.ctl.liveStatus.selectTraceSpan({context:t.context,spanId:id});},await under.getAttribute('data-span-id'));
+ await expect(under).toHaveAttribute('aria-pressed','true');
+ await expect.poll(async()=>{const b=await under.boundingBox();return b.y>=bar.y+bar.height && b.y<=bar.y+bar.height+12;},{message:'the reveal brings the row to just below the fixed bar'}).toBe(true);
  await info.attach('direct-loaded-imported',{body:await h.root.screenshot(),contentType:'image/png'});
- await openTraceConfiguration(h.root);await h.root.getByRole('button',{name:'Verify trace connection',exact:true}).click();await expect.poll(()=>h.calls.length).toBe(2);await expect(h.root.locator('.dv-trace-direct-report')).toContainText('Stage: complete');await expect(h.root.locator('.dv-trace-diagnostics')).toHaveJSProperty('open',true);await expect(h.root.locator('.dv-trace-arguments')).toBeVisible();await expect(h.root.locator('.dv-trace-arguments')).toContainText('[configured]');expect(await page.evaluate(()=>window.traceReveals.length)).toBe(1);await info.attach('direct-verified-expanded',{body:await h.root.screenshot(),contentType:'image/png'});
+ await openTraceConfiguration(h.root);await h.root.getByRole('button',{name:'Verify trace connection',exact:true}).evaluate(b=>b.scrollIntoView({block:'center'}));const beforeVerify=await scrollState(h.root);await h.root.getByRole('button',{name:'Verify trace connection',exact:true}).click();await expect.poll(()=>h.calls.length).toBe(2);await expect(h.root.locator('.dv-trace-direct-report')).toContainText('Stage: complete');await expect(h.root.locator('.dv-trace-diagnostics')).toHaveJSProperty('open',true);await expect(h.root.locator('.dv-trace-arguments')).toBeVisible();await expect(h.root.locator('.dv-trace-arguments')).toContainText('[configured]');expect(await scrollState(h.root),'Verify does not reveal').toBe(beforeVerify);await info.attach('direct-verified-expanded',{body:await h.root.screenshot(),contentType:'image/png'});
  await h.root.getByRole('button',{name:'Clear loaded trace',exact:true}).click();await expect(h.root.locator('.dv-trace-selected')).toHaveCount(0);await expect(h.root.locator('[data-trace-tone]')).toHaveCount(0);expect(h.calls).toHaveLength(2);
 });
 test('desktop Load trace shows the active lookback, and a no-spans load names it and opens the Lookback section',async({page,server})=>{
@@ -78,11 +114,11 @@ test('desktop Load trace shows the active lookback, and a no-spans load names it
  h.respond(RECORDED);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);expect(h.calls).toHaveLength(2);expect(h.calls[1].args.from).toBe('-7d');
 });
 for(const change of ['environment','connection','section'])test('desktop changing '+change+' cancels pending detail without fetching again',async({page,server})=>{
- const h=await portable(page,server,{held:true});await observeTraceReveals(page);await h.root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();await expect.poll(()=>h.calls.length).toBe(1);await expect(h.root.getByRole('button',{name:'Cancel request',exact:true})).toBeVisible();
+ const h=await portable(page,server,{held:true});await h.root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();await expect.poll(()=>h.calls.length).toBe(1);await expect(h.root.getByRole('button',{name:'Cancel request',exact:true})).toBeVisible();
  if(change==='environment')await h.root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('stage');
  if(change==='connection')await h.root.getByRole('combobox',{name:'Trace connection',exact:true}).selectOption('alternate');
  if(change==='section')await h.root.getByRole('combobox',{name:'Mapping diagram',exact:true}).selectOption(h.choices.find(o=>o.value && o.value!==h.selected.value).value);
- h.release();await expect(h.root.locator('.dv-trace-direct-report')).toHaveCount(0);await expect(h.root.locator('.dv-trace-selected')).toHaveCount(0);expect(h.calls).toHaveLength(1);expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});expect(await page.evaluate(()=>window.traceReveals.length)).toBe(0);
+ const beforeRelease=await scrollState(h.root);h.release();await expect(h.root.locator('.dv-trace-direct-report')).toHaveCount(0);await expect(h.root.locator('.dv-trace-selected')).toHaveCount(0);expect(h.calls).toHaveLength(1);expect(await page.evaluate(()=>window.ctl.telemetry.snapshot().map)).toEqual({});expect(await scrollState(h.root),'a cancelled Load does not reveal').toBe(beforeRelease);
  if(change==='section')await expect(h.root.getByRole('textbox',{name:'Trace ID or link',exact:true})).toHaveValue(ID);
  else {await expect(h.root.getByRole('textbox',{name:'Trace ID or link',exact:true})).toHaveValue('');await expect(h.root.getByRole('button',{name:'Load trace',exact:true})).toBeDisabled();await expect(h.root.getByRole('button',{name:'Verify trace connection',exact:true})).toBeDisabled();}
  if(change==='environment'){await h.root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);expect(h.calls).toHaveLength(2);expect(h.calls[1].args.environment_slug).toBe('staging');}
@@ -95,12 +131,23 @@ test('desktop link bounds reach the detail tool exactly; mismatched environment 
 });
 test('desktop native direct-only callbacks show an unmapped waterfall and reject late responses after destroy',async({page,server},info)=>{
  await page.setViewportSize({width:1500,height:1100});await writeFile(path.join(server.root,'direct-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));await writeFile(path.join(server.root,'direct-native.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./direct-native.js";window.mount=mountNativeViewer;</script>');await page.goto(server.origin+'/direct-native.html');await page.waitForFunction(()=>!!window.mount);
- await observeTraceReveals(page);
  const spec={page:{title:'Native direct',tracking:{telemetry:{traceConnections:{company:PROFILE}}},sections:[{id:'main',diagram:{nodes:{a:{title:'No mappings authored'}},rows:[['a']],panels:[PANEL]}}]}};
  await page.evaluate(({spec,tool,text})=>{window.nativeCalls=[];window.holdDirect=false;window.nativeViewer=window.mount(document.querySelector('#host'),spec,{telemetry:{directTrace:{describe:async()=>tool,call:async(request,args)=>{window.nativeCalls.push(args);if(window.holdDirect)await new Promise(resolve=>window.releaseDirect=resolve);return {payload:text};}}}});},{spec,tool:schema(),text:RECORDED});
- const root=page.locator('#host');await onTrace(root);await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await root.getByRole('button',{name:'Load trace',exact:true}).click();await expect(root.locator('.dv-trace-span')).toHaveCount(55);await expect(root).toContainText('Diagram mapping is not configured');expect(await page.evaluate(()=>window.nativeCalls.length)).toBe(1);expect(await page.evaluate(()=>window.nativeViewer.controller.telemetry.enabled())).toBe(false);await expectCompactTrace(root);await info.attach('native-direct-unmapped',{body:await root.screenshot(),contentType:'image/png'});
- expect(await page.evaluate(()=>window.traceReveals.length)).toBe(1);expect(await root.locator('.dv-trace-selected').evaluate(selected=>window.traceReveals[0]===selected)).toBe(true);await info.attach('native-direct-unmapped-viewport',{body:await page.screenshot(),contentType:'image/png'});
- await openTraceConfiguration(root);await page.evaluate(()=>window.holdDirect=true);await root.getByRole('button',{name:'Verify trace connection',exact:true}).click();await page.waitForFunction(()=>!!window.releaseDirect);await page.evaluate(()=>{window.nativeViewer.destroy();window.releaseDirect();});await expect(root.locator('.dv-trace-selected')).toHaveCount(0);expect(await page.evaluate(()=>window.traceReveals.length)).toBe(1);
+ const root=page.locator('#host');await onTrace(root);await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await scrollLoadToTop(page,root);const beforeLoad=await scrollState(root);await root.getByRole('button',{name:'Load trace',exact:true}).click();await expect(root.locator('.dv-trace-span')).toHaveCount(55);await expect(root).toContainText('Diagram mapping is not configured');expect(await page.evaluate(()=>window.nativeCalls.length)).toBe(1);expect(await page.evaluate(()=>window.nativeViewer.controller.telemetry.enabled())).toBe(false);await expectCompactTrace(root);await info.attach('native-direct-unmapped',{body:await root.screenshot(),contentType:'image/png'});
+ await expect.poll(()=>lineInView(root),{message:'#1280: the Load revealed the selected trace\'s request line'}).toBe(true);
+ expect(movedUp(beforeLoad,await scrollState(root)),'review c6: the reveal scrolled up to the line').toBe(true);
+ // #1283 rule: a click on a row near the window's bottom reveals the row with its opened detail by the least scroll, and
+ // the row never leaves the window (this page has no fixed bar, so Playwright does not scroll before the click).
+ const low=root.locator('.dv-trace-span').nth(30);await low.evaluate(el=>el.scrollIntoView({block:'end'}));
+ const lowBefore=await low.boundingBox(),yBefore=await page.evaluate(()=>window.scrollY);await low.click();await expect(low).toHaveAttribute('aria-pressed','true');
+ await expect.poll(async()=>{const d=await root.locator('.dv-trace-span-detail').boundingBox(),v=page.viewportSize();return !!d && d.y+d.height<=v.height+1;},{message:'the opened detail is fully in the window'}).toBe(true);
+ const lowAfter=await low.boundingBox(),lowDetail=await root.locator('.dv-trace-span-detail').boundingBox(),vp=page.viewportSize(),yAfter=await page.evaluate(()=>window.scrollY);
+ expect(yAfter,'the page scrolled to show the detail').toBeGreaterThan(yBefore);expect(lowAfter.y,'the row is still in the window').toBeGreaterThanOrEqual(0);
+ expect(lowDetail.y+lowDetail.height,'by the least: the detail ends at the window edge less 8px').toBeGreaterThanOrEqual(vp.height-12);
+ expect(Math.abs(lowDetail.y-(lowAfter.y+lowAfter.height)),'the detail sits directly below its row').toBeLessThan(10);expect(lowBefore.y+lowBefore.height).toBeLessThanOrEqual(vp.height+1);await info.attach('native-direct-unmapped-viewport',{body:await page.screenshot(),contentType:'image/png'});
+ await openTraceConfiguration(root);await page.evaluate(()=>window.holdDirect=true);await root.getByRole('button',{name:'Verify trace connection',exact:true}).click();await page.waitForFunction(()=>!!window.releaseDirect);// Destroy removes the board above the spacer; with scroll anchoring off the page keeps its offset, so a move here would
+ // be a reveal (CI run 42886692965 saw anchoring, not a reveal).
+ const beforeLate=await page.evaluate(()=>{document.documentElement.style.overflowAnchor='none';document.body.style.overflowAnchor='none';return Math.round(window.scrollY);});await page.evaluate(()=>{window.nativeViewer.destroy();window.releaseDirect();});await expect(root.locator('.dv-trace-selected')).toHaveCount(0);expect(await page.evaluate(()=>Math.round(window.scrollY)),'a late answer after destroy does not reveal').toBe(beforeLate);
  await page.evaluate(spec=>window.nativeViewer=window.mount(document.querySelector('#host'),spec,{}),spec);await onTrace(root);await expect(root).toContainText('Direct trace retrieval is unavailable');await expect(root.getByRole('button',{name:'Load trace',exact:true})).toBeDisabled();expect(await page.evaluate(()=>window.nativeCalls.length)).toBe(2);
 });
 

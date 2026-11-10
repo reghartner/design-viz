@@ -265,7 +265,10 @@
             var owner=host._livePanelApi;if(!owner || load.disabled)return;var request=host._directRevealRequest=(host._directRevealRequest || 0)+1;
             Promise.resolve(owner.loadLogTrace(load._logIndex)).then(function(result){
               if(!live || !result || host._livePanelApi!==owner || host._directRevealRequest!==request)return;
-              var target=host.querySelector('.dv-trace-selected');if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
+              // #1280 review c8: the line's span was focused and revealed by this Load; scrolling back up to the request
+              // line would push it off screen. Only without a focused span does the Load reveal its request line.
+              var focused=host.querySelector('.dv-trace-selected .dv-trace-span[aria-pressed="true"]'),item=focused && focused.closest('.dv-trace-span-item');
+              if(item && item.getClientRects().length)revealInView(item,false,focusBox(item));else revealLoadedTrace();
             });
           };load.addEventListener('click',load._logClick);}
         });
@@ -333,7 +336,7 @@
           if(!live || !result || host._livePanelApi!==owner || host._directRevealRequest!==request)return;
           var value=owner.snapshot(),selected=value.trace && value.trace.selected;
           if(value.mode!=='trace' || !selected || !selected.manual || selected.exemplar.selectionToken!==result.selectionToken)return;
-          var target=host.querySelector('.dv-trace-selected');if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
+          revealLoadedTrace();
         });
       };
       if(!load._directLoadClick){load._directLoadClick=function(){load._directLoadAction();};load.addEventListener('click',load._directLoadClick);}
@@ -419,7 +422,7 @@
         });
       }
       // Focus inside the card when it goes away (a Load's gap; it is swept after this render) returns to the next card's line once.
-      if(!trace.selected){var gone=host.querySelector('details.dv-trace-request');if(gone && gone.contains(doc.activeElement))host._traceCardFocus=true;if(slot)el(slot,'p','hint','dv-trace-slot-hint',trace.direct.busy?'Loading trace…':'Load a trace to show it here');if(trace.entries.length)returnedTraces(body);return;}
+      if(!trace.selected){stopListCap();var gone=host.querySelector('details.dv-trace-request');if(gone && gone.contains(doc.activeElement))host._traceCardFocus=true;if(slot)el(slot,'p','hint','dv-trace-slot-hint',trace.direct.busy?'Loading trace…':'Load a trace to show it here');if(trace.entries.length)returnedTraces(body);return;}
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(slot || body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
       // #1173: the request card (Returned traces and the selected request's details) is one collapsed line while it is shown.
       // #1186: the card shares its line with Show on diagram and Open trace, which sit outside the summary so they never toggle it.
@@ -491,6 +494,10 @@
       var extent=Math.max.apply(null,e.spans.map(function(s){return s.startMs+s.ms;}).concat([1]));
       // #1177: in Edit mode a span row drags onto a step, a node or an edge to map it.
       var dragSpans=!!(value.edit && value.edit.active && model.mapSteps);
+      // #1280 (Chuck, option A): only while Edit-mode span dragging is on, the list is capped at about one screen and scrolls
+      // itself, so any row and the diagram it is dropped on are on screen together. Reading view has no inner scroll.
+      var capped=waterfall.classList.contains('dv-trace-waterfall-edit');waterfall.classList.toggle('dv-trace-waterfall-edit',dragSpans);
+      if(dragSpans && !capped)measureListCap(waterfall);watchListCap(dragSpans?waterfall:null);
       e.spans.forEach(function(span){
         var item=el(waterfall,'div',span.id,'dv-trace-span-item'),row=el(item,'button','row','dv-trace-span'+(dragSpans && span.service && span.name?' dv-live-draggable':''));row.type='button';
         if(dragSpans && span.service && span.name)row.setAttribute('draggable','true');else row.removeAttribute('draggable');
@@ -501,10 +508,12 @@
         var duration=el(row,'span','duration','dv-trace-duration',telemetryTraceDuration(span.ms)+(span.error?' · error':''));duration.setAttribute('role','img');duration.setAttribute('aria-label',span.ms+' milliseconds'+(span.error?' · error':''));duration.title=span.ms+' ms';
         if(focusedSpan && span.id===focusedSpan.id){spanDetail(item);focusItem=item;}
       });
-      // A newly focused span (from the list or the diagram) is scrolled into the list's view, not the page's, after the sweep
-      // has removed the previous span's detail (revealTraceFocus).
-      var focusKey=focusedSpan?focusedSpan.id:'';
-      if(!focusItem){waterfall._traceFocusShown='';host._traceFocusPending=null;}else if(waterfall._traceFocusShown!==focusKey)host._traceFocusPending={list:waterfall,item:focusItem,key:focusKey};
+      // A newly focused span (a row, a step choice or a log line) is scrolled into view after the sweep has removed the previous
+      // span's detail (revealTraceFocus). #1280: the list grows with its spans and a Live status tile grows with the list, so
+      // what scrolls is the page (or a fixed-height container that holds the panel). An automatic focus never moves the page.
+      // The key notes an automatic focus, so a reader's later focus of the same span still reveals it.
+      var focusKey=focusedSpan?focusedSpan.id+(focus.auto?'#auto':''):'';
+      if(!focusItem){waterfall._traceFocusShown='';host._traceFocusPending=null;}else if(waterfall._traceFocusShown!==focusKey)host._traceFocusPending={list:waterfall,item:focusItem,key:focusKey,auto:!!focus.auto};
     }
     function stopFocusWatch(){if(host._traceFocusWatch){host._traceFocusWatch.disconnect();host._traceFocusWatch=null;}}
     function revealTraceFocus(){
@@ -516,7 +525,77 @@
         return;
       }
       stopFocusWatch();host._traceFocusPending=null;list._traceFocusShown=pending.key;
-      var lb=list.getBoundingClientRect(),ib=pending.item.getBoundingClientRect();if(ib.top<lb.top || ib.bottom>lb.bottom)list.scrollTop+=ib.top-lb.top-8;
+      // The row with its opened detail, so a click shows the detail too; the row itself never leaves the window.
+      revealInView(pending.item,pending.auto,focusBox(pending.item));
+    }
+    /* #1280: bring `node` into view by the least scroll. Already fully visible: nothing moves. Below the edge: its bottom
+       comes to the edge (8 px margin). Above the edge, or taller than the view less the margins: its top comes to the top
+       edge, so the top (the focused row) never leaves the window. A scrolling ancestor below the page (the capped Edit-mode
+       list, a fixed-height container holding the panel) moves first. Without one, only a reveal the reader asked for
+       (pageOff false) scrolls the page, and only this document's scrolling element, never a frame around the board. */
+    function revealDelta(top,bottom,edgeTop,edgeBottom){
+      if(top>=edgeTop && bottom<=edgeBottom)return 0;
+      return top<edgeTop || bottom-top>edgeBottom-edgeTop-16?top-edgeTop-8:bottom-edgeBottom+8;
+    }
+    // The page's top edge sits below the reader's fixed navigation bar: the engine publishes its bottom (+8 px) as
+    // --flowview-navigation-bottom on the view, which this panel inherits. Without a bar it is 0.
+    function pageTop(view){
+      var style=view.getComputedStyle?view.getComputedStyle(host):null,value=style && style.getPropertyValue?parseFloat(style.getPropertyValue('--flowview-navigation-bottom')):NaN;
+      return isFinite(value)?Math.max(0,value-8):0;
+    }
+    /* What a span focus shows: from the item's top (its row) to the opened detail's own bottom. The item's trailing space
+       (the detail's bottom margin, the item's border) is not content (CI run 42899309527). The detail's rect is used as it is,
+       so a last item, whose margin collapses out of it, is right too; it counts only when it lies inside the item's box. */
+    function focusBox(item){
+      var box=item.getBoundingClientRect(),detail=item.querySelector('.dv-trace-span-detail'),bottom=box.bottom;
+      if(detail && detail.getBoundingClientRect){var d=detail.getBoundingClientRect();if(d.height>0 && d.bottom>box.top && d.bottom<=box.bottom+0.5)bottom=d.bottom;}
+      return {top:box.top,bottom:bottom};
+    }
+    // box: the part of `node` to show ({top, bottom} in viewport px); default its whole rect.
+    function revealInView(node,pageOff,box){
+      var holder=scrollHolder(node),ib=box || node.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement,delta;
+      if(holder){var hb=holder.getBoundingClientRect();delta=revealDelta(ib.top,ib.bottom,hb.top,hb.bottom);if(delta)holder.scrollTop+=delta;return;}
+      if(pageOff)return;
+      if(page && view && view.innerHeight){delta=revealDelta(ib.top,ib.bottom,pageTop(view),view.innerHeight);if(delta)page.scrollTop+=delta;}
+      else if(node.scrollIntoView)node.scrollIntoView({block:'nearest',inline:'nearest'});
+    }
+    // A successful Load's reveal of its own trace (#1230): the request line, by the least scroll.
+    function revealLoadedTrace(){
+      var target=traceRevealTarget();if(target && target.getClientRects && target.getClientRects().length)revealInView(target,false);
+    }
+    // #1280: the Edit-mode cap runs from the list's top to the window's bottom (CSS --dv-trace-list-top). It is measured when
+    // the cap turns on, and again once per animation frame after a resize or any scroll while it is on, so every row reaches
+    // the screen by scrolling the list alone wherever the page is scrolled. The listeners exist only while the cap is on.
+    function measureListCap(list){
+      if(!list.getBoundingClientRect || !list.style || !list.style.setProperty)return;
+      var top=Math.max(0,Math.round(list.getBoundingClientRect().top))+'px';if(list._traceCapTop===top)return;
+      list._traceCapTop=top;list.style.setProperty('--dv-trace-list-top',top);
+    }
+    function watchListCap(list){
+      var view=doc.defaultView;if(!list){stopListCap();return;}
+      host._traceCapList=list;if(host._traceCapWatch || !view || !view.addEventListener)return;
+      var frame=view.requestAnimationFrame?function(f){view.requestAnimationFrame(f);}:function(f){view.setTimeout(f,16);},queued=false;
+      var watch=host._traceCapWatch=function(){
+        if(queued)return;queued=true;
+        frame(function(){queued=false;var l=host._traceCapList;if(live && host._traceCapWatch===watch && l && l.isConnected)measureListCap(l);});
+      };
+      watch._view=view;view.addEventListener('resize',watch);view.addEventListener('scroll',watch,true);
+    }
+    function stopListCap(){
+      var watch=host._traceCapWatch;host._traceCapList=null;if(!watch)return;host._traceCapWatch=null;
+      watch._view.removeEventListener('resize',watch);watch._view.removeEventListener('scroll',watch,true);
+    }
+    // #1280: a successful Load reveals the loaded trace's top line (its request line). The trace itself can be taller than the
+    // window now that the Spans list grows, and revealing all of it would align its top to the window's and move the page.
+    function traceRevealTarget(){var selected=host.querySelector('.dv-trace-selected');return selected && (selected.querySelector('.dv-trace-request-line') || selected);}
+    // The closest element above `node` (crossing a shadow root) whose content scrolls vertically: the list itself while
+    // its Edit-mode cap is on (#1280), else the panel's container or none (the page).
+    function scrollHolder(node){
+      var view=doc.defaultView || (typeof window!=='undefined'?window:null);if(!view || !view.getComputedStyle)return null;
+      for(var at=node.parentElement || (node.parentNode && node.parentNode.host) || null;at;at=at.parentElement || (at.parentNode && at.parentNode.host) || null){
+        var style=view.getComputedStyle(at);if(style && /(auto|scroll)/.test(style.overflowY) && at.scrollHeight>at.clientHeight+1)return at;
+      }
+      return null;
     }
     function traceIcon(parent,kind){
       var svg=el(parent,'svg','icon','dv-trace-icon-svg');svg.setAttribute('viewBox','0 0 16 16');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
@@ -612,10 +691,9 @@
     }
     function paint(value){
       if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=activeElement();host._liveFocusControls={};
-      // #1186: with a trace shown, the Trace body fills the panel's tile and the span list takes the rest (CSS below).
-      if(value && value.mode==='trace' && value.trace && value.trace.selected)host.classList.add('dv-trace-fill');else host.classList.remove('dv-trace-fill');
       sharedHeader(value);
       if(value && value.mode==='trace'){traceBody(value);sweep(host);revealTraceFocus();settleFocus(value);return;}
+      stopListCap();
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
       // #986/#1162: the first row is the counts, then the provider action, then First blocker in a fixed slot at its top right, so
       // neither changing counts nor a button appearing can move it. The counts wrap onto more lines so every one shows in full;
@@ -758,7 +836,7 @@
       if(focused && host.contains(focused) && activeElement()!==focused && focused.focus)focused.focus({preventScroll:true});
       settleFocus(value);
     }
-    function cleanup(){if(!live)return;live=false;stopFocusWatch();host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
+    function cleanup(){if(!live)return;live=false;stopFocusWatch();stopListCap();host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
     host._panelMotionCleanup=cleanup;
     function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(function(){var value=api.snapshot();value.metrics=Object.assign({},value.metrics,{proof:null,available:false,enabled:false});value.trace=Object.assign({},value.trace,{entries:[],selected:null,available:false,enabled:false});paint(value);cleanup();});}
     var controller=typeof liveStatusControllerFor==='function'?liveStatusControllerFor(host):null;
@@ -791,7 +869,7 @@
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}.dv-trace-log-report>.dv-trace-direct-report{margin-top:0}.dv-trace-log-row:has(+.dv-trace-log-report){border-bottom:0}
 .dv-trace-selected{min-width:0}.dv-trace-slot{margin:10px 0;min-width:0}.dv-trace-slot-hint{margin:0;padding:10px;border:1px dashed var(--explore-border);border-radius:6px;color:var(--dfaint);font-size:11px}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
-.dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall{max-height:240px;overflow:auto;margin:0 0 12px;border:1px solid var(--explore-border);border-top:0;border-radius:0 0 6px 6px;padding:0 8px 8px}
+.dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall.dv-trace-waterfall-edit{max-height:max(240px,calc(100vh - var(--dv-trace-list-top,200px) - 16px));overflow:auto}.dv-trace-waterfall{margin:0 0 12px;border:1px solid var(--explore-border);border-top:0;border-radius:0 0 6px 6px;padding:0 8px 8px}
 .dv-trace-span{width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;align-items:center;padding:5px 0;font-size:10px}.dv-trace-span[aria-pressed="true"]{background:color-mix(in srgb,var(--dv-live-active) 10%,transparent)}.dv-trace-span:focus-visible{outline:2px solid var(--dv-live-active)}.dv-trace-operation-detail{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;gap:6px;margin-top:12px;padding:8px;border:1px solid var(--explore-border);border-radius:6px}.dv-trace-operation-detail>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}.dv-trace-operation-detail small{grid-column:1/-1}.dv-trace-duration{font:700 13px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}.dv-trace-span .dv-trace-duration{grid-column:2;grid-row:1;white-space:nowrap}.dv-trace-operation-detail .dv-trace-duration{font-size:20px;line-height:1.4}.dv-trace-span-name{grid-column:1;grid-row:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-track{grid-column:1/-1;grid-row:2;height:10px;background:color-mix(in srgb,var(--dink) 7%,transparent)}.dv-trace-bar{display:block;box-sizing:border-box;max-width:100%;height:10px;background:var(--dv-live-active)}.dv-trace-span[data-error="true"] .dv-trace-bar{background:var(--dv-live-blocked)}
 .dv-trace-mappings{display:grid;gap:5px}.dv-trace-mapping{display:grid;grid-template-columns:1fr auto;gap:2px 8px;border-left:3px solid var(--dfaint);padding:5px 8px}.dv-trace-mapping small{grid-column:1/-1;color:var(--dfaint)}.dv-trace-mapping[data-tone="error"]{border-color:var(--dv-live-blocked)}.dv-trace-mapping[data-tone="warning"]{border-color:#d49620}
 [data-trace-tone="error"]{--dv-trace-color:#d64b68}[data-trace-tone="warning"]{--dv-trace-color:#c88b14}[data-trace-tone="observed"]{--dv-trace-color:#368cc9}[data-trace-tone="unknown"]{--dv-trace-color:#87929e}
@@ -815,11 +893,6 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-trace-icon-svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}.dv-trace-icon-svg .dv-trace-icon-fill{fill:currentColor;stroke:none}
 .dv-trace-spans-head{display:flex;align-items:baseline;gap:0;margin-top:10px;padding:7px 8px 6px;border:1px solid var(--explore-border);border-bottom-color:color-mix(in srgb,var(--explore-border) 60%,transparent);border-radius:6px 6px 0 0;font-size:11px;color:var(--dfaint)}.dv-trace-spans-head strong{color:var(--dink);font-size:12px}.dv-trace-spans-head span{white-space:pre-wrap}
 .dv-trace-span-item{border-bottom:1px solid color-mix(in srgb,var(--explore-border) 50%,transparent)}.dv-trace-span-item:last-child{border-bottom:0}.dv-trace-span-item>.dv-trace-span-detail{margin:2px 0 8px;border-color:color-mix(in srgb,var(--dv-live-active) 40%,var(--explore-border));background:color-mix(in srgb,var(--dv-live-active) 5%,transparent)}.dv-trace-detail-actions{display:flex;flex-wrap:wrap;gap:6px}
-.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
-.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>*,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>*,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill .dv-trace-selected>*{flex:none}
-.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-selected,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-slot,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-slot>.dv-trace-selected{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
-.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-slot,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-slot>.dv-trace-selected{min-height:auto}
-.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill .dv-trace-selected>.dv-trace-waterfall{flex:1 1 0;min-height:200px;max-height:none;contain:size;margin-bottom:0}
 .dv-trace-focus-status{color:var(--dtext)}.dv-trace-span-identity{display:grid;gap:3px;min-width:0}.dv-trace-span-field{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;align-items:baseline;min-width:0;font-size:10px}.dv-trace-span-label{color:var(--dtext)}.dv-trace-span-field code{min-width:0;overflow-wrap:anywhere;user-select:all}.dv-trace-map-guide{justify-self:start;max-width:100%;overflow-wrap:anywhere}.dv-trace-map-step{display:flex;flex-wrap:wrap;gap:7px;min-width:0}.dv-trace-map-select{min-width:0;max-width:100%}.dv-trace-map-apply{min-width:0;max-width:100%;white-space:normal}.dv-trace-map-none{margin:0;color:var(--dtext)}.dv-trace-step-choices{display:flex;flex-wrap:wrap;gap:7px;grid-column:1/-1}.dv-trace-step-choice{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
 .dv-trace-span:focus-visible,.dv-trace-step-choice:focus-visible{outline:2px solid #009fc7;outline-offset:3px}
 

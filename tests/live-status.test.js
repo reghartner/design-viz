@@ -4416,20 +4416,23 @@ test('#1186 focus that left the card before a Load is not carried to the new car
   assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(focused.length,0,'focus stays where the reader left it');
  }finally{Element.prototype.focus=focus;api.destroy();}
 });
-test('#1186 a span focused while the panel is hidden is scrolled into the list\'s view when the panel shows again',async()=>{
+/* #1280: the list grows with its spans, so a span focused while the panel is hidden is scrolled into the view of the
+   panel body (the nearest ancestor that scrolls) when the panel shows again; the list itself never scrolls. */
+test('#1186 #1280 a span focused while the panel is hidden is scrolled into the panel body\'s view when the panel shows again',async()=>{
  const {h,api,m}=await stage2Loaded();
  let hidden=true;const watchers=[];h.C.ResizeObserver=class{constructor(f){this.f=f;this.off=false;watchers.push(this);}observe(t){this.t=t;}disconnect(){this.off=true;}};
- const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect;
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView;
  proto.getClientRects=function(){return hidden?[]:[1];};
- proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-waterfall'))return {top:0,bottom:300,left:0,right:100,width:100,height:300};if(this.classList.contains('dv-trace-span-item'))return {top:900,bottom:1100,left:0,right:100,width:100,height:200};return bound.call(this);};
+ proto.getBoundingClientRect=function(){if(this===m.body)return {top:0,bottom:300,left:0,right:100,width:100,height:300};if(this.classList.contains('dv-trace-span-item'))return {top:900,bottom:1100,left:0,right:100,width:100,height:200};return bound.call(this);};
+ h.doc.defaultView={getComputedStyle:el=>({overflowY:el===m.body?'auto':'visible'})};m.body.scrollHeight=4000;m.body.clientHeight=300;
  try{
   const t=api.snapshot().trace.selected,span=t.exemplar.spans[41];assert.equal(api.selectTraceSpan({context:t.context,spanId:span.id}),true);h.flush();
   const list=m.body.querySelector('.dv-trace-waterfall');assert.ok(list.querySelector('.dv-trace-span-detail'),'the detail is open');
-  assert.equal(list.scrollTop,undefined,'nothing is measured or scrolled while the panel is hidden');assert.equal(watchers.length,1,'the list is watched until it has a size');assert.ok(watchers[0].t===list);
-  list.scrollTop=0;hidden=false;watchers[0].f([]);
-  assert.equal(list.scrollTop,892,'shown again: the focused span is scrolled into the list\'s view');assert.equal(watchers[0].off,true,'the watch stops');
-  api.setTraceShow(true);h.flush();assert.equal(list.scrollTop,892,'a repaint of the same focus does not scroll again');
- }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;api.destroy();}
+  assert.equal(m.body.scrollTop,undefined,'nothing is measured or scrolled while the panel is hidden');assert.equal(watchers.length,1,'the list is watched until it has a size');assert.ok(watchers[0].t===list);
+  m.body.scrollTop=0;hidden=false;watchers[0].f([]);
+  assert.equal(m.body.scrollTop,808,'shown again: the panel body scrolls the least that shows the focused span (its bottom + 8)');assert.equal(list.scrollTop,undefined,'the list does not scroll');assert.equal(watchers[0].off,true,'the watch stops');
+  api.setTraceShow(true);h.flush();assert.equal(m.body.scrollTop,808,'a repaint of the same focus does not scroll again');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;api.destroy();}
 });
 
 /* #1193: "N/M steps matched" counts only steps with a traceMatch, less optional steps this trace lacks. The request
@@ -4788,9 +4791,17 @@ test('#1252 typing in Trace ID keeps the loaded trace and its focus; a failed Lo
  for(const [field,value] of [['input','5ab0'],['start','-6h'],['end','']]){api.setDirectTraceField({field,value});h.flush();
   selected=api.snapshot().trace.selected;assert.ok(selected && selected.manual,field+': the trace stays');assert.equal(selected.exemplar.traceId,COMPACT_ID);assert.equal(selected.focus && selected.focus.spanId,span,field+': the span focus stays');
   assert.ok(m.body.querySelector('.dv-trace-slot .dv-trace-selected'),field+': still drawn');}
- api.setDirectTraceField({field:'start',value:''});api.setDirectTraceField({field:'input',value:'f'.repeat(32)});assert.equal(await api.loadDirectTrace(false),null,'a trace whose ID does not match fails');h.flush();
- selected=api.snapshot().trace.selected;assert.ok(selected && selected.exemplar.traceId===COMPACT_ID,'the failed Load keeps the shown trace');assert.ok(api.snapshot().trace.direct.report.error,'and reports its error');
- assert.equal(selected.focus && selected.focus.spanId,span,'review c1: and its span focus');
+ api.setDirectTraceField({field:'start',value:''});api.setDirectTraceField({field:'input',value:'f'.repeat(32)});
+ // #1280 review c2 (probe P3): the kept focus does not scroll the page, so the error by the search stays in view.
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,pageCalls=[],scroller={scrollTop:0};
+ proto.getClientRects=function(){return [1];};proto.getBoundingClientRect=function(){return {top:1900,bottom:1930,left:0,right:100,width:100,height:30};};proto.scrollIntoView=function(){pageCalls.push(this.className);};
+ h.doc.scrollingElement=scroller;h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
+ try{
+  assert.equal(await api.loadDirectTrace(false),null,'a trace whose ID does not match fails');h.flush();
+  selected=api.snapshot().trace.selected;assert.ok(selected && selected.exemplar.traceId===COMPACT_ID,'the failed Load keeps the shown trace');assert.ok(api.snapshot().trace.direct.report.error,'and reports its error');
+  assert.equal(selected.focus && selected.focus.spanId,span,'review c1: and its span focus');assert.equal(selected.focus.auto,true,'the kept focus is not a new request');
+  assert.equal(scroller.scrollTop,0,'the page did not scroll to the kept row');assert.equal(pageCalls.filter(c=>/dv-trace-span-item/.test(c)).length,0,'no scrollIntoView');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;h.doc.defaultView=view;delete h.doc.scrollingElement;}
  api.clearDirectTrace();h.flush();assert.equal(api.snapshot().trace.selected,null,'Clear removes it');assert.equal(calls.length,2);
  api.destroy();
 });
@@ -4863,4 +4874,171 @@ test('#1252 Cancel request during a Load keeps the shown trace and its focus; Cl
  const clear=m.body.querySelectorAll('button').find(b=>b.textContent==='Clear loaded trace');assert.ok(clear);clear.dispatchEvent({type:'click'});h.flush();
  assert.equal(api.snapshot().trace.selected,null,'idle: Clear loaded trace clears');assert.equal(calls.length,2);
  api.destroy();
+});
+/* #1280 light check for fixed-size tiles (Chuck 2026-11-10: the stretching layout is the case that matters; elsewhere the
+   panel body scrolls as a whole): the Spans list's own CSS caps nothing and scrolls nothing, and no rule fills a tile with it. */
+test('#1280 the Spans list has no height cap or scroll of its own in the panel CSS',()=>{
+ const h=harness(fixture()),styles=h.C.PanelRegistry.get('live-status').styles,css=typeof styles==='string'?styles:(Array.isArray(styles)?styles:[]).map(s=>typeof s==='string'?s:s.css || '').join('\n');
+ assert.ok(css.includes('.dv-trace-waterfall{'),'the waterfall rule is in the panel CSS');
+ const own=css.match(/\.dv-trace-waterfall\{[^}]*\}/g) || [],rules=css.match(/[^{}]*\.dv-trace-waterfall[^{]*\{[^}]*\}/g) || [];
+ // The one exception is Chuck's option A: the Edit-mode span-dragging class caps and scrolls the list.
+ assert.ok(own.length>=1);for(const rule of rules.filter(r=>!r.includes('dv-trace-waterfall-edit')))assert.doesNotMatch(rule.slice(rule.indexOf('{')),/max-height|overflow|contain:size|flex:1 1 0/,rule.trim());
+ assert.ok(css.includes('.dv-trace-waterfall.dv-trace-waterfall-edit{max-height:max(240px,calc(100vh - var(--dv-trace-list-top,200px) - 16px));overflow:auto}'),'the Edit-mode cap runs from the list top to the window bottom');
+ assert.ok(!css.includes('dv-trace-fill'),'no tile fill rule');
+ h.ctl.liveStatus.destroy();
+});
+/* #1280 review: with no scrolling ancestor below the page, a span focus the reader asked for scrolls the page by the least
+   needed; an automatic focus (the failed span on load passes auto) never scrolls the page. A reader's later focus of the SAME
+   span still scrolls (review c1 P1). With doc.scrollingElement the page is scrolled by the delta, never via scrollIntoView. */
+test('#1280 an automatic span focus never scrolls the page; a reader\'s focus scrolls it by the least needed',async()=>{
+ const {h,api}=await stage2Loaded();
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,calls=[];
+ proto.getClientRects=function(){return [1];};proto.getBoundingClientRect=function(){return {top:900,bottom:930,left:0,right:100,width:100,height:30};};
+ proto.scrollIntoView=function(options){calls.push([this.className,options]);};h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible'})};
+ const page=()=>calls.filter(c=>/dv-trace-span-item/.test(c[0]));
+ try{
+  const t=api.snapshot().trace.selected,span=t.exemplar.spans[41].id;
+  assert.equal(api.selectTraceSpan({context:t.context,spanId:span,auto:true}),true);h.flush();
+  assert.equal(api.snapshot().trace.selected.focus.auto,true,'the focus says it is automatic');assert.equal(page().length,0,'an automatic focus does not scroll the page');
+  const t1=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t1.context,spanId:span}),true);h.flush();
+  assert.equal(api.snapshot().trace.selected.focus.auto,false);assert.equal(page().length,1,'P1: the reader focusing the same span scrolls the page');
+  assert.deepEqual(plain(page()[0][1]),{block:'nearest',inline:'nearest'});
+  // With the document's scrolling element known, the page is scrolled by the least delta (this document only).
+  const scroller={scrollTop:0};h.doc.scrollingElement=scroller;h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible'}),innerHeight:900};
+  const t2=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t2.context,spanId:t2.exemplar.spans[45].id}),true);h.flush();
+  assert.equal(scroller.scrollTop,38,'row bottom 930 - viewport 900 + 8');assert.equal(page().length,1,'no scrollIntoView, so no frame around the board moves');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
+});
+/* #1280 review c1 MAJOR (probe P2): a focus restored after an Edit-mode re-render (carried by the board editor) never
+   scrolls the page, whether it was the reader's or automatic. */
+test('#1280 a span focus restored after an edit re-render never scrolls the page',async()=>{
+ for(const auto of [false,true]){
+  const editor=mapEditor();let b=mapBoard({editor});assert.ok(await b.api.loadDirectTrace(false));
+  const s=b.api.snapshot().trace.selected;assert.equal(b.api.selectTraceSpan({context:s.context,spanId:MAP_SPAN,auto}),true);b.h.flush();b.api.destroy();
+  const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,calls=[];
+  proto.getClientRects=function(){return [1];};proto.getBoundingClientRect=function(){return {top:1900,bottom:1930,left:0,right:100,width:100,height:30};};
+  proto.scrollIntoView=function(){calls.push(this.className);};
+  try{
+   b=mapBoard({editor});const scroller={scrollTop:0};b.h.doc.scrollingElement=scroller;b.h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
+   for(let i=0;i<3;i++){b.h.flush();runTimers(b.h);}b.h.flush();
+   const restored=b.api.snapshot().trace.selected;assert.ok(restored && restored.focus && restored.focus.spanId===MAP_SPAN,(auto?'auto':'reader')+': the focus is restored');
+   assert.equal(restored.focus.auto,true,'a restored focus is marked as nobody\'s new request');
+   assert.equal(scroller.scrollTop,0,(auto?'auto':'reader')+': the page did not scroll');assert.equal(calls.filter(c=>/dv-trace-span-item/.test(c)).length,0,'no scrollIntoView');
+   // Review c2: the reader then focusing the same span is a request, so the page scrolls by the least needed.
+   assert.equal(b.api.selectTraceSpan({context:restored.context,spanId:MAP_SPAN}),true);b.h.flush();
+   assert.equal(b.api.snapshot().trace.selected.focus.auto,false);assert.equal(scroller.scrollTop,1038,(auto?'auto':'reader')+': a reader focus of the same span after a restore scrolls (1930 - 900 + 8)');
+  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;b.api.destroy();}
+ }
+});
+/* #1280 option A (Chuck 2026-11-10): only while Edit-mode span dragging is on, the list carries the cap class and a focused
+   row scrolls inside the list, never the page; the class goes the moment Edit mode ends. */
+test('#1280 Edit-mode span dragging caps the list; a focused row scrolls inside it; the cap ends with Edit mode',async()=>{
+ const editor=mapEditor();let active=true;editor.state=()=>({editable:true,blocked:'',active,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
+ const b=mapBoard({editor});assert.ok(await b.api.loadDirectTrace(false));b.h.flush();
+ const list=()=>b.m.body.querySelector('.dv-trace-waterfall');
+ assert.ok(list().classList.contains('dv-trace-waterfall-edit'),'Edit mode with span dragging: the cap class is on');
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,calls=[],scroller={scrollTop:0};
+ proto.getClientRects=function(){return [1];};
+ proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-waterfall'))return {top:200,bottom:900,left:0,right:100,width:100,height:700};if(this.classList.contains('dv-trace-span-item'))return {top:1500,bottom:1530,left:0,right:100,width:100,height:30};return bound.call(this);};
+ proto.scrollIntoView=function(){calls.push(this.className);};
+ b.h.doc.scrollingElement=scroller;b.h.doc.defaultView={getComputedStyle:el=>({overflowY:el.classList && el.classList.contains('dv-trace-waterfall-edit')?'auto':'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
+ const l=list();l.scrollHeight=1600;l.clientHeight=700;l.scrollTop=0;
+ try{
+  const s=b.api.snapshot().trace.selected;assert.equal(b.api.selectTraceSpan({context:s.context,spanId:MAP_SPAN}),true);b.h.flush();
+  assert.equal(l.scrollTop,638,'the row scrolls inside the capped list (1530 - 900 + 8)');assert.equal(scroller.scrollTop,0,'not the page');assert.equal(calls.filter(c=>/dv-trace-span-item/.test(c)).length,0);
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;}
+ active=false;b.api.setTraceShow(false);b.api.setTraceShow(true);b.h.flush();
+ assert.ok(!list().classList.contains('dv-trace-waterfall-edit'),'Edit mode ended: no cap');
+ b.api.destroy();
+});
+/* #1280 review c5 (probe C5): the Edit-mode cap's resize and scroll listeners exist only while the cap is on; turning it
+   off and destroying the panel remove them, so three boards built and destroyed leave none behind. */
+test('#1280 the Edit-mode cap listeners exist only while the cap is on and are gone after destroy',async()=>{
+ const counting=()=>({listeners:new Map(),
+  addEventListener(type,fn,capture){const key=type+(capture?':capture':'');if(!this.listeners.has(key))this.listeners.set(key,new Set());this.listeners.get(key).add(fn);},
+  removeEventListener(type,fn,capture){const key=type+(capture?':capture':'');if(this.listeners.has(key))this.listeners.get(key).delete(fn);},
+  requestAnimationFrame:f=>f(),innerHeight:900,getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),
+  count(){let n=0;for(const set of this.listeners.values())n+=set.size;return n;}});
+ const views=[];
+ for(let i=0;i<3;i++){
+  const editor=mapEditor();let active=true;editor.state=()=>({editable:true,blocked:'',active,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
+  const b=mapBoard({editor}),view=counting();b.h.doc.defaultView=view;views.push(view);
+  assert.ok(await b.api.loadDirectTrace(false));b.h.flush();
+  assert.ok(b.m.body.querySelector('.dv-trace-waterfall').classList.contains('dv-trace-waterfall-edit'),'the cap is on');
+  assert.deepEqual([...view.listeners.keys()].sort(),['resize','scroll:capture']);assert.equal(view.count(),2,'one resize and one scroll listener while the cap is on');
+  if(i===0){active=false;b.api.setTraceShow(false);b.api.setTraceShow(true);b.h.flush();assert.equal(view.count(),0,'the cap turning off removes them');active=true;}
+  b.api.destroy();assert.equal(view.count(),0,'destroy removes them');
+ }
+ assert.equal(views.reduce((n,v)=>n+v.count(),0),0,'none left after three boards');
+});
+/* #1283 CI follow-up (lead's rule): a click reveals the row with its opened detail by the least scroll; when the two are
+   taller than the window the row is aligned to the top edge, so it never leaves the window; already visible, nothing moves. */
+test('#1280 a reader focus reveals row and detail by the least scroll; taller than the window, the row goes to the top',async()=>{
+ const {h,api}=await stage2Loaded();
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView;
+ let item={top:300,bottom:600};
+ proto.getClientRects=function(){return [1];};
+ proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-span-item'))return {top:item.top,bottom:item.bottom,left:0,right:100,width:100,height:item.bottom-item.top};return bound.call(this);};
+ h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
+ const focus=(i,box)=>{item=box;const scroller={scrollTop:0};h.doc.scrollingElement=scroller;const t=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t.context,spanId:t.exemplar.spans[i].id}),true);h.flush();return scroller.scrollTop;};
+ try{
+  assert.equal(focus(10,{top:300,bottom:600}),0,'row and detail already visible: nothing moves');
+  assert.equal(focus(20,{top:700,bottom:1000}),108,'row near the bottom: the least scroll shows the detail (1000 - 900 + 8); the row stays at 592');
+  assert.equal(focus(30,{top:500,bottom:1600}),492,'taller than the window: the row is aligned to the top edge (500 - 8)');
+  assert.equal(focus(40,{top:-200,bottom:100}),-208,'above the window: the row comes to the top edge');
+  // Review c8: under the reader's fixed bar (its bottom + 8 published as --flowview-navigation-bottom) the top edge is the
+  // bar's bottom, so a top-aligned reveal ends below it and a row under the bar is not counted as visible.
+  h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:name=>name==='--flowview-navigation-bottom'?'64px':''}),innerHeight:900};
+  assert.equal(focus(42,{top:-200,bottom:100}),-264,'above: the row comes to 8 px below the 56 px bar (-200 - 56 - 8)');
+  assert.equal(focus(44,{top:20,bottom:50}),-44,'under the bar: not visible, brought below it (20 - 56 - 8)');
+  assert.equal(focus(46,{top:300,bottom:600}),0,'below the bar and in the window: nothing moves');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
+});
+/* #1280 review c8 (probe C8): a log-line Load focuses the line's span and reveals its row; it must not then scroll back up
+   to the request line, which would push the focused row off screen. Rects follow the page scroll. */
+test('#1280 a log-line Load leaves the focused span in view; it does not scroll back up to the request line',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')));profile.environments=Object.fromEntries(Object.entries(profile.environments).filter(([id])=>id==='prod'));
+ const recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),SPAN='dcce084f04baa9e1';
+ const raw=compactBoard(['prod']);
+ const line={timestamp:String(BigInt(Date.now()-60000)*1000000n),line:'checkout',labels:{},structuredMetadata:{cameraModel:'arch',trace_id:COMPACT_ID,span_id:SPAN}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>compactTool(),call:async()=>({payload:recorded}),logsConnector:async()=>'Grafana',queryLogs:async()=>({data:[line]})}}}),api=h.ctl.liveStatus,m=mountStatus(h);
+ for(let i=0;i<6;i++)await settle();api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();h.flush();
+ const loadButton=m.body.querySelector('.dv-trace-log-row button.dv-trace-log-load');assert.ok(loadButton,'the log row offers Load');
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,scroller={scrollTop:0};
+ const at=(docY,height)=>({top:docY-scroller.scrollTop,bottom:docY-scroller.scrollTop+height,left:0,right:100,width:100,height});
+ proto.getClientRects=function(){return [1];};
+ proto.getBoundingClientRect=function(){
+  if(this.classList.contains('dv-trace-request-line'))return at(100,30);
+  // The item ends 9 px below its detail (the detail's 8 px margin and the item's 1 px border, review c10).
+  if(this.classList.contains('dv-trace-span-item') && this.querySelector('.dv-trace-span[data-span-id="'+SPAN+'"]'))return at(2000,39);
+  if(this.classList.contains('dv-trace-span-detail') && this.closest('.dv-trace-span-item') && this.closest('.dv-trace-span-item').querySelector('.dv-trace-span[data-span-id="'+SPAN+'"]'))return at(2002,28);
+  return bound.call(this);};
+ h.doc.scrollingElement=scroller;h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
+ try{
+  loadButton.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});for(let i=0;i<10;i++){await settle();h.flush();}
+  const selected=api.snapshot().trace.selected;assert.ok(selected && selected.focus && selected.focus.spanId===SPAN,'the line\'s span is focused');
+  const item=m.body.querySelector('.dv-trace-span[data-span-id="'+SPAN+'"]').closest('.dv-trace-span-item'),box=item.getBoundingClientRect(),detail=item.querySelector('.dv-trace-span-detail').getBoundingClientRect();
+  assert.ok(box.top>=0 && detail.bottom<=900,'the focused row and its detail stay in the window: row top '+box.top+', detail bottom '+detail.bottom+' at scrollTop '+scroller.scrollTop);
+  assert.equal(scroller.scrollTop,1138,'revealed once by the least scroll to the detail (2030 - 900 + 8), not sent back up to the request line, and not 9 px further for the item\'s trailing space');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
+});
+/* #1283 CI (run 42899309527): the least scroll is measured to the detail's own bottom, not the item's. The item adds the
+   detail's 8 px bottom margin and its 1 px border, so revealing the item put the detail 8.6 px above the edge less 8 px. */
+test('#1280 the reveal ends the opened detail itself at the window edge less 8px, not the item with its trailing margin',async()=>{
+ const {h,api}=await stage2Loaded();
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,scroller={scrollTop:0};
+ proto.getClientRects=function(){return [1];};
+ let itemBottom=1009;
+ proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-span-item'))return {top:700,bottom:itemBottom,left:0,right:100,width:100,height:itemBottom-700};if(this.classList.contains('dv-trace-span-detail'))return {top:732,bottom:1000,left:0,right:100,width:100,height:268};return bound.call(this);};
+ h.doc.scrollingElement=scroller;
+ h.doc.defaultView={innerHeight:900,getComputedStyle:el=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>'',
+  marginBottom:el.classList && el.classList.contains('dv-trace-span-detail')?'8px':'0px',borderBottomWidth:el.classList && el.classList.contains('dv-trace-span-item')?'1px':'0px',paddingBottom:'0px'})};
+ try{
+  const t=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t.context,spanId:t.exemplar.spans[20].id}),true);h.flush();
+  assert.equal(scroller.scrollTop,108,'the detail (bottom 1000) ends at 892: 1000 - 900 + 8, not 1009 - 900 + 8');
+  // Review c10: the last item has no bottom border and its detail's margin collapses out of it, so the item ends where the
+  // detail does. Subtracting the computed margin anyway would leave the detail 8 px past the edge.
+  itemBottom=1000;scroller.scrollTop=0;const t2=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t2.context,spanId:t2.exemplar.spans[54].id}),true);h.flush();
+  assert.equal(scroller.scrollTop,108,'last item: the detail still ends at the edge less 8 px');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
 });

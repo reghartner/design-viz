@@ -1097,7 +1097,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function restoreDirectFocus(saved){
     var e=saved && !traceFocus && directTrace.snapshot().exemplar;if(!e || e.traceId!==saved.traceId)return;
     var entry=traceSources().entries.find(function(x){return x.manual && x.exemplar.traceId===saved.traceId;});
-    if(entry)traceFocus={context:traceContext(entry),spanId:saved.spanId,choiceKey:saved.choiceKey};
+    // #1280: kept, not newly requested, so it never scrolls the page (the error stays in view).
+    if(entry)traceFocus={context:traceContext(entry),spanId:saved.spanId,choiceKey:saved.choiceKey,auto:true};
   }
   /* #1078: in board Edit mode, the steps of the trace's own diagram a span can be
      mapped to; null outside Edit mode. A step that has a traceMatch is marked
@@ -1133,7 +1134,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     requestAnimationFrame(function(){
       if(retired || statusMode!=='trace')return;
       var selected=traceSnapshot().selected;
-      if(carried.spanId && selected && selected.exemplar.spans.some(function(s){return s.id===carried.spanId;}))api.selectTraceSpan({context:selected.context,spanId:carried.spanId});
+      // #1280: a restored focus is not a fresh request, so it never scrolls the page (auto).
+      if(carried.spanId && selected && selected.exemplar.spans.some(function(s){return s.id===carried.spanId;}))api.selectTraceSpan({context:selected.context,spanId:carried.spanId,auto:true});
       // A drop or chooser pick re-rendered the board: focus goes back to the dragged span row (#1180).
       var row=carried.returnSpan && view.querySelector('.dv-trace-span[data-span-id="'+carried.returnSpan+'"]');if(row && row.focus)row.focus({preventScroll:true});
     });
@@ -1179,7 +1181,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(!entry || traceFocus.context!==context || !entry.exemplar.spans.some(function(s){return s.id===traceFocus.spanId;})){traceFocus=null;return null;}
     var choices=telemetryTraceChoices(entry.binding.section.diagram,entry.binding.stepper && entry.binding.stepper.path(),entry.exemplar,traceFocus.spanId);
     var choice=traceFocus.choiceKey && choices.find(function(c){return c.key===traceFocus.choiceKey;});
-    return {spanId:traceFocus.spanId,choices:choices,choice:choice || null,navigable:!!entry.binding.stepper};
+    return {spanId:traceFocus.spanId,choices:choices,choice:choice || null,navigable:!!entry.binding.stepper,auto:!!traceFocus.auto};
   }
   /* #1185: the trace's error span to focus or name. "mapped": the earliest error span whose step
      mapping is unique (focused when the trace is first shown, as if the reader clicked it);
@@ -1227,7 +1229,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var errorTarget=selected?traceErrorTarget(selected):null,autoKey=selected?selected.exemplar.traceId:'';
     if(selected && statusMode==='trace' && traceShow && traceAutoFocused!==autoKey){
       traceAutoFocused=autoKey;
-      if(!traceFocus && errorTarget && errorTarget.kind==='mapped'){var autoSpan=errorTarget.span.id;requestAnimationFrame(function(){if(!retired && !traceFocus)api.selectTraceSpan({context:context,spanId:autoSpan});});}
+      if(!traceFocus && errorTarget && errorTarget.kind==='mapped'){var autoSpan=errorTarget.span.id;requestAnimationFrame(function(){if(!retired && !traceFocus)api.selectTraceSpan({context:context,spanId:autoSpan,auto:true});});}
     }
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
     if(selected)model.mapSteps=traceMapSteps(selected.binding);
@@ -2238,7 +2240,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var binding=entry.binding,choices=telemetryTraceChoices(binding.section.diagram,binding.stepper && binding.stepper.path(),entry.exemplar,action.spanId);
       var choice=action.choiceKey?choices.find(function(c){return c.key===action.choiceKey;}):choices.length===1 && choices[0].row.status==='matched'?choices[0]:null;
       if(action.choiceKey && (!traceFocus || traceFocus.spanId!==action.spanId || !choice))return false;
-      traceFocus={context:action.context,spanId:action.spanId,choiceKey:choice && choice.key};
+      // #1280: auto marks a focus nobody asked for (the failed span on load); the panel never scrolls the page for it.
+      traceFocus={context:action.context,spanId:action.spanId,choiceKey:choice && choice.key,auto:action.auto===true};
       if(binding.stepper){
         binding.stepper.pause();
         if(choice){

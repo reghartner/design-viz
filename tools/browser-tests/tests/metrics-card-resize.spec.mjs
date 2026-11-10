@@ -1,10 +1,11 @@
 /* #1242 desktop Workbench: corner handles and Alt+Left/Right change a metrics card's width in Preview metrics layout.
 | row | rule | fixture | assertion | broken implementation it rejects |
 |---|---|---|---|---|
-| R1 | Dragging the bottom-right handle 60 units right grows card.width by 60 while showing the live width; the card does not move; one Undo restores; the Card width field shows the new width. | one bound connection, card below | `card.width` 300, no `position`, readout "Width 300" during the drag, Card width input "300", Undo exact text | handles that move the card, multi-step history, no live feedback |
+| R1 | Dragging the bottom-right handle 60 units right grows card.width by 60 while showing the live width; the automatically placed card is pinned with its left edge where it was; one Undo restores; the Card width field shows the new width. | one bound connection, card below | `card.width` 300 and `position` = previewed top-left, left edge within 2, readout "Width 300" during the drag, Card width input "300", Undo exact text | a card that re-centres away from the pointer on release, multi-step history, no live feedback |
 | R2 | Dragging past 480 clamps to 480; a left-handle drag on a manually placed card keeps its right edge within 2 units and is one Undo step. | same, then a manual position | width 480; right edge before/after; one Undo restores the exact text | unclamped widths, a left drag that moves the right edge |
-| R3 | Alt+Right on a focused card adds 10, Shift+Alt+Left takes 50; Escape during a drag cancels it with no source change. | same | width 250, then 200; source unchanged after Escape | no keyboard path, Escape that commits |
-| R4 | Handles have a 20-unit hit area and the ew-resize cursor; dragging the card body still moves it. | same | hit rect 20×20, cursor ew-resize; body drag writes `position` and keeps width | tiny hit targets, a body drag that resizes |
+| R3 | Alt+Right on a focused card adds 10 and Shift+Alt+Left takes 50, keeping the left edge; releasing Alt while Right repeats saves the pending width; Escape during a drag cancels it with no source change. | same | width 250, 200, 210; left edge within 2; source unchanged after Escape | no keyboard path, a mode switch that drops the pending change, Escape that commits |
+| R4 | Handles have a 16–20px on-screen hit area and the ew-resize cursor; dragging the card body still moves it. | same | hit rect size on screen, cursor ew-resize; body drag changes `position` and keeps width | tiny hit targets, a body drag that resizes |
+| R7 | A left-handle drag on an automatically placed card keeps its right edge and pins it, in one Undo step. | same | right edge within 2, `position` written, Undo exact text | a left drag that re-centres the card |
 | R5 | An inherited imported connection: a handle drag saves the consumer override in one Undo step; the Inspector keeps its scroll. | consumer importing a provider binding | `edgeTracking['a->b'].telemetry.card.width`; Undo restores; `#guide` scrollTop within 2 | resize that edits the provider or loses the Inspector scroll |
 | R6 | Readers never see handles. | reader render of the same spec | reader card count 1, handle count 0 | handles painted for readers |
 */
@@ -30,18 +31,22 @@ async function dragHandle(page,card,corner,dx,{release=true,during}={}){
   if(during)await during();
   if(release)await page.mouse.up();
 }
-const geometry=card=>card.evaluate(el=>{const m=el.transform.baseVal.consolidate().matrix,w=Number(el.querySelector('.dv-metrics-card-box').getAttribute('width'));return {x:m.e,y:m.f,w,right:m.e+w};});
+const geometry=card=>card.evaluate(el=>{const m=el.transform.baseVal.consolidate().matrix,w=Number(el.querySelector('.dv-metrics-card-box').getAttribute('width'));return {x:m.e,y:m.f,w,right:m.e+w,ax:Number(el.dataset.metricsAnchorX),ay:Number(el.dataset.metricsAnchorY)};});
 
 test('R1 R4 desktop bottom-right handle drag grows the width with live feedback, never moves the card, and is one Undo step',async({page,server})=>{
   await open(page,server);await toggle(page).check();await expect(cards(page)).toHaveCount(1);
   const card=cards(page),source=page.locator('#src'),before=await source.inputValue(),start=await geometry(card);expect(start.w).toBe(240);
-  const hit=await card.evaluate(el=>[...el.querySelectorAll('.dv-metrics-resize')].map(g=>{const r=g.querySelector('.dv-metrics-resize-hit');return [g.getAttribute('data-corner'),+r.getAttribute('width'),+r.getAttribute('height'),getComputedStyle(g).cursor];}));
-  expect(hit).toEqual([['nw',20,20,'ew-resize'],['ne',20,20,'ew-resize'],['sw',20,20,'ew-resize'],['se',20,20,'ew-resize']]);
+  await card.hover();
+  const hit=await card.evaluate(el=>[...el.querySelectorAll('.dv-metrics-resize')].map(g=>{const r=g.querySelector('.dv-metrics-resize-hit').getBoundingClientRect();return [g.getAttribute('data-corner'),Math.round(r.width*10)/10,Math.round(r.height*10)/10,getComputedStyle(g).cursor];}));
+  expect(hit.map(h=>[h[0],h[3]])).toEqual([['nw','ew-resize'],['ne','ew-resize'],['sw','ew-resize'],['se','ew-resize']]);
+  for(const h of hit){expect(h[1],'on-screen hit width').toBeGreaterThanOrEqual(16);expect(h[1]).toBeLessThanOrEqual(20.5);expect(h[2]).toBe(h[1]);}
   await dragHandle(page,card,'se',60,{during:async()=>{
     await expect(card.locator('.dv-metrics-resize-readout')).toHaveText('Width 300');await expect(source).toHaveValue(before);
   }});
-  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card).toEqual({side:'below',offset:0,width:300});
-  expect((await geometry(card)).w).toBe(300);
+  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card?.width).toBe(300);
+  const pinned=await geometry(card);expect(pinned.w).toBe(300);
+  expect(Math.abs(pinned.x-start.x),'the left edge stays where the drag left it').toBeLessThanOrEqual(2);
+  expect(edge(await source.inputValue()).telemetry.card).toEqual({side:'below',offset:0,width:300,position:{x:Math.round((start.x-start.ax)*100)/100,y:Math.round((start.y-start.ay)*100)/100}});
   await expect(card.locator('.dv-metrics-resize-readout')).toHaveCount(0);
   await page.locator('#editor-tab-inspect').click();await expect(page.locator('#guide').getByLabel('Card width',{exact:true})).toHaveValue('300');
   const resized=await source.inputValue();
@@ -50,7 +55,8 @@ test('R1 R4 desktop bottom-right handle drag grows the width with live feedback,
   // The card body still moves the card and never changes its width.
   const body=await card.evaluate(el=>{const r=el.querySelector('.dv-metrics-card-box').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};});
   await page.mouse.move(body.x,body.y);await page.mouse.down();await page.mouse.move(body.x+40,body.y+30,{steps:6});await page.mouse.up();
-  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.position).toBeTruthy();
+  const pinnedAt=edge(resized).telemetry.card.position;
+  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.position).not.toEqual(pinnedAt);
   expect(edge(await source.inputValue()).telemetry.card.width).toBe(300);
 });
 
@@ -74,12 +80,18 @@ test('R2 desktop handle drags clamp at 480 and a left-handle drag on a manually 
 
 test('R3 desktop Alt+Left/Right changes the focused card width; Escape cancels a handle drag',async({page,server})=>{
   await open(page,server);await toggle(page).check();await expect(cards(page)).toHaveCount(1);
-  const card=cards(page),source=page.locator('#src');
+  const card=cards(page),source=page.locator('#src'),start=await geometry(card);
   await card.focus();await card.press('Alt+ArrowRight');
   await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.width).toBe(250);
-  await expect(card).toBeFocused();
+  await expect(card).toBeFocused();expect(Math.abs((await geometry(card)).x-start.x),'Alt+Right keeps the left edge').toBeLessThanOrEqual(2);
+  expect(edge(await source.inputValue()).telemetry.card.position,'the resized card is pinned').toBeTruthy();
   await card.press('Shift+Alt+ArrowLeft');await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.width).toBe(200);
-  expect(edge(await source.inputValue()).telemetry.card.position,'keyboard width changes never move the card').toBeUndefined();
+  expect(Math.abs((await geometry(card)).x-start.x)).toBeLessThanOrEqual(2);
+  // Releasing Alt while Right repeats saves the pending width instead of discarding it.
+  const position=edge(await source.inputValue()).telemetry.card.position;
+  await card.focus();await page.keyboard.down('Alt');await page.keyboard.down('ArrowRight');await page.keyboard.up('Alt');await page.keyboard.down('ArrowRight');await page.keyboard.up('ArrowRight');
+  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.width).toBe(210);
+  expect(edge(await source.inputValue()).telemetry.card.position,'the switch did not also move the card').toEqual(position);
   const before=await source.inputValue();
   await dragHandle(page,card,'se',80,{release:false});await expect(card.locator('.dv-metrics-resize-readout')).toHaveText('Width 280');
   await page.keyboard.press('Escape');await page.mouse.up();
@@ -115,4 +127,14 @@ test('R6 readers never see metrics card handles',async({page,server})=>{
   const count=()=>page.evaluate(()=>{const host=document.getElementById('resize-reader');return {cards:host.querySelectorAll('.dv-metrics-card').length,handles:host.querySelectorAll('.dv-metrics-resize').length,editable:host.querySelectorAll('.dv-metrics-card[data-metrics-section]').length};});
   await expect.poll(async()=>(await count()).cards,'the reader painted the card').toBe(1);
   expect(await count()).toEqual({cards:1,handles:0,editable:0});
+});
+
+test('R7 desktop left-handle drag on an automatically placed card keeps its right edge and pins it in one Undo step',async({page,server})=>{
+  await open(page,server);await toggle(page).check();await expect(cards(page)).toHaveCount(1);
+  const card=cards(page),source=page.locator('#src'),before=await source.inputValue(),start=await geometry(card);
+  await dragHandle(page,card,'sw',-60);
+  await expect.poll(async()=>edge(await source.inputValue()).telemetry.card?.width).toBe(300);
+  const end=await geometry(card);expect(Math.abs(end.right-start.right),'right edge stays within 2 units').toBeLessThanOrEqual(2);
+  expect(edge(await source.inputValue()).telemetry.card.position,'the card is pinned where the preview showed it').toEqual({x:Math.round((start.x-60-start.ax)*100)/100,y:Math.round((start.y-start.ay)*100)/100});
+  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);
 });

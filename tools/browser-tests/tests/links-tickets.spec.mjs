@@ -34,7 +34,7 @@ async function open(page,server,spec=fixture){
 test('B1 Links by ticket lists FW-45 with its node, edge and step, and highlights them on the canvas and in Steps',async({page,server})=>{
   const {links}=await open(page,server);
   await expect(links.getByRole('tab',{name:/^Tickets/})).toHaveAttribute('aria-selected','true');
-  for(const name of [/^Metrics/,/^Trace match/,/^Log searches/]){
+  for(const name of [/^Metrics/,/^Log searches/]){
     await links.getByRole('tab',{name}).click();await expect(links.getByRole('tabpanel')).toContainText('Coming next');
   }
   await links.getByRole('tab',{name:/^Tickets/}).click();
@@ -110,6 +110,10 @@ test('B3 By element: the step row shows FW-45; a chip drag moves it in one Undo 
   const menu=page.getByRole('menu',{name:/FW-45/});await expect(menu).toBeVisible();
   await menu.getByRole('menuitem',{name:'Move to…'}).click();
   const picker=page.getByRole('dialog',{name:/Move FW-45/});await expect(picker).toBeVisible();
+  // A refused target stays focusable, says why in visible text, and is described by it.
+  const self=picker.getByRole('button',{name:'Doorbell controller',exact:true});
+  await expect(self).toHaveAttribute('aria-disabled','true');
+  const selfWhy=page.locator('#'+await self.getAttribute('aria-describedby'));await expect(selfWhy).toBeVisible();await expect(selfWhy).toContainText('already here');
   await picker.getByRole('button',{name:'Notification service',exact:true}).click();
   await expect.poll(async()=>diagram(await source(page)).nodes.notify.tickets).toEqual(['FW-45']);
   expect(diagram(await source(page)).nodes.ctrl.tickets).toBeUndefined();

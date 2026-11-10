@@ -165,6 +165,34 @@ function telemetryTraceLabelsBlocked(texts){
 function telemetryTraceLabelBoxes(svg){
   return Array.from(svg.querySelectorAll('.dv-trace-overlay text')).map(function(el){return boardControlBox(el,svg);}).filter(Boolean);
 }
+/* #1242 Workbench-only width handles for an editable card (readers never call this).
+   Each corner has a drawn square inside a transparent hit area, sized for the current
+   zoom: the hit area is always 16–20px on screen (20px unless 40% of the card's smaller
+   side is less, never under 16px) and the square is 8px. */
+var TELEMETRY_CARD_HANDLE_HIT=20,TELEMETRY_CARD_HANDLE_MIN=16,TELEMETRY_CARD_HANDLE_MARK=8;
+function telemetryCardResizeHandles(card){
+  var doc=card.ownerDocument,box=card.querySelector('.dv-metrics-card-box');if(!box)return;
+  card.querySelectorAll('.dv-metrics-resize').forEach(function(el){el.remove();});
+  ['nw','ne','sw','se'].forEach(function(corner){
+    var g=telemetrySvg(doc,'g',{'class':'dv-metrics-resize','data-corner':corner},card);
+    telemetrySvg(doc,'title',{},g).textContent='Drag to change the card width ('+TELEMETRY_CARD_WIDTH_MIN+'–'+TELEMETRY_CARD_WIDTH_MAX+'). Resizing pins the card where you see it. With the card focused, Alt+Left/Right changes it by 10; Shift+Alt by 50.';
+    telemetrySvg(doc,'rect',{'class':'dv-metrics-resize-hit',fill:'transparent'},g);
+    telemetrySvg(doc,'rect',{'class':'dv-metrics-resize-mark',rx:1.5,'aria-hidden':'true'},g);
+  });
+  telemetryCardPlaceHandles(card,Number(box.getAttribute('width')));
+}
+function telemetryCardPlaceHandles(card,w){
+  var box=card.querySelector('.dv-metrics-card-box'),h=box?Number(box.getAttribute('height')):0,svg=card.ownerSVGElement,scale=1;
+  try{var m=svg && svg.getScreenCTM && svg.getScreenCTM();if(m && m.a>0)scale=m.a;}catch(ignored){}
+  var hit=Math.min(TELEMETRY_CARD_HANDLE_HIT/scale,Math.max(TELEMETRY_CARD_HANDLE_MIN/scale,Math.min(w,h)*0.4)),mark=TELEMETRY_CARD_HANDLE_MARK/scale;
+  card.setAttribute('data-metrics-handle-scale',scale);
+  card.querySelectorAll('.dv-metrics-resize').forEach(function(g){
+    var corner=g.getAttribute('data-corner'),r=g.querySelector('.dv-metrics-resize-hit'),q=g.querySelector('.dv-metrics-resize-mark');
+    g.setAttribute('transform','translate('+(corner[1]==='w'?0:w)+' '+(corner[0]==='n'?0:h)+')');
+    r.setAttribute('x',-hit/2);r.setAttribute('y',-hit/2);r.setAttribute('width',hit);r.setAttribute('height',hit);
+    q.setAttribute('x',-mark/2);q.setAttribute('y',-mark/2);q.setAttribute('width',mark);q.setAttribute('height',mark);
+  });
+}
 function telemetryPaintCards(scope,diagram,templates,view,window,activate,config){
   telemetryClearCards(scope);
   if(!view || !diagram)return;

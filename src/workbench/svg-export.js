@@ -16,7 +16,7 @@ var SVG_EXPORT_REMOVED_SELECTOR=[
   '.dv-position-lock-badge','[data-dv-hidden="true"]',
   '.nlink','.nbackref','.nrefs-trigger','.detail-trigger',
   '.dv-metrics-card[data-state="preview"]','.dv-metrics-leader[data-metrics-preview]'
-  ,'.dv-text-resize','.dv-text-resize-preview','.text-box-hit'
+  ,'.dv-text-resize','.dv-text-resize-preview','.text-box-hit','.dv-metrics-resize','.dv-metrics-resize-readout'
 ].join(',');
 var SVG_EXPORT_EDITOR_CLASSES=/^(?:dv-(?:sel|instep|inserttarget|dragsrc|droptgt|ghost|ghostback|grabbing|position-(?:locked|lock-feedback)|connect-(?:source|candidate|target|replaced)|free-edge-source|topology-boundary-drag)|view-focus)$/;
 

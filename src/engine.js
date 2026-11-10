@@ -1065,6 +1065,18 @@ function fitLaneNodeTitle(node, title, width, subtitle, measurement){
   if (hasSub) sub.setAttribute('y', subY + 7);
   return remember();
 }
+/* #1242: framing and control boxes measure a metrics card's content, never the
+   Workbench resize handles' hit areas, tooltips or drag readout around it. */
+function boardInkBBox(el){
+  if(!el.classList || !el.classList.contains('dv-metrics-card') || !el.querySelector('.dv-metrics-resize'))return el.getBBox();
+  var x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  Array.prototype.forEach.call(el.children,function(child){
+    if(child.matches('.dv-metrics-resize,.dv-metrics-resize-readout,.dv-metrics-resize-clip,title') || typeof child.getBBox!=='function')return;
+    var b=child.getBBox();if(!b.width && !b.height)return;
+    x0=Math.min(x0,b.x);y0=Math.min(y0,b.y);x1=Math.max(x1,b.x+b.width);y1=Math.max(y1,b.y+b.height);
+  });
+  return x0===Infinity?{x:0,y:0,width:0,height:0}:{x:x0,y:y0,width:x1-x0,height:y1-y0};
+}
 /* Measure complete graph ink in SVG coordinates, including transformed node
    groups, paths, labels and coins. Hidden story fragments retain their bounds.
    Headless DOMs without SVG measurement use the saved/pure geometry fallback. */
@@ -1078,7 +1090,7 @@ function boardContentBounds(svg){
     // Metrics packet streams (#939) ride the same paths and are skipped likewise.
     if(child.tagName.toLowerCase()==='defs' || child.matches('.dv-board-ground,.dv-board-grid,.pkt,.dv-metrics-stream') || typeof child.getBBox!=='function')return;
     try{
-      var box=child.getBBox(),matrix=child.getCTM();if(!matrix || !box.width && !box.height)return;
+      var box=boardInkBBox(child),matrix=child.getCTM();if(!matrix || !box.width && !box.height)return;
       matrix=inverse.multiply(matrix);
       var corners=[[box.x,box.y],[box.x+box.width,box.y],[box.x,box.y+box.height],[box.x+box.width,box.y+box.height]].map(function(xy){return {x:matrix.a*xy[0]+matrix.c*xy[1]+matrix.e,y:matrix.b*xy[0]+matrix.d*xy[1]+matrix.f};});
       var x=Math.min.apply(null,corners.map(function(p){return p.x;})),y=Math.min.apply(null,corners.map(function(p){return p.y;}));
@@ -1097,7 +1109,7 @@ function boardControlBox(el,svg){
   var style=el.ownerDocument.defaultView.getComputedStyle(el);
   if(style.display==='none' || style.visibility==='hidden' || el.closest('.dv-fragment-hidden,.view-step-hidden,.comm-hidden,.dv-live-comm-suppressed'))return null;
   var root=svg.getCTM(),matrix=el.getCTM();if(!root || !matrix)return null;
-  var box=el.getBBox();if(!box.width && !box.height)return null;
+  var box=boardInkBBox(el);if(!box.width && !box.height)return null;
   matrix=root.inverse().multiply(matrix);
   var points=[[box.x,box.y],[box.x+box.width,box.y],[box.x,box.y+box.height],[box.x+box.width,box.y+box.height]].map(function(p){return {x:matrix.a*p[0]+matrix.c*p[1]+matrix.e,y:matrix.b*p[0]+matrix.d*p[1]+matrix.f};});
   var x=Math.min.apply(null,points.map(function(p){return p.x;})),y=Math.min.apply(null,points.map(function(p){return p.y;}));

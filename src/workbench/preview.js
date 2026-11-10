@@ -184,7 +184,7 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
     metricsLabel=doc.createElement('label');metricsLabel.className='workspace-preview workspace-metrics-preview';
     metricsInput=doc.createElement('input');metricsInput.type='checkbox';metricsInput.checked=metricsOn;
     metricsInput.disabled=!trackingTelemetry(page).enabled;
-    metricsLabel.title=metricsInput.disabled?'Enable Allow metrics in Document settings → Tracking → Metrics.':'Synthetic values only; no queries or saved changes.';
+    metricsLabel.title=metricsInput.disabled?'Enable Allow metrics in Status board settings → Metrics.':'Synthetic values only; no queries or saved changes.';
     metricsLabel.appendChild(metricsInput);metricsLabel.appendChild(doc.createTextNode('Preview metrics layout'));
     metricsInput.addEventListener('change',changeMetrics);previewButton.parentNode.insertBefore(metricsLabel,previewButton);
   }

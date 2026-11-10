@@ -132,6 +132,11 @@ var BUILDER_GUIDES = {
     how:'These settings travel with Save and Export. Canvas appearance is a temporary preview.',
     fields:[['title','page heading'],['description','optional one line (up to 200 characters) shown on library cards'],['tags','optional comma-separated lowercase tags shown as chips; both are matched by Search diagrams'],['skin','saved opening skin; omitted uses pastel'],['generatedFrom','source URL, description, version and date shown below the title'],['tour','advanced reader tour JSON; validated before committing']]
   },
+  board: {
+    title:'Status board settings',
+    how:'Board-level live status settings, saved in the page tracking block. Each edit is one Undo step. Tickets and metrics for one node or connection are in its Inspect → Tracking.',
+    fields:[['tracking.jira','Jira site, parent Epic or Initiative keys and excluded stories'],['tracking.github','repositories or organization searched for pull requests'],['tracking.telemetry','metrics settings, environments, trace connections and log searches'],['panels','a Live status panel shows the board status beside the diagram']]
+  },
   group: {
     title: 'Group — a containment boundary',
     how: 'Select nodes and set their group to create a boundary. Select its boundary to edit or delete it.',

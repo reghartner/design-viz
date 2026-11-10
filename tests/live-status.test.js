@@ -4416,20 +4416,23 @@ test('#1186 focus that left the card before a Load is not carried to the new car
   assert.equal(api.snapshot().trace.selected.manual,true);assert.equal(focused.length,0,'focus stays where the reader left it');
  }finally{Element.prototype.focus=focus;api.destroy();}
 });
-test('#1186 a span focused while the panel is hidden is scrolled into the list\'s view when the panel shows again',async()=>{
+/* #1280: the list grows with its spans, so a span focused while the panel is hidden is scrolled into the view of the
+   panel body (the nearest ancestor that scrolls) when the panel shows again; the list itself never scrolls. */
+test('#1186 #1280 a span focused while the panel is hidden is scrolled into the panel body\'s view when the panel shows again',async()=>{
  const {h,api,m}=await stage2Loaded();
  let hidden=true;const watchers=[];h.C.ResizeObserver=class{constructor(f){this.f=f;this.off=false;watchers.push(this);}observe(t){this.t=t;}disconnect(){this.off=true;}};
- const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect;
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView;
  proto.getClientRects=function(){return hidden?[]:[1];};
- proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-waterfall'))return {top:0,bottom:300,left:0,right:100,width:100,height:300};if(this.classList.contains('dv-trace-span-item'))return {top:900,bottom:1100,left:0,right:100,width:100,height:200};return bound.call(this);};
+ proto.getBoundingClientRect=function(){if(this===m.body)return {top:0,bottom:300,left:0,right:100,width:100,height:300};if(this.classList.contains('dv-trace-span-item'))return {top:900,bottom:1100,left:0,right:100,width:100,height:200};return bound.call(this);};
+ h.doc.defaultView={getComputedStyle:el=>({overflowY:el===m.body?'auto':'visible'})};m.body.scrollHeight=4000;m.body.clientHeight=300;
  try{
   const t=api.snapshot().trace.selected,span=t.exemplar.spans[41];assert.equal(api.selectTraceSpan({context:t.context,spanId:span.id}),true);h.flush();
   const list=m.body.querySelector('.dv-trace-waterfall');assert.ok(list.querySelector('.dv-trace-span-detail'),'the detail is open');
-  assert.equal(list.scrollTop,undefined,'nothing is measured or scrolled while the panel is hidden');assert.equal(watchers.length,1,'the list is watched until it has a size');assert.ok(watchers[0].t===list);
-  list.scrollTop=0;hidden=false;watchers[0].f([]);
-  assert.equal(list.scrollTop,892,'shown again: the focused span is scrolled into the list\'s view');assert.equal(watchers[0].off,true,'the watch stops');
-  api.setTraceShow(true);h.flush();assert.equal(list.scrollTop,892,'a repaint of the same focus does not scroll again');
- }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;api.destroy();}
+  assert.equal(m.body.scrollTop,undefined,'nothing is measured or scrolled while the panel is hidden');assert.equal(watchers.length,1,'the list is watched until it has a size');assert.ok(watchers[0].t===list);
+  m.body.scrollTop=0;hidden=false;watchers[0].f([]);
+  assert.equal(m.body.scrollTop,808,'shown again: the panel body scrolls the least that shows the focused span (its bottom + 8)');assert.equal(list.scrollTop,undefined,'the list does not scroll');assert.equal(watchers[0].off,true,'the watch stops');
+  api.setTraceShow(true);h.flush();assert.equal(m.body.scrollTop,808,'a repaint of the same focus does not scroll again');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;api.destroy();}
 });
 
 /* #1193: "N/M steps matched" counts only steps with a traceMatch, less optional steps this trace lacks. The request

@@ -2331,11 +2331,12 @@ Stage 2 (#1186) finishes the layout. **Show on diagram** (a toggle) and **Open
 trace** are icons at the right end of the request line, outside its summary, with
 those accessible names. The request card also holds **Pin as evidence**, **Source
 and limitations** and **All operation mappings**. A header row, "Spans · 55 · click
-a span to focus it on the diagram", sits above the span list. In a section layout
-tile the list fills the rest of the panel and scrolls inside it, so its length
-never grows the tile. A focused span's detail (duration, service, operation, the
-matched step or the step choices, **Clear trace focus**) opens directly under its
-row, and a span focused from the diagram is scrolled into the list's view.
+a span to focus it on the diagram", sits above the span list. The list has no
+scroll bar of its own: it is as tall as its spans (#1280), and the panel body (in a
+section layout tile) or the page scrolls instead. A focused span's detail (duration,
+service, operation, the matched step or the step choices, **Clear trace focus**)
+opens directly under its row, and a span focused from the diagram is scrolled into
+view by the panel body or the page.
 
 Each annotated node or uniquely matched edge gets one label from its rows: one row per
 step on the current path whose `traceMatch` names it (#1154). Connection timing (#1196):

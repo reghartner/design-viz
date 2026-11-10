@@ -501,8 +501,8 @@
         var duration=el(row,'span','duration','dv-trace-duration',telemetryTraceDuration(span.ms)+(span.error?' · error':''));duration.setAttribute('role','img');duration.setAttribute('aria-label',span.ms+' milliseconds'+(span.error?' · error':''));duration.title=span.ms+' ms';
         if(focusedSpan && span.id===focusedSpan.id){spanDetail(item);focusItem=item;}
       });
-      // A newly focused span (from the list or the diagram) is scrolled into the list's view, not the page's, after the sweep
-      // has removed the previous span's detail (revealTraceFocus).
+      // A newly focused span (from the list or the diagram) is scrolled into view after the sweep has removed the previous
+      // span's detail (revealTraceFocus). #1280: the list grows with its spans, so what scrolls is the panel body or the page.
       var focusKey=focusedSpan?focusedSpan.id:'';
       if(!focusItem){waterfall._traceFocusShown='';host._traceFocusPending=null;}else if(waterfall._traceFocusShown!==focusKey)host._traceFocusPending={list:waterfall,item:focusItem,key:focusKey};
     }
@@ -516,7 +516,18 @@
         return;
       }
       stopFocusWatch();host._traceFocusPending=null;list._traceFocusShown=pending.key;
-      var lb=list.getBoundingClientRect(),ib=pending.item.getBoundingClientRect();if(ib.top<lb.top || ib.bottom>lb.bottom)list.scrollTop+=ib.top-lb.top-8;
+      // The nearest ancestor that scrolls (the panel body in a tile) moves by the least that shows the row; without one, the page does.
+      var holder=scrollHolder(list),ib=pending.item.getBoundingClientRect();
+      if(holder){var hb=holder.getBoundingClientRect();if(ib.top<hb.top || ib.bottom>hb.bottom)holder.scrollTop+=ib.top<hb.top || ib.height>hb.height?ib.top-hb.top-8:ib.bottom-hb.bottom+8;}
+      else if(pending.item.scrollIntoView)pending.item.scrollIntoView({block:'nearest',inline:'nearest'});
+    }
+    // The closest element above `node` (crossing a shadow root) whose content scrolls vertically.
+    function scrollHolder(node){
+      var view=doc.defaultView || (typeof window!=='undefined'?window:null);if(!view || !view.getComputedStyle)return null;
+      for(var at=node.parentElement || (node.parentNode && node.parentNode.host) || null;at;at=at.parentElement || (at.parentNode && at.parentNode.host) || null){
+        var style=view.getComputedStyle(at);if(style && /(auto|scroll)/.test(style.overflowY) && at.scrollHeight>at.clientHeight+1)return at;
+      }
+      return null;
     }
     function traceIcon(parent,kind){
       var svg=el(parent,'svg','icon','dv-trace-icon-svg');svg.setAttribute('viewBox','0 0 16 16');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
@@ -612,8 +623,6 @@
     }
     function paint(value){
       if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=activeElement();host._liveFocusControls={};
-      // #1186: with a trace shown, the Trace body fills the panel's tile and the span list takes the rest (CSS below).
-      if(value && value.mode==='trace' && value.trace && value.trace.selected)host.classList.add('dv-trace-fill');else host.classList.remove('dv-trace-fill');
       sharedHeader(value);
       if(value && value.mode==='trace'){traceBody(value);sweep(host);revealTraceFocus();settleFocus(value);return;}
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
@@ -791,7 +800,7 @@
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}.dv-trace-log-report>.dv-trace-direct-report{margin-top:0}.dv-trace-log-row:has(+.dv-trace-log-report){border-bottom:0}
 .dv-trace-selected{min-width:0}.dv-trace-slot{margin:10px 0;min-width:0}.dv-trace-slot-hint{margin:0;padding:10px;border:1px dashed var(--explore-border);border-radius:6px;color:var(--dfaint);font-size:11px}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
-.dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall{max-height:240px;overflow:auto;margin:0 0 12px;border:1px solid var(--explore-border);border-top:0;border-radius:0 0 6px 6px;padding:0 8px 8px}
+.dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall{margin:0 0 12px;border:1px solid var(--explore-border);border-top:0;border-radius:0 0 6px 6px;padding:0 8px 8px}
 .dv-trace-span{width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;align-items:center;padding:5px 0;font-size:10px}.dv-trace-span[aria-pressed="true"]{background:color-mix(in srgb,var(--dv-live-active) 10%,transparent)}.dv-trace-span:focus-visible{outline:2px solid var(--dv-live-active)}.dv-trace-operation-detail{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;gap:6px;margin-top:12px;padding:8px;border:1px solid var(--explore-border);border-radius:6px}.dv-trace-operation-detail>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}.dv-trace-operation-detail small{grid-column:1/-1}.dv-trace-duration{font:700 13px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}.dv-trace-span .dv-trace-duration{grid-column:2;grid-row:1;white-space:nowrap}.dv-trace-operation-detail .dv-trace-duration{font-size:20px;line-height:1.4}.dv-trace-span-name{grid-column:1;grid-row:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-track{grid-column:1/-1;grid-row:2;height:10px;background:color-mix(in srgb,var(--dink) 7%,transparent)}.dv-trace-bar{display:block;box-sizing:border-box;max-width:100%;height:10px;background:var(--dv-live-active)}.dv-trace-span[data-error="true"] .dv-trace-bar{background:var(--dv-live-blocked)}
 .dv-trace-mappings{display:grid;gap:5px}.dv-trace-mapping{display:grid;grid-template-columns:1fr auto;gap:2px 8px;border-left:3px solid var(--dfaint);padding:5px 8px}.dv-trace-mapping small{grid-column:1/-1;color:var(--dfaint)}.dv-trace-mapping[data-tone="error"]{border-color:var(--dv-live-blocked)}.dv-trace-mapping[data-tone="warning"]{border-color:#d49620}
 [data-trace-tone="error"]{--dv-trace-color:#d64b68}[data-trace-tone="warning"]{--dv-trace-color:#c88b14}[data-trace-tone="observed"]{--dv-trace-color:#368cc9}[data-trace-tone="unknown"]{--dv-trace-color:#87929e}
@@ -815,11 +824,6 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-trace-icon-svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}.dv-trace-icon-svg .dv-trace-icon-fill{fill:currentColor;stroke:none}
 .dv-trace-spans-head{display:flex;align-items:baseline;gap:0;margin-top:10px;padding:7px 8px 6px;border:1px solid var(--explore-border);border-bottom-color:color-mix(in srgb,var(--explore-border) 60%,transparent);border-radius:6px 6px 0 0;font-size:11px;color:var(--dfaint)}.dv-trace-spans-head strong{color:var(--dink);font-size:12px}.dv-trace-spans-head span{white-space:pre-wrap}
 .dv-trace-span-item{border-bottom:1px solid color-mix(in srgb,var(--explore-border) 50%,transparent)}.dv-trace-span-item:last-child{border-bottom:0}.dv-trace-span-item>.dv-trace-span-detail{margin:2px 0 8px;border-color:color-mix(in srgb,var(--dv-live-active) 40%,var(--explore-border));background:color-mix(in srgb,var(--dv-live-active) 5%,transparent)}.dv-trace-detail-actions{display:flex;flex-wrap:wrap;gap:6px}
-.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
-.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>*,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>*,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill .dv-trace-selected>*{flex:none}
-.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-selected,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-slot,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-slot>.dv-trace-selected{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
-.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-slot,.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill>.dv-live-trace>.dv-trace-slot>.dv-trace-selected{min-height:auto}
-.docview .section-layout-tile>.pwidget.pt-live-status>.pbody.dv-trace-fill .dv-trace-selected>.dv-trace-waterfall{flex:1 1 0;min-height:200px;max-height:none;contain:size;margin-bottom:0}
 .dv-trace-focus-status{color:var(--dtext)}.dv-trace-span-identity{display:grid;gap:3px;min-width:0}.dv-trace-span-field{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;align-items:baseline;min-width:0;font-size:10px}.dv-trace-span-label{color:var(--dtext)}.dv-trace-span-field code{min-width:0;overflow-wrap:anywhere;user-select:all}.dv-trace-map-guide{justify-self:start;max-width:100%;overflow-wrap:anywhere}.dv-trace-map-step{display:flex;flex-wrap:wrap;gap:7px;min-width:0}.dv-trace-map-select{min-width:0;max-width:100%}.dv-trace-map-apply{min-width:0;max-width:100%;white-space:normal}.dv-trace-map-none{margin:0;color:var(--dtext)}.dv-trace-step-choices{display:flex;flex-wrap:wrap;gap:7px;grid-column:1/-1}.dv-trace-step-choice{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
 .dv-trace-span:focus-visible,.dv-trace-step-choice:focus-visible{outline:2px solid #009fc7;outline-offset:3px}
 

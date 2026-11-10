@@ -422,7 +422,7 @@ body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display
  /* Numbered rail of top-level parts, shown while Contents is closed on desktop. */
  .reader-rail{position:fixed;z-index:104;width:44px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;padding:14px 0 12px;background:var(--reader-sidebar,var(--explore-bg));border-right:1px solid var(--explore-border);}
  .reader-rail[hidden]{display:none;}
- .reader-rail-list{position:relative;align-self:stretch;flex:0 1 auto;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;align-items:center;gap:10px;margin:0;padding:3px 0;list-style:none;}
+ .reader-rail-list{position:relative;align-self:stretch;flex:0 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--explore-border) transparent;display:flex;flex-direction:column;align-items:center;gap:10px;margin:0;padding:3px 0;list-style:none;}
  .reader-rail-list>li{position:relative;flex:none;}
  .reader-rail-list>li+li:before{content:'';position:absolute;bottom:100%;left:50%;width:2px;height:10px;margin-left:-1px;background:var(--explore-border);}
  .reader-rail-list>li:has(.reader-rail-past)+li:before{background:color-mix(in srgb,var(--navigation-accent) 55%,transparent);}
@@ -433,8 +433,10 @@ body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display
  .reader-rail-count{flex:none;margin-top:12px;font-size:10.5px;font-weight:500;color:var(--dfaint);font-variant-numeric:tabular-nums;}
  .reader-part-number{display:inline-block;min-width:16px;margin-right:9px;color:var(--dfaint);font-weight:500;font-variant-numeric:tabular-nums;}
  body .reader-navigation .reader-tree-tab[data-current-part],.reader-tree-tab[data-current-part] .reader-part-number{color:var(--navigation-accent);}
-/* #1305: the current page row's number wears the accent, like the rail's current marker. */
-.reader-navigation .reader-tree-leaf[aria-current=page]>.reader-part-number{color:var(--navigation-accent);}
+/* #1305: tree page rows carry the rail's page number (data-page-index). Tab rows without one keep an
+   empty slot of the same width, so the columns stay aligned. */
+.reader-tree-numbered .reader-tree-tab::before,.reader-tree-numbered .reader-tree-view::before,.reader-tree-numbered .reader-tree-section::before{content:attr(data-page-index);display:inline-block;min-width:16px;margin-right:9px;color:var(--dfaint);font-weight:500;font-variant-numeric:tabular-nums;}
+.reader-tree-numbered [data-page-index][aria-current=page]::before{color:var(--navigation-accent);}
  .reader-contents-tree{flex:1;overflow:auto;min-height:0;padding:8px 10px 24px;overscroll-behavior:contain;}
  .reader-contents-tab+.reader-contents-tab{margin-top:16px;padding-top:14px;border-top:1px solid var(--explore-border);}
  body .reader-navigation .reader-tree-tab{font-weight:600;display:block;width:100%;padding:9px 10px;}

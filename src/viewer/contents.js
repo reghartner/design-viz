@@ -194,6 +194,7 @@ function createReaderContents(ctl,nav,actions,options){
     // The overlay keeps its own disclosure set: only the current part opens.
     // #1305: page rows carry the rail's numbers (pager order); Tab rows are not numbered.
     var shown=hovering?overlayTabs:expandedTabs,pages=documentPages(),numbered=pages.length>1;
+    tree.classList.toggle('reader-tree-numbered',numbered);
     topParts().forEach(function(item){
       var embed=embedded(),canonical=item.records.some(function(record){return Array.isArray(record.section.views);}),groups=[];
       // Keep each section/View occurrence intact, then omit grouping levels
@@ -215,7 +216,8 @@ function createReaderContents(ctl,nav,actions,options){
         var rec=definition.members[0].record.runtime,selected=item===owner && item.current===definition && current===rec;
         if(search)search.mark(choice,item,rec,definition);
         var page=numbered?pages.findIndex(function(entry){return entry.owner===item && entry.definition===definition && entry.rec===rec;}):-1;
-        if(page>=0){var badge=element('span','reader-part-number',String(page+1));badge.setAttribute('aria-hidden','true');choice.prepend(badge);choice.setAttribute('data-page-index',String(page+1));}
+        // The number is drawn by CSS from data-page-index, so row text and names stay the section/View title.
+        if(page>=0){choice.setAttribute('data-page-index',String(page+1));choice.setAttribute('aria-description','Page '+(page+1)+' of '+pages.length);}
         choice.classList.add('reader-tree-leaf');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-owner-selected',String(item.current===definition));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-current',selected?'page':'false');choice.setAttribute('aria-pressed',String(selected));
         if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
         if(selected)trail(parent);
@@ -260,9 +262,7 @@ function createReaderContents(ctl,nav,actions,options){
   // #1305: the rail lists the pager's document pages, so marker n is "Page n of m".
   function parts(){var pages=documentPages();return readerRailPages(pages,currentPageIndex(pages),title);}
   function goPart(part){
-    if(part.definition)choose(part.owner,part.definition,part.rec,true);
-    else if(part.owner){var definition=part.owner.current,first=definition && definition.members[0];if(definition)choose(part.owner,definition,first && first.record.runtime,true);}
-    else if(options.selectSection){options.selectSection(part.rec);pinnedTop=part.rec.sectionEl.getBoundingClientRect().top;}
+    choose(part.owner,part.definition,part.rec,true);
   }
   // A document page is one navigable rendering of a section in a View. Preserve
   // owner, View and member order so a shared section remains reachable in each

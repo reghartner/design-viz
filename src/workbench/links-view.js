@@ -10,7 +10,7 @@ function initWorkbenchLinksView(opts){
   life.own(function(){rowsLife.destroy();popLife.destroy();});
   var TABS=[['tickets','Tickets'],['metrics','Metrics'],['trace','Trace match'],['logs','Log searches']];
   var state={tab:'tickets',by:'ticket',show:'all',filter:'',drafts:[],highlight:null,popover:null,drag:null,editing:null,adding:false};
-  var model=null,modelKey=null,stale=false,suppressClick=false,uid='links-'+Math.random().toString(36).slice(2);
+  var dryRuns=Object.create(null),model=null,modelKey=null,stale=false,suppressClick=false,uid='links-'+Math.random().toString(36).slice(2);
 
   function el(tag,cls,text){var n=doc.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;}
   function button(cls,text,label,title){var b=el('button',cls,text);b.type='button';if(label)b.setAttribute('aria-label',label);if(title)b.title=title;return b;}
@@ -87,7 +87,7 @@ function initWorkbenchLinksView(opts){
     if(s.error){stale=true;model={error:'Fix the JSON source to see links.'};return model;}
     stale=s.renderedText!=null && s.renderedText!==s.text;
     var key=JSON.stringify([s.project,s.text,s.topologyRevision]);
-    if(key!==modelKey){modelKey=key;model=linksTicketModel(s.text,s.raw,context());}
+    if(key!==modelKey){modelKey=key;dryRuns=Object.create(null);model=linksTicketModel(s.text,s.raw,context());}
     return model;
   }
   function element(id){return model && model.elements && model.elements.find(function(e){return linksElementId(e)===id;}) || null;}
@@ -120,18 +120,17 @@ function initWorkbenchLinksView(opts){
     return commit(function(text,raw,ctx){return planLinksTicketMove(text,raw,from,to,key,ref,copy,ctx);},
       {ok:(from?(copy?'Copied ':'Moved ')+key+' from '+describe(from)+' to ':'Attached '+key+' to ')+describe(to)+'. Undo restores it.',same:key+' is already on '+describe(to)+'.'});
   }
-  /* Why a ticket cannot go onto an element, or null. */
-  function refusal(e,key,from){
-    if(!e)return 'Drop on a node, connection or step.';
-    if(from && linksElementId(from)===linksElementId(e))return key+' is already here.';
-    if(!e.editable)return e.reason;
-    if(e.kind==='step'){
-      if(e.lit.indexOf(key)<0)return e.label+' lights no node or connection with '+key+'. A step shows the tickets of what it lights.';
-      if(e.shown.indexOf(key)>=0)return e.label+' already shows '+key+'.';
-      return null;
+  /* Why a ticket cannot go onto an element, or null: the static source and
+     target rules, then a dry run of the same plan the drop would make. */
+  function refusal(e,key,from,copy){
+    var why=linksDropRefusal(from || null,e,key,!!copy);if(why)return why;
+    var s=snapshot();if(s.error)return s.error;
+    var memo=JSON.stringify([modelKey,from && linksElementId(from),linksElementId(e),key,!!copy]);
+    if(!(memo in dryRuns)){
+      var plan=planLinksTicketMove(s.text,s.raw,copy?null:from,e,key,refOf(key),false,context());
+      dryRuns[memo]=plan.error || null;
     }
-    if(e.keys.indexOf(key)>=0)return describe(e)+' already has '+key+'.';
-    return null;
+    return dryRuns[memo];
   }
 
   /* ---------- rows ---------- */
@@ -145,15 +144,16 @@ function initWorkbenchLinksView(opts){
     var name=state.by==='ticket'?describe(e):key;
     main.setAttribute('aria-label',(state.by==='ticket'?'Highlight '+name+' ('+key+')':'Highlight '+key+' (on '+describe(e)+')'));
     main.setAttribute('aria-haspopup','menu');main.setAttribute('data-links-opener','chip:'+linksElementId(e)+'|'+key);
-    main.title=(inherited?'Inherited from the provider (read only). ':'')+'Click to highlight. Enter or right-click: Move to…, Copy to…, Remove.'+(inherited?'':' Drag to move; hold ⌥ to copy.')+(link.via && link.via.length?'\nShown through '+link.via.join(', ')+'.':'');
+    main.title=(inherited?'Inherited from the provider (read only). ':!e.editable?e.reason+' ':'')+(!inherited && e.editable?'Click to highlight. Enter or right-click: Move to…, Copy to…, Remove. Drag to move; hold ⌥ to copy.':'Click to highlight. Enter or right-click: Copy to…. Drag to copy it elsewhere.')+(link.via && link.via.length?'\nShown through '+link.via.join(', ')+'.':'');
     if(state.by==='ticket'){var tag=el('span','links-kind',e.kind==='edge'?'EDGE':e.kind.toUpperCase());tag.setAttribute('aria-hidden','true');main.appendChild(tag);main.appendChild(el('span','links-chip-text',sectionPrefix(e)+e.label));}
     else main.appendChild(el('span','links-chip-text',key));
     if(e.imported && e.kind!=='step')main.appendChild(el('span','links-chip-note',inherited?'inherited':'imported · local override'));
     wrap.appendChild(main);
     rowsLife.listen(main,'click',function(){if(suppressClick){suppressClick=false;return;}setHighlight(state.by==='ticket'?{type:'element',id:linksElementId(e)}:{type:'ticket',key:key},true);});
-    rowsLife.listen(main,'keydown',function(ev){if(ev.key==='Enter' || ev.key==='ContextMenu' || ev.key==='F10' && ev.shiftKey){ev.preventDefault();openMenu(main,e,key,inherited);}});
-    rowsLife.listen(main,'contextmenu',function(ev){ev.preventDefault();openMenu(main,e,key,inherited);});
-    if(!inherited)rowsLife.listen(main,'pointerdown',function(ev){startDrag(ev,main,key,e);});
+    rowsLife.listen(main,'keydown',function(ev){if(ev.key==='Enter' || ev.key==='ContextMenu' || ev.key==='F10' && ev.shiftKey){ev.preventDefault();openMenu(main,e,key,!movable);}});
+    rowsLife.listen(main,'contextmenu',function(ev){ev.preventDefault();openMenu(main,e,key,!movable);});
+    var movable=!inherited && e.editable;
+    rowsLife.listen(main,'pointerdown',function(ev){startDrag(ev,main,key,movable?e:null,!movable);});
     if(!inherited && e.editable){
       var x=button('links-chip-remove','×',(e.kind==='step'?'Hide '+key+' on ':'Remove '+key+' from ')+describe(e),e.kind==='step'?'Hide on this step (writes the step ticket filter)':'Remove');
       rowsLife.listen(x,'click',function(){assign(e,key,true);});wrap.appendChild(x);
@@ -247,6 +247,7 @@ function initWorkbenchLinksView(opts){
         if(e.editable && !(e.kind==='step' && !e.lit.length))chips.appendChild(assignButton('+ Assign ticket','Assign ticket to '+describe(e),{type:'assign-element',id:linksElementId(e),opener:'assign:'+linksElementId(e)}));
         else if(!e.editable)chips.appendChild(el('span','links-none',e.reason));
         row.appendChild(chips);
+        if(e.unreadable && e.unreadable.length){var kept=el('p','links-none links-unrecognised','Not recognised, kept as written (fix in JSON): '+e.unreadable.join(', ')+'.');row.appendChild(kept);}
         if(state.highlight && state.highlight.type==='element' && state.highlight.id===linksElementId(e))row.classList.add('links-row-active');
         list.appendChild(row);
       });
@@ -347,7 +348,7 @@ function initWorkbenchLinksView(opts){
             var reason=!x.editable?x.reason:x.kind==='step' && x.lit.indexOf(key)<0?'Lights no node or connection with '+key:x.kind!=='step' && x.inherited.indexOf(key)>=0?'Inherited from the provider (read only)':null;
             body.appendChild(option(id,sectionPrefix(x)+x.label,on,reason,function(checked){assign(x,key,!checked);},note));
           }else{
-            var why=refusal(x,key,from),pick=button('links-pop-target',sectionPrefix(x)+x.label);pick.setAttribute('data-links-option',id);
+            var why=refusal(x,key,from,spec.copy),pick=button('links-pop-target',sectionPrefix(x)+x.label);pick.setAttribute('data-links-option',id);
             if(why){pick.disabled=true;pick.title=why;}
             popLife.listen(pick,'click',function(){var source=from,copy=spec.copy;closePopover(false);if(move(copy?null:source,x,key,false))focusChip(x,key);});
             var line=el('div','links-pop-row');line.appendChild(pick);if(note)line.appendChild(el('span','links-chip-note',note));body.appendChild(line);
@@ -375,11 +376,9 @@ function initWorkbenchLinksView(opts){
     var e=element(spec.id);
     popover.setAttribute('aria-label',spec.key+' on '+describe(e));
     var items=[['Highlight',function(){closePopover(false);setHighlight({type:'ticket',key:spec.key},true);}]];
-    if(!spec.inherited){
-      items.push(['Move to…',function(){openPopover({type:'move',key:spec.key,from:spec.id,copy:false,opener:spec.opener},opener);}]);
-      items.push(['Copy to…',function(){openPopover({type:'move',key:spec.key,from:spec.id,copy:true,opener:spec.opener},opener);}]);
-      if(e && e.editable)items.push([e.kind==='step'?'Hide on this step':'Remove',function(){closePopover(false);assign(e,spec.key,true);}]);
-    }
+    if(!spec.inherited)items.push(['Move to…',function(){openPopover({type:'move',key:spec.key,from:spec.id,copy:false,opener:spec.opener},opener);}]);
+    items.push(['Copy to…',function(){openPopover({type:'move',key:spec.key,from:spec.id,copy:true,opener:spec.opener},opener);}]);
+    if(!spec.inherited)items.push([e.kind==='step'?'Hide on this step':'Remove',function(){closePopover(false);assign(e,spec.key,true);}]);
     items.forEach(function(item){var b=button('links-menu-item',item[0]);b.setAttribute('role','menuitem');popLife.listen(b,'click',item[1]);popover.appendChild(b);});
     popLife.listen(popover,'keydown',popKeys);
     place(opener);
@@ -423,10 +422,23 @@ function initWorkbenchLinksView(opts){
     if(steps)links.forEach(function(l){if(l.kind==='step' && pick && Number(pick.value)===l.section)Array.prototype.forEach.call(steps.querySelectorAll('[data-step-index="'+l.index+'"]'),function(n){out.push(n);});});
     return out;
   }
+  /* On-canvas note while a highlight dims the board, so the dimming always has
+     a visible reason and a way out, even with the Links window closed. */
+  var pill=el('div','links-canvas-pill');pill.setAttribute('role','status');pill.hidden=true;
+  var pillText=el('span','links-canvas-pill-text');pill.appendChild(pillText);
+  var pillClear=button('bbtn links-canvas-pill-clear','Clear (Esc)','Clear link highlight');pill.appendChild(pillClear);
+  life.listen(pillClear,'click',function(){setHighlight(null);});
+  (doc.body || root).appendChild(pill);life.own(function(){pill.remove();});
+  function paintPill(links){
+    pill.hidden=!state.highlight;if(!state.highlight)return;
+    pillText.textContent=summary(links).replace(/\. Others dim\. Esc clears\.$/,'');
+    var controls=doc.getElementById('workspace-canvas-controls'),r=controls && controls.getClientRects().length?controls.getBoundingClientRect():null;
+    pill.style.bottom=(r?Math.max(12,win.innerHeight-r.top+8):24)+'px';
+  }
   function applyHighlight(){
     Array.prototype.forEach.call(doc.querySelectorAll('.dv-links-lit'),function(n){n.classList.remove('dv-links-lit');});
     Array.prototype.forEach.call(doc.querySelectorAll('.dv-links-dimming'),function(n){n.classList.remove('dv-links-dimming');});
-    var links=highlightLinks();clear.hidden=!state.highlight;
+    var links=highlightLinks();clear.hidden=!state.highlight;paintPill(links);
     if(!state.highlight){return;}
     links.forEach(function(l){var sec=sectionEl(l.section);if(sec)sec.classList.add('dv-links-dimming');});
     litTargets(links).forEach(function(n){n.classList.add('dv-links-lit');});
@@ -479,10 +491,10 @@ function initWorkbenchLinksView(opts){
   }
 
   /* ---------- drag ---------- */
-  function startDrag(ev,source,key,from){
+  function startDrag(ev,source,key,from,copyOnly){
     if(ev.button!==0 || !ev.isPrimary || state.drag)return;
     if(stale){fail('The source changed. Click Render before editing links.');return;}
-    state.drag={id:ev.pointerId,source:source,key:key,from:from,x:ev.clientX,y:ev.clientY,active:false,target:null,copy:!!ev.altKey,ghost:null,marked:[]};
+    state.drag={id:ev.pointerId,source:source,key:key,from:from,x:ev.clientX,y:ev.clientY,active:false,target:null,copy:!!ev.altKey,copyOnly:!!copyOnly,ghost:null,marked:[]};
     try{source.setPointerCapture(ev.pointerId);}catch(_){}
     var d=state.drag;
     d.off=[life.listen(source,'pointermove',dragMove),life.listen(source,'pointerup',dragEnd),life.listen(source,'pointercancel',function(){cancelDrag('Drag cancelled.');}),
@@ -496,7 +508,7 @@ function initWorkbenchLinksView(opts){
       d.ghost=el('div','links-ghost',d.key);d.ghost.setAttribute('aria-hidden','true');doc.body.appendChild(d.ghost);
       if(d.source.closest('.links-chip'))d.source.closest('.links-chip').classList.add('links-chip-dragging');
     }
-    ev.preventDefault();d.copy=!!ev.altKey;
+    ev.preventDefault();d.copy=!!ev.altKey || d.copyOnly;
     d.ghost.style.left=(ev.clientX+12)+'px';d.ghost.style.top=(ev.clientY+10)+'px';
     d.target=dropTarget(ev.clientX,ev.clientY);paintDrop();
   }
@@ -519,9 +531,9 @@ function initWorkbenchLinksView(opts){
   function paintDrop(){
     var d=state.drag;d.marked.forEach(function(n){n.classList.remove('dv-links-drop','dv-links-refused');});d.marked=[];
     if(!d.target){say(d.from?'Dragging '+d.key+' from '+describe(d.from)+'. Drop on a node, connection, step or row. Esc cancels.':'Dragging '+d.key+'. Drop on a node, connection or step. Esc cancels.');return;}
-    var why=refusal(d.target.element,d.key,d.copy?null:d.from);
+    var why=refusal(d.target.element,d.key,d.from,d.copy);
     d.target.marks.forEach(function(n){n.classList.add(why?'dv-links-refused':'dv-links-drop');d.marked.push(n);});
-    var verb=d.from?(d.copy?'copy':'move'):'attach';
+    var verb=d.from && !d.copyOnly?(d.copy?'copy':'move'):'attach';
     say(why?'Cannot drop here: '+why:'Drop to '+verb+' '+d.key+(d.from && !d.copy?' from '+describe(d.from):'')+' to '+describe(d.target.element)+(d.from && !d.copy?' · hold ⌥ to copy':'')+'.');
   }
   function endDrag(){
@@ -536,10 +548,10 @@ function initWorkbenchLinksView(opts){
   function dragEnd(ev){
     var d=state.drag;if(!d || ev.pointerId!==d.id)return;
     if(!d.active){endDrag();return;}
-    d.copy=!!ev.altKey;d.target=dropTarget(ev.clientX,ev.clientY);
+    d.copy=!!ev.altKey || d.copyOnly;d.target=dropTarget(ev.clientX,ev.clientY);
     endDrag();suppressClick=true;win.setTimeout(function(){suppressClick=false;},0);
     if(!d.target){say('Nothing changed: drop on a node, connection or step.');return;}
-    var why=refusal(d.target.element,d.key,d.copy?null:d.from);
+    var why=refusal(d.target.element,d.key,d.from,d.copy);
     if(why){fail(why);say('');return;}
     move(d.copy?null:d.from,d.target.element,d.key,false);
   }
@@ -548,7 +560,7 @@ function initWorkbenchLinksView(opts){
     if(state.drag && ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancelDrag('Drag cancelled. Nothing changed.');return;}
     if(state.drag && ev.key==='Alt' && state.drag.active){state.drag.copy=true;paintDrop();}
   },true);
-  life.listen(win,'keyup',function(ev){if(state.drag && ev.key==='Alt' && state.drag.active){state.drag.copy=false;paintDrop();}},true);
+  life.listen(win,'keyup',function(ev){if(state.drag && ev.key==='Alt' && state.drag.active){state.drag.copy=state.drag.copyOnly;paintDrop();}},true);
   life.listen(win,'blur',function(){cancelDrag(null);});
 
   /* ---------- keyboard ---------- */
@@ -569,7 +581,12 @@ function initWorkbenchLinksView(opts){
     if(state.highlight && state.highlight.type==='element' && !element(state.highlight.id))state.highlight=null;
     render();
   }
-  life.listen(doc,'workbench-tool-visibility',function(ev){if(ev.detail && ev.detail.name==='links' && ev.detail.open)refresh();});
+  life.listen(doc,'workbench-tool-visibility',function(ev){
+    if(!ev.detail || ev.detail.name!=='links')return;
+    if(ev.detail.open)refresh();
+    // Closing (or hiding) the Links window ends its highlight and any drag or popover.
+    else{cancelDrag(null);closePopover(false);if(state.highlight)setHighlight(null);}
+  });
   paintTabs();render();
   return {refresh:life.guard(refresh),
     highlight:function(){return state.highlight?JSON.parse(JSON.stringify(state.highlight)):null;},

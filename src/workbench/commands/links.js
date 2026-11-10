@@ -17,6 +17,17 @@ function linksCompareKeys(a,b){
   if(pa && pb && pa[1]===pb[1])return Number(pa[2])-Number(pb[2]);
   return a<b?-1:a>b?1:0;
 }
+/* Authored entries the Tracking form cannot read: kept as written, named here. */
+function linksUnreadable(value){
+  if(!value || value.tickets==null)return {unreadable:[],notList:false};
+  if(!Array.isArray(value.tickets))return {unreadable:[],notList:true};
+  return {unreadable:value.tickets.filter(function(entry){return trackingTicket(entry)==null;}).map(function(entry){return typeof entry==='string'?entry:JSON.stringify(entry);}),notList:false};
+}
+function linksNotList(own,value,label){
+  var bad=linksUnreadable(value);
+  if(bad.notList && own.editable && !own.overlay)return Object.assign({},own,bad,{editable:false,reason:'Tickets on '+label+' in the JSON is not a list. Fix it in JSON first.'});
+  return Object.assign({},own,bad);
+}
 function linksStepLabel(st,index){
   var name=st && typeof st.id==='string' && st.id?st.id:st && typeof st.text==='string' && st.text?st.text:'untitled';
   return 'Step '+(index+1)+' · '+name;
@@ -61,7 +72,7 @@ function linksTicketModel(text,raw,context){
       var own=ownership('nodes',id,!!(authored && authored.nodes && Object.prototype.hasOwnProperty.call(authored.nodes,id)));
       var keys=trackingRefs(node).tickets,inherited=own.overlay && plain && plain.nodes && plain.nodes[id]?trackingRefs(plain.nodes[id]).tickets:[];
       var refs={};trackingStoredRefs(node).tickets.forEach(function(ref,i){refs[keys[i]]=ref;});
-      elements.push(Object.assign({kind:'node',section:section,id:id,label:title(id),keys:keys,inherited:inherited.filter(function(k){return keys.indexOf(k)>=0;}),refs:refs},own));
+      elements.push(Object.assign({kind:'node',section:section,id:id,label:title(id),keys:keys,inherited:inherited.filter(function(k){return keys.indexOf(k)>=0;}),refs:refs},linksNotList(own,own.overlay?null:node,'node '+id)));
     });
     (Array.isArray(d.edges)?d.edges:[]).forEach(function(edge,index){
       if(!edge || typeof edge!=='object')return;
@@ -72,7 +83,7 @@ function linksTicketModel(text,raw,context){
       var refs={};trackingStoredRefs(edge).tickets.forEach(function(ref,i){refs[keys[i]]=ref;});
       elements.push(Object.assign({kind:'edge',section:section,index:index,key:key,
         label:title(edge.from)+' → '+title(edge.to)+(typeof edge.label==='string' && edge.label?' · '+edge.label:''),
-        keys:keys,inherited:inherited.filter(function(k){return keys.indexOf(k)>=0;}),refs:refs},own));
+        keys:keys,inherited:inherited.filter(function(k){return keys.indexOf(k)>=0;}),refs:refs},linksNotList(own,own.overlay?null:edge,'connection '+key.replace('->',' → '))));
     });
     (Array.isArray(d.steps)?d.steps:[]).forEach(function(st,index){
       if(!st || typeof st!=='object')return;
@@ -153,11 +164,13 @@ function linksStepTicketPlan(text,raw,step,key,show,context){
   var label=linksStepLabel(st,step.index),lit=trackingStepLitTickets(view,st,page);
   if(lit.indexOf(key)<0)return {error:label+' does not light a node or connection that carries '+key+'. A step shows the tickets of the nodes and connections it lights: add '+key+' to one of those.'};
   var shown=trackingStepTicketFilter(view,st,page) || lit.slice(),next;
-  if(show){if(shown.indexOf(key)>=0)return {text:text};next=lit.filter(function(k){return shown.indexOf(k)>=0 || k===key;});}
+  // Filter keys the step no longer lights stay listed, as the Inspector checklist keeps them.
+  var unlit=(trackingStepFilter(st) || []).filter(function(k){return lit.indexOf(k)<0;});
+  if(show){if(shown.indexOf(key)>=0)return {text:text};next=lit.filter(function(k){return shown.indexOf(k)>=0 || k===key;}).concat(unlit);}
   else {
     if(shown.indexOf(key)<0)return {text:text};
-    next=shown.filter(function(k){return k!==key;});
-    if(!next.length)return {error:'Keep at least one ticket on '+label+'. Its tickets come from the nodes and connections it lights.'};
+    next=shown.filter(function(k){return k!==key;}).concat(unlit);
+    if(!next.some(function(k){return lit.indexOf(k)>=0;}))return {error:'Keep at least one ticket on '+label+'. Its tickets come from the nodes and connections it lights.'};
   }
   var all=lit.every(function(k){return next.indexOf(k)>=0;});
   return planSetField(text,raw,rec.diagram.concat(['steps',step.index]),'ticketFilter',all?null:JSON.stringify(next));
@@ -172,8 +185,33 @@ function planLinksTicket(text,raw,link,key,ref,remove,context){
   return builderPruneTicketFilters(plan,link.section,[key],function(value){return linksResolve(value,context);});
 }
 /* Move (or copy) a ticket between two elements in one Undo step. */
+/* Moving a ticket from a node or connection onto a step would delete it: a step
+   only shows the tickets of what it lights. Copy (⌥) shows it on the step. */
+function linksMoveToStepError(from,to,key){
+  if(!from || !to || from.kind==='step' || to.kind!=='step')return null;
+  return 'Moving '+key+' onto step '+(to.index+1)+' would take it off the '+(from.kind==='edge'?'connection':'node')+', and a step only shows the tickets of what it lights. Hold ⌥ (Alt) to show it on the step instead.';
+}
+/* Why `key` cannot go from `from` (null: attach) onto `to`, or null. Checks the
+   source and the target, so a drop is never offered and then refused. */
+function linksDropRefusal(from,to,key,copy){
+  if(!to)return 'Drop on a node, connection or step.';
+  var name=(to.kind==='edge'?'connection ':to.kind+' ')+to.label;
+  if(from && linksElementId(from)===linksElementId(to))return key+' is already here.';
+  if(!to.editable)return to.reason;
+  if(to.kind==='step'){
+    if(to.lit.indexOf(key)<0)return to.label+' lights no node or connection with '+key+'. A step shows the tickets of what it lights.';
+    if(to.shown.indexOf(key)>=0)return to.label+' already shows '+key+'.';
+  }else if(to.keys.indexOf(key)>=0)return name+' already has '+key+'.';
+  if(from && !copy){
+    if(!from.editable)return from.reason+' Hold ⌥ (Alt) to copy instead.';
+    if(from.kind!=='step' && from.inherited.indexOf(key)>=0)return key+' is inherited from the provider on '+from.label+'. Hold ⌥ (Alt) to copy it instead.';
+    var toStep=linksMoveToStepError(from,to,key);if(toStep)return toStep;
+  }
+  return null;
+}
 function planLinksTicketMove(text,raw,from,to,key,ref,copy,context){
   if(from && to && linksElementId(from)===linksElementId(to))return {text:text};
+  if(!copy){var toStep=linksMoveToStepError(from,to,key);if(toStep)return {error:toStep};}
   var added=planLinksTicket(text,raw,to,key,ref,false,context);if(added.error)return added;
   if(copy || !from)return added;
   var next=JSON.parse(added.text),removed=planLinksTicket(added.text,next,from,key,ref,true,context);

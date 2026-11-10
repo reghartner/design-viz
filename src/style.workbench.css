@@ -1921,3 +1921,8 @@ body.links-dragging,body.links-dragging *{cursor:grabbing !important;user-select
 #steps-list .dv-links-drop,.links-row.dv-links-drop{outline:2px dashed #D99A1E;outline-offset:1px;}
 #docview g.node.dv-links-refused .card{stroke:#C0392B;stroke-width:2;stroke-dasharray:3 3;}
 #steps-list .dv-links-refused,.links-row.dv-links-refused{outline:2px dashed #C0392B;outline-offset:1px;}
+.links-canvas-pill{position:fixed;left:50%;transform:translateX(-50%);z-index:125;display:flex;align-items:center;gap:10px;max-width:min(640px,calc(100vw - 160px));padding:5px 6px 5px 14px;border:1px solid var(--accent);border-radius:999px;background:var(--card);color:var(--ink);font-size:12px;box-shadow:0 6px 18px #14244222;}
+.links-canvas-pill[hidden]{display:none;}
+.links-canvas-pill-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.links-canvas-pill-clear{min-height:26px;border-radius:999px;}
+.links-unrecognised{flex:1 1 100%;margin-left:40px;color:#a05a00;}

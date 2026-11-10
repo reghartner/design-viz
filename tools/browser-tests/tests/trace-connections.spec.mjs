@@ -83,6 +83,14 @@ test('desktop inherited-company direct-only read-only load maps local and nested
  await expect(clicked).toHaveAttribute('aria-pressed','true');expect(await scrollState(h.root),'a row click does not move the page').toBe(beforeClick);
  const rowAfter=await clicked.boundingBox(),detail=await h.root.locator('.dv-trace-span-detail').boundingBox();
  expect(Math.abs(rowAfter.y-rowBefore.y),'the row stays where it was').toBeLessThanOrEqual(1);expect(Math.abs(detail.y-(rowAfter.y+rowAfter.height)),'its detail opens directly below').toBeLessThan(10);
+ // Review c8: the reader's fixed navigation bar is the page's top edge. A row scrolled under it is not counted as in view,
+ // and a top-aligned reveal brings it to just below the bar.
+ const under=h.root.locator('.dv-trace-span').nth(40);await under.evaluate(el=>el.scrollIntoView({block:'start'}));
+ const bar=await page.getByRole('navigation',{name:'Document navigation'}).boundingBox();expect(bar,'the reader\'s navigation bar').not.toBeNull();
+ expect((await under.boundingBox()).y,'precondition: the row is under the bar').toBeLessThan(bar.y+bar.height);
+ await page.evaluate(id=>{const t=window.ctl.liveStatus.snapshot().trace.selected;window.ctl.liveStatus.selectTraceSpan({context:t.context,spanId:id});},await under.getAttribute('data-span-id'));
+ await expect(under).toHaveAttribute('aria-pressed','true');
+ await expect.poll(async()=>{const b=await under.boundingBox();return b.y>=bar.y+bar.height && b.y<=bar.y+bar.height+12;},{message:'the reveal brings the row to just below the fixed bar'}).toBe(true);
  await info.attach('direct-loaded-imported',{body:await h.root.screenshot(),contentType:'image/png'});
  await openTraceConfiguration(h.root);await h.root.getByRole('button',{name:'Verify trace connection',exact:true}).evaluate(b=>b.scrollIntoView({block:'center'}));const beforeVerify=await scrollState(h.root);await h.root.getByRole('button',{name:'Verify trace connection',exact:true}).click();await expect.poll(()=>h.calls.length).toBe(2);await expect(h.root.locator('.dv-trace-direct-report')).toContainText('Stage: complete');await expect(h.root.locator('.dv-trace-diagnostics')).toHaveJSProperty('open',true);await expect(h.root.locator('.dv-trace-arguments')).toBeVisible();await expect(h.root.locator('.dv-trace-arguments')).toContainText('[configured]');expect(await scrollState(h.root),'Verify does not reveal').toBe(beforeVerify);await info.attach('direct-verified-expanded',{body:await h.root.screenshot(),contentType:'image/png'});
  await h.root.getByRole('button',{name:'Clear loaded trace',exact:true}).click();await expect(h.root.locator('.dv-trace-selected')).toHaveCount(0);await expect(h.root.locator('[data-trace-tone]')).toHaveCount(0);expect(h.calls).toHaveLength(2);

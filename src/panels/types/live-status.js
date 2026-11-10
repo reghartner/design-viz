@@ -265,7 +265,10 @@
             var owner=host._livePanelApi;if(!owner || load.disabled)return;var request=host._directRevealRequest=(host._directRevealRequest || 0)+1;
             Promise.resolve(owner.loadLogTrace(load._logIndex)).then(function(result){
               if(!live || !result || host._livePanelApi!==owner || host._directRevealRequest!==request)return;
-              revealLoadedTrace();
+              // #1280 review c8: the line's span was focused and revealed by this Load; scrolling back up to the request
+              // line would push it off screen. Only without a focused span does the Load reveal its request line.
+              var focused=host.querySelector('.dv-trace-selected .dv-trace-span[aria-pressed="true"]'),item=focused && focused.closest('.dv-trace-span-item');
+              if(item && item.getClientRects().length)revealInView(item,false);else revealLoadedTrace();
             });
           };load.addEventListener('click',load._logClick);}
         });
@@ -534,11 +537,17 @@
       if(top>=edgeTop && bottom<=edgeBottom)return 0;
       return top<edgeTop || bottom-top>edgeBottom-edgeTop-16?top-edgeTop-8:bottom-edgeBottom+8;
     }
+    // The page's top edge sits below the reader's fixed navigation bar: the engine publishes its bottom (+8 px) as
+    // --flowview-navigation-bottom on the view, which this panel inherits. Without a bar it is 0.
+    function pageTop(view){
+      var style=view.getComputedStyle?view.getComputedStyle(host):null,value=style && style.getPropertyValue?parseFloat(style.getPropertyValue('--flowview-navigation-bottom')):NaN;
+      return isFinite(value)?Math.max(0,value-8):0;
+    }
     function revealInView(node,pageOff){
       var holder=scrollHolder(node),ib=node.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement,delta;
       if(holder){var hb=holder.getBoundingClientRect();delta=revealDelta(ib.top,ib.bottom,hb.top,hb.bottom);if(delta)holder.scrollTop+=delta;return;}
       if(pageOff)return;
-      if(page && view && view.innerHeight){delta=revealDelta(ib.top,ib.bottom,0,view.innerHeight);if(delta)page.scrollTop+=delta;}
+      if(page && view && view.innerHeight){delta=revealDelta(ib.top,ib.bottom,pageTop(view),view.innerHeight);if(delta)page.scrollTop+=delta;}
       else if(node.scrollIntoView)node.scrollIntoView({block:'nearest',inline:'nearest'});
     }
     // A successful Load's reveal of its own trace (#1230): the request line, by the least scroll.

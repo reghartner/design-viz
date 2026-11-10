@@ -153,6 +153,23 @@ test('desktop the loaded trace goes in the reserved space above the search; the 
  await info.attach('trace-slot-loaded',{body:await h.root.screenshot(),contentType:'image/png'});
 });
 
+/* #1280 review c8: Load on a log line whose span is the trace's last row focuses that span and keeps it in view. The Load
+   must not then scroll back up to the trace's request line, which would push the focused row off screen. */
+test('desktop a log-line Load whose span is far down the trace leaves that focused span in view',async({page,server})=>{
+ const LAST='1c4d74a48ded77bc',h=await open(page,server,{lines:{data:[{timestamp:String(BigInt(Date.now()-60000)*1000000n),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:{cameraModel:'arch',trace_id:ID,span_id:LAST}}]}});
+ await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');await h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true}).click();await expect(h.logs.locator('.dv-trace-log-row')).toHaveCount(1);
+ await h.logs.getByRole('button',{name:'Load trace '+ID,exact:true}).click();
+ const row=h.root.locator('.dv-trace-span[data-span-id="'+LAST+'"]');await expect(row,'the line\'s span is focused').toHaveAttribute('aria-pressed','true');
+ await expect.poll(()=>row.evaluate(el=>{
+  const b=el.getBoundingClientRect(),x=b.left+b.width/2,y=b.top+b.height/2;if(!b.height || x<0 || y<0 || x>innerWidth || y>innerHeight)return false;
+  for(let a=el.parentElement || (el.parentNode && el.parentNode.host);a && a!==document;a=a.parentElement || (a.parentNode && a.parentNode.host) || null){
+   if(a.nodeType!==1)continue;const st=getComputedStyle(a);if(st.overflowX==='visible' && st.overflowY==='visible')continue;
+   const c=a.getBoundingClientRect();if(x<c.left || x>c.right || y<c.top || y>c.bottom)return false;
+  }
+  const r=el.getRootNode(),hit=(r.elementFromPoint?r:document).elementFromPoint(x,y);return !!hit && (hit===el || el.contains(hit));
+ }),{message:'the focused span is in view (all clipping ancestors and the viewport) after the log-line Load'}).toBe(true);
+});
+
 /* #1158: "Only lines with a trace ID" is checked by default; Find then appends the trace ID label filter. */
 test('desktop "Only lines with a trace ID": checked by default; unchecked Find sends the query unchanged, checked Find appends the trace ID filter',async({page,server},info)=>{
  const h=await open(page,server),traced=h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true}),find=h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true}),rows=h.logs.locator('.dv-trace-log-row');

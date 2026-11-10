@@ -4986,5 +4986,37 @@ test('#1280 a reader focus reveals row and detail by the least scroll; taller th
   assert.equal(focus(20,{top:700,bottom:1000}),108,'row near the bottom: the least scroll shows the detail (1000 - 900 + 8); the row stays at 592');
   assert.equal(focus(30,{top:500,bottom:1600}),492,'taller than the window: the row is aligned to the top edge (500 - 8)');
   assert.equal(focus(40,{top:-200,bottom:100}),-208,'above the window: the row comes to the top edge');
+  // Review c8: under the reader's fixed bar (its bottom + 8 published as --flowview-navigation-bottom) the top edge is the
+  // bar's bottom, so a top-aligned reveal ends below it and a row under the bar is not counted as visible.
+  h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:name=>name==='--flowview-navigation-bottom'?'64px':''}),innerHeight:900};
+  assert.equal(focus(42,{top:-200,bottom:100}),-264,'above: the row comes to 8 px below the 56 px bar (-200 - 56 - 8)');
+  assert.equal(focus(44,{top:20,bottom:50}),-44,'under the bar: not visible, brought below it (20 - 56 - 8)');
+  assert.equal(focus(46,{top:300,bottom:600}),0,'below the bar and in the window: nothing moves');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
+});
+/* #1280 review c8 (probe C8): a log-line Load focuses the line's span and reveals its row; it must not then scroll back up
+   to the request line, which would push the focused row off screen. Rects follow the page scroll. */
+test('#1280 a log-line Load leaves the focused span in view; it does not scroll back up to the request line',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')));profile.environments=Object.fromEntries(Object.entries(profile.environments).filter(([id])=>id==='prod'));
+ const recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),SPAN='dcce084f04baa9e1';
+ const raw=compactBoard(['prod']);
+ const line={timestamp:String(BigInt(Date.now()-60000)*1000000n),line:'checkout',labels:{},structuredMetadata:{cameraModel:'arch',trace_id:COMPACT_ID,span_id:SPAN}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>compactTool(),call:async()=>({payload:recorded}),logsConnector:async()=>'Grafana',queryLogs:async()=>({data:[line]})}}}),api=h.ctl.liveStatus,m=mountStatus(h);
+ for(let i=0;i<6;i++)await settle();api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();h.flush();
+ const loadButton=m.body.querySelector('.dv-trace-log-row button.dv-trace-log-load');assert.ok(loadButton,'the log row offers Load');
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,scroller={scrollTop:0};
+ const at=(docY,height)=>({top:docY-scroller.scrollTop,bottom:docY-scroller.scrollTop+height,left:0,right:100,width:100,height});
+ proto.getClientRects=function(){return [1];};
+ proto.getBoundingClientRect=function(){
+  if(this.classList.contains('dv-trace-request-line'))return at(100,30);
+  if(this.classList.contains('dv-trace-span-item') && this.querySelector('.dv-trace-span[data-span-id="'+SPAN+'"]'))return at(2000,30);
+  return bound.call(this);};
+ h.doc.scrollingElement=scroller;h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
+ try{
+  loadButton.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});for(let i=0;i<10;i++){await settle();h.flush();}
+  const selected=api.snapshot().trace.selected;assert.ok(selected && selected.focus && selected.focus.spanId===SPAN,'the line\'s span is focused');
+  const item=m.body.querySelector('.dv-trace-span[data-span-id="'+SPAN+'"]').closest('.dv-trace-span-item'),box=item.getBoundingClientRect();
+  assert.ok(box.top>=0 && box.bottom<=900,'the focused span stays in the window: '+JSON.stringify(box)+' at scrollTop '+scroller.scrollTop);
+  assert.equal(scroller.scrollTop,1138,'revealed once by the least scroll (2030 - 900 + 8), not sent back up to the request line');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
 });

@@ -845,7 +845,7 @@ even with Live disabled; ordinary diagrams retain their authored lane context.
 Without ticket or epic references the panel opens on the Trace view (see the header above).
 Before a provider or applied map is available, it shows the connector note and any
 required authorization action without an empty rollup. With no provider at all (a plain web
-host or a local file: not claude.ai, no host provider, no demo) it says “Live ticket status
+host or a local file: not claude.ai, no host provider, no demo) on a page with ticket or epic references it says “Live ticket status
 needs a host with a Jira connector (claude.ai).” and lists the page's authored tickets (Jira
 links when the tracking site is set) with their PR links, and any other authored PRs, without a state (#1253). Print preserves the last
 paint, and reduced motion disables ring animation.
@@ -1844,8 +1844,10 @@ mode:
 - **Remove:** the carrier's ticket popover shows **Remove** for tickets authored on
   that carrier. Tickets the popover lists because of an availability rule, and
   provider-inherited tickets on imported carriers, have none. A move is add +
-  remove. Removing a ticket added in this session (or adding back one removed) cancels
-  that pending change instead of adding a second one (#1253).
+  remove. Removing a ticket added in this session (or adding back one removed, which puts
+  it back where it was) cancels that pending change when the carrier's tickets are then as
+  they were; otherwise both changes stay recorded (#1253). A ticket authored as a Jira
+  browse URL is removed like one authored as a key.
 - **Clear Missing work** (#855): a node or edge marked `missingWork: true` shows
   **Clear Missing work** in its popover. Clicking it removes the marker (one
   pending change) and the carrier repaints from its tickets alone. A drop that
@@ -1876,7 +1878,9 @@ mode:
   it: Edit to Done, Done to Edit, Save and Discard to Edit once the board re-renders (Save
   keeps focus while it saves). After Remove or Clear Missing work in a popover, focus goes to
   that carrier in the re-rendered board, or to **Save N changes** when the carrier is no longer
-  a button (an edge without tickets).
+  a button (an edge without tickets). Focus moves only while it is still on the pressed control
+  or nowhere; a reader who moved on keeps their place. A read-only answer moves focus to its
+  notice. A repaint redraws the post-drop question in place and does not take focus back.
 - **Save** appends one `page.editHistory` entry (`at`, `by: {id, name}` from
   `user.me()`, one change per operation with the carrier's path, identity and
   display label; the newest 200 entries are kept) and publishes only

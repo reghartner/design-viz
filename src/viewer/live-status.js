@@ -1290,7 +1290,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       demo:demoControls?{ended:!!demoControls.ended,first:!demoControls.prev || !!demoControls.first}:null,verdict:verdict,
       overTime:overTimeState(),
       // #1253: no provider, no host-applied map and no connector adapter: the page cannot show live status here.
-      noProvider:!provider && !applied && !demoMode && connection.state==='none'?{prs:refs().prs.slice()}:null,
+      noProvider:!provider && !applied && !demoMode && connection.state==='none' && (refs().tickets.length || refs().epics.length)?{prs:refs().prs.slice()}:null,
       editHistory:copy(editHistory),edit:editState(),
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
       connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+clockTime(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}},
@@ -1364,8 +1364,6 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function overLoad(request,result,source){
     if(retired || request!==overRequest)return;overLoading=false;
-    // #1253: Edit mode can start without the Edit button (a conflict replay); a past day is never shown while editing.
-    if(editing()){overTarget=null;overError='Over time did not open because Edit mode is on. Finish editing, then try again.';notify();return;}
     var days=result && Array.isArray(result.days)?result.days:[];
     if(!days.length){overError='History could not load. Try Over time again.';notify();return;}
     var index=result.index;if(typeof index!=='number' || index<0 || index>=days.length)index=days.length-1;
@@ -1377,6 +1375,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(mark && !target && directTrace.snapshot().busy){overParked={request:request,result:result,source:source,reader:!!mark.reader};notify();return;}
     if(mark && (target?target.key===localDayKey(Date.now()):!mark.reader)){notify();return;}
     if(target){index=days.findIndex(function(day){return day.key===target.key;});if(index<0){traceDayNote=outsideNote(target);notify();return;}}
+    // #1253: Edit mode can start without the Edit button (a conflict replay); a past day is never shown while editing.
+    if(editing()){overError='Over time did not open because Edit mode is on. Finish editing, then try again.';notify();return;}
     var show=function(){over={live:map,today:result.today?cleanMap(result.today):map,days:days,index:index,held:false,value:null,source:source};on=true;availabilityOn=true;traceViewChanged();telemetry.openHistory(days,index);overShow();};
     if(target)traceMoved(show);else show();
   }
@@ -1481,7 +1481,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function rebuildPopover(trigger){
     var c=trigger._liveCarrier,root=pop.getRootNode?pop.getRootNode():document,focused=root && root.activeElement,key=focused && focused!==pop && pop.contains(focused)?popoverControlKey(focused):null;
     var block=pop.querySelector('.dv-live-production');if(block)block.remove();
-    var box=document.createElement('div'),dismiss=fillPopover(box,trigger,c.value,c.tracking,c.label,c.waiting,c.availability,c.ref,null).dismiss;
+    var question=asked && editing() && editor.question(),box=document.createElement('div'),filled=fillPopover(box,trigger,c.value,c.tracking,c.label,c.waiting,c.availability,c.ref,question || null),dismiss=filled.dismiss;asked=!!filled.asking;
     var fresh=Array.prototype.slice.call(box.children),old=popoverMarkup(Array.prototype.slice.call(pop.children));
     if(old==null || old!==popoverMarkup(fresh)){
       pop.replaceChildren.apply(pop,fresh);
@@ -1645,7 +1645,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var intent=editor && editor.focusIntent && editor.focusIntent();if(!intent || !intent.carrier)return;
     // A new render paints once before it applies the remembered live map; a carrier without tickets is a button only after that.
     if(!applied && editor.lastMap && editor.lastMap())return;
-    var el=refTarget(intent.carrier);
+    var el=refTarget(intent.carrier),root=typeof view.getRootNode==='function'?view.getRootNode():view.ownerDocument,now=root && root.activeElement;
+    // Only while focus is nowhere (the closed popover's control is gone): a reader who moved on keeps their place.
+    if(now && now!==document.body && now.isConnected!==false && !(pop && pop.contains(now))){editor.rememberFocus(null);return;}
     editor.rememberFocus(!el && intent.panel?{panel:intent.panel}:null);
     if(el)el.focus({preventScroll:true});
   }
@@ -2103,8 +2105,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     try{
       var focusRoot=typeof view.getRootNode==='function'?view.getRootNode():view.ownerDocument;
       var focused=focusRoot && focusRoot.activeElement,focusCarrier=focused && focused.classList && focused.classList.contains('dv-live-target') && focused.getAttribute('data-live-carrier'),focusBinding=focusCarrier && bindings.find(function(binding){return binding.el.contains(focused);});
-      // #1253: an open popover stays open through the repaint; a post-drop question is closed and asked again (askPending).
-      if(asked)close(false);
+      // #1253: an open popover stays open through the repaint, the post-drop question too (rebuilt in place).
       var openId=active && active.getAttribute('data-live-carrier'),openBinding=active && bindings.find(function(binding){return binding.el.contains(active);}),openMetrics=!!(active && active._liveCarrier && active._liveCarrier.metricsOnly);
       syncBindings();clearTargets();refreshDependencies();
       if(applied || availabilityOn || refs().tickets.length){

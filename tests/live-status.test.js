@@ -4662,12 +4662,12 @@ test('#1253 item 20 an empty Activity section says None yet',()=>{
 
 /* A real board editor (src/viewer/board-edit.js) whose render re-renders the board: the old controller and
    panel are destroyed and a new pair is built from the new text, as boot.flowview.js rerender does. */
-async function editBoard(raw=fixture()){
+async function editBoard(raw=fixture(),{reject=null}={}){
  const S={console,URL};vm.runInNewContext(entrypoint('standalone').body,S);
  const store=new Map(),published=[],board={published};
  const win={console,location:{pathname:'/board/'},addEventListener(){},removeEventListener(){},
   sessionStorage:{getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
-  claude:{use:async name=>name==='artifact'?{publish:async files=>{published.push(files['flowspec.json'].content);}}:name==='user'?{canEdit:async()=>true,me:async()=>({id:'u1',name:'Reader'})}:null}};
+  claude:{use:async name=>name==='artifact'?{publish:async files=>{published.push(files['flowspec.json'].content);if(reject)throw {code:reject,message:'mock '+reject};}}:name==='user'?{canEdit:async()=>true,me:async()=>({id:'u1',name:'Reader'})}:null}};
  const mount=text=>{
   if(board.h){board.h.ctl.liveStatus.destroy();board.m.destroy();}
   board.h=harness(JSON.parse(text),{},{boardEditor:board.editor});board.m=mountStatus(board.h);return null;
@@ -4733,4 +4733,35 @@ test('#1253 item 15 a first change that leaves no carrier button hands focus to 
   assert.equal(b.control('save').hidden,false);assert.equal(b.control('save').textContent,'Save 1 change');
   b.h.ctl.liveStatus.destroy();
  }finally{focus.restore();}
+});
+test('#1253 review: an edit hand-off never takes focus from where the reader moved, and a read-only answer focuses its notice',async()=>{
+ const focus=trackFocus();try{
+  let b=await editBoard(fixture(),{reject:'network'});b.control('edit').dispatchEvent({type:'click'});b.editor.add({section:0,kind:'node',id:'a'},'NEW-1');
+  b.control('save').focus();b.control('save').dispatchEvent({type:'click'});
+  const elsewhere=cardOf(b.h,'b');elsewhere.focus();await settle();await settle();
+  assert.match(b.editor.state().notice.text,/Save failed/);assert.ok(focus.el===elsewhere,'the failed save leaves focus where the reader put it');
+  b.h.ctl.liveStatus.destroy();
+  b=await editBoard(fixture(),{reject:'not_writer'});b.control('edit').dispatchEvent({type:'click'});b.editor.add({section:0,kind:'node',id:'a'},'NEW-1');
+  b.control('save').focus();b.control('save').dispatchEvent({type:'click'});await settle();await settle();
+  const notice=b.m.body.querySelector('.dv-live-edit-notice');assert.match(notice.textContent,/read-only here/);
+  assert.ok(focus.el===notice,'focus is on the read-only notice, not on the page');assert.equal(notice.getAttribute('tabindex'),'-1','the notice takes focus without becoming a Tab stop');
+  b.h.ctl.liveStatus.destroy();
+ }finally{focus.restore();}
+});
+test('#1253 review: the post-drop question stays open through a repaint without taking focus back',async()=>{
+ const focus=trackFocus();try{
+  const raw=fixture();raw.page.sections[0].diagram.nodes.c.missingWork=true;
+  const b=await editBoard(raw);b.control('edit').dispatchEvent({type:'click'});
+  assert.equal(b.editor.add({section:0,kind:'node',id:'c'},'NEW-1'),true);
+  const pop=b.h.view.querySelector('.dv-live-popover');assert.equal(pop.hidden,false);assert.ok(pop.querySelector('.dv-live-question'),'the question opens');
+  const elsewhere=cardOf(b.h,'b');elsewhere.focus();
+  const next=plain(fixed);next['CC-1']={state:'done'};b.h.ctl.liveStatus.apply(next);
+  assert.ok(b.h.view.querySelector('.dv-live-popover')===pop && pop.hidden===false,'the same popover stays open');assert.ok(pop.querySelector('.dv-live-question'),'still asking');
+  assert.ok(focus.el===elsewhere,'the repaint does not pull focus to Close');
+  b.h.ctl.liveStatus.destroy();
+ }finally{focus.restore();}
+});
+test('#1253 review: a board with only Missing work and no ticket references shows no Jira connector note',()=>{
+ const h=harness({page:{sections:[{id:'main',diagram:{nodes:{a:{title:'A',missingWork:true}},rows:[['a']],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}}),{body}=mountStatus(h);
+ assert.equal(h.ctl.liveStatus.snapshot().noProvider,null);assert.doesNotMatch(textOf(body),/needs a host with a Jira connector/);h.ctl.liveStatus.destroy();
 });

@@ -76,3 +76,24 @@ test('#1253 item 23 a replay that leaves a change pending still asks to Save aga
  const state=b.e.state();assert.equal(state.pending,1);assert.equal(state.active,true);
  assert.match(state.notice.text,/1 of your changes were re-applied/);assert.match(state.notice.text,/Save again\.$/);
 });
+test('#1253 item 3 review: a remove then an add of the same ticket cancels only with the ticket back in its place',async()=>{
+ const url='https://jira.test/browse/PAY-1',raw=spec();raw.page.sections[0].diagram.nodes.pay.tickets=[url,'PAY-9'];const text=JSON.stringify(raw,null,2);
+ const b=await editor(text);
+ assert.equal(b.e.remove(PAY,'PAY-1'),true,'a ticket authored as a browse URL can be removed');assert.deepEqual(b.node('pay').tickets,['PAY-9']);
+ assert.equal(b.e.add(PAY,'PAY-1'),true);
+ assert.deepEqual(b.node('pay').tickets,[url,'PAY-9'],'the removed entry comes back where it was, as it was');
+ assert.deepEqual(JSON.parse(b.e.text()),raw,'the spec is the original again');assert.equal(b.e.state().pending,0);
+ b.e.save();await settle();assert.equal(b.published.length,0,'nothing to publish');
+});
+test('#1253 item 3 review: a pair that cannot restore the earlier tickets stays recorded, so Save records it',async()=>{
+ const raw=spec();raw.page.sections[0].diagram.nodes.pay.tickets=['PAY-1','PAY-9'];
+ const b=await editor(JSON.stringify(raw,null,2));
+ // A change in between: the add puts PAY-1 back at its place, but PAY-5 is there now, so the tickets differ from
+ // what they were before the remove and both stay recorded.
+ b.e.remove(PAY,'PAY-1');b.e.add(PAY,'PAY-5');b.e.add(PAY,'PAY-1');
+ assert.deepEqual(b.node('pay').tickets,['PAY-1','PAY-9','PAY-5']);
+ assert.equal(b.e.state().pending,3,'every step stays recorded');
+ b.e.save();await settle();const saved=JSON.parse(b.published[0]);
+ assert.deepEqual(saved.page.sections[0].diagram.nodes.pay.tickets,['PAY-1','PAY-9','PAY-5'],'what is saved is what was shown');
+ assert.deepEqual(saved.page.editHistory.at(-1).changes.map(c=>c.op+' '+c.ticket),['remove PAY-1','add PAY-5','add PAY-1'],'the history records each step');
+});

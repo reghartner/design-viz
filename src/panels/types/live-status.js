@@ -68,9 +68,14 @@
       var over=value && value.overTime,loading=!!(over && over.loading),controls=host._liveFocusControls || {};
       if(host._liveOverLoading && !loading && over && over.active){var slider=host.querySelector('input.dv-live-over-time-slider');if(slider && activeElement()===controls.overTime)slider.focus({preventScroll:true});}
       host._liveOverLoading=loading;
-      // A panel not in the page yet (a re-render still building) leaves the hand-off to the next paint.
+      // A panel not in the page yet (a re-render still building) leaves the hand-off to the next paint. Focus moves
+      // only while it is still on the pressed control (or another edit control) or nowhere (the body, or a removed
+      // element after a re-render); a reader who moved on keeps their place. The edit notice is the last resort,
+      // so a read-only answer is read out instead of leaving focus on the body.
       var names=api && typeof api.takeFocus==='function' && host.isConnected!==false?api.takeFocus():null;
-      var next=(names || []).map(function(name){return controls[name];}).filter(shown)[0];
+      if(!names)return;
+      var now=activeElement(),idle=!now || now===doc.body || now===doc.documentElement || now.isConnected===false || ['edit','save','discard','done'].some(function(name){return controls[name]===now;});
+      var next=idle && names.concat(['notice']).map(function(name){return controls[name];}).filter(shown)[0];
       if(next)next.focus({preventScroll:true});
     }
     // One keyed icon per URL: GitHub evidence (#756) and a plain authored link share the node, so a URL that gains evidence keeps its identity.
@@ -634,6 +639,8 @@
       else{first.setAttribute('data-reserved','true');first.setAttribute('tabindex','-1');first.setAttribute('aria-hidden','true');}
       var reason=el(statusLine,'span','edit-reason','dv-live-edit-reason',edit && edit.editable && edit.blocked?edit.blocked:'');reason.hidden=!reason.textContent;
       var editNotice=el(statusLine,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
+      // #1253: the notice can take focus from script (tabindex -1, not a Tab stop) when an edit control has nothing to hand focus to.
+      if(editNotice.textContent)editNotice.setAttribute('tabindex','-1');else editNotice.removeAttribute('tabindex');host._liveFocusControls.notice=editNotice;
       controls.hidden=!actionLabel && !hasData;statusRow.hidden=(!available || !(hasData || value.note.text)) && !reason.textContent && !editNotice.textContent && metricsConnection.el.hidden || connection.hidden && metricsConnection.el.hidden && note.hidden && reason.hidden && editNotice.hidden;
       head.hidden=controls.hidden && statusRow.hidden;
       // The tooltip repeats the whole status text.

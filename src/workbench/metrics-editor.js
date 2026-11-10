@@ -81,7 +81,6 @@ function flowMetricsDom(o){
     });
     if(merge && (merge.hidden.length || merge.staleHidden.length)){
       var hidden=fold(parent,'metrics-hidden','Hidden inherited signals');
-      if(merge.allHidden)note(hidden,'All inherited signals are hidden for this document, so it shows no metrics here. Show one again, or add a signal.','metrics-status');
       note(hidden,'Hidden in this document only; the provider still has them. Uncheck to show one again.');
       merge.hidden.forEach(function(name){hideToggle(hidden,prefix+name+' hidden for this document',true,name,commit);});
       if(merge.staleHidden.length){
@@ -138,6 +137,7 @@ function createFlowMetricsEditor(o){
   if(s.imported)d.note(box,'Inherited metrics from '+s.provider+': '+(!s.inherited?'none yet. Signals added here are kept as additions, so a binding the provider adds later merges with them.':
     s.merge?telemetrySummary(s.inherited)+'. Signals you add here are added to the provider\'s in this document; you can hide or change inherited ones. The provider is unchanged.':
     telemetrySummary(s.inherited)+'. This document replaces it with its own binding (saved before merging was available); Remove metrics restores the inherited binding.'),'metrics-inherited');
+  if(s.merge && s.merge.allHidden)d.note(box,'All inherited signals are hidden for this document, so it shows no metrics here. Show one again under Hidden inherited signals, or add a signal.','metrics-status');
   if(s.imported && s.inherited && !s.merge && b){
     var effects=s.mergeEffects || [],about='Store these metrics as changes to the provider binding, so later provider changes reach this document'+(effects.length?'. Also: '+effects.join('; '):'')+'.';
     if(effects.length)d.note(box,'Merge with provider: '+effects.join('; ')+'.');
@@ -157,6 +157,8 @@ function createFlowMetricsEditor(o){
   if(inheritedKind)kindLabels[inheritedKind]=inheritedKind+' (inherited)';
   if(s.merge && telemetryObject(s.inherited) && TELEMETRY_KINDS.indexOf(s.inherited.kind)>=0)kindLabels[s.inherited.kind]=s.inherited.kind+' (inherited)';
   d.row(box,'Metrics kind',d.relabel(kind,kindLabels));
+  // #1266: templates replace a binding, so an imported (merging) carrier explains why it has none.
+  if(s.merge && templateNames.length)d.note(box,'Templates cannot be used here: this binding merges with the provider\'s, and a template would replace it. To use a template\'s signals, add them with New signal.','metrics-template-note');
   if(!s.merge && (templateNames.length || template)){
     d.row(box,'Signals from',d.relabel(c.select(templateNames,template?s.template:'',function(v){var ok=commit({op:'use',name:v,kind:draftKind});if(ok && v)d.forget(['Metrics kind']);return ok;},true),{'':'Raw signals'}));
   }

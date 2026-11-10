@@ -255,7 +255,7 @@ test('manual card cancellation and stale gestures never publish; direct and nest
   // #1266: the overlay stores only the moved position. The re-rendered card is the resolved
   // binding: the provider's signals and side with the new position.
   const position={x:initial.x+40,y:initial.y+25};
-  expect(next).toEqual({extends:true,card:{position}});
+  expect(next).toEqual({extends:true,kind:binding.kind,card:{position}});
   await expect.poll(()=>positionOf(card)).toEqual(position);
   expect(await card.evaluate(el=>[...new Set([...el.querySelectorAll('.dv-metrics-card-label[data-signal]')].map(t=>t.getAttribute('data-signal')))].sort())).toEqual(Object.keys(binding.signals).sort());
   await expect(card).toHaveAttribute('data-side',binding.card.side);
@@ -347,12 +347,12 @@ test('#1112 an inherited imported connection without an overlay sets Card width 
  const width=guide.getByLabel('Card width',{exact:true});await expect(width).toHaveValue('');await expect(guide.getByLabel('Card title',{exact:true})).toHaveValue('');
  await openMetricsFold(guide,'Card');await width.fill('400');await width.press('Enter');
  // #1266: the overlay stores only the card change; the provider binding keeps flowing.
- await expect.poll(async()=>overlay(await source.inputValue())?.['a->b']?.telemetry).toEqual({extends:true,card:{width:400}});
+ await expect.poll(async()=>overlay(await source.inputValue())?.['a->b']?.telemetry).toEqual({extends:true,kind:'call',card:{width:400}});
  await expect.poll(async()=>(await box(inherited)).w).toBe(400);
  expect(await page.evaluate(()=>window.metricsImportContext.specs[0])).toEqual(provider);
  const created=await source.inputValue();
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect.poll(async()=>(await box(inherited)).w).toBe(240);
  await page.locator('#redo-builder').click();await expect(source).toHaveValue(created);
- expect(overlay(await source.inputValue())['a->b'].telemetry).toEqual({extends:true,card:{width:400}});await expect.poll(async()=>(await box(inherited)).w).toBe(400);
+ expect(overlay(await source.inputValue())['a->b'].telemetry).toEqual({extends:true,kind:'call',card:{width:400}});await expect.poll(async()=>(await box(inherited)).w).toBe(400);
  expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
 });

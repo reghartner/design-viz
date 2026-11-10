@@ -479,7 +479,7 @@ Both fail at the baseline on the focus assertion: no code moves focus. */
 const focusedControl=page=>page.evaluate(()=>{
  let at=document.activeElement;while(at && at.shadowRoot && at.shadowRoot.activeElement)at=at.shadowRoot.activeElement;
  if(!at)return null;const node=at.closest('[data-dv-node]');
- return {tag:at.tagName.toLowerCase(),text:(at.textContent || '').trim(),node:node?node.getAttribute('data-dv-node'):null,card:at.classList.contains('card')};
+ return {tag:at.tagName.toLowerCase(),text:(at.textContent || '').trim().slice(0,80),node:node?node.getAttribute('data-dv-node'):null,card:at.classList.contains('card')};
 });
 test('E21 #1253 Edit, Done, Save and Discard hand keyboard focus to the control that replaces them',async({page,server})=>{
  const board=await buildBoard(server,'focus-controls',boardSpec());await mockRuntime(page);

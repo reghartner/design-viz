@@ -34,8 +34,9 @@
              links are dropped, times become ISO text, and each kept carrier
              always has signals, observedAt (or null), markers and links.
    refreshMs The refresh interval while Metrics is on. Without it the page's
-             tracking.telemetry.refreshMs applies, else one minute. Never
-             below 60000.
+             tracking.telemetry.refreshMs applies, else five minutes. Never
+             below 300000, and no automatic call (a visibility return, closing
+             Over time) comes sooner than that after the previous one (#1287).
    source    Optional connector name for the panel's Metrics text
              ('Grafana' from the claude.ai adapter, viewer/telemetry-claude.js).
    demo      Optional {mount(api) → cleanup}: a demo source mounted when Metrics
@@ -418,6 +419,7 @@ function createTelemetry(page,options,hooks){
   var windowHistory=options.historyMode==='window',windowCache=Object.create(null);
   var demo=options.demo && typeof options.demo.mount==='function'?options.demo:null;
   var configured=Number(options.refreshMs),authored=trackingTelemetry(page || {}).refreshMs;
+  // #1287: at most once every 5 minutes (TELEMETRY_MIN_REFRESH_MS), whatever the host or the page asks for.
   var delay=Math.max(TELEMETRY_MIN_REFRESH_MS,configured>0 && isFinite(configured)?configured:authored || TELEMETRY_MIN_REFRESH_MS);
   var map=Object.create(null),liveMap=map,past=null,historyRequests=[],historyGeneration=0,historyCache=telemetryHistoryCache(),liveStatus=null,enabled=false,retired=false,listeners=[],demoCleanup=null;
   available=available && !!(provider || demo);
@@ -472,6 +474,7 @@ function createTelemetry(page,options,hooks){
     signal.addEventListener('abort',function(){if(generation===requestGeneration){clearPending();notify();}},{once:true});
     return Promise.resolve().then(function(){return provider(bound,signal,report,{environment:environment,config:api.config()});}).then(function(value){return {value:value,note:noted,keys:keys};});
   },delay,{
+    spaced:true,
     busy:function(){if(past){liveStatus=Object.assign({},liveStatus,{busy:true});return;}setStatus({busy:true});notify();},
     result:function(answer){clearPending();store(answer.value,answer.keys);var next={state:'ok',busy:false,refreshedAt:new Date().toISOString(),note:answer.note};if(past)liveStatus=next;else setStatus(next);notify();},
     error:function(error){clearPending();var next={state:error && error.state==='approval'?'approval':'error',busy:false,note:error && typeof error.message==='string'?error.message:String(error)};if(past)liveStatus=next;else setStatus(next);notify();}

@@ -767,15 +767,20 @@ function liveStatusWhenReady(host,connect){
    retires the timer and the visibility listener, and drops any late answer;
    start() after stop() begins again with a fresh signal. hooks: busy() before
    each call, result(value) and error(error) after it. */
+/* hooks.spaced (#1287, Metrics): no automatic call comes sooner than `delay` after the previous call started. A
+   visibility return, a resume (closing Over time) or a catch-up waits out the rest; start() (Metrics on, Retry, an
+   environment change) is the reader's and calls at once. The timer itself is armed `delay` after an answer. */
 function liveStatusPoller(call,delay,hooks){
-  var abort=null,timer=0,pending=false,catchUp=false,running=false,paused=false,generation=0;
+  var abort=null,timer=0,pending=false,catchUp=false,running=false,paused=false,generation=0,last=null,spaced=!!hooks.spaced;
   function visible(){return !document.hidden;}
   function stopTimer(){if(timer){clearTimeout(timer);timer=0;}}
-  function arm(){stopTimer();if(running && !paused && visible())timer=setTimeout(function(){timer=0;run();},delay);}
-  function run(){
+  function arm(ms){stopTimer();if(running && !paused && visible())timer=setTimeout(function(){timer=0;run(true);},ms==null?delay:ms);}
+  function run(now){
     if(!running || paused || !visible())return;
     if(pending){catchUp=true;return;}
-    pending=true;stopTimer();var current=generation,signal=abort.signal;hooks.busy();
+    var wait=spaced && !now && last!=null?delay-(Date.now()-last):0;
+    if(wait>0){arm(wait);return;}
+    pending=true;stopTimer();last=Date.now();var current=generation,signal=abort.signal;hooks.busy();
     Promise.resolve().then(function(){if(current===generation)return call(signal);}).then(function(value){
       if(current===generation)hooks.result(value);
     },function(error){if(current===generation)hooks.error(error);}).then(function(){
@@ -787,7 +792,7 @@ function liveStatusPoller(call,delay,hooks){
   return {
     pause:function(){paused=true;stopTimer();},
     resume:function(){paused=false;if(running)run();else this.start();},
-    start:function(){if(running)return;running=true;paused=false;abort=new AbortController();document.addEventListener('visibilitychange',visibility);run();},
+    start:function(){if(running)return;running=true;paused=false;abort=new AbortController();document.addEventListener('visibilitychange',visibility);run(true);},
     stop:function(){if(!running)return;running=false;generation++;pending=catchUp=false;stopTimer();document.removeEventListener('visibilitychange',visibility);abort.abort();}
   };
 }

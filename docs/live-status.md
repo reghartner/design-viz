@@ -297,8 +297,8 @@ Undo/Redo per edit. Future offsets (`+6h`), zero, fractional durations and date
 expressions are unsupported: authored invalid values warn and use `24h`, while
 the editor refuses invalid edits. This shared window applies to metrics and
 native trace search/detail for all local and imported carriers. `refreshMs`
-is the connector refresh interval; values under one minute use 60000 and an
-absent value leaves the connector default. `templates` are named signal sets
+is the refresh interval; values under five minutes use 300000 (with a warning)
+and an absent value means five minutes. `templates` are named signal sets
 authored on the page; the repository ships none.
 
 A carrier applies a template with `"use"` plus a value for every declared
@@ -588,7 +588,7 @@ and **Remove metrics** restores the inherited one.
 **Status board settings → Metrics** edits the page
 `tracking.telemetry` block: the Grafana Prometheus, Loki, Tempo and SQL datasource
 UIDs, the Honeycomb environment and dataset, **Metrics window** (such as `1h`) and
-**Metrics refresh ms** (60000 or more). **Allow metrics** controls availability on
+**Metrics refresh ms** (300000 or more). **Allow metrics** controls availability on
 this page, including all direct/nested imports and loaded details. It is checked
 by default; that permits Metrics but never turns it on or runs queries. Uncheck
 it to hide Metrics controls and suppress telemetry discovery, data calls, cards
@@ -1302,9 +1302,9 @@ turns `observedAt` and marker times into ISO text, and gives every kept carrier
 `signals`, `observedAt` (or `null`), `markers` and `links`.
 
 The first call runs when Metrics turns on. Calls repeat every `refreshMs`, else the
-page's `tracking.telemetry.refreshMs`, else one minute, and never more often than
-once a minute. A hidden document pauses refresh; returning to visible runs one
-catch-up call. A rejection reports the error and keeps the previous map. Turning
+page's `tracking.telemetry.refreshMs`, else five minutes, never more often (#1287).
+A hidden document pauses refresh; returning to visible, or closing Over time,
+calls once five minutes have passed. Metrics on and Retry call at once. A rejection reports the error and keeps the previous map. Turning
 Metrics off or destroying the page aborts the signal, stops the timer and drops any
 late answer; turning it off also clears the map. `report.note(text)` attaches a note
 to that answer, such as a query that failed while the others answered; it becomes
@@ -1840,7 +1840,7 @@ panel shows **Allow Grafana**, which makes the same call once and restarts Metri
 Until then no further call is made. An authorization answer (reconnect, not
 allowed) also clears the map and stops calls until Metrics is
 turned on again. Missing or removed capabilities hide Metrics entirely. Refreshes follow the [telemetry provider](#telemetry-provider)
-loop: at most once a minute (the page's `refreshMs` when longer), paused while the
+loop: at most every five minutes (the page's `refreshMs` when longer), paused while the
 document is hidden, aborted when Metrics turns off. The connector line reads
 "Grafana connected · 24h window · refreshed 10:42:13". Each refresh makes these
 calls:

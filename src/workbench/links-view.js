@@ -119,8 +119,8 @@ function initWorkbenchLinksView(opts){
       byId=Object.create(null);byKey=Object.create(null);
       if(!model.error){model.elements.forEach(function(e){byId[linksElementId(e)]=e;});model.tickets.forEach(function(t){byKey[t.key]=t;});}
     }
-    // The Trace match model is built only while that tab is open.
-    if(state.tab==='trace' && key!==traceKey){
+    // The Trace match model is built with the Tickets model, so both tab counts show.
+    if(key!==traceKey){
       traceKey=key;traceModel=linksTraceModel(s.text,s.raw,context());traceById=Object.create(null);traceByKey=Object.create(null);
       if(!traceModel.error){traceModel.elements.forEach(function(e){traceById[linksElementId(e)]=e;});traceModel.groups.forEach(function(g){traceByKey[g.key]=g;});}
     }
@@ -146,7 +146,7 @@ function initWorkbenchLinksView(opts){
     if(!plan || plan.error){fail(plan?plan.error:'That edit could not be made.');return false;}
     if(plan.text===s.text){if(done && done.same)say(done.same);return true;}
     var ok=opts.apply(plan,{editError:function(message){fail('This edit was not applied: '+message);}},s);
-    if(ok && done && done.ok)say(done.ok);
+    if(ok && done && done.ok)say(typeof done.ok==='function'?done.ok(plan):done.ok);
     return ok;
   }
   function assign(link,key,remove){
@@ -491,7 +491,7 @@ function initWorkbenchLinksView(opts){
 
   /* ---------- Trace match tab (#1243 part 2) ---------- */
   function stepRef(e){return {kind:'step',section:e.section,index:e.index};}
-  function useOf(u){return {kind:'step',section:u.section,index:u.index,alternative:u.alternative};}
+  function useOf(u){var st=element('step:'+u.section+':'+u.index);return {kind:'step',section:u.section,index:u.index,alternative:u.alternative,label:st?st.label:u.label};}
   function useText(u){return [u.nodeId?'node '+(u.nodeLabel || u.nodeId):'',u.attributes?'+'+u.attributes+(u.attributes===1?' attribute':' attributes'):'',u.many?'alternative '+(u.alternative+1):''].filter(Boolean).join(' · ');}
   function traceHighlightLinks(h){
     if(!traceModel || traceModel.error)return [];
@@ -537,9 +537,15 @@ function initWorkbenchLinksView(opts){
   function traceChoose(from,to,key,copy,opener){
     openPopover({type:'trace-choose',key:key,from:useOf(from),to:linksElementId(to),copy:!!copy,opener:opener});
   }
+  function traceDropText(d){
+    var to=d.target.element,has=to.matches && to.matches.length;
+    if(!d.from)return 'Drop to give '+to.label+' '+d.key+(has?' as an alternative (it already has '+to.matches.map(function(u){return u.key;}).join(', ')+')':'')+'.';
+    return 'Drop to '+(d.copy?'copy ':'move ')+d.key+(d.copy?'':' from '+d.from.label)+' to '+to.label+(has?'; you choose Replace or Add as alternative next':'')+(d.copy?'':' · hold ⌥ to copy')+'.';
+  }
+  function assignText(to,key){return 'Gave '+to.label+' '+key+(to.matches && to.matches.length?' as an alternative':'')+'. Undo restores it.';}
   function traceDrop(d){
     var to=d.target.element;
-    if(!d.from){var g=traceGroup(d.key);if(g)commit(function(text,raw,ctx){return planLinksTraceAssign(text,raw,g,stepRef(to),false,ctx);},{ok:'Gave '+to.label+' '+d.key+'. Undo restores it.'});return;}
+    if(!d.from){var g=traceGroup(d.key);if(g)commit(function(text,raw,ctx){return planLinksTraceAssign(text,raw,g,stepRef(to),false,ctx);},{ok:assignText(to,d.key)});return;}
     if(to.matches.length){traceChoose(d.from,to,d.key,d.copy,'trace-chip:'+linksElementId(d.from)+'|'+d.from.alternative);return;}
     traceMove(d.from,to,d.key,null,d.copy);
   }
@@ -598,15 +604,32 @@ function initWorkbenchLinksView(opts){
     function save(){if(input.value!==(value==null?'':String(value)))onCommit(input.value,input);}
     rowsLife.listen(input,'keydown',function(ev){
       if(ev.key==='Enter'){ev.preventDefault();save();}
-      if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();state.traceEdit=state.traceCreate=state.traceRename=null;render();}
+      // Esc in an inline editor bubbles to the editor (escCloses); in the rename form it cancels the rename.
+      if(ev.key==='Escape' && !input.closest('.links-trace-editor')){
+        ev.preventDefault();ev.stopPropagation();var k=state.traceRename;state.traceRename=null;state.traceRenameDraft=null;render();
+        if(k)focusIn('[data-links-trace="'+cssEscape(k)+'"] .links-edit');
+      }
     });
     rowsLife.listen(input,'change',save);
     return row;
   }
+  // Esc from any control in an inline editor closes it, back to its chip.
+  function escCloses(box){
+    rowsLife.listen(box,'keydown',function(ev){
+      if(ev.key!=='Escape' || ev.defaultPrevented)return;ev.preventDefault();ev.stopPropagation();
+      var t=state.traceEdit;state.traceEdit=null;state.traceCreate=null;render();
+      var st=t && element('step:'+t.section+':'+t.index),u=st && st.matches[t.alternative];if(st && u)focusTraceChip(st,u.key);
+    });
+  }
   function traceEditor(e,alternative){
     var s=snapshot(),got=!s.error && builderStepAt(s.raw,e.section,e.index),alts=got && traceMatchFormAlternatives(got.st.traceMatch),m=alts && alts[alternative];
     var box=el('div','links-trace-editor');box.setAttribute('role','group');box.setAttribute('aria-label','Trace match · '+e.label+(alts && alts.length>1?' · alternative '+(alternative+1):''));
-    if(!m){box.appendChild(el('p','links-none','This match changed. Close and reopen it.'));return box;}
+    escCloses(box);
+    if(!m){
+      box.appendChild(el('p','links-none','This match changed.'));
+      var shut=button('bbtn','Close');rowsLife.listen(shut,'click',function(){state.traceEdit=null;render();});box.appendChild(shut);
+      return box;
+    }
     var base=linksElementId(e)+'|'+alternative+'|';
     function set(field){return function(v){return traceEdit(e,alternative,{op:'set',alternative:alternative,field:field,value:v},base+field);};}
     box.appendChild(traceField(base+'serviceName','Service name',m.serviceName,set('serviceName'),'notify-svc'));
@@ -645,13 +668,22 @@ function initWorkbenchLinksView(opts){
   }
   function traceCreateForm(e){
     var box=el('div','links-trace-editor');box.setAttribute('role','group');box.setAttribute('aria-label','New trace match · '+e.label);
-    var base=linksElementId(e)+'|new|',service=traceField(base+'serviceName','Service name','',function(){},'notify-svc'),operation=traceField(base+'operation','Operation','',function(){},'route.event');
+    var draft=state.traceCreate || {},base=linksElementId(e)+'|new|';
+    var service=traceField(base+'serviceName','Service name',draft.serviceName || '',function(){},'notify-svc'),operation=traceField(base+'operation','Operation',draft.operation || '',function(){},'route.event');
+    escCloses(box);
+    // Keep the draft current while typing, so a re-render (Render, Undo elsewhere) keeps it.
+    [['serviceName',service],['operation',operation]].forEach(function(pair){rowsLife.listen(pair[1].querySelector('input'),'input',function(ev){if(state.traceCreate)state.traceCreate[pair[0]]=ev.target.value;});});
     var create=button('bbtn','Create trace match');
     function go(){
       var sv=service.querySelector('input').value,op=operation.querySelector('input').value;
       if(!sv.trim()){fieldError(service.querySelector('input'),'Enter the service name of the span this step stands for.');return;}
       if(!op.trim()){fieldError(operation.querySelector('input'),'Enter the operation of the span this step stands for.');return;}
-      state.traceCreate=null;if(!traceEdit(e,0,{op:'create',serviceName:sv,operation:op}))state.traceCreate=linksElementId(e);
+      var keep={id:linksElementId(e),serviceName:sv,operation:op};state.traceCreate=null;
+      if(!traceEdit(e,0,{op:'create',serviceName:sv,operation:op})){
+        // Keep what was typed; the reason shows beside the service field.
+        var msg=error.textContent;state.traceCreate=keep;render();
+        var f=list.querySelector('[data-links-field="'+cssEscape(base+'serviceName')+'"]');if(f && msg){fail('');fieldError(f,msg);}return;
+      }
       render();focusTraceChip(e,sv.trim()+' · '+op.trim());
     }
     [service,operation].forEach(function(f){rowsLife.listen(f.querySelector('input'),'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();ev.stopImmediatePropagation();go();}});});
@@ -680,7 +712,10 @@ function initWorkbenchLinksView(opts){
       head.appendChild(rename);
       if(state.traceRename===g.key){
         var form=el('div','links-merge links-trace-rename');form.setAttribute('role','group');form.setAttribute('aria-label','Rename '+g.key);
-        var sv=traceField('rename|'+g.key+'|serviceName','Service name',g.serviceName,function(){}),op=traceField('rename|'+g.key+'|operation','Operation',g.operation,function(){});
+        var typed=state.traceRenameDraft && state.traceRenameDraft.key===g.key?state.traceRenameDraft:{serviceName:g.serviceName,operation:g.operation};
+        var sv=traceField('rename|'+g.key+'|serviceName','Service name',typed.serviceName,function(){}),op=traceField('rename|'+g.key+'|operation','Operation',typed.operation,function(){});
+        [['serviceName',sv],['operation',op]].forEach(function(pair){rowsLife.listen(pair[1].querySelector('input'),'input',function(ev){
+          if(!state.traceRenameDraft || state.traceRenameDraft.key!==g.key)state.traceRenameDraft={key:g.key,serviceName:g.serviceName,operation:g.operation};state.traceRenameDraft[pair[0]]=ev.target.value;});});
         // The fields save only through the Rename button, so each change field edits nothing on its own.
         form.appendChild(sv);form.appendChild(op);
         form.appendChild(el('p','links-merge-text','Renames on '+count+(count===1?' step':' steps')+': '+g.uses.map(function(u){return u.label;}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(', ')+'. One Undo step restores all of them.'));
@@ -688,13 +723,18 @@ function initWorkbenchLinksView(opts){
         function doRename(){
           var next={serviceName:sv.querySelector('input').value,operation:op.querySelector('input').value},nk=next.serviceName.trim()+' · '+next.operation.trim();
           var lit=state.highlight && state.highlight.type==='trace' && state.highlight.key===g.key;if(lit)state.highlight.key=nk;
-          state.traceRename=null;
-          var ok=commit(function(text,raw,ctx){return planLinksTraceRename(text,raw,g,next,ctx);},{ok:'Renamed '+g.key+' to '+nk+' on '+count+(count===1?' step':' steps')+'. Undo restores all of them.'});
-          if(!ok){if(lit && state.highlight)state.highlight.key=g.key;state.traceRename=g.key;render();var f=list.querySelector('[data-links-field="'+cssEscape('rename|'+g.key+'|serviceName')+'"]');if(f && error.textContent){var msg=error.textContent;fail('');fieldError(f,msg);}return;}
+          state.traceRename=null;state.traceRenameDraft=null;var refused=null;
+          var ok=commit(function(text,raw,ctx){var plan=planLinksTraceRename(text,raw,g,next,ctx);if(plan.error)refused=plan.field || 'serviceName';return plan;},
+            {ok:function(plan){return 'Renamed '+g.key+' to '+nk+' on '+plan.count+(plan.count===1?' step':' steps')+'. Undo restores all of them.';}});
+          if(!ok){
+            // Keep what was typed, and show the reason under the field at fault.
+            if(lit && state.highlight)state.highlight.key=g.key;state.traceRename=g.key;state.traceRenameDraft={key:g.key,serviceName:next.serviceName,operation:next.operation};render();
+            var f=list.querySelector('[data-links-field="'+cssEscape('rename|'+g.key+'|'+(refused || 'serviceName'))+'"]');if(f && error.textContent){var msg=error.textContent;fail('');fieldError(f,msg);}return;
+          }
           var k=list.querySelector('[data-links-trace="'+cssEscape(nk)+'"] .links-key');if(k)k.focus();
         }
         [sv,op].forEach(function(f){rowsLife.listen(f.querySelector('input'),'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();ev.stopImmediatePropagation();doRename();}},true);});
-        rowsLife.listen(go,'click',doRename);rowsLife.listen(no,'click',function(){state.traceRename=null;render();focusIn('[data-links-trace="'+cssEscape(g.key)+'"] .links-edit');});
+        rowsLife.listen(go,'click',doRename);rowsLife.listen(no,'click',function(){state.traceRename=null;state.traceRenameDraft=null;render();focusIn('[data-links-trace="'+cssEscape(g.key)+'"] .links-edit');});
         form.appendChild(go);form.appendChild(no);row.appendChild(form);
       }
       var chips=el('div','links-chips');chips.setAttribute('role','list');chips.setAttribute('aria-label',g.key+' links');row.appendChild(chips);
@@ -727,7 +767,7 @@ function initWorkbenchLinksView(opts){
           e.matches.forEach(function(u){chips.appendChild(traceChip(u,e,false));});
           if(e.form && !e.matches.length){
             var addMatch=button('links-assign','+ Add trace match','Add trace match to '+e.label);
-            rowsLife.listen(addMatch,'click',function(){state.traceCreate=linksElementId(e);state.traceEdit=null;render();var f=list.querySelector('[data-links-field="'+cssEscape(linksElementId(e)+'|new|serviceName')+'"]');if(f)f.focus();});
+            rowsLife.listen(addMatch,'click',function(){state.traceCreate={id:linksElementId(e),serviceName:'',operation:''};state.traceEdit=null;render();var f=list.querySelector('[data-links-field="'+cssEscape(linksElementId(e)+'|new|serviceName')+'"]');if(f)f.focus();});
             chips.appendChild(addMatch);
           }
         }else{
@@ -738,8 +778,11 @@ function initWorkbenchLinksView(opts){
           });
         }
         row.appendChild(chips);
-        if(e.kind==='step' && state.traceEdit && state.traceEdit.section===e.section && state.traceEdit.index===e.index)row.appendChild(traceEditor(e,state.traceEdit.alternative));
-        if(e.kind==='step' && state.traceCreate===linksElementId(e))row.appendChild(traceCreateForm(e));
+        if(e.kind==='step' && state.traceEdit && state.traceEdit.section===e.section && state.traceEdit.index===e.index){
+          // Undo, or a drag that took this alternative away, closes the editor.
+          if(e.matches[state.traceEdit.alternative])row.appendChild(traceEditor(e,state.traceEdit.alternative));else state.traceEdit=null;
+        }
+        if(e.kind==='step' && state.traceCreate && state.traceCreate.id===linksElementId(e))row.appendChild(traceCreateForm(e));
         if(state.highlight && state.highlight.type==='element' && state.highlight.id===linksElementId(e))row.classList.add('links-row-active');
         list.appendChild(row);
       });
@@ -768,10 +811,13 @@ function initWorkbenchLinksView(opts){
       var to=element(spec.to);if(!to){state.popover=null;popover=null;return;}
       popover.setAttribute('aria-label',to.label+' already has a trace match. '+(spec.copy?'Copy':'Move')+' '+spec.key+' as:');
       var head=el('p','links-pop-hint',to.label+' already has '+to.matches.map(function(u){return u.key;}).join(', ')+'. Esc cancels; nothing is written until you choose.');popover.appendChild(head);
-      return menuItems([
+      menuItems([
         ['Replace',function(){var f=spec.from,c=spec.copy;closePopover(false);traceMove(f,to,spec.key,'replace',c);}],
         ['Add as alternative',function(){var f=spec.from,c=spec.copy;closePopover(false);traceMove(f,to,spec.key,'alternative',c);}],
         ['Cancel',function(){closePopover(true);say('Nothing changed.');}]]);
+      var dup=linksTraceAlternativeRefusal(to,spec.key),alt=popover.querySelectorAll('[role="menuitem"]')[1];
+      if(dup && alt){alt.disabled=true;alt.setAttribute('aria-disabled','true');alt.title=dup;popover.insertBefore(el('p','links-pop-reason',dup),alt.nextSibling);}
+      return;
     }
     var title=spec.type==='trace-assign'?'Assign '+spec.key+' to steps':(spec.copy?'Copy ':'Move ')+spec.key+' from '+from.label;
     popover.setAttribute('aria-label',title);
@@ -787,9 +833,10 @@ function initWorkbenchLinksView(opts){
       var id=linksElementId(x),note=x.matches.length?x.matches.map(function(u){return u.key;}).join(', '):'';
       if(spec.type==='trace-assign'){
         var on=x.matches.some(function(u){return u.key===spec.key;});
+        var assignNote=!on && x.matches.length?'adds an alternative to '+note:note;
         body.appendChild(option(id,sectionPrefix(x)+x.label,on,x.form?null:x.reason,function(checked){
-          if(!g)return false;return commit(function(text,raw,ctx){return planLinksTraceAssign(text,raw,g,stepRef(x),!checked,ctx);},{ok:(checked?'Gave ':'Removed ')+spec.key+(checked?' to ':' from ')+x.label+'. Undo restores it.'});
-        },note));
+          if(!g)return false;return commit(function(text,raw,ctx){return planLinksTraceAssign(text,raw,g,stepRef(x),!checked,ctx);},{ok:checked?assignText(x,spec.key):'Removed '+spec.key+' from '+x.label+'. Undo restores it.'});
+        },assignNote));
       }else{
         var pick=button('links-pop-target',sectionPrefix(x)+x.label);pick.setAttribute('data-links-option',id);
         if(why[id]){pick.disabled=true;pick.title=why[id];}
@@ -969,10 +1016,15 @@ function initWorkbenchLinksView(opts){
   function listRowFor(e){var r=list.querySelector('[data-links-element="'+cssEscape(linksElementId(e))+'"]');return r?[r]:[];}
   function paintDrop(){
     var d=state.drag;d.marked.forEach(function(n){n.classList.remove('dv-links-drop','dv-links-refused');});d.marked=[];
-    if(!d.target){say(d.from?'Dragging '+d.key+' from '+describe(d.from)+'. Drop on a node, connection, step or row. Esc cancels.':'Dragging '+d.key+'. Drop on a node, connection or step. Esc cancels.');return;}
+    if(!d.target){
+      if(state.tab==='trace')say(d.from?'Dragging '+d.key+' from '+d.from.label+'. Drop on a step: a Steps row, a step coin or a step row here. Esc cancels.':'Dragging '+d.key+'. Drop on a step to give it this match. Esc cancels.');
+      else say(d.from?'Dragging '+d.key+' from '+describe(d.from)+'. Drop on a node, connection, step or row. Esc cancels.':'Dragging '+d.key+'. Drop on a node, connection or step. Esc cancels.');
+      return;
+    }
     var why=dropRefusal(d.target.element,d.key,d.from,d.copy);
     d.target.marks.forEach(function(n){n.classList.add(why?'dv-links-refused':'dv-links-drop');d.marked.push(n);});
     var verb=d.from && !d.copyOnly?(d.copy?'copy':'move'):(state.tab==='trace'?'assign':'attach');
+    if(!why && state.tab==='trace'){say(traceDropText(d));return;}
     say(why?'Cannot drop here: '+why:'Drop to '+verb+' '+d.key+(d.from && !d.copy?' from '+describe(d.from):'')+' to '+describe(d.target.element)+(d.from && !d.copy?' · hold ⌥ to copy':'')+'.');
   }
   function endDrag(){
@@ -989,7 +1041,7 @@ function initWorkbenchLinksView(opts){
     if(!d.active){endDrag();return;}
     d.copy=!!ev.altKey || d.copyOnly;d.target=dropTarget(ev.clientX,ev.clientY);
     endDrag();suppressClick=true;win.setTimeout(function(){suppressClick=false;},0);
-    if(!d.target){say('Nothing changed: drop on a node, connection or step.');return;}
+    if(!d.target){say(state.tab==='trace'?'Nothing changed: drop on a step.':'Nothing changed: drop on a node, connection or step.');return;}
     var why=dropRefusal(d.target.element,d.key,d.from,d.copy);
     if(why){fail(why);say('');return;}
     if(state.tab==='trace'){traceDrop(d);return;}

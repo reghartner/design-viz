@@ -455,15 +455,18 @@ function createTelemetry(page,options,hooks){
   }
   /* #1289, like Jira's 5-minute answer reuse: the last clean answer per environment (same bindings and settings) is shown again,
      with its own time and no call, when Metrics turns on or the environment comes back within 5 minutes. An answer
-     that names a failure is not reused, so turning Metrics off and on still tries again after a failure. Trace
-     exemplars are not reused: their selection tokens belong to the session that loaded them. */
+     that names a failure is not reused, so turning Metrics off and on still tries again after a failure. A trace
+     exemplar's selection token belongs to the session that loaded it: options.restoreExemplars registers the cached
+     exemplar again under a fresh token (no call); one it cannot restore is left out until the next refresh. */
   var answers=Object.create(null);
   function envKey(){return environment || '';}
   function forgetAnswers(){answers=Object.create(null);}
   function startLive(){
     var key=envKey(),hit=answers[key],now=Date.now();
     if(hit && now-hit.at<delay && hit.keys===JSON.stringify(bindingKeys()) && hit.config===JSON.stringify(api.config())){
-      var reused=copy(hit.value);Object.keys(reused).forEach(function(id){if(reused[id] && typeof reused[id]==='object')delete reused[id].exemplars;});
+      var reused=copy(hit.value),restored={};
+      if(typeof options.restoreExemplars==='function'){try{restored=options.restoreExemplars(copy(hit.value)) || {};}catch(ex){restored={};}}
+      Object.keys(reused).forEach(function(id){if(!reused[id] || typeof reused[id]!=='object')return;delete reused[id].exemplars;if(restored[id])reused[id].exemplars=[restored[id]];});
       store(reused,JSON.parse(hit.keys));setStatus({state:'ok',busy:false,refreshedAt:hit.refreshedAt,note:''});poller.start(delay-(now-hit.at));return;
     }
     poller.start();

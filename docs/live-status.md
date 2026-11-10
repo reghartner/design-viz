@@ -1306,8 +1306,9 @@ page's `tracking.telemetry.refreshMs`, else five minutes, never more often (#128
 A hidden document pauses refresh; returning to visible, or closing Over time,
 calls once five minutes have passed. Like Jira, turning Metrics on or coming back
 to an environment within five minutes shows that environment's last clean answer
-with its own refreshed time and makes no call (an answer that names a failure,
-and trace exemplars, are not reused). Retry always calls at once. A rejection reports the error and keeps the previous map. Turning
+with its own refreshed time and makes no call; its example traces return under
+fresh selection tokens. An answer that names a failure is not reused. Retry
+always calls at once. A rejection reports the error and keeps the previous map. Turning
 Metrics off or destroying the page aborts the signal, stops the timer and drops any
 late answer; turning it off also clears the map. `report.note(text)` attaches a note
 to that answer, such as a query that failed while the others answered; it becomes

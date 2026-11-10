@@ -469,6 +469,17 @@ sample states in sorted ticket order. It starts off when a project opens, except
 from the built-in **Epic status board** template (**Start new project → Delivery
 status**), which opens with it on. It stays preview-only across ordinary edits and
 skin changes; it never saves status to the spec or contacts Jira.
+
+An agent's snapshot of the board's real Jira status and metrics (`tools/live-snapshot.js`, #1265)
+is a second preview choice. Load it with **File → Load snapshot…**; a `<board>.snapshot.json`
+beside a board opened with **Choose working folder…** is offered too. A **Snapshot from <time>**
+checkbox then sits beside **Demo live status**: checked after Load snapshot, unchecked when only
+offered, and checking one turns the other off. While it is on, the Epic status connection line
+reads "Snapshot from <time>" (a violet dot), the Metrics line "Metrics: snapshot from <time>", the
+Metrics overlay is on with the snapshot's values, and **Preview metrics layout** is off. Like the
+demo it is preview state only: it is never saved to the spec, exported or published, and opening
+another project forgets it. A file that is not a snapshot is refused with its reason under the
+File actions.
 This offline preview treats the configured parent as a direct Epic: an opaque
 Jira key alone cannot establish its type. Automatic initiative detection requires
 Jira metadata. A standalone demo timeline or host provider can supply the runtime

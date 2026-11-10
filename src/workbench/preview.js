@@ -58,7 +58,7 @@ function workbenchPreviewSnapshot(page, ctl, options){
       : steps.filter(function(s){ return JSON.stringify(s) === signature; }).length !== 1)) return;
     prior.mode = stepper.mode(); prior.id = id; prior.signature = signature;
   });
-  return {sections:saved,demoLiveStatus:!!(ctl && ctl.demoLiveStatus),metricsPreview:!!(ctl && ctl.metricsPreview),details:ctl && ctl.details && ctl.details.snapshot()};
+  return {sections:saved,demoLiveStatus:!!(ctl && ctl.demoLiveStatus),liveSnapshot:!!(ctl && ctl.liveSnapshot),metricsPreview:!!(ctl && ctl.metricsPreview),details:ctl && ctl.details && ctl.details.snapshot()};
 }
 /* Authoring a legacy View materializes its generated ID as an explicit ID.
    That ID remains authoritative through Undo/Redo. Layout identity is needed
@@ -159,8 +159,20 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   var demoMap=lifecycle && lifecycle.demoLiveStatus?workbenchDemoStatus(page):{};
   var hasTickets=Object.keys(demoMap).length>0;
   var demoOn=hasTickets && !!(saved && saved.demoLiveStatus);
-  var metricsOn=!!(saved && saved.metricsPreview);
+  // #1265: an agent's snapshot, when one is loaded, is a second choice beside the demo; one of them at a time.
+  var liveSnapshot=lifecycle && lifecycle.liveSnapshot && lifecycle.liveSnapshot(),snapshotOn=!!liveSnapshot && !demoOn && !!(saved && saved.liveSnapshot);
+  var metricsOn=!!(saved && saved.metricsPreview) && !snapshotOn;
   var renderOptions={autoplay:false,authoring:true,layoutTarget:'default',telemetry:false,metricsPreview:metricsOn,loadDetail:lifecycle && lifecycle.loadDetail};
+  if(snapshotOn){
+    var snapshotMap=liveSnapshot.map(Object.keys(demoMap)),snapshotTelemetry=liveSnapshot.telemetry();
+    // The connection and Metrics lines read "Snapshot from <time>", never connected or demo. No provider: nothing
+    // refreshes a snapshot, so the connection line never claims a refresh.
+    renderOptions.liveStatus={demo:{mount:function(live){
+      live.apply(snapshotMap);live.status({state:'snapshot',source:liveSnapshot.label,busy:false});
+      if(Object.keys(snapshotTelemetry).length)live.setMetricsEnabled(true);
+    }}};
+    renderOptions.telemetry={provider:function(){return Promise.resolve(snapshotTelemetry);},snapshot:liveSnapshot.label};
+  }
   if(demoOn){
     var demoDay=0,initialDemo=JSON.parse(JSON.stringify(demoMap)),demoStates=['todo','active','done','blocked'];
     // A demo mount, as the reader's #live=demo uses, makes the connection read "Demo" instead of "Host connected" (#863).
@@ -174,17 +186,18 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
     }}};
   }
   var ctl = renderPage(view, display, skin, null, renderOptions);
-  ctl.demoLiveStatus=demoOn;ctl.metricsPreview=metricsOn;
+  ctl.demoLiveStatus=demoOn;ctl.liveSnapshot=snapshotOn;ctl.metricsPreview=metricsOn;
   var retired=false,metricsLabel=null,metricsInput=null;
-  var demoLabel=null,demoInput=null;
+  var demoLabel=null,demoInput=null,snapshotLabel=null,snapshotInput=null;
   function changeDemo(){if(lifecycle && lifecycle.demoLiveStatus)lifecycle.demoLiveStatus(demoInput.checked);}
+  function changeSnapshot(){if(lifecycle && lifecycle.snapshotLiveStatus)lifecycle.snapshotLiveStatus(snapshotInput.checked);}
   var doc=view.ownerDocument,previewButton=lifecycle && lifecycle.previewButton;
   function changeMetrics(){if(!retired && lifecycle && lifecycle.metricsPreview)lifecycle.metricsPreview(metricsInput.checked);}
   if(previewButton && lifecycle && lifecycle.metricsPreview){
     metricsLabel=doc.createElement('label');metricsLabel.className='workspace-preview workspace-metrics-preview';
     metricsInput=doc.createElement('input');metricsInput.type='checkbox';metricsInput.checked=metricsOn;
-    metricsInput.disabled=!trackingTelemetry(page).enabled;
-    metricsLabel.title=metricsInput.disabled?'Enable Allow metrics in Status board settings → Metrics.':'Synthetic values only; no queries or saved changes.';
+    metricsInput.disabled=!trackingTelemetry(page).enabled || snapshotOn;
+    metricsLabel.title=snapshotOn?'Off while the snapshot shows its own metrics.':metricsInput.disabled?'Enable Allow metrics in Status board settings → Metrics.':'Synthetic values only; no queries or saved changes.';
     metricsLabel.appendChild(metricsInput);metricsLabel.appendChild(doc.createTextNode('Preview metrics layout'));
     metricsInput.addEventListener('change',changeMetrics);previewButton.parentNode.insertBefore(metricsLabel,previewButton);
   }
@@ -194,6 +207,14 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
     demoLabel.appendChild(demoInput);demoLabel.appendChild(doc.createTextNode('Demo live status'));
     demoInput.addEventListener('change',changeDemo);
     previewButton.parentNode.insertBefore(demoLabel,previewButton);
+  }
+  if(liveSnapshot && previewButton && lifecycle && lifecycle.snapshotLiveStatus){
+    snapshotLabel=doc.createElement('label');snapshotLabel.className='workspace-preview workspace-snapshot-preview';
+    snapshotLabel.title='Real Jira and metrics data an agent saved at that time (tools/live-snapshot.js). Preview only: never saved, exported or published.';
+    snapshotInput=doc.createElement('input');snapshotInput.type='checkbox';snapshotInput.checked=snapshotOn;
+    snapshotLabel.appendChild(snapshotInput);snapshotLabel.appendChild(doc.createTextNode(liveSnapshot.label));
+    snapshotInput.addEventListener('change',changeSnapshot);
+    previewButton.parentNode.insertBefore(snapshotLabel,previewButton);
   }
   /* An unpublished draft has no public document ID. Its controls deliberately
      use this Workbench document as a local/recovery base; Canon supplies its
@@ -210,6 +231,8 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
     if(metricsLabel)metricsLabel.remove();
     if(demoInput)demoInput.removeEventListener('change',changeDemo);
     if(demoLabel && demoLabel.parentNode)demoLabel.parentNode.removeChild(demoLabel);
+    if(snapshotInput)snapshotInput.removeEventListener('change',changeSnapshot);
+    if(snapshotLabel && snapshotLabel.parentNode)snapshotLabel.parentNode.removeChild(snapshotLabel);
     if(links)links.destroy();destroy();
   };
   try{
@@ -295,7 +318,7 @@ function renderWorkbenchReaderPreview(view,page,skin,authoringCtl,options){
 /* One owner for preview identity and controlled replacement outcomes. The host
    supplies presentation callbacks; callers never infer a render from DOM mutation. */
 function createWorkbenchPreviewController(opts){
-  var page=null,ctl=null,renderedText=null,disposed=false;
+  var page=null,ctl=null,renderedText=null,disposed=false,liveSnapshot=null;
   function finish(outcome){if(opts.completed)opts.completed(outcome);return outcome;}
   function replace(next,text,skin,request){
     /* Rebuilding panels can force layout while the document is only partially
@@ -320,8 +343,21 @@ function createWorkbenchPreviewController(opts){
      demo on (#865) share this one path. Demo state is preview state only. */
   function setDemoLiveStatus(on){
     if(disposed || !ctl || !page)return;
-    ctl.demoLiveStatus=on;
+    ctl.demoLiveStatus=on;if(on)ctl.liveSnapshot=false;
     replace(page,renderedText,opts.skin(page),{origin:'demo-live-status'});
+  }
+  /* #1265: a loaded snapshot belongs to the open document; another project forgets it. `show` turns it on
+     (File → Load snapshot…); a snapshot found beside the board is only offered. */
+  function setLiveSnapshot(read,show){
+    if(disposed)return;liveSnapshot=read && read.ok?read:null;
+    if(!ctl || !page)return;
+    if(show && liveSnapshot){ctl.liveSnapshot=true;ctl.demoLiveStatus=false;}else if(!liveSnapshot)ctl.liveSnapshot=false;
+    replace(page,renderedText,opts.skin(page),{origin:'live-snapshot'});
+  }
+  function setSnapshotLiveStatus(on){
+    if(disposed || !ctl || !page || !liveSnapshot)return;
+    ctl.liveSnapshot=on;if(on)ctl.demoLiveStatus=false;
+    replace(page,renderedText,opts.skin(page),{origin:'live-snapshot'});
   }
   function setMetricsPreview(on){
     if(disposed || !ctl || !page || ctl.metricsPreview===!!on)return;
@@ -333,6 +369,7 @@ function createWorkbenchPreviewController(opts){
     try{
       var nextCtl=renderWorkbenchPreview(opts.view,next,skin,previousPage,previousCtl,{
         demoLiveStatus:function(on){if(ctl===nextCtl)setDemoLiveStatus(on);},
+        liveSnapshot:function(){return liveSnapshot;},snapshotLiveStatus:function(on){if(ctl===nextCtl)setSnapshotLiveStatus(on);},
         metricsPreview:function(on){if(ctl===nextCtl)setMetricsPreview(on);},
         previewButton:opts.previewButton,loadDetail:opts.loadDetail,restoreDetails:opts.restoreDetails,
         arrangementSection:opts.arrangementSection?opts.arrangementSection(request,next,page):null,
@@ -411,7 +448,8 @@ function createWorkbenchPreviewController(opts){
       if(disposed || !page)return {ok:false,replaced:false,text:renderedText,reason:'missing',origin:'skin'};
       return replace(page,renderedText,skin,{origin:'skin'});
     },
-    forgetDocument:function(){page=null;},setDemoLiveStatus:setDemoLiveStatus,setMetricsPreview:setMetricsPreview,
+    forgetDocument:function(){page=null;liveSnapshot=null;},setDemoLiveStatus:setDemoLiveStatus,setMetricsPreview:setMetricsPreview,
+    setLiveSnapshot:setLiveSnapshot,liveSnapshot:function(){return liveSnapshot;},
     destroy:function(){if(disposed)return;disposed=true;if(ctl)ctl.destroy();ctl=null;page=null;renderedText=null;},
     controller:function(){return ctl;},page:function(){return page;},renderedText:function(){return renderedText;}
   };

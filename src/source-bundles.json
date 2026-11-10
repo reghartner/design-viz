@@ -153,7 +153,7 @@
     "reuse.workbench.js"
   ],
   "workspace.workbench.js": [
-    "workbench/preview.js",
+    "viewer/live-status-story.js", "workbench/live-snapshot.js", "workbench/preview.js",
     "workbench/canvas.js",
     "workspace.workbench.js"
   ],
@@ -164,7 +164,7 @@
         "canon.js",
         "validator.js",
         "engine.js",
-        "viewer/live-status-demo.js",
+        "viewer/live-status-story.js", "viewer/live-status-demo.js",
         "viewer/artifact-comments.js",
         "viewer/live-status-claude.js",
         "viewer/telemetry-claude.js",

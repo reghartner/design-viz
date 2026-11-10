@@ -403,7 +403,29 @@ applySkinClasses(document.body, view, currentSkin(null));
 var workspace = initWorkbenchWorkspace();
 workspace.canvas.bind(workbenchPreview.controller,workbenchPreview.page);
 var canonContext, loadingCanon=false;
+/* #1265: File → Load snapshot… shows an agent's snapshot of real Jira and metrics data in the preview. It is
+   preview state only; another project forgets it. */
+var liveSnapshotStatus=document.getElementById('live-snapshot-status');
+function sayLiveSnapshot(text,kind){if(!liveSnapshotStatus)return;liveSnapshotStatus.textContent=text || '';liveSnapshotStatus.hidden=!text;liveSnapshotStatus.setAttribute('data-kind',kind || 'info');}
+function showLiveSnapshot(text,name,turnOn){
+  var read=workbenchLiveSnapshot(text);
+  if(!read.ok){sayLiveSnapshot('Snapshot not loaded: '+read.error,'error');return false;}
+  if(!workbenchPreview.page()){sayLiveSnapshot('Open a board first, then load its snapshot.','warn');return false;}
+  workbenchPreview.setLiveSnapshot(read,turnOn);
+  sayLiveSnapshot((turnOn?'Showing ':'Found ')+read.label+(name?' ('+name+')':'')+': '+read.tickets+' tickets, '+read.carriers+' carriers with metrics.'+(turnOn?'':' Turn it on beside Preview.'),'info');
+  return true;
+}
+(function(){
+  var open=document.getElementById('live-snapshot-open'),input=document.getElementById('live-snapshot-input');
+  if(!open || !input)return;
+  open.addEventListener('click',function(){input.value='';input.click();});
+  input.addEventListener('change',function(){
+    var file=input.files && input.files[0];if(!file)return;
+    file.text().then(function(text){showLiveSnapshot(text,file.name,true);},function(){sayLiveSnapshot('Snapshot not loaded: the file could not be read.','error');});
+  });
+})();
 var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(request){return go(true,request);}, workspace:workspace,
+  offerLiveSnapshot:function(text,name){showLiveSnapshot(text,name,false);},
   practice:workbenchPracticeAgent,previewSkin:currentSkin,
   catalog:function(){return workbenchPractice?workbenchTourCatalog():canonContext && canonContext.catalog;},
   importCatalog:function(raw){if(canonContext)canonContext.importCatalog(raw);},
@@ -411,7 +433,7 @@ var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: functio
   isActive:function(){return !document.getElementById('workbench-workspace').hidden;},
   beforeProjectLoad:function(){
     workspace.canvas.reset();
-    workbenchPreview.forgetDocument();
+    workbenchPreview.forgetDocument();sayLiveSnapshot('');
     if(!loadingCanon){
       if(welcome && welcome.localProjectOpened)welcome.localProjectOpened();
       if(canonContext && canonContext.detach)canonContext.detach();

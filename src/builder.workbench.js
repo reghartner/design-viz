@@ -687,6 +687,19 @@ function initWorkbenchBuilder(opts){
       life.own(function(){finish(null);});dialog.showModal();select.focus();
     });
   }
+  /* #1265: an agent's <board>.snapshot.json beside the opened board is offered in the preview, never turned on.
+     Read only; a folder without one, or one the preview cannot read, changes nothing. */
+  async function offerLiveSnapshot(directory,spec,binding){
+    if(!opts.offerLiveSnapshot || typeof spec!=='string')return;
+    try{
+      var parts=spec.split('/').filter(Boolean),folder=directory;
+      for(var i=0;i<parts.length-1;i++)folder=await folder.getDirectoryHandle(parts[i]);
+      var name=parts[parts.length-1].replace(/\.spec\.json$|\.json$/i,'')+'.snapshot.json',file=await(await folder.getFileHandle(name)).getFile();
+      if(file.size>8*1024*1024)return;
+      var text=await file.text();
+      if(life.alive() && workingFile.attached()===binding)opts.offerLiveSnapshot(text,name);
+    }catch(ex){}
+  }
   async function chooseWorkingFolder(){
     if(!workingBrowser.pickDirectory){inspectorMessage('Writable folder access requires desktop Chrome or Edge over HTTPS. Browser recovery remains available.');return;}
     var token=++workingOperation,expected=session.snapshot(),client=null,binding=null,startup=null,unlock=null;
@@ -722,6 +735,7 @@ function initWorkbenchBuilder(opts){
       if(workingFile.attached()!==binding)return;
       workingFile.report(binding,'saved');
       workingHeartbeat=life.delay(function(){renewWorkingFolder(binding);},1000);
+      offerLiveSnapshot(directory,found.spec,binding);
     }catch(ex){if(binding && workingFile.attached()===binding)workingFile.report(binding,'failed',ex.message);
       else if(life.alive() && ex.name!=='AbortError')inspectorMessage('Could not open the working folder. '+ex.message);
     }finally{if(unlock)unlock();}

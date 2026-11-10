@@ -227,31 +227,44 @@ function topologyFixtures(){
   return {provider,consumer,context:{version:1,id:'consumer',specs:[provider,consumer]}};
 }
 
-test('M8 M9 imported carriers show the inherited binding read only and edit the consumer overlay; the provider is untouched',()=>{
-  const C=api(harness(board()).e.C),f=topologyFixtures(),providerBefore=JSON.stringify(f.provider);
+test('M8 M9 #1266 imported carriers merge consumer additions, filters and overrides with the inherited binding; the provider is untouched',()=>{
+  const C=api(harness(board()).e.C),f=topologyFixtures(),providerBefore=JSON.stringify(f.provider),UP={kind:'service',signals:{up:{grafana:'up{job="api"}'}}};
   const node={kind:'node',section:0,id:'shared::api'};
   const state=C.telemetryCarrierState(f.consumer,node,f.context);
-  assert.equal(state.imported,true);assert.equal(state.binding,null);assert.equal(state.provider,'provider / core','the inherited binding names its provider');
-  assert.deepEqual(plain(state.inherited),{kind:'service',signals:{up:{grafana:'up{job="api"}'}}});
+  assert.equal(state.imported,true);assert.equal(state.provider,'provider / core','the inherited binding names its provider');
+  assert.deepEqual(plain(state.inherited),UP);assert.deepEqual(plain(state.binding),UP,'the editor starts from the inherited binding');
+  assert.deepEqual(plain(state.merge),{overlay:null,inheritedNames:['up'],hidden:[],overridden:[]});
   let text=JSON.stringify(f.consumer,null,2),raw=JSON.parse(text);
   const apply=(target,edit)=>{const plan=C.planCarrierTelemetry(text,raw,target,edit,f.context);assert.equal(plan.error,undefined,plan.error);text=plan.text;raw=JSON.parse(text);};
+  const overlay=()=>diagramOf(raw).topologyImports[0].nodeTracking.api;
+  const resolvedNode=()=>plain(diagramOf(C.FlowTopology.resolveSource(raw,f.context)).nodes['shared::api'].telemetry);
   apply(node,{op:'addSignal',name:'rate',source:'grafana',query:PROM_RATE,kind:'service'});
-  assert.deepEqual(diagramOf(raw).topologyImports[0].nodeTracking.api,{tickets:['API-1'],telemetry:{kind:'service',signals:{rate:{grafana:PROM_RATE}}}},'M8: the overlay entry keeps its tickets');
+  assert.deepEqual(overlay(),{tickets:['API-1'],telemetry:{extends:true,signals:{rate:{grafana:PROM_RATE}}}},'M8: Add signal stores only the addition; the overlay keeps its tickets');
+  assert.deepEqual(resolvedNode(),{kind:'service',signals:{up:{grafana:'up{job="api"}'},rate:{grafana:PROM_RATE}}},'the inherited signal stays beside the added one');
+  apply(node,{op:'signal',name:'up',field:'unit',value:'req/s'});
+  assert.deepEqual(overlay().telemetry.signals.up,{unit:'req/s'},'an inherited field edit stores only that field');
+  assert.deepEqual(plain(C.telemetryCarrierState(raw,node,f.context).merge.overridden),['up']);
+  apply(node,{op:'revert',name:'up'});assert.deepEqual(overlay().telemetry,{extends:true,signals:{rate:{grafana:PROM_RATE}}},'Revert to inherited removes the override');
+  apply(node,{op:'hide',name:'up',value:true});assert.deepEqual(overlay().telemetry.hide,['up']);
+  assert.deepEqual(resolvedNode(),{kind:'service',signals:{rate:{grafana:PROM_RATE}}},'a hidden inherited signal is gone in this document');
+  assert.deepEqual(plain(C.telemetryCarrierState(raw,node,f.context).merge.hidden),['up']);
+  apply(node,{op:'hide',name:'up',value:false});assert.equal(Object.hasOwn(overlay().telemetry,'hide'),false,'Show removes the filter');
+  assert.match(C.planCarrierTelemetry(text,raw,node,{op:'hide',name:'rate',value:true},f.context).error || '',/not inherited/,'only inherited signals can be hidden');
+  // The imported edge: links and card settings patch the inherited binding instead of copying it.
   let resolved=diagramOf(C.FlowTopology.resolveSource(raw,f.context));
-  assert.deepEqual(plain(resolved.nodes['shared::api'].telemetry),{kind:'service',signals:{rate:{grafana:PROM_RATE}}},'the local binding replaces the inherited one');
-  assert.deepEqual(plain(C.telemetryCarrierState(raw,node,f.context).inherited),{kind:'service',signals:{up:{grafana:'up{job="api"}'}}},'the inherited binding stays visible');
-  // The imported edge has no overlay entry yet; one is created.
   const edgeIndex=resolved.edges.findIndex(e=>e.from==='shared::api' && e.to==='shared::store'),edge={kind:'edge',section:0,index:edgeIndex};
-  assert.match(C.planCarrierTelemetry(text,raw,edge,{op:'link',key:'dashboard',value:'https://acme.grafana.net/d/x'},f.context).error || '',/[Aa]dd a signal or choose a template/,'links need a binding first');
   assert.match(C.planCarrierTelemetry(text,raw,{...edge,key:'shared::store->shared::api'},{op:'addSignal',name:'rate',source:'grafana',query:PROM_RATE,kind:'call'},f.context).error || '',/changed/,'a stale connection identity is refused');
-  apply(edge,{op:'addSignal',name:'rate',source:'grafana',query:PROM_RATE,kind:'call'});
-  apply(edge,{op:'card',field:'side',value:'right'});
-  assert.deepEqual(diagramOf(raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{kind:'call',signals:{rate:{grafana:PROM_RATE}},card:{side:'right'}}}});
-  apply(node,{op:'remove'});assert.deepEqual(diagramOf(raw).topologyImports[0].nodeTracking.api,{tickets:['API-1']},'removing the local binding keeps the tickets');
-  resolved=diagramOf(C.FlowTopology.resolveSource(raw,f.context));
-  assert.deepEqual(plain(resolved.nodes['shared::api'].telemetry),{kind:'service',signals:{up:{grafana:'up{job="api"}'}}},'the inherited binding applies again');
+  apply(edge,{op:'link',key:'dashboard',value:'https://acme.grafana.net/d/x'});apply(edge,{op:'card',field:'side',value:'right'});
+  assert.deepEqual(diagramOf(raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{extends:true,links:{dashboard:'https://acme.grafana.net/d/x'},card:{side:'right'}}}},'card and link edits store only the change');
+  apply(node,{op:'remove'});assert.deepEqual(overlay(),{tickets:['API-1']},'Revert all removes the overlay binding and keeps the tickets');
+  assert.deepEqual(resolvedNode(),UP,'the inherited binding applies unchanged');
   assert.equal(JSON.stringify(f.provider),providerBefore,'the provider spec is untouched');
   assert.equal(JSON.stringify(f.context.specs[0]),providerBefore);
+  // An older replacing overlay keeps its meaning and is edited as a whole binding.
+  const old=plain(raw);diagramOf(old).topologyImports[0].nodeTracking.api.telemetry={kind:'service',signals:{rate:{grafana:PROM_RATE}}};
+  const oldState=C.telemetryCarrierState(old,node,f.context);assert.equal(oldState.merge,null);assert.deepEqual(plain(oldState.binding),{kind:'service',signals:{rate:{grafana:PROM_RATE}}});
+  text=JSON.stringify(old,null,2);raw=JSON.parse(text);apply(node,{op:'signal',name:'rate',field:'unit',value:'req/h'});
+  assert.deepEqual(overlay().telemetry,{kind:'service',signals:{rate:{grafana:PROM_RATE,unit:'req/h'}}},'a replace overlay stays a replace overlay');
   // A provider binding its own templates cannot expand is reported at the imported carrier.
   const store=C.telemetryCarrierState(raw,{kind:'node',section:0,id:'shared::store'},f.context);
   assert.equal(store.inherited,null);assert.ok(store.warnings.some(w=>/provider "provider" .*telemetry\.use: /.test(w)),'M9: provider drops are listed');
@@ -259,38 +272,37 @@ test('M8 M9 imported carriers show the inherited binding read only and edit the 
   assert.deepEqual(plain(store.warnings),plain(C.validate(C.normalize(C.FlowTopology.resolveSource(raw,f.context))).warnings).filter(w=>w.startsWith(prefix+'telemetry')).map(w=>w.slice(prefix.length)));
 });
 
-test('M8 the inspector shows an imported carrier inherited binding read only and edits its overlay',()=>{
+test('M8 #1266 the inspector lists inherited and added signals, hides and shows inherited ones and reverts overrides, one Undo each',()=>{
   const f=topologyFixtures(),ui=harness(f.consumer);
   ui.h.session.replaceProject(JSON.stringify(f.consumer,null,2),null,{topologyContext:f.context});
   const node={kind:'node',section:0,id:'shared::api'};ui.select(node);
-  const box=ui.metrics(),notes=box.querySelectorAll('p').map(p=>p.textContent).join(' ');
-  assert.match(notes,/Inherited metrics from provider \/ core \(read only\): service · up \(grafana\)/);
-  assert.match(notes,/replaces/);assert.doesNotMatch(notes,/Unbound/,'an inherited binding is not unbound');
-  ui.control('New signal name').value='rate';ui.control('New signal source').value='grafana';ui.control('New signal query').value=PROM_RATE;ui.set('Metrics kind','service');
+  const notes=()=>ui.metrics().querySelectorAll('p').map(p=>p.textContent).join(' '),titles=()=>ui.metrics().querySelectorAll('details.metrics-signal').map(d=>d.querySelector('summary').textContent);
+  assert.match(notes(),/Inherited metrics from provider \/ core: service · up \(grafana\)\. Signals you add here are added to the provider's in this document/);
+  assert.doesNotMatch(notes(),/replaces|Unbound/);
+  assert.deepEqual(titles(),['Signal up · inherited']);assert.equal(ui.control('up name').readOnly,true,'inherited names come from the provider');
+  assert.equal(ui.button('Remove signal up'),null,'inherited signals are hidden, not removed');assert.equal(ui.button('Remove metrics'),null);assert.equal(ui.button('Revert all metrics to inherited'),null);
+  assert.equal(ui.control('Metrics kind').options.find(o=>o.value==='service').textContent,'service (inherited)');
+  ui.control('New signal name').value='rate';ui.control('New signal source').value='grafana';ui.control('New signal query').value=PROM_RATE;
   oneStep(ui,()=>ui.click('Add signal'),node);
-  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].nodeTracking.api,{tickets:['API-1'],telemetry:{kind:'service',signals:{rate:{grafana:PROM_RATE}}}});
-  assert.ok(ui.button('Remove metrics'));oneStep(ui,()=>ui.click('Remove metrics'),node);
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].nodeTracking.api,{tickets:['API-1'],telemetry:{extends:true,signals:{rate:{grafana:PROM_RATE}}}},'Add signal adds; the inherited signal stays');
+  assert.deepEqual(titles(),['Signal up · inherited','Signal rate · added here']);assert.ok(ui.button('Remove signal rate'));assert.ok(ui.button('Revert all metrics to inherited'));
+  oneStep(ui,()=>ui.set('up unit','req/s'),node);
+  assert.deepEqual(titles(),['Signal up · inherited, changed here','Signal rate · added here']);
+  oneStep(ui,()=>ui.click('Revert up to inherited'),node);assert.equal(Object.hasOwn(diagramOf(ui.raw).topologyImports[0].nodeTracking.api.telemetry.signals,'up'),false);
+  const toggle=(checked)=>{const input=ui.control('up hidden for this document').querySelector('input');assert.equal(input.getAttribute('aria-label'),'up hidden for this document');input.checked=checked;input.fire('change');ui.h.flush();};
+  oneStep(ui,()=>toggle(true),node);
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].nodeTracking.api.telemetry.hide,['up']);
+  assert.deepEqual(titles(),['Signal rate · added here'],'a hidden signal leaves the list');
+  assert.ok(ui.metrics().querySelectorAll('details.metrics-hidden').length===1,'hidden inherited signals are listed');
+  oneStep(ui,()=>toggle(false),node);assert.deepEqual(titles(),['Signal up · inherited','Signal rate · added here']);
+  oneStep(ui,()=>ui.click('Revert all metrics to inherited'),node);
   assert.deepEqual(diagramOf(ui.raw).topologyImports[0].nodeTracking.api,{tickets:['API-1']});
-  // The imported connection: the provider binding is read only and named; the local overlay is editable.
-  const C=ui.e.C,providerBefore=JSON.stringify(f.provider),resolvedEdge=()=>diagramOf(C.FlowTopology.resolveSource(ui.raw,f.context)).edges.find(e=>e.from==='shared::api' && e.to==='shared::store');
-  const edge={kind:'edge',section:0,index:diagramOf(C.FlowTopology.resolveSource(ui.raw,f.context)).edges.findIndex(e=>e.from==='shared::api' && e.to==='shared::store')};
-  assert.ok(edge.index>=0,'the imported connection resolves');
-  ui.select(edge);
-  const inherited=()=>ui.metrics().querySelectorAll('p').map(p=>p.textContent).join(' ');
-  assert.match(inherited(),/Inherited metrics from provider \/ core \(read only\): call · rate \(loki\)\. A binding saved here replaces it in this consumer\./);
-  assert.doesNotMatch(inherited(),/Unbound/);assert.equal(ui.button('Remove metrics'),null,'the inherited binding is not removable here');
-  assert.equal(ui.row('rate query'),null,'inherited signals are not editable rows');
-  ui.control('New signal name').value='rate';ui.control('New signal source').value='grafana';ui.control('New signal query').value=PROM_RATE;ui.set('Metrics kind','call');
-  oneStep(ui,()=>ui.click('Add signal'),edge);
-  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{kind:'call',signals:{rate:{grafana:PROM_RATE}}}}});
-  assert.match(inherited(),/Inherited metrics from provider \/ core \(read only\): call · rate \(loki\)/,'the inherited binding stays visible beside the local one');
-  oneStep(ui,()=>ui.set('Card side','below'),edge);oneStep(ui,()=>ui.set('rate min','5'),edge);
-  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking['api->store'].telemetry,{kind:'call',signals:{rate:{grafana:PROM_RATE}},card:{side:'below'},proof:{rate:{min:5}}});
-  assert.deepEqual(plain(resolvedEdge().telemetry),{kind:'call',signals:{rate:{grafana:PROM_RATE}},card:{side:'below'},proof:{rate:{min:5}}},'the local binding replaces the inherited one');
-  oneStep(ui,()=>ui.click('Remove metrics'),edge);
-  assert.equal(Object.hasOwn(diagramOf(ui.raw).topologyImports[0],'edgeTracking'),false,'the empty overlay entry is removed');
-  assert.deepEqual(plain(resolvedEdge().telemetry),{kind:'call',signals:{rate:{loki:LOKI_IN}}},'the inherited binding applies again');
-  assert.equal(JSON.stringify(f.provider),providerBefore,'the provider spec is untouched');
+  // The imported connection: a card edit stores only the change.
+  const C=ui.e.C,resolved=()=>diagramOf(C.FlowTopology.resolveSource(ui.raw,f.context));
+  const edge={kind:'edge',section:0,index:resolved().edges.findIndex(e=>e.from==='shared::api' && e.to==='shared::store')};ui.select(edge);
+  oneStep(ui,()=>ui.set('Card side','below'),edge);
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{extends:true,card:{side:'below'}}}});
+  assert.deepEqual(plain(resolved().edges.find(e=>e.from==='shared::api' && e.to==='shared::store').telemetry),{kind:'call',signals:{rate:{loki:LOKI_IN}},card:{side:'below'}});
 });
 
 test('M10 M12 Document settings edit the page telemetry block, validate window and refresh, and leave Jira untouched',()=>{
@@ -381,8 +393,9 @@ test('M13 Export project keeps carrier, overlay and page telemetry written by th
   const f=topologyFixtures();let text=JSON.stringify(f.consumer,null,2);
   const plan=C.planCarrierTelemetry(text,JSON.parse(text),{kind:'node',section:0,id:'shared::api'},{op:'addSignal',name:'rate',source:'grafana',query:PROM_RATE,kind:'service'},f.context);text=plan.text;
   const stamped=JSON.parse(C.FlowviewCompatibility.stampText(text,C.FlowTopology.resolveSource(JSON.parse(text),f.context)));
-  assert.deepEqual(diagramOf(stamped).topologyImports[0].nodeTracking.api.telemetry,{kind:'service',signals:{rate:{grafana:PROM_RATE}}});
+  assert.deepEqual(diagramOf(stamped).topologyImports[0].nodeTracking.api.telemetry,{extends:true,signals:{rate:{grafana:PROM_RATE}}},'#1266: the merge overlay is exported as authored');
   assert.ok(stamped.page.flowview.features.includes('flow.telemetry'));
+  assert.ok(stamped.page.flowview.features.includes('flow.telemetry-merge'),'#1266: a merge overlay declares flow.telemetry-merge');
 });
 
 test('M15 docs describe the Workbench Metrics editor',()=>{
@@ -467,8 +480,11 @@ test('moving inherited cards writes only the consumer overlay and preserves the 
   const consumer=structuredClone(f.consumer);diagramOf(consumer).topologyImports[0].edgeTracking={'api->store':{tickets:['TEST-9'],prs:['https://github.com/acme/service/pull/9']}};
   const text=JSON.stringify(consumer,null,2),plan=C.planCarrierTelemetry(text,consumer,target,{op:'card',field:'position',value:{x:-40,y:60}},f.context);assert.ok(!plan.error,plan.error);
   const next=JSON.parse(plan.text),entry=diagramOf(next).topologyImports[0].edgeTracking['api->store'];
-  assert.equal(entry.telemetry.use,undefined);assert.equal(entry.telemetry.proof.lag.max,17);assert.match(entry.telemetry.signals.in.grafana,/delivery/);
-  assert.deepEqual(entry,{tickets:['TEST-9'],prs:['https://github.com/acme/service/pull/9'],telemetry:{...inherited,card:{...inherited.card,position:{x:-40,y:60}}}});
+  // #1266: the move stores only the card position; the provider binding keeps flowing to this consumer.
+  assert.deepEqual(entry,{tickets:['TEST-9'],prs:['https://github.com/acme/service/pull/9'],telemetry:{extends:true,card:{position:{x:-40,y:60}}}});
+  const merged=plain(diagramOf(C.FlowTopology.resolveSource(next,f.context)).edges[index].telemetry);
+  assert.deepEqual(merged,{...inherited,card:{...inherited.card,position:{x:-40,y:60}}},'the resolved binding is the inherited one with the moved card');
+  assert.equal(merged.proof.lag.max,17);assert.match(merged.signals.in.grafana,/delivery/);
   assert.equal(JSON.stringify(f.provider),providerBefore);assert.equal(JSON.stringify(f.context.specs[0]),providerBefore);
 });
 test('signal label and query link edit with one Undo/Redo and survive ordinary signal edits and exported source',()=>{
@@ -548,7 +564,7 @@ test('#1112 an inherited imported connection without an overlay shows the card r
   assert.equal(ui.control('Card width').value,'');const before=ui.text;
   for(const field of ['title','width','position'])assert.equal(C.planCarrierTelemetry(before,ui.raw,edge,{op:'card',field,value:null},f.context).text,before,'clearing an unset inherited '+field+' creates no overlay');
   oneStep(ui,()=>ui.set('Card width','400'),edge);
-  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{kind:'call',signals:{rate:{loki:LOKI_IN}},card:{width:400}}}});
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking,{'api->store':{telemetry:{extends:true,card:{width:400}}}},'#1266: only the card change is stored');
   assert.equal(C.carrierTelemetry(resolved().edges[edge.index],{}).card.width,400);assert.equal(ui.control('Card width').value,'400');
   assert.equal(JSON.stringify(f.provider),providerBefore,'the provider spec is untouched');
   const after=ui.text;assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'one Undo removes the created overlay');
@@ -689,7 +705,9 @@ test('#1255 S17 an imported carrier that inherits a binding starts from the inhe
   assert.equal(kind.options.find(o=>o.value==='service').textContent,'service (inherited)');
   ui.control('New signal name').value='local';ui.control('New signal query').value='consumer_up';
   oneStep(ui,()=>ui.click('Add signal'),node);
-  assert.equal(diagramOf(ui.raw).topologyImports[0].nodeTracking.api.telemetry.kind,'service','Add signal saves the inherited kind');
+  // #1266: the merge overlay keeps the inherited kind by not storing one.
+  assert.equal(Object.hasOwn(diagramOf(ui.raw).topologyImports[0].nodeTracking.api.telemetry,'kind'),false,'the inherited kind is not copied');
+  assert.equal(diagramOf(ui.e.C.FlowTopology.resolveSource(ui.raw,f.context)).nodes['shared::api'].telemetry.kind,'service','the resolved binding keeps the inherited kind');
 });
 test('#1255 S19 New signal, New template and New environment drafts survive a same-selection re-render and clear after Add or a new selection',()=>{
   const ui=harness(board(),EDGE);ui.metrics();

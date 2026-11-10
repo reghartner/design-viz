@@ -268,7 +268,7 @@
               // #1280 review c8: the line's span was focused and revealed by this Load; scrolling back up to the request
               // line would push it off screen. Only without a focused span does the Load reveal its request line.
               var focused=host.querySelector('.dv-trace-selected .dv-trace-span[aria-pressed="true"]'),item=focused && focused.closest('.dv-trace-span-item');
-              if(item && item.getClientRects().length)revealInView(item,false);else revealLoadedTrace();
+              if(item && item.getClientRects().length)revealInView(item,false,focusBox(item));else revealLoadedTrace();
             });
           };load.addEventListener('click',load._logClick);}
         });
@@ -525,15 +525,8 @@
         return;
       }
       stopFocusWatch();host._traceFocusPending=null;list._traceFocusShown=pending.key;
-      // The row with its opened detail, so a click shows the detail too; the row itself never leaves the window. The item's
-      // trailing space (the detail's bottom margin, the item's padding and border) is not content: CI run 42899309527 put
-      // the item's bottom at the edge less 8 px and the detail itself 8.6 px higher.
-      var item=pending.item,box=item.getBoundingClientRect(),detail=item.querySelector('.dv-trace-span-detail'),view=doc.defaultView || (typeof window!=='undefined'?window:null),trim=0;
-      if(detail && view && view.getComputedStyle){
-        var detailStyle=view.getComputedStyle(detail),itemStyle=view.getComputedStyle(item);
-        trim=(parseFloat(detailStyle && detailStyle.marginBottom) || 0)+(parseFloat(itemStyle && itemStyle.paddingBottom) || 0)+(parseFloat(itemStyle && itemStyle.borderBottomWidth) || 0);
-      }
-      revealInView(item,pending.auto,{top:box.top,bottom:Math.max(box.top,box.bottom-trim)});
+      // The row with its opened detail, so a click shows the detail too; the row itself never leaves the window.
+      revealInView(pending.item,pending.auto,focusBox(pending.item));
     }
     /* #1280: bring `node` into view by the least scroll. Already fully visible: nothing moves. Below the edge: its bottom
        comes to the edge (8 px margin). Above the edge, or taller than the view less the margins: its top comes to the top
@@ -549,6 +542,14 @@
     function pageTop(view){
       var style=view.getComputedStyle?view.getComputedStyle(host):null,value=style && style.getPropertyValue?parseFloat(style.getPropertyValue('--flowview-navigation-bottom')):NaN;
       return isFinite(value)?Math.max(0,value-8):0;
+    }
+    /* What a span focus shows: from the item's top (its row) to the opened detail's own bottom. The item's trailing space
+       (the detail's bottom margin, the item's border) is not content (CI run 42899309527). The detail's rect is used as it is,
+       so a last item, whose margin collapses out of it, is right too; it counts only when it lies inside the item's box. */
+    function focusBox(item){
+      var box=item.getBoundingClientRect(),detail=item.querySelector('.dv-trace-span-detail'),bottom=box.bottom;
+      if(detail && detail.getBoundingClientRect){var d=detail.getBoundingClientRect();if(d.height>0 && d.bottom>box.top && d.bottom<=box.bottom+0.5)bottom=d.bottom;}
+      return {top:box.top,bottom:bottom};
     }
     // box: the part of `node` to show ({top, bottom} in viewport px); default its whole rect.
     function revealInView(node,pageOff,box){

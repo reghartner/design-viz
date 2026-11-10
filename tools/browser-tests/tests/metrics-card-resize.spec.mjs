@@ -20,13 +20,17 @@ async function open(page,server,spec=raw){
   await page.setViewportSize({width:1680,height:1100});
   await page.goto(server.origin+'/lifetime/index.html');await paste(page,JSON.stringify(spec,null,2));await prepareEditorSurface(page);
 }
-// Screen geometry of one handle's hit area and the SVG user-unit scale.
+// Screen geometry of one handle's hit area and the SVG user-unit scale. The handle is scrolled
+// into the diagram viewport first, as an author would, and must be the element under its centre.
 async function handleAt(card,corner){
   return card.evaluate((el,corner)=>{const hit=el.querySelector('.dv-metrics-resize[data-corner="'+corner+'"] .dv-metrics-resize-hit');if(!hit)return null;
-    const r=hit.getBoundingClientRect(),m=el.ownerSVGElement.getScreenCTM();return {x:r.x+r.width/2,y:r.y+r.height/2,scale:m.a};},corner);
+    hit.scrollIntoView({block:'center',inline:'nearest'});
+    const r=hit.getBoundingClientRect(),m=el.ownerSVGElement.getScreenCTM(),x=r.x+r.width/2,y=r.y+r.height/2,top=document.elementFromPoint(x,y);
+    return {x,y,scale:m.a,hittable:!!(top && top.closest && top.closest('.dv-metrics-resize')===hit.parentNode),top:top?top.tagName+'.'+(top.getAttribute('class') || ''):'none'};},corner);
 }
 async function dragHandle(page,card,corner,dx,{release=true,during}={}){
   const h=await handleAt(card,corner);expect(h,'the '+corner+' handle exists').not.toBeNull();
+  expect(h.hittable,'the '+corner+' handle is the element under its centre (found '+h.top+')').toBe(true);
   await page.mouse.move(h.x,h.y);await page.mouse.down();await page.mouse.move(h.x+dx*h.scale,h.y,{steps:8});
   if(during)await during();
   if(release)await page.mouse.up();
@@ -83,6 +87,8 @@ test('R3 desktop Alt+Left/Right changes the focused card width; Escape cancels a
   const card=cards(page),source=page.locator('#src'),start=await geometry(card);
   await card.focus();await card.press('Alt+ArrowRight');
   await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.width).toBe(250);
+  const active=()=>page.evaluate(()=>{const a=document.activeElement;return a?a.tagName+'.'+(a.getAttribute('class') || '')+'#'+(a.id || ''):'none';});
+  await expect.poll(active,'focus returns to the card after the width step').toMatch(/^g\.dv-metrics-card/);
   await expect(card).toBeFocused();expect(Math.abs((await geometry(card)).x-start.x),'Alt+Right keeps the left edge').toBeLessThanOrEqual(2);
   expect(edge(await source.inputValue()).telemetry.card.position,'the resized card is pinned').toBeTruthy();
   await card.press('Shift+Alt+ArrowLeft');await expect.poll(async()=>edge(await source.inputValue()).telemetry.card.width).toBe(200);

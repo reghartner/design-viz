@@ -2610,7 +2610,7 @@ test('C9 the panel shows loaded count of total and at most six ticket calls run 
  const keys=Array.from({length:9},(_,i)=>'AA-'+(i+1)),waiting=[];let running=0,peak=0;
  const h=historyProvider({keys,gate:async tool=>{if(tool!=='getJiraIssue')return;running++;peak=Math.max(peak,running);await new Promise(done=>waiting.push(done));running--;}});
  await overLive(h,keys.map(key=>jira(key)));overButton(h).dispatchEvent({type:'click'});for(let i=0;i<8;i++)await historySettle();
- assert.equal(overButton(h).textContent,'Loading history 0 of 9…');assert.equal(overButton(h).disabled,true);assert.equal(waiting.length,6);
+ assert.equal(overButton(h).textContent,'Loading history 0 of 9…');assert.equal(overButton(h).getAttribute('aria-disabled'),'true','#1253 inert while loading, but it keeps keyboard focus');assert.equal(waiting.length,6);
  for(let done=1;done<=9;done++){waiting.shift()();for(let i=0;i<8;i++)await historySettle();if(done<9)assert.equal(overButton(h).textContent,'Loading history '+done+' of 9…');}
  assert.equal(peak,6);assert.equal(overButton(h).textContent,'Over time');assert.equal(overButton(h).getAttribute('aria-pressed'),'true');
 });

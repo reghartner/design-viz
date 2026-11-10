@@ -1173,6 +1173,9 @@ function initWorkbenchBuilder(opts){
     refreshOutline();
   }
 
+  /* #1243: the Links window reads the same session and writes through applyPlan (one Undo step per edit). */
+  var linksView=typeof initWorkbenchLinksView==='function'?initWorkbenchLinksView({document:document,window:window,view:view,session:session,apply:applyPlan}):null;
+  if(linksView)life.own(linksView.destroy);
   /* The step list shares this builder's selection, render and undo pipeline. */
   var stepList = typeof initWorkbenchStepList === 'function' ? initWorkbenchStepList({
     view:view, src:src, renderedText:opts.renderedText,
@@ -1287,6 +1290,7 @@ function initWorkbenchBuilder(opts){
     if(outcome.ok && outcome.retained==='explore'){
       // Retain the live canvas, but renew source-bound View action callbacks.
       if(sectionLayoutEditor)sectionLayoutEditor.refreshViewSettings();
+      if(linksView)linksView.refresh();
       return;
     }
     if(addMenu)addMenu.refresh();
@@ -1294,11 +1298,13 @@ function initWorkbenchBuilder(opts){
     if(!outcome.ok){
       if(outcome.replaced){clearMultiSelect();clearStepMarkers();if(interactions.adding())cancelAddToStep(null);}
       if(stepList)stepList.refresh();
+      if(linksView)linksView.refresh();
       return;
     }
     rehighlight();syncBoardToSelectedStep();applyStepMarkers();reapplyMultiSel();
     applyRowGrabs();markInsertTarget();
     if(stepList)stepList.refresh();
+    if(linksView)linksView.refresh();
   }
 
   /* ================= insert buttons ================= */

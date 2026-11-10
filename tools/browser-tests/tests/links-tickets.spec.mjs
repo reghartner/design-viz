@@ -20,6 +20,8 @@ async function open(page,server){
   await expect(page.locator('#docview g.node[data-dv-node="ctrl"]')).toBeVisible();await closeTools(page);
   await page.locator('#editor-tab-links').click();
   const links=page.locator('#workspace-window-links');await expect(links).toBeVisible();
+  // Fit leaves room for the open Links window, so canvas drop targets are not under it.
+  await page.locator('#workspace-fit').click();
   return {links,text};
 }
 
@@ -54,6 +56,7 @@ test('B2 dragging FW-45 onto an edge attaches it in one Undo step, and + Assign 
   await expect(handle).toBeVisible();
   const box=await handle.boundingBox();expect(box.width).toBeGreaterThanOrEqual(24);expect(box.height).toBeGreaterThanOrEqual(24);
   const label=page.locator('#docview text.lbl[data-dv-edge="2"]');
+  await expect.poll(()=>label.evaluate(n=>{const r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===n || n.contains(hit);})).toBe(true);
   await pointerTo(page,handle,label,{release:false});
   await expect(page.locator('#docview path.edge[data-dv-edge="2"].dv-links-drop')).toHaveCount(1);
   await expect(links.locator('.links-status')).toContainText('Drop to');

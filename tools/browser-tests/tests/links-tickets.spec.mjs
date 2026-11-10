@@ -34,7 +34,7 @@ async function open(page,server,spec=fixture){
 test('B1 Links by ticket lists FW-45 with its node, edge and step, and highlights them on the canvas and in Steps',async({page,server})=>{
   const {links}=await open(page,server);
   await expect(links.getByRole('tab',{name:/^Tickets/})).toHaveAttribute('aria-selected','true');
-  for(const name of [/^Metrics/,/^Trace match/,/^Log searches/]){
+  for(const name of [/^Metrics/,/^Log searches/]){
     await links.getByRole('tab',{name}).click();await expect(links.getByRole('tabpanel')).toContainText('Coming next');
   }
   await links.getByRole('tab',{name:/^Tickets/}).click();

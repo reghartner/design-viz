@@ -1,0 +1,158 @@
+/* #1243 part 2: the desktop Workbench Links window, Trace match tab (mockup m4).
+   row | fixture | assertion | rejects
+   T1 by trace match + highlight | board below | the notify-svc · route.event row has chips for steps 2 and 4 and the matched node; Highlight lights both Steps rows, step 2's edge and the node, and Esc clears | a list that misses a sharing step, a highlight of one step only
+   T2 drag + Assign | same | dragging step 2's chip onto Steps row 3 (no match) moves the whole match in one Undo step; + Assign step ticks step 3 and writes {serviceName, operation}; Undo restores | a drop that copies, two Undo steps
+   T3 by element edit + Add as alternative | same | step 2's chip opens the inline editor; an Operation edit is one Undo step; dragging step 1's chip onto step 2 offers Replace / Add as alternative, and Add as alternative writes the array form in one Undo step | a silent replace, an edit that drops attributes
+   T4 keyboard Move to… + Esc | same | Enter on step 1's chip → Move to… → Step 2 asks Replace / Add as alternative; Esc writes nothing; Replace writes step 1's match onto step 2 and clears step 1 | a keyboard path that skips the question, an Esc that writes
+   T5 shared rename | same | Rename on the row says "Renames on 2 steps" before the write; Save changes both steps; one Undo restores both | a rename that changes one step, a count missing before the write
+   T6 imported node | consumer importing provider api | the Node select lists API (imported) and writes nodeId canon::api in one Undo step | imported nodes missing from the select */
+import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
+import {digest} from '../../canon/drift.mjs';
+
+const KEY='notify-svc · route.event';
+const fixture={page:{title:'Doorbell',sections:[{heading:'Flow',diagram:{autoplay:false,
+  nodes:{ctrl:{title:'Doorbell controller'},ingest:{title:'Event ingest'},notify:{title:'Notification service'}},
+  rows:[['ctrl','ingest','notify']],
+  edges:[{from:'ctrl',to:'ingest',label:'event'},{from:'ingest',to:'notify',label:'route'}],
+  steps:[
+    {id:'publish',text:'The controller publishes',edge:'ctrl->ingest',traceMatch:{serviceName:'ingest-api',operation:'POST /v1/events'}},
+    {id:'route',text:'Ingest routes the event',edge:'ingest->notify',traceMatch:{serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'event.type':'doorbell.press'}}},
+    {id:'push',text:'The service pushes an alert',nodes:['notify']},
+    {id:'retry',text:'Offline: retry',nodes:['notify'],traceMatch:{serviceName:'notify-svc',operation:'route.event'}}]}}]}};
+const source=async page=>JSON.parse(await page.locator('#src').inputValue());
+const steps=raw=>raw.page.sections[0].diagram.steps;
+
+async function open(page,server,spec=fixture){
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto(server.origin+'/workbench.html');
+  const text=JSON.stringify(spec,null,2);await paste(page,text);
+  await expect(page.locator('#docview g.node[data-dv-node="ctrl"]')).toBeVisible();await closeTools(page);
+  await page.locator('#editor-tab-links').click();
+  const links=page.locator('#workspace-window-links');await expect(links).toBeVisible();
+  if(await page.locator('#workspace-fit').isVisible())await page.locator('#workspace-fit').click();
+  await links.getByRole('tab',{name:/^Trace match/}).click();
+  await expect(links.getByRole('tab',{name:/^Trace match/})).toHaveAttribute('aria-selected','true');
+  return {links,text,panel:links.getByRole('tabpanel')};
+}
+
+test('T1 By trace match lists notify-svc · route.event with both steps and its node, and highlights them',async({page,server})=>{
+  const {panel}=await open(page,server);
+  await expect(panel.getByRole('button',{name:'By trace match',exact:true})).toHaveAttribute('aria-pressed','true');
+  const row=panel.locator('[data-links-trace="'+KEY+'"]');
+  expect((await row.locator('[data-links-chip]').evaluateAll(list=>list.map(el=>el.getAttribute('data-links-chip')))).sort()).toEqual(['node:0:notify','step:0:1','step:0:3']);
+  await page.locator('#editor-tab-steps').click();await expect(page.locator('#steps-list [data-step-index="3"]')).toBeVisible();
+  await page.locator('#editor-tab-links').click();
+  await row.getByRole('button',{name:'Highlight '+KEY,exact:true}).click();
+  const lit=()=>page.evaluate(()=>({
+    nodes:[...document.querySelectorAll('#docview g.node.dv-links-lit')].map(el=>el.getAttribute('data-dv-node')).sort(),
+    edges:[...document.querySelectorAll('#docview path.edge.dv-links-lit')].map(el=>el.getAttribute('data-dv-edge')).sort(),
+    steps:[...document.querySelectorAll('#steps-list .dv-links-lit')].map(el=>el.getAttribute('data-step-index')).sort()}));
+  await expect.poll(lit).toEqual({nodes:['notify'],edges:['1'],steps:['1','3']});
+  await expect(page.locator('.links-canvas-pill')).toContainText(KEY);
+  await row.getByRole('button',{name:'Highlight '+KEY,exact:true}).focus();await page.keyboard.press('Escape');
+  await expect.poll(lit).toEqual({nodes:[],edges:[],steps:[]});
+});
+
+test('T2 dragging a match onto a step with none moves it in one Undo step, and + Assign step gives a step the match',async({page,server})=>{
+  const {panel,text}=await open(page,server);
+  await page.locator('#editor-tab-steps').click();const target=page.locator('#steps-list [data-step-index="2"]');await expect(target).toBeVisible();
+  await page.locator('#editor-tab-links').click();
+  const chip=panel.locator('[data-links-trace="'+KEY+'"] [data-links-chip="step:0:1"] .links-chip-main');
+  await pointerTo(page,chip,target,{release:false});
+  await expect(target).toHaveClass(/dv-links-drop/);
+  await page.mouse.up();
+  await expect.poll(async()=>steps(await source(page))[2].traceMatch).toEqual({serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'event.type':'doorbell.press'}});
+  expect(steps(await source(page))[1].traceMatch).toBeUndefined();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
+
+  await panel.locator('[data-links-trace="'+KEY+'"]').getByRole('button',{name:'Assign '+KEY+' to steps',exact:true}).click();
+  const picker=page.getByRole('dialog',{name:'Assign '+KEY+' to steps'});await expect(picker).toBeVisible();
+  await picker.getByRole('checkbox',{name:'Step 3 · push',exact:true}).check();
+  await expect.poll(async()=>steps(await source(page))[2].traceMatch).toEqual({serviceName:'notify-svc',operation:'route.event'});
+  await page.keyboard.press('Escape');await expect(picker).toBeHidden();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
+});
+
+test('T3 By element: the inline editor edits a match in one Undo step; a drop onto a step with a match offers Add as alternative',async({page,server})=>{
+  const {panel,text}=await open(page,server);
+  await panel.getByRole('button',{name:'By element',exact:true}).click();
+  await panel.locator('[data-links-element="step:0:1"] [data-links-trace-chip="'+KEY+'"] .links-chip-main').click();
+  const editor=panel.getByRole('group',{name:/^Trace match · Step 2/});await expect(editor).toBeVisible();
+  const operation=editor.getByRole('textbox',{name:'Operation',exact:true});
+  await operation.fill('route.event.v2');await operation.press('Enter');
+  await expect.poll(async()=>steps(await source(page))[1].traceMatch.operation).toBe('route.event.v2');
+  expect(steps(await source(page))[1].traceMatch.attributes).toEqual({'event.type':'doorbell.press'});
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
+
+  const from=panel.locator('[data-links-element="step:0:0"] [data-links-trace-chip="ingest-api · POST /v1/events"] .links-chip-main');
+  const onto=panel.locator('[data-links-element="step:0:1"]');
+  await pointerTo(page,from,onto);
+  const ask=page.getByRole('menu',{name:/Step 2 · route already has a trace match/});await expect(ask).toBeVisible();
+  await expect(page.locator('#src')).toHaveValue(text);
+  await ask.getByRole('menuitem',{name:'Add as alternative'}).click();
+  await expect.poll(async()=>Array.isArray(steps(await source(page))[1].traceMatch)).toBe(true);
+  const after=steps(await source(page));
+  expect(after[1].traceMatch[1]).toEqual({serviceName:'ingest-api',operation:'POST /v1/events'});expect(after[0].traceMatch).toBeUndefined();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
+});
+
+test('T4 keyboard Move to… onto a step with a match asks Replace or Add as alternative; Esc writes nothing',async({page,server})=>{
+  const {panel,text}=await open(page,server);
+  await panel.getByRole('button',{name:'By element',exact:true}).click();
+  const chip=()=>panel.locator('[data-links-element="step:0:0"] [data-links-trace-chip="ingest-api · POST /v1/events"] .links-chip-main');
+  async function moveToStep2(){
+    await chip().focus();await page.keyboard.press('Enter');
+    const menu=page.getByRole('menu',{name:/ingest-api · POST \/v1\/events/});await expect(menu).toBeVisible();
+    await menu.getByRole('menuitem',{name:'Move to…'}).click();
+    const picker=page.getByRole('dialog',{name:/Move ingest-api · POST \/v1\/events/});await expect(picker).toBeVisible();
+    await picker.getByRole('button',{name:'Step 2 · route',exact:true}).focus();await page.keyboard.press('Enter');
+    const ask=page.getByRole('menu',{name:/Step 2 · route already has a trace match/});await expect(ask).toBeVisible();
+    return ask;
+  }
+  let ask=await moveToStep2();
+  await page.keyboard.press('Escape');await expect(ask).toBeHidden();
+  await expect(page.locator('#src')).toHaveValue(text);
+  ask=await moveToStep2();
+  await ask.getByRole('menuitem',{name:'Replace'}).focus();await page.keyboard.press('Enter');
+  await expect.poll(async()=>steps(await source(page))[1].traceMatch).toEqual({serviceName:'ingest-api',operation:'POST /v1/events'});
+  expect(steps(await source(page))[0].traceMatch).toBeUndefined();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
+});
+
+test('T5 the shared rename says how many steps it changes before the write, and one Undo restores all of them',async({page,server})=>{
+  const {panel,text}=await open(page,server);
+  const row=panel.locator('[data-links-trace="'+KEY+'"]');
+  await row.getByRole('button',{name:'Rename '+KEY,exact:true}).click();
+  const form=row.getByRole('group',{name:'Rename '+KEY});await expect(form).toBeVisible();
+  await expect(form).toContainText('Renames on 2 steps');
+  await expect(page.locator('#src')).toHaveValue(text);
+  await form.getByRole('textbox',{name:'Operation',exact:true}).fill('route.evt');
+  await form.getByRole('button',{name:'Rename on 2 steps',exact:true}).click();
+  await expect.poll(async()=>steps(await source(page)).map(st=>st.traceMatch && st.traceMatch.operation)).toEqual(['POST /v1/events','route.evt',undefined,'route.evt']);
+  expect(steps(await source(page))[1].traceMatch.nodeId).toBe('notify');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
+});
+
+test('T6 the Node select lists imported nodes and writes the namespaced id',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:1000});
+  const model=(id,dg)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:dg}]}});
+  const provider=model('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+  const consumer=model('consumer',{autoplay:false,nodes:{local:{title:'Local worker'}},rows:[['local']],
+    topologyImports:[{spec:'provider',export:'core',as:'canon'}],steps:[{id:'call',nodes:['canon::api'],traceMatch:{serviceName:'api',operation:'GET /items'}}]});
+  const catalog={version:3,diagrams:[provider,consumer].map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:2,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
+  await page.route('**/diagrams.json',route=>route.fulfill({json:catalog}));
+  for(const spec of [provider,consumer])await page.route('**/'+spec.page.canon.id+'.json',route=>route.fulfill({json:spec}));
+  await page.goto(server.origin+'/workbench.html');
+  await page.locator('#welcome-file').setInputFiles({name:'consumer.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(consumer,null,2))});
+  await expect(page.locator('#docview g.node[data-dv-node="canon::api"]')).toBeVisible();await closeTools(page);
+  await page.locator('#editor-tab-links').click();const links=page.locator('#workspace-window-links');
+  await links.getByRole('tab',{name:/^Trace match/}).click();const panel=links.getByRole('tabpanel');
+  const before=await page.locator('#src').inputValue();
+  await panel.getByRole('button',{name:'By element',exact:true}).click();
+  await panel.locator('[data-links-element="step:0:0"] [data-links-trace-chip="api · GET /items"] .links-chip-main').click();
+  const node=panel.getByRole('group',{name:/^Trace match · Step 1/}).getByRole('combobox',{name:'Node',exact:true});
+  await expect(node.locator('option',{hasText:'API (imported)'})).toHaveCount(1);
+  await node.selectOption('canon::api');
+  await expect.poll(async()=>steps(await source(page))[0].traceMatch.nodeId).toBe('canon::api');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
+});

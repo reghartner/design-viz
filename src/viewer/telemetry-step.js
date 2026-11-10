@@ -217,12 +217,13 @@ function telemetryTraceSpanTime(rows){
 }
 function telemetryTraceLabel(listed){
   // #1175: an optional step missing from this trace is left out of the label; the title lists it.
-  var rows=listed.filter(function(r){return !r.optional;}),time=telemetryTraceSpanTime(rows),one=rows.length===1 && rows[0];
+  var rows=listed.filter(function(r){return !r.optional;}),time=telemetryTraceSpanTime(rows),one=rows.length===1 && rows[0],steps=rows.filter(function(r){return r.kind!=='carrier';});
   function count(status,word){var n=rows.filter(function(r){return r.status===status;}).length;return n?n+' '+word:'';}
   function named(r){return r.alternative!=null && r.status==='matched'?'Matched: '+r.service+' '+r.operation:r.operation;}
   // On the canvas the service and operation are cut to 40 characters; the title keeps them whole.
   var name=one && one.service+' '+one.operation,text=one && one.status!=='matched'?one.label:one?[one.alternative!=null?'Matched: '+(name.length>40?name.slice(0,39)+'…':name):'',time || one.label].filter(Boolean).join(' · '):
-    [rows.length+' operations',count('missing','unknown'),count('ambiguous','ambiguous'),time].filter(Boolean).join(' · ');
+    // #1290: a carrier row is the node's declared spans, not an operation; only step rows are counted.
+    [(steps.length>1?steps.length+' operations':''),count('missing','unknown'),count('ambiguous','ambiguous'),time].filter(Boolean).join(' · ');
   var title=listed.map(function(r){
     if(r.kind==='carrier')return 'Declared spans: '+r.declarations.join('; ');
     var others=r.otherAlternatives || [],absent=others.filter(function(a){return !a.seen;}),unused=others.filter(function(a){return a.seen;});

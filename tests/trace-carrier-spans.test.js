@@ -49,29 +49,31 @@ const model=(d,e=exemplar())=>V.telemetryTraceModel(d,undefined,e);
 const label=rows=>{assert.ok(rows,'the node has trace rows (a label)');return plain(V.telemetryTraceLabel(rows));};
 
 test('M1 M2 carrierSpans matches by exact operation, prefix or attributes alone',()=>{
-  assert.equal(typeof V.FlowTraceMatch.carrierSpans,'function','FlowTraceMatch.carrierSpans is the carrier matcher');
   const trace={spans:SPANS().map(s=>({id:s.id,parentId:s.parentId,serviceName:s.service,operation:s.name,startMs:s.startMs,durationMs:s.ms,attributes:s.attributes,links:[]}))};
-  const ids=r=>Object.fromEntries(r.map(x=>[x.key,x.spans.map(s=>s.id)]));
-  let out=V.FlowTraceMatch.carrierSpans(board(),trace);
+  const ids=r=>Object.fromEntries((r || []).map(x=>[x.key,x.spans.map(s=>s.id)]));
+  // Without the matcher every carrier reads as having no declarations, so the assertions below fail on what they return.
+  const carrierSpans=(d,t)=>(V.FlowTraceMatch.carrierSpans || (()=>({nodes:{},edges:{}})))(d,t);
+  let out=carrierSpans(board(),trace);
   assert.deepEqual(plain(ids(out.nodes.worker)),{process:['proc'],find:['f1','f2'],cache:['h1','h2']},'the billing span of the same name is another service');
-  assert.deepEqual(plain(out.nodes.worker.map(x=>x.role)),['process','database','cache']);
+  assert.deepEqual(plain((out.nodes.worker || []).map(x=>x.role)),['process','database','cache']);
   assert.deepEqual(plain(ids(out.edges['api->worker'])),{send:['pub']},'connection declarations are matched (drawn in PR 3)');
   // namespace and attributes narrow each mode.
   const narrowed={spans:{process:{serviceName:'worker',operation:'process orders',namespace:'eu',role:'process'},
     find:{serviceName:'worker',operationPrefix:'find ',attributes:{'db.system':'postgres'},role:'database'},
     cache:{serviceName:'worker',attributes:{'db.system':'redis'},namespace:'orders',role:'cache'},
     mine:{serviceName:'worker',operation:'process orders',namespace:'orders',role:'process'}}};
-  out=V.FlowTraceMatch.carrierSpans(board(narrowed),trace);
+  out=carrierSpans(board(narrowed),trace);
   assert.deepEqual(plain(ids(out.nodes.worker)),{process:[],find:[],cache:[],mine:['proc']});
   // One span declared on two carriers shows on both: declarations describe, they do not own.
   const d=board();d.nodes.billing.trace={spans:{process:{serviceName:'worker',operation:'process orders',role:'process'}}};
-  out=V.FlowTraceMatch.carrierSpans(d,trace);
+  out=carrierSpans(d,trace);
   assert.deepEqual(plain(ids(out.nodes.billing)),{process:['proc']});assert.deepEqual(plain(ids(out.nodes.worker)).process,['proc']);
   // An attribute no span of that service records is reported, not just missing.
   const unrecorded=board({spans:{cache:{serviceName:'worker',attributes:{'cache.region':'eu'},role:'cache'},find:{serviceName:'worker',operationPrefix:'find ',attributes:{'db.system':'mongodb'},role:'database'}}});
-  out=V.FlowTraceMatch.carrierSpans(unrecorded,trace);
-  assert.deepEqual(plain(out.nodes.worker.map(x=>[x.key,x.spans.length,x.notRecorded])),[['cache',0,['cache.region']],['find',2,[]]]);
-  assert.deepEqual(plain(V.FlowTraceMatch.carrierSpans({nodes:{a:{title:'A'}},edges:[]},trace)),{nodes:{},edges:{}});
+  out=carrierSpans(unrecorded,trace);
+  assert.deepEqual(plain((out.nodes.worker || []).map(x=>[x.key,x.spans.length,x.notRecorded])),[['cache',0,['cache.region']],['find',2,[]]]);
+  assert.deepEqual(plain(carrierSpans({nodes:{a:{title:'A'}},edges:[]},trace)),{nodes:{},edges:{}});
+  assert.equal(typeof V.FlowTraceMatch.carrierSpans,'function','FlowTraceMatch.carrierSpans is the carrier matcher');
 });
 
 test('M3 M4 M5 a declared node gets the union time and a declaration title; nothing matched means no label; connections stay undrawn',()=>{
@@ -104,7 +106,9 @@ test('M6 M8 a span shared by a step row and the carrier row counts once; step ro
   const m=model(d),rows=m.nodes.worker;
   assert.deepEqual(plain(rows.map(r=>r.kind || 'step')),['step','carrier']);
   const text=label(rows);
-  assert.equal(text.text,'2 operations · 45 ms across 5 spans','the process span is counted once');
+  assert.equal(text.text,'45 ms across 5 spans','the process span is counted once, and the carrier row is not an operation');
+  const two=board();two.steps.push({id:'process',text:'Process',nodes:['worker'],traceMatch:{serviceName:'worker',operation:'process orders',nodeId:'worker'}},{id:'find',text:'Find',nodes:['worker'],traceMatch:{serviceName:'worker',operation:'find orders',nodeId:'worker'}});
+  assert.equal(label(model(two).nodes.worker).text,'2 operations · 45 ms across 5 spans','two step rows are two operations; the carrier row adds none');
   assert.equal(m.rows.length,2,'two step rows; the carrier row is not one');
   assert.equal(m.rows.find(r=>r.id==='process').label,'40 ms','the step row is unchanged');
   // Focus: the focused span's carrier row makes the node current; with nothing focused it is below.

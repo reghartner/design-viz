@@ -3,6 +3,7 @@
 // overlay patch). Declared connections draw nothing yet (PR 3). Nothing calls the trace provider
 // before the reader presses Load. Node coverage: tests/trace-carrier-spans.test.js.
 import {readFile,writeFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import vm from 'node:vm';
 import sourceLoader from '../../../tools/source-loader.cjs';
@@ -34,10 +35,12 @@ function resolvedBoard(){
   const context=vm.createContext({URL,TextEncoder});vm.runInContext(sourceLoader.composeSources(['canon.js','validator.js']),context);
   return JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(consumer,{version:1,id:'checkout-board',specs:[provider,consumer]})));
 }
-// In the page, from the viewer's shadow root: each node's trace label and every edge trace label.
+// In the page, from the native viewer's shadow root (or the standalone page): each node's trace label,
+// the number of edge trace labels, the Trace view status and the Selected request card text.
 function labels(root){
   return root.evaluate(host=>{
-    const scope=host.shadowRoot,out={nodes:{},edges:scope.querySelectorAll('.dv-trace-overlay[data-trace-edge]').length,status:(scope.querySelector('.dv-trace-mode-status') || {}).textContent || ''};
+    const scope=host.shadowRoot || host,request=scope.querySelector('.dv-trace-request');
+    const out={nodes:{},edges:scope.querySelectorAll('.dv-trace-overlay[data-trace-edge]').length,status:(scope.querySelector('.dv-trace-mode-status') || {}).textContent || '',request:request?request.textContent:null};
     scope.querySelectorAll('g.node[data-dv-node]').forEach(node=>{const text=node.querySelector('.dv-trace-overlay text');if(text)out.nodes[node.getAttribute('data-dv-node')]=text.textContent;});
     return out;
   });
@@ -65,7 +68,42 @@ test('desktop: declared local and imported nodes show their span time from a loa
   expect(out.nodes).toEqual({payment:'23.6 ms across 2 spans','platform::shipping':'182.4 ms across 3 spans'});
   expect(out.edges,'a declared connection has no trace label in this PR').toBe(0);
   expect(out.status).not.toContain('Diagram mapping is not configured');
+  expect(out.request,'the Selected request card is shown').not.toBeNull();
+  expect(out.request,'the Selected request card has no mapping-unavailable note').not.toContain('Diagram mapping is not configured');
   expect(await page.evaluate(()=>window.providerCalls.length)).toBeGreaterThan(0);
   const title=await root.locator('g.node[data-dv-node="platform::shipping"] .dv-trace-overlay title').textContent();
   expect(title).toMatch(/^Declared spans: ship \(process\) [\d.]+ ms; writes \(database\) [\d.]+ ms across 2 spans/);
+});
+
+test('desktop: a declarations-only board with no trace connection of its own inherits the company profile and loads on Load only',async({page,server})=>{
+  const spec=resolvedBoard();delete spec.page.tracking;
+  await page.setViewportSize({width:1500,height:1100});
+  const calls=[];
+  await page.exposeFunction('traceTools',()=>[{server:PROFILE.server,tools:[{name:schema.name,annotations:schema.annotations}]}]);
+  await page.exposeFunction('traceDescribe',()=>{calls.push('describe');return schema;});
+  await page.exposeFunction('tracePermission',keys=>Object.fromEntries(keys.map(k=>[k,'granted'])));
+  await page.exposeFunction('traceCall',()=>{calls.push('call');return {payload:RECORDED};});
+  await page.addInitScript(()=>{
+    window.claude={use:async name=>name==='permissions'?{request:keys=>window.tracePermission(keys)}:{listTools:()=>window.traceTools(),describeTool:()=>window.traceDescribe(),callTool:(s,n,a)=>window.traceCall(s,n,a)}};
+    window.flowviewBooted=ctl=>{window.ctl=ctl;};
+  });
+  const file=path.join(server.root,'trace-carrier-inherited.spec.json'),output=path.join(server.root,'trace-carrier-inherited.html');
+  await writeFile(file,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),output],{stdio:'pipe'});
+  // The company profile is inherited (no page tracking): set the build-time company connections.
+  const boot='var ctl = renderPage(view, page, bootSkin, backlinkData, renderOptions);';
+  let html=await readFile(output,'utf8');expect(html).toContain(boot);
+  html=html.replace(boot,'TELEMETRY_COMPANY_TRACE_CONNECTIONS='+JSON.stringify({company:PROFILE})+';\n'+boot);await writeFile(output,html);
+  await page.goto(server.origin+'/trace-carrier-inherited.html');await page.waitForFunction(()=>!!window.ctl);
+  const root=page.locator('body');
+  await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
+  await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);
+  expect(calls,'nothing calls the provider before Load').toEqual([]);
+  await root.getByRole('button',{name:'Load trace',exact:true}).click();
+  await expect.poll(async()=>Object.keys((await labels(root)).nodes).length,{message:'two declared nodes are annotated'}).toBe(2);
+  const out=await labels(root);
+  expect(out.nodes).toEqual({payment:'23.6 ms across 2 spans','platform::shipping':'182.4 ms across 3 spans'});
+  expect(out.edges).toBe(0);
+  expect(out.status).not.toContain('Diagram mapping is not configured');
+  expect(out.request).not.toBeNull();expect(out.request).not.toContain('Diagram mapping is not configured');
+  expect(calls).toContain('call');
 });

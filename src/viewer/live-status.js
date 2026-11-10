@@ -1213,10 +1213,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(row && row.status==='missing' && kept && !Array.isArray(kept) && (kept.parentStepId || kept.attributes || kept.namespace || kept.occurrence!=null))out.unmatched=true;
     return out;
   }
+  // A diagram maps a loaded trace through step traceMatch or (#1290) spans declared on its nodes and edges.
+  function traceMapsDiagram(d){
+    return (d.steps || []).some(function(step){return !!step.traceMatch;}) ||
+      Object.keys(d.nodes || {}).some(function(id){return !!(d.nodes[id] && d.nodes[id].trace);}) || (d.edges || []).some(function(e){return !!(e && e.trace);});
+  }
   function traceSnapshot(){
     var source=traceSources(),entries=source.entries,evidence=source.evidence,hasMappings=false;
-    // #1290: spans declared on nodes and edges map a loaded trace too.
-    eachDiagram(function(d){if((d.steps || []).some(function(step){return !!step.traceMatch;}) || Object.keys(d.nodes || {}).some(function(id){return !!(d.nodes[id] && d.nodes[id].trace);}) || (d.edges || []).some(function(e){return !!(e && e.trace);}))hasMappings=true;});
+    eachDiagram(function(d){if(traceMapsDiagram(d))hasMappings=true;});
     var hasBindings=evidence.carriers.some(function(binding){return Object.keys(binding.signals).some(function(name){return proofVerdicts.isTraceSignal(binding.signals[name]);});});
     var traceStatus=telemetryOptions && typeof telemetryOptions.traceStatus==='function'?telemetryOptions.traceStatus():{available:evidence.available,note:''};
     var selected=traceSelection && entries.find(function(e){return e.key===traceSelection.key && e.exemplar.traceId===traceSelection.traceId;});
@@ -1232,7 +1236,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }
     var model=selected?telemetryTraceModel(selected.binding.section.diagram,selected.binding.stepper && selected.binding.stepper.path(),selected.exemplar):null;
     if(selected)model.mapSteps=traceMapSteps(selected.binding);
-    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{errorNote:traceErrorNote(errorTarget),key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:(selected.binding.section.diagram.steps || []).some(function(step){return !!step.traceMatch;}),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:canOpenOver()}),
+    return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{errorNote:traceErrorNote(errorTarget),key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:traceMapsDiagram(selected.binding.section.diagram),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:canOpenOver()}),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,
       // #1177: the step chooser of a span drop, and the latest pending mapping with its Undo.
       mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,span:traceChooser.span,spanId:traceChooser.spanId,drop:traceChooser.drop,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,disabled:step.alternatives,label:step.caption+(step.alternatives?' · has alternatives; edit in Inspect':step.mapped?' · mapped, replaces':'')};})}:null,

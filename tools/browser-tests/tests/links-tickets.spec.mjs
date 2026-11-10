@@ -174,11 +174,11 @@ test('B7 highlighting scrolls the Steps row into view, and Esc on the canvas cle
   await page.locator('#editor-tab-steps').click();await expect(page.locator('#steps-list [data-step-index="0"]')).toBeVisible();
   await expect(page.locator('#steps-list [data-step-index="'+late+'"]')).not.toBeInViewport();
   await page.locator('#editor-tab-links').click();
+  // The Steps row reveal scrolls only the Steps list; it never moves a tool window over the canvas.
+  const stepsBox=await page.locator('#workspace-window-steps').boundingBox();
   await links.locator('[data-links-ticket="BE-67"]').getByRole('button',{name:'Highlight BE-67',exact:true}).click();
   const row=page.locator('#steps-list [data-step-index="'+late+'"]');
   await expect(row).toHaveClass(/dv-links-lit/);await expect(row).toBeInViewport();
-  // The Steps row reveal scrolls only the Steps list; it never moves a tool window over the canvas.
-  const stepsBox=await page.locator('#workspace-window-steps').boundingBox();
   // The linked node is revealed where it can be clicked: in the viewport and not under any tool window.
   const ingest=page.locator('#docview g.node[data-dv-node="ingest"]');
   await expect(ingest).toBeInViewport();

@@ -9,9 +9,9 @@
 | R5 | the same boards | Retry calls at once (a reader action), and the next automatic refresh is again 300000 ms later | a Retry that is held back, or one that starts a faster timer |
 | R6 | the same boards, like Jira's 5-minute answer reuse | Metrics off then on 60 s after an answer: no call; the answer shows again with its own refreshed time; the next refresh comes 5 minutes after that answer | a toggle that refetches |
 | R7 | a board with environments qa and stg | qa → stg → qa within 5 minutes: one call for stg, none for the second qa, which shows qa's answer and time | an environment flip that refetches |
-| R8 | the same boards with a failing query | Retry after the failed answer calls at once; a second Retry 10 s later shows busy and waits until 30 s after the first, then calls; that clean answer is then reused by off/on | Retry that is held back after an error, or repeated Retries that hammer the provider |
-| R10 | the same boards with a failing query | an answer that names a failure is not reused: off/on calls again, but no sooner than 30 s after the last call | a failed answer held for 5 minutes, or off/on after errors as a fast poll |
-| R9 | the reviewer's exp8 pattern | five off/on toggles and four Retries in 3 s after the first answer make one more call, not nine | a reader toggle as a fast poll |
+| R8 | the same boards with a failing query | Retry after the failed answer calls at once; once a Retry answers cleanly, off/on reuses that answer | Retry that is held back after an error |
+| R10 | the same boards with a failing query | an answer that names a failure is not reused: off/on calls again at once | a failed answer held for 5 minutes with no way to try again |
+| R9 | the reviewer's exp8 toggles | five off/on toggles in 3 s after the first answer make no call | a reader toggle as a fast poll |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {entrypoint}=require('../tools/source-loader.cjs');
@@ -141,35 +141,30 @@ for(const kind of ['grafana','honeycomb']){
    h.advance(20000);h.api.setEnvironment('stg');await settle();assert.equal(h.data(),2,'stg again within 5 minutes: no call');
   }finally{h.close();}
  });
- test('R8 '+kind+': Retry after an error calls at once; a second Retry within 30 s waits until 30 s after the first',async()=>{
+ test('R8 '+kind+': Retry after an error calls at once, and a clean Retry answer is then reused by off/on',async()=>{
   let failing=true;const h=await setup(kind,{fail:()=>failing});
   try{
    h.api.setEnabled(true);await settle();assert.equal(h.data(),1);assert.match(h.api.status().note,/boom/,'the answer names its failure: '+JSON.stringify(h.api.status()));
    h.advance(2000);h.api.retry();await settle();assert.equal(h.data(),2,'Retry after an error calls at once');
-   h.advance(10000);h.api.retry();await settle();
-   assert.equal(h.data(),2,'a second Retry 10 s later does not call yet');assert.equal(h.api.status().busy,true,'it shows that it is waiting to retry');
-   assert.deepEqual(h.armed(),[20000],'it calls 30 s after the first Retry');
-   failing=false;h.advance(20000);await h.fire();assert.equal(h.data(),3);assert.equal(h.api.status().state,'ok');assert.equal(h.api.status().note,'','the retried answer is clean');
+   assert.deepEqual(h.armed(),[FIVE],'Retry starts no faster timer');
+   failing=false;h.advance(10000);h.api.retry();await settle();assert.equal(h.data(),3,'a second Retry also calls at once');assert.equal(h.api.status().state,'ok');assert.equal(h.api.status().note,'','the retried answer is clean');
    h.advance(1000);h.api.setEnabled(false);h.api.setEnabled(true);await settle();assert.equal(h.data(),3,'a clean answer is reused');
   }finally{h.close();}
  });
- test('R9 '+kind+': five off/on toggles and four Retries in 3 s after the first answer make one more call',async()=>{
+ test('R9 '+kind+': five off/on toggles in 3 s after the first answer make no call',async()=>{
   const h=await setup(kind);
   try{
    h.api.setEnabled(true);await settle();assert.equal(h.data(),1);
    for(let i=0;i<5;i++){h.advance(300);h.api.setEnabled(false);h.api.setEnabled(true);await settle();}
-   for(let i=0;i<4;i++){h.advance(300);h.api.retry();await settle();}
-   assert.equal(h.data(),2,'toggles reuse the answer; Retries are spaced 30 s apart: '+h.data());
+   assert.equal(h.data(),1,'toggles reuse the answer: '+h.data());assert.deepEqual(h.armed(),[FIVE-1500],'the refresh stays 5 minutes after the answer');
   }finally{h.close();}
  });
 }
-for(const kind of ['grafana','honeycomb'])test('R10 '+kind+': an answer that names a failure is not reused; off/on calls again no sooner than 30 s after the last call',async()=>{
+for(const kind of ['grafana','honeycomb'])test('R10 '+kind+': an answer that names a failure is not reused; off/on calls again at once',async()=>{
  const h=await setup(kind,{fail:()=>true});
  try{
   h.api.setEnabled(true);await settle();assert.equal(h.data(),1);assert.match(h.api.status().note,/boom/);
   h.advance(5000);h.api.setEnabled(false);h.api.setEnabled(true);await settle();
-  assert.equal(h.data(),1,'off/on 5 s after a call: no call yet');assert.equal(h.api.status().busy,true,'it shows that it is waiting');assert.deepEqual(h.armed(),[25000]);
-  h.advance(25000);await h.fire();assert.equal(h.data(),2,'it calls 30 s after the last call');
-  h.advance(31000);h.api.setEnabled(false);h.api.setEnabled(true);await settle();assert.equal(h.data(),3,'off/on more than 30 s later calls at once: the failed answer is not reused');
+  assert.equal(h.data(),2,'off/on after a failed answer tries again at once');assert.deepEqual(h.armed(),[FIVE]);
  }finally{h.close();}
 });

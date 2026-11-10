@@ -2007,6 +2007,8 @@ test('M3 Metrics is off by default; on starts the provider loop with a 5-minute 
  assert.equal(signals[signals.length-1].aborted,true,'M3 off aborts the signal');assert.equal(h.timers.size,0,'M3 off retires the timer');
  assert.deepEqual(plain(t.snapshot().map),{},'M3 off clears the map');assert.deepEqual(plain(t.status()),IDLE,'M3 off returns to idle');
  const before=calls;h.doc.dispatchEvent({type:'visibilitychange'});await settle();assert.equal(calls,before,'M3 visibility never calls while off');
+ // #1289: within 5 minutes on again reuses the last clean answer; past them it calls.
+ t.setEnabled(true);await settle();assert.equal(calls,before,'M3 on again within 5 minutes reuses the answer');assert.deepEqual(plain(t.snapshot().map),sample);t.setEnabled(false);now.at+=300000;
  let release;hold=new Promise(r=>release=r);t.setEnabled(true);await settle();assert.equal(calls,before+1);t.setEnabled(false);release(sample);await settle();
  assert.deepEqual(plain(t.snapshot().map),{},'M3 a late answer after off is dropped');assert.deepEqual(plain(t.status()),IDLE);
  hold=null;t.setEnabled(true);await settle();assert.equal(t.status().state,'ok');const live=signals[signals.length-1];assert.equal(live.aborted,false,'M3 on again gets a fresh signal');

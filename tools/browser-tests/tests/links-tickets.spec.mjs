@@ -5,7 +5,7 @@
    B4 canvas pill | same | the canvas pill names FW-45 and its Clear ends the highlight; closing Links ends it too | a dimmed canvas with no explanation after Links closes
    B5 refused step move | ctrl with FW-45, FW-46 plus a step lighting ctrl with ticketFilter [FW-46] | dragging the FW-45 chip from ctrl onto that step marks it refused, not amber, and the drop changes nothing | a move that deletes the ticket
    B6 keyboard + Edit key | B1 board | Enter on the FW-45 handle opens Assign; Edit key with a bad key marks the field aria-invalid with the message beside it; Edit key onto BE-67 asks to merge and Merge writes BE-67 in one Undo step | errors far from the field, a silent merge
-   B7 reveal + Esc on canvas | 40 filler steps, then a step lighting ingest | Highlight BE-67 scrolls its Steps row into view; Esc pressed on the canvas clears the highlight | a highlight off screen, Esc only working inside Links
+   B7 reveal + Esc on canvas | 40 filler steps, then a step lighting ingest | Highlight BE-67 scrolls its Steps row into view without moving the Steps window, leaves the linked node clickable, and Esc pressed on the canvas clears the highlight | a highlight off screen or under a tool window, Esc only working inside Links
    B8 imported overlay | consumer importing provider api (CAN-1) with nodeTracking API-2 | the inherited CAN-1 chip has no remove; + Assign LOC-1 ticks API and writes topologyImports[0].nodeTracking.api; Undo restores | writing onto the imported node, removable inherited tickets
    B3 by element move | same | By element: step 2 row shows FW-45; dragging the FW-45 chip from the ctrl row onto the notify row moves it in one Undo step; ⌥-drag copies; Enter on a chip offers Move to… and moving by keyboard writes the same | a move that leaves the source, a copy that removes it */
 import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
@@ -177,8 +177,14 @@ test('B7 highlighting scrolls the Steps row into view, and Esc on the canvas cle
   await links.locator('[data-links-ticket="BE-67"]').getByRole('button',{name:'Highlight BE-67',exact:true}).click();
   const row=page.locator('#steps-list [data-step-index="'+late+'"]');
   await expect(row).toHaveClass(/dv-links-lit/);await expect(row).toBeInViewport();
-  await expect(page.locator('#docview g.node[data-dv-node="ingest"]')).toBeInViewport();
-  await page.locator('#docview g.node[data-dv-node="button"]').click();
+  // The Steps row reveal scrolls only the Steps list; it never moves a tool window over the canvas.
+  const stepsBox=await page.locator('#workspace-window-steps').boundingBox();
+  // The linked node is revealed where it can be clicked: in the viewport and not under any tool window.
+  const ingest=page.locator('#docview g.node[data-dv-node="ingest"]');
+  await expect(ingest).toBeInViewport();
+  await expect.poll(()=>ingest.evaluate(n=>{const r=(n.querySelector('.card') || n).getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return !!hit && n.contains(hit);})).toBe(true);
+  expect(await page.locator('#workspace-window-steps').boundingBox()).toEqual(stepsBox);
+  await ingest.click();
   await expect(page.locator('#workspace-window-links .links-key:focus')).toHaveCount(0);
   // The first Esc may be used by the canvas (it clears the node selection); the highlight clears once Esc is free.
   await page.keyboard.press('Escape');

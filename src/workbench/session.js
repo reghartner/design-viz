@@ -1,3 +1,11 @@
+/* #1276: opt-in agent-connection trace for diagnosing folder setup in real browsers.
+   Off unless localStorage has dv-agent-debug=1; it only writes console.info lines
+   (step names, generation numbers, project ids, file names), never diagram content. */
+function flowviewAgentDebug(event,detail){
+  try{if(typeof localStorage==='undefined' || localStorage.getItem('dv-agent-debug')!=='1')return false;}catch(ex){return false;}
+  try{console.info('[flowview-agent '+new Date().toISOString().slice(11,23)+'] '+event,detail===undefined?'':detail);}catch(ex){}
+  return true;
+}
 /* Source/history/project policy without DOM ownership. Always read the source
    adapter at a transaction boundary: handwritten text may include invalid JSON
    or whitespace that has never been published through a builder command. */
@@ -79,6 +87,7 @@ function createBuilderSession(options){
       undoStack.length=redoStack.length=0;importedText=null;historyVersion++;historyChanged();
     }
     project++;
+    flowviewAgentDebug('project id changed',{project:project,preserveHistory:!!(policy && policy.preserveHistory),stack:new Error('project change').stack});
     if(options.invalidateProject)options.invalidateProject(policy);
     target=null;
   }

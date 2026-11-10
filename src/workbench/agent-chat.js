@@ -205,6 +205,19 @@ function initWorkbenchAgentChat(opts){
     if(state.connected)record.at=Date.now();
     if(recovery.save(record)){lastSaved=signature;remembered=folderAgentRecoveryRecord(record);}
   }
+  /* #1276 trace (off unless dv-agent-debug=1): every awaited connection step, and every
+     guard that drops a superseded connection, with both generation numbers. */
+  function trace(event,detail){return typeof flowviewAgentDebug==='function' && flowviewAgentDebug(event,detail);}
+  async function step(name,pending){
+    trace(name+': start');
+    try{var value=await pending;trace(name+': end');return value;}
+    catch(ex){trace(name+': throw',ex && (ex.name+': '+ex.message));throw ex;}
+  }
+  function stale(token,where){
+    var dropped=!life.alive() || token!==generation;
+    if(dropped)trace('superseded connection dropped at '+where,{token:token,generation:generation,alive:life.alive()});
+    return dropped;
+  }
   function resetConversationForProject(current){
     composeEpoch++;copying=false;copyFallback.hidden=true;copyPreview.value='';handoff.hidden=true;handoffText.value='';activeFiles=null;
     cacheReady=false;seenProject=current.project;activeFolder=null;activeRepository=null;activeLocalRepository=null;accessLost=false;lastSaved='';
@@ -217,6 +230,7 @@ function initWorkbenchAgentChat(opts){
     // #1276: superseding an in-flight connection makes this call the owner of the panel status:
     // the old attempt's guards return silently, so say here that nothing was connected.
     var interrupted=connecting && !state.connected;
+    trace('project change seen by the agent panel',{from:seenProject,to:current.project,connecting:connecting,generation:generation+1});
     generation++;background.cancelDelay(timer);background.release();
     var retired=client,unlock=releaseLock;client=null;releaseLock=null;connecting=false;cacheReady=false;
     if(retired)retired.disconnect().catch(function(){}).finally(function(){retired.destroy();if(unlock)unlock();});else if(unlock)unlock();
@@ -473,12 +487,12 @@ function initWorkbenchAgentChat(opts){
   async function beginConnection(directory,parent,resume,token,recovered,projectFolder,pilotCapture,renewal){
     pilotRequested=pilotCapture===true;state.pilotStatus=null;
     var files=renewal?renewal.files:projectFolder?projectFolder.files:createFolderAgentFiles(directory);
-    if(!life.alive() || token!==generation)return;
+    if(stale(token,'step 1'))return;
     var choice;
     if(recovered){
       checkResumeDraft(recovered.current);
-      var saved=recovered.preview,fresh=saved.identity?await inspectFolderAgentSession(files,opts.snapshot):{savedSource:saved.newFolder?recovered.current.source:await files.readText('story.spec.json')};
-      if(!life.alive() || token!==generation)return;
+      var saved=recovered.preview,fresh=saved.identity?await step('inspect saved session',inspectFolderAgentSession(files,opts.snapshot)):{savedSource:saved.newFolder?recovered.current.source:await step('read saved story',files.readText('story.spec.json'))};
+      if(stale(token,'step 2'))return;
       checkResumeDraft(recovered.current);
       if(fresh.lease && fresh.lease.active)throw Error('This folder is still connected to another editor. Disconnect it there first.');
       if(saved.identity && (fresh.identity.sessionId!==saved.identity.sessionId || fresh.identity.connectionId!==saved.identity.connectionId || fresh.savedRevision!==saved.savedRevision) || fresh.savedSource!==saved.savedSource)
@@ -487,10 +501,10 @@ function initWorkbenchAgentChat(opts){
       // Rendering the restored story can synchronously ask for recoveryInfo.
       // Retire the old chat below without cancelling our own explicit open.
       var restored;adoptingProject=true;
-      try{restored=saved.newFolder && opts.openEmptyFolder?await opts.openEmptyFolder(recovered.current,recovered.topologyContext):await opts.restoreSavedStory(saved.savedSource,recovered.current,recovered.topologyContext);}
+      try{restored=saved.newFolder && opts.openEmptyFolder?await step('open empty folder',opts.openEmptyFolder(recovered.current,recovered.topologyContext)):await step('restore saved story',opts.restoreSavedStory(saved.savedSource,recovered.current,recovered.topologyContext));}
       finally{adoptingProject=false;}
       if(restored===false || restored && restored.ok===false)throw Error(restored && restored.error || 'Could not restore the saved story.');
-      if(!life.alive() || token!==generation)return;
+      if(stale(token,'step 3'))return;
       var resumed=opts.snapshot();
       if(!resumed.open || resumed.source!==saved.savedSource || restored && restored.project!==undefined && restored.project!==resumed.project)
         throw Error('The project changed while opening the saved story. Choose the diagram folder again.');
@@ -513,8 +527,8 @@ function initWorkbenchAgentChat(opts){
     client=createFolderAgentClient({files:files,artifactStatus:function(state,detail){if(workingBinding && opts.workingStatus)opts.workingStatus(workingBinding,state,detail);},snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,normalize:opts.normalize,refreshSources:opts.refreshSources,topologyContext:opts.topologyContext,workflow:workflow,requireLedger:!!files.artifacts,
       level:function(){return get('level').value;},changed:function(update){if(life.alive() && token===generation && opts.snapshot().project===connectionProject){paint(update);if(update.connected===false && workingBinding && opts.workingStatus)opts.workingStatus(workingBinding,'disconnected');}}});
 
-    var connectingClient=client,identity=await connectingClient.start(resume,choice,renewal?{renewSession:true,expectedSessionId:renewal.previous.sessionId,expectedConnectionId:renewal.previous.connectionId}:undefined);
-    if(!life.alive() || token!==generation){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
+    var connectingClient=client,identity=await step('client start',connectingClient.start(resume,choice,renewal?{renewSession:true,expectedSessionId:renewal.previous.sessionId,expectedConnectionId:renewal.previous.connectionId}:undefined));
+    if(stale(token,'step 4')){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
     if(workingBinding && opts.workingStatus)opts.workingStatus(workingBinding,'saved');
     if(!renewal)activeRepository=parent || directory;
     activeFolder=directory;activeFiles=files;accessLost=false;cacheReady=true;freshProject=null;
@@ -522,17 +536,17 @@ function initWorkbenchAgentChat(opts){
     var rememberDirectory=activeRepository || directory;
     recovery.remember(rememberDirectory,identity.sessionId).then(function(saved){if(life.alive() && token===generation && saved)rememberedHandle={handle:rememberDirectory,sessionId:identity.sessionId};});
     status('Preparing the authoring instructions in your folder…');
-    await files.write('folder-agent.py',kit.watcher);
-    if(!life.alive() || token!==generation){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
-    await files.write('authoring-kit.json',{gzip:kit.gzip,sha256:kit.sha256});
-    if(!life.alive() || token!==generation){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
+    await step('write folder-agent.py',files.write('folder-agent.py',kit.watcher));
+    if(stale(token,'step 5')){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
+    await step('write authoring-kit.json',files.write('authoring-kit.json',{gzip:kit.gzip,sha256:kit.sha256}));
+    if(stale(token,'step 6')){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
     var located=activeLocalRepository && activeLocalRepository.path?activeLocalRepository.path.replace(/\/[^\/]*$/,''):null;
     var instructions=folderAgentInstructions(directory.name,get('level').value,resume,identity,workflow,pilotCapture,located);
     setText('pilot-review',pilotCapture?'Pilot capture: On for this session (requested, not yet verified). Pasting these instructions requests optional local capture under normal host permissions. The helper reads matching native Claude Code transcripts and saves raw lines from the consent boundary, observed models, and token usage in your diagram folder. Checkpoints can refresh other already-authorized sessions; a final-response copier may run in the background for up to 45 seconds. No upload or additional model/session. If capture is unavailable or denied, diagram work continues. Dollar cost is collected manually by the pilot owner.':'Pilot capture: Off for this session. The instructions tell your agent not to capture your transcript or usage, even if this folder was used for a pilot before. To enable it later, type “Use pilot mode for this session” directly in Claude Code.');
-    await files.write('CONNECT.md',instructions+'\n');
-    if(!life.alive() || token!==generation){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
-    await files.write('README.md',instructions+'\n');
-    if(!life.alive() || token!==generation){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
+    await step('write CONNECT.md',files.write('CONNECT.md',instructions+'\n'));
+    if(stale(token,'step 7')){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
+    await step('write README.md',files.write('README.md',instructions+'\n'));
+    if(stale(token,'step 8')){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
     get('instructions').value=instructions;
     get('folder').textContent=files.artifacts?'Diagram folder: '+directory.name+' · '+files.artifacts.spec+' + '+files.artifacts.ledger:directory.name;
     get('guide-folder-name').textContent=get('folder').textContent;
@@ -541,7 +555,7 @@ function initWorkbenchAgentChat(opts){
     status(workflow==='external'?'Paste the setup instructions into your agent.':'Paste the connection instructions into Claude.');get('copy').disabled=false;saveRecovery();tick(token);
   }
   async function connectionFailure(ex,token){
-    if(!life.alive() || token!==generation)return;
+    if(stale(token,'step 9'))return;
     var failed=client,unlock=releaseLock;client=null;releaseLock=null;setupUseRemembered=false;get('pilot-capture').checked=false;
     paint({connected:false,pending:null,listening:false,progress:'',review:null});
     if(failed){try{await failed.disconnect();}catch(ignored){}failed.destroy();}
@@ -573,13 +587,13 @@ function initWorkbenchAgentChat(opts){
     if(intent==='new' && freshProject!==opts.snapshot().project && opts.newProject){opts.newProject(composeMode);intent='new';}
     connecting=true;get('instructions').value='';paint({});var token=++generation,opening=opts.snapshot(),unlockSetup=null;
     function checkOpening(){
-      if(!life.alive() || token!==generation)throw new DOMException('Folder connection cancelled.','AbortError');
+      if(stale(token,'step 10'))throw new DOMException('Folder connection cancelled.','AbortError');
       checkResumeDraft(opening);
     }
     var preparedSource,preparedContext;
     async function prepareSource(value){
       checkOpening();
-      preparedContext=opts.prepareFolder?await opts.prepareFolder(value,found):undefined;
+      preparedContext=opts.prepareFolder?await step('prepare folder topology',opts.prepareFolder(value,found)):undefined;
       checkOpening();
       var invalid=opts.validate && (opts.prepareFolder?opts.validate(value,preparedContext):opts.validate(value));
       if(invalid && !isUnresolvedLocalTopology(preparedContext))throw Error('The saved spec needs repair before opening: '+invalid);
@@ -590,53 +604,53 @@ function initWorkbenchAgentChat(opts){
       // Permission/picker must be the first await, inside this click gesture.
       if(useRemembered && rememberedHandle && remembered && rememberedHandle.sessionId===remembered.sessionId && typeof rememberedHandle.handle.requestPermission==='function'){
         directory=rememberedHandle.handle;
-        var permission=await directory.requestPermission({mode:'readwrite'});
+        var permission=await step('request remembered folder permission',directory.requestPermission({mode:'readwrite'}));
         if(permission!=='granted')throw new DOMException('Folder access was not granted.','NotAllowedError');
         parent=directory;
       }else{
-        parent=await window.showDirectoryPicker({mode:'readwrite',id:'flowview-agent'});
-        if(!life.alive() || token!==generation)return;
+        parent=await step('folder picker',window.showDirectoryPicker({mode:'readwrite',id:'flowview-agent'}));
+        if(stale(token,'step 11'))return;
         directory=parent;
       }
-      if(!life.alive() || token!==generation)return;
+      if(stale(token,'step 12'))return;
       checkResumeDraft(opening);
-      if(opts.releaseWorking)await opts.releaseWorking();
+      if(opts.releaseWorking)await step('release working file',opts.releaseWorking());
       checkOpening();
       // Serialize setup/recovery writes within this origin before any disk mutation.
       // Release after connecting, so unrelated folders can remain open together.
-      if(navigator.locks)unlockSetup=await new Promise(function(resolve,reject){navigator.locks.request('flowview-diagram-folder-setup',function(){return new Promise(function(release){resolve(release);});}).catch(reject);});
-      if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
+      if(navigator.locks)unlockSetup=await step('folder setup lock',new Promise(function(resolve,reject){navigator.locks.request('flowview-diagram-folder-setup',function(){return new Promise(function(release){resolve(release);});}).catch(reject);}));
+      if(stale(token,'step 13'))return;checkResumeDraft(opening);
       releaseLock=unlockSetup;
       var projectFolder,preview,recovered;
       if(typeof openFolderAgentProject==='function'){
-        var found=await openFolderAgentProject(directory);
+        var found=await step('read diagram folder',openFolderAgentProject(directory));
         if(found.selectionRequired){
-          var selected=await chooseDiagramFile(found.specs,token);
-          if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
-          found=await openFolderAgentProject(directory,selected);
+          var selected=await step('choose diagram file (waits for the author)',chooseDiagramFile(found.specs,token));
+          if(stale(token,'step 14'))return;checkResumeDraft(opening);
+          found=await step('read chosen diagram',openFolderAgentProject(directory,selected));
         }
-        if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
+        if(stale(token,'step 15'))return;checkResumeDraft(opening);
         if(intent==='new' && (found.existing || found.source!==null || found.recovering || found.ledger))throw Error('This folder already contains a diagram or agent connection. Select a new, empty diagram folder to start fresh. Existing files were not changed.');
         if(intent==='resume' && !found.hasSession)throw Error('This folder does not contain an existing agent build. Select the diagram folder used by the earlier build.');
         directory=found.directory || directory;
         await prepareSource(found.source===null?opening.source:found.source);
-        projectFolder=await found.initialize(checkOpening);
+        projectFolder=await step('initialize .flowview-agent',found.initialize(checkOpening));
         projectFolder.localRepository=found.repository?{handle:found.repository,path:found.topologyContext.localSource.path}:null;
         if(projectFolder.source===null && !projectFolder.hasLedger)projectFolder.ledger=opening.ledger || '';
         if((projectFolder.source===null?opening.source:projectFolder.source)!==preparedSource)throw Error('The saved story changed while opening the folder. Choose the diagram folder again.');
-        if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
+        if(stale(token,'step 16'))return;checkResumeDraft(opening);
         resume=found.hasSession;
-        if(resume)preview=await inspectFolderAgentSession(projectFolder.files,opts.snapshot());
+        if(resume)preview=await step('inspect folder session',inspectFolderAgentSession(projectFolder.files,opts.snapshot()));
         else preview={savedSource:projectFolder.source===null?opening.source:projectFolder.source,newFolder:projectFolder.source===null};
       }else if(resume)preview=await inspectFolderAgentSession(createFolderAgentFiles(directory),opts.snapshot());
       if(preview){
-        if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
+        if(stale(token,'step 17'))return;checkResumeDraft(opening);
         if(preview.lease && preview.lease.active)throw Error('This folder is still connected to another editor. Disconnect it there first.');
         if(preparedSource===undefined)await prepareSource(preview.savedSource);
         if(preview.savedSource!==preparedSource)throw Error('The saved story changed while opening the folder. Choose the diagram folder again.');
         recovered={preview:preview,current:opening,topologyContext:preparedContext};status('Opening the diagram and its ledger…');
       }
-      await beginConnection(directory,parent,resume,token,recovered,projectFolder,pilotCapture);
+      await step('begin connection',beginConnection(directory,parent,resume,token,recovered,projectFolder,pilotCapture));
     }catch(ex){await connectionFailure(ex,token);}
     finally{if(unlockSetup)unlockSetup();if(releaseLock===unlockSetup)releaseLock=null;if(pendingFileChoice && pendingFileChoice.token===token)pendingFileChoice=null;if(life.alive() && token===generation){get('file-choice').hidden=true;connecting=false;paint({});}}
   }

@@ -11,13 +11,15 @@
 | O6 phone tap | cueSpec at 390 px with touch | first tap shows the card only; a second tap, or a tap on the card, opens the detail | tap opens at once or never |
 | O7 repaint keeps the open node popover | cueSpec | a node's Jira popover opened in Outline stays open on its node card, with the same text, through a metrics repaint | the ring stealing the popover or focus |
 | O8 loaded detail | importedDetailSpec | Outline outlines the loaded detail's imported carriers and shows their cards | detail carriers left out |
+| O9 handoff node | handoffSpec with a bound handoff node | its ring opens the ticket popover from the Jira cue that took over the node's button | a ring pointing at a cleared button |
+| O3 (c2) hidden next stop | O3 board | Tab from the card's last link skips a hidden next stop and leaves the link | a keyboard trap on the link |
 Every DOM measurement starts at #host's shadowRoot (the native viewer renders inside it).
 Flip: without the Outline style the "Metrics style" group does not exist, so every row fails at the toggle. */
 import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
-import {cueSpec,mountCues,mountImportedDetail,CUE_JIRA,CUE_SAMPLES} from '../helpers/telemetry-cards.mjs';
+import {cueSpec,mountCues,mountImportedDetail,handoffSpec,CUE_JIRA,CUE_SAMPLES} from '../helpers/telemetry-cards.mjs';
 
 const EDGES=['ingest->app','app->push','shared::api->shared::store'],NODES=['ingest','shared::api'];
 // Worst signal wins: breach > degraded > no data > healthy (app->push has no traffic, so its rate limit fails).
@@ -165,6 +167,19 @@ test('O3 focus shows the card; Tab reaches its link and moves on; Enter opens th
  await page.keyboard.press('Tab');await page.keyboard.press('Tab');
  await expect.poll(async()=>(await canvas(page)).active,'Tab moves on past the card').not.toMatch(/^card:|^ingest->app$/);
  await expect.poll(async()=>(await canvas(page)).cards.filter(c=>c.id==='ingest->app' && c.shown).length).toBe(0);
+ // Review c2: a hidden next stop is skipped, never a trap on the link.
+ await halo.focus();await page.keyboard.press('Tab');
+ await expect.poll(async()=>(await canvas(page)).active).toBe('card:ingest->app');
+ const hidden=await page.evaluate(()=>{
+  const root=document.querySelector('#host').shadowRoot,view=root.querySelector('#section-main').closest('.docview') || root;
+  const halo=root.querySelector('.dv-metrics-outline[data-metrics-carrier="ingest->app"]');
+  const stops=Array.from(root.querySelectorAll('a[href],button,input,select,textarea,[tabindex]')).filter(el=>el.tabIndex>=0 && !el.disabled && !el.closest('.dv-metrics-card[data-metrics-style="outline"]') && el.getClientRects().length && el.checkVisibility({visibilityProperty:true}));
+  const next=stops[stops.indexOf(halo)+1];if(!next)return null;next.style.visibility='hidden';next.setAttribute('data-outline-hidden-stop','');return next.tagName;
+ });
+ expect(hidden,'a stop follows the carrier').not.toBeNull();
+ await page.keyboard.press('Tab');
+ await expect.poll(async()=>(await canvas(page)).active,'Tab leaves the link').not.toBe('card:ingest->app');
+ expect(await page.evaluate(()=>{const a=document.querySelector('#host').shadowRoot.activeElement;return !!(a && a.hasAttribute('data-outline-hidden-stop'));}),'the hidden stop is skipped').toBe(false);
 });
 
 test('O4 a click on a connection or on a Jira node ring opens the detail popover',async({page,server})=>{
@@ -234,4 +249,20 @@ test('O8 Outline covers the carriers of a loaded imported detail',async({page,se
  expect((await canvas(page,sel)).cards.filter(c=>c.shown)).toEqual([]);
  const p=await point(page,'shared::api->shared::store',sel);await page.mouse.move(p.x,p.y);
  await expect.poll(async()=>(await canvas(page,sel)).cards.filter(c=>c.shown).map(c=>c.id)).toEqual(['shared::api->shared::store']);
+});
+
+test('O9 a handoff node ring opens the ticket popover from the cue that took over its button',async({page,server})=>{
+ const {root}=await mountCues(page,server),spec=handoffSpec();
+ spec.page.sections[0].diagram.nodes.h.telemetry=structuredClone(SERVICE);
+ await page.evaluate(spec=>{
+  window.viewer.destroy();
+  window.viewer=window.mount(document.querySelector('#host'),spec,{telemetry:{provider:async()=>({h:{signals:{rate:{value:12}}},'a->b':{signals:{rate:{value:10},errors:{value:0}}}})}});
+  window.viewer.controller.liveStatus.apply({'LOC-1':{state:'done'},'IMP-1':{state:'done'},'EDGE-1':{state:'done'}});
+ },spec);
+ const {section,outline}=await overlayOn(root);await outline.click();
+ await expect.poll(async()=>(await canvas(page)).outlines.map(o=>o.id).sort()).toEqual(['a->b','h']);
+ const pop=root.locator('.dv-live-popover'),p=await point(page,'h');
+ await page.mouse.click(p.x,p.y);
+ await expect(pop).toBeVisible();await expect(pop.getByRole('link',{name:'LOC-1',exact:true})).toBeVisible();
+ await expect(section.locator('g.node[data-dv-node="h"] .dv-jira-cue')).toHaveAttribute('aria-expanded','true');
 });

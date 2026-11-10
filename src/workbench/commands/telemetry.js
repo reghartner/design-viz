@@ -299,7 +299,10 @@ function telemetryEditPage(telemetry,edit){
     else t.refreshMs=edit.value;
     return done();
   }
-  if(op==='lookupsEnabled' || op==='addLookup' || op==='removeLookup' || op==='moveLookup' || op==='lookup')return telemetryEditLookups(t,edit,done);
+  if(op==='lookupsEnabled' || op==='addLookup' || op==='removeLookup' || op==='moveLookup' || op==='lookup'){
+    if(telemetry!=null && !telemetryObject(telemetry))return {error:'Metrics settings are not an object; repair tracking.telemetry in JSON first.'};
+    return telemetryEditLookups(t,edit,done);
+  }
   var templates=telemetryObject(t.templates)?t.templates:{};
   if(op==='addTemplate'){
     if(typeof edit.name!=='string' || !telemetryNamePattern.test(edit.name))return {error:'Template names start with a letter and use letters, digits, - and _.'};
@@ -443,11 +446,17 @@ function telemetryEditLookups(t,edit,done){
   }else return {error:'Unknown log search setting.'};
   return done();
 }
-// An unused log search id made from its label ("Order ID" → order-id, then order-id-2).
+/* An unused log search id made from its label: "Order ID" → order-id, then order-id-2. Accents are dropped
+   ("Número de pedido" → numero-de-pedido); a label with no Latin letters or digits gives search-1, search-2. */
+var TELEMETRY_LOOKUP_LETTERS={'ß':'ss','æ':'ae','œ':'oe','ø':'o','ł':'l','đ':'d','ð':'d','þ':'th','ı':'i'};
 function telemetryLookupId(label,existing){
-  var base=String(label || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40) || 'search';
+  existing=existing || {};
+  var text=String(label || '').toLowerCase().replace(/[ßæœøłđðþı]/g,function(ch){return TELEMETRY_LOOKUP_LETTERS[ch];});
+  if(text.normalize)text=text.normalize('NFKD').replace(/[\u0300-\u036f]/g,'');
+  var base=text.replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40).replace(/-+$/,''),n;
+  if(!base){for(n=1;telemetryOwn(existing,'search-'+n);n++);return 'search-'+n;}
   if(!/^[a-z]/.test(base))base='search-'+base;
-  var id=base,n=2;while(telemetryOwn(existing || {},id))id=base+'-'+(n++);return id;
+  var id=base;for(n=2;telemetryOwn(existing,id);n++)id=base+'-'+n;return id;
 }
 /* Read model for Status board settings → Log searches. */
 function telemetryLookupState(raw){

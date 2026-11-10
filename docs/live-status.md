@@ -442,8 +442,11 @@ in the Trace view** adds or removes the block (`{}` offers only the typed LogQL
 box), each search is a fold titled by its id with its label, query, suggested
 values (one per line), Loki datasource UID and trace and span ID field names, plus
 Move up, Move down and Remove. **New log search** takes a label and a query (the id
-is made from the label unless typed) and keeps typed text while the form
-refreshes. Each edit is one Undo step, and a validator warning sits under the
+is made from the label unless typed, accents dropped, and shown before saving) and
+keeps typed text while the form refreshes; Enter in the label adds it, opens the new
+search and moves focus to its label. After Move, focus stays on a usable Move
+button; after Remove, on the next search. While searches exist, the Offer checkbox
+says under it that they must be removed first. Each edit is one Undo step, and a validator warning sits under the
 field it names, such as "has suggested values but no $value slot" under the query.
 The header reads "Not set", "Typed query only" or the number of searches. On a document that is not yet a
 status board, **Make this a status board** adds what is missing (a page wrapper

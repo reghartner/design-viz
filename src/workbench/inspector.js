@@ -673,7 +673,8 @@ function metricsControls(){
 function logSearchesControls(warnings){
     var snapshot=parseEditor();if(snapshot.error)return null;
     var state=telemetryLookupState(snapshot.raw);state.warnings=warnings || [];
-    return createFlowLogSearches({document:document,state:state,controls:metricsControlKit(),listen:listen,drafts:LOG_SEARCH_DRAFTS,idPrefix:prefix+'-log-search',commit:function(edit){
+    return createFlowLogSearches({document:document,state:state,controls:metricsControlKit(),listen:listen,drafts:LOG_SEARCH_DRAFTS,idPrefix:prefix+'-log-search',
+      later:function(fn){opts.schedule(function(){if(!disposed)fn();},0);},commit:function(edit){
       return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }

@@ -40,9 +40,10 @@ test('LL1 the read model lists the searches in Trace view order with their kind'
 test('LL2 a move of several places is one plan and gives the order of the same single moves',()=>{
   const s=apply(board(),(t,r)=>c.planLinksLogSearchMove(t,r,'errors',0));
   assert.deepEqual(Object.keys(lookups(s.raw)),['errors','camera','device']);
-  let step=board();
-  for(const offset of [-1,-1]){const text=JSON.stringify(step,null,2);step=JSON.parse(c.planPageTelemetry(text,JSON.parse(text),{op:'moveLookup',name:'errors',offset}).text);}
-  assert.deepEqual(Object.keys(lookups(step)),Object.keys(lookups(s.raw)));
+  // Byte-identical to the same two single moves made on the same text (what two Earlier clicks write).
+  let text=JSON.stringify(board(),null,2);
+  for(const offset of [-1,-1])text=c.planPageTelemetry(text,JSON.parse(text),{op:'moveLookup',name:'errors',offset}).text;
+  assert.equal(s.text,text);
   assert.deepEqual(lookups(s.raw).errors,lookups(board()).errors,'the search itself is unchanged');
   const down=apply(board(),(t,r)=>c.planLinksLogSearchMove(t,r,'camera',2));
   assert.deepEqual(Object.keys(lookups(down.raw)),['device','errors','camera']);
@@ -59,6 +60,7 @@ test('LL3 Viewer value: Typed clears the suggested values; None is refused while
   assert.match(c.linksLogSearchKindRefusal(m.rows[1],'fixed'),/Remove \$value from the query/);
   assert.equal(c.linksLogSearchKindRefusal(m.rows[2],'fixed'),null);
   assert.equal(c.linksLogSearchKindRefusal(m.rows[0],'typed'),null);
+  assert.match(c.linksLogSearchKindRefusal(m.rows[2],'list'),/Add \$value to the query/,'Pick from list without $value is refused: the validator would drop the search');
   assert.ok(apply(board(),(t,r)=>c.planLinksLogSearchKind(t,r,'device','typed')).unchanged,'already typed: no change');
 });
 

@@ -7,6 +7,7 @@
    L4 inline edit | same | Edit camera, change Query, Tab out: one Undo step; an empty Label is refused beside Label with aria-invalid and nothing written | errors far from the field
    L5 Viewer value | same | Typed on camera clears its suggested values in one Undo step; None on device is aria-disabled with "Remove $value from the query", and Enter on it writes nothing | a None that leaves a dangling $value
    L6 add + remove | same | + New log search (label Order ID, query with $value) adds lookups.order-id last; Remove log search Order ID removes it; one Undo each | ids not made from the label
+   L8 ignored searches | camera label 90 characters, device value with a quote, errors with values but no $value (0 validator errors, 3 warnings) | each row says "Not shown in the Trace view: …"; the preview names them instead of drawing boxes; the editor marks the faulty field aria-invalid with the warning beside it; Pick from list on a search without $value is aria-disabled with its reason and Enter writes nothing; after Typed, focus stays on Typed | a preview that draws searches the Trace view drops, a pick list that gets a search dropped
    L7 two-way sync | same | a Query edit in Links shows in Status board settings → Log searches; a label edit there shows in the Links row, with no reload | a stale copy in either place */
 import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
 
@@ -20,17 +21,17 @@ const source=async page=>JSON.parse(await page.locator('#src').inputValue());
 const lookups=raw=>raw.page.tracking.telemetry.lookups;
 const order=async page=>Object.keys(lookups(await source(page)) || {});
 
-async function open(page,server){
+async function open(page,server,spec=fixture){
   await page.setViewportSize({width:1440,height:1000});
   await page.goto(server.origin+'/workbench.html');
-  const text=JSON.stringify(fixture,null,2);await paste(page,text);
+  const text=JSON.stringify(spec,null,2);await paste(page,text);
   await expect(page.locator('#docview g.node[data-dv-node="ctrl"]')).toBeVisible();await closeTools(page);
   await page.locator('#editor-tab-links').click();
   const links=page.locator('#workspace-window-links');await expect(links).toBeVisible();
   // The count shows before the tab is opened.
-  await expect(links.getByRole('tab',{name:'Log searches (3)',exact:true})).toBeVisible();
+  await expect(links.getByRole('tab',{name:'Log searches ('+Object.keys(spec.page.tracking.telemetry.lookups).length+')',exact:true})).toBeVisible();
   await links.getByRole('tab',{name:/^Log searches/}).click();
-  const panel=links.getByRole('tabpanel');await expect(panel.locator('[data-links-log]')).toHaveCount(3);
+  const panel=links.getByRole('tabpanel');await expect(panel.locator('[data-links-log]')).toHaveCount(Object.keys(spec.page.tracking.telemetry.lookups).length);
   return {links,panel,text};
 }
 const row=(panel,id)=>panel.locator('[data-links-log="'+id+'"]');
@@ -143,4 +144,33 @@ test('L7 an edit in Links shows in Status board settings, and an edit there show
   await expect.poll(async()=>lookups(await source(page)).device.label).toBe('Device ID');
   await page.locator('#editor-tab-links').click();
   await expect(row(links.getByRole('tabpanel'),'device').locator('.links-log-label')).toHaveText('Device ID');
+});
+
+test('L8 searches the Trace view would drop are named, not drawn; warnings sit beside their field; Pick from list needs $value',async({page,server})=>{
+  const spec=JSON.parse(JSON.stringify(fixture)),l=spec.page.tracking.telemetry.lookups;
+  l.camera.label='Camera model '.repeat(7).trim();l.device.values=['a"b'];l.errors.values=['ERROR'];
+  const {panel,text}=await open(page,server,spec);
+  for(const id of ['camera','device','errors'])await expect(row(panel,id).locator('.links-log-ignored')).toContainText('Not shown in the Trace view');
+  await expect(row(panel,'errors').locator('.links-log-ignored')).toContainText('no $value slot');
+  const preview=panel.getByRole('region',{name:'Trace view preview (read only)'});
+  await expect(preview.locator('.links-preview-ignored')).toHaveCount(3);await expect(preview.locator('.links-preview-control')).toHaveCount(0);
+  await row(panel,'errors').getByRole('button',{name:'Edit Recent errors',exact:true}).click();
+  const form=panel.getByRole('group',{name:'Log search errors',exact:true});
+  const query=form.getByRole('textbox',{name:'Query',exact:true});
+  await expect(query).toHaveAttribute('aria-invalid','true');
+  await expect(page.locator('#'+await query.getAttribute('aria-describedby'))).toContainText('no $value slot');
+  const pick=form.getByRole('group',{name:'Viewer value',exact:true}).getByRole('button',{name:'Pick from list',exact:true});
+  await expect(pick).toHaveAttribute('aria-disabled','true');
+  await expect(page.locator('#'+await pick.getAttribute('aria-describedby'))).toContainText('Add $value to the query');
+  await pick.focus();await page.keyboard.press('Enter');await expect(page.locator('#src')).toHaveValue(text);
+  // A refused choice keeps focus; so does a choice that writes (Typed on device keeps focus on Typed).
+  await expect(pick).toBeFocused();
+  await row(panel,'device').getByRole('button',{name:'Edit Find by my device ID',exact:true}).click();
+  const typed=panel.getByRole('group',{name:'Log search device',exact:true}).getByRole('group',{name:'Viewer value',exact:true}).getByRole('button',{name:'Typed',exact:true});
+  await typed.focus();await page.keyboard.press('Enter');
+  await expect.poll(async()=>lookups(await source(page)).device.values).toBeUndefined();
+  await expect(panel.getByRole('group',{name:'Log search device',exact:true}).getByRole('group',{name:'Viewer value',exact:true}).getByRole('button',{name:'Typed',exact:true})).toBeFocused();
+  // Esc in an editor text box returns to that row's Edit button.
+  await panel.getByRole('group',{name:'Log search device',exact:true}).getByRole('textbox',{name:'Label',exact:true}).focus();await page.keyboard.press('Escape');
+  await expect(row(panel,'device').getByRole('button',{name:'Edit Find by my device ID',exact:true})).toBeFocused();
 });

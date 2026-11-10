@@ -4,6 +4,8 @@ function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null,invalidateAlignment=null,invalidateEdgeEndpoints=null;
   var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),TRACE_MATCH_DRAFTS=new Map(),TRACE_MATCH_REVEALED=new Set(),traceMatchCache=null,OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false,BOARD_READY_TEXT=null;
+  // #1255: unsaved Metrics editor New … fields for the current selection.
+  var METRICS_DRAFTS=new Map();
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   var proseDraft={key:null,fields:Object.create(null)};
   // #1233: uncommitted New log search text in Status board settings; cleared when the selection changes.
@@ -40,6 +42,7 @@ function createBuilderInspector(opts){
       OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;
       LOG_SEARCH_DRAFTS.clear();
     }
+    if(!same)METRICS_DRAFTS.clear();
     retireForm();
     inspectorScrollKey=identity;invalidateEffectiveState=null;
     revealInspector();guide.hidden=false;guide.innerHTML='';
@@ -665,7 +668,7 @@ function metricsControls(){
     if(state.error)return null;
     // Pin the connection's identity so a later commit cannot land on a different edge at the same index.
     if(target.kind==='edge')target.key=state.id;
-    return createFlowMetricsEditor({document:document,state:state,controls:metricsControlKit(),listen:listen,commit:function(edit){
+    return createFlowMetricsEditor({document:document,state:state,controls:metricsControlKit(),listen:listen,drafts:METRICS_DRAFTS,commit:function(edit){
       return commitTelemetry(function(text,raw){return planCarrierTelemetry(text,raw,target,edit,session.topologyContext());});
     }});
   }
@@ -681,7 +684,7 @@ function logSearchesControls(warnings){
 function metricsSettingsControls(environments,warnings){
     var snapshot=parseEditor();if(snapshot.error)return null;
     var state=telemetryPageState(snapshot.raw);if(warnings)state.warnings=warnings;
-    return createFlowMetricsSettings({document:document,state:state,controls:metricsControlKit(),listen:listen,environments:environments,commit:function(edit){
+    return createFlowMetricsSettings({document:document,state:state,controls:metricsControlKit(),listen:listen,environments:environments,drafts:METRICS_DRAFTS,commit:function(edit){
       return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }

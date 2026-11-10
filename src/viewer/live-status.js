@@ -934,7 +934,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
         carrierTarget(card,edge.from+'->'+edge.to,edge,appearance,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null,null,!workPaint);
         carrierPointer(path,card);carrierPointer(path.closest('svg').querySelector('path.halo[data-dv-edge="'+index+'"]'),card);
       },telemetry.config());
-      scope.querySelectorAll('svg').forEach(function(svg){if(svg._layoutStatusCoins)svg._layoutStatusCoins();});
+      scope.querySelectorAll('svg').forEach(function(svg){
+        if(svg._layoutStatusCoins)svg._layoutStatusCoins();
+        // #1255: the status frame refresh after this paint grows the viewBox for the cards; Workbench
+        // Preview metrics layout also asks its board camera to grow its box so the cards are not clipped.
+        svg._dvGrowFrame=!!(authoring && cardsView && cardsView.preview);
+      });
     });
   }
   // A named connector (#943: 'Grafana') reads "<source> connected · <window> window · refreshed <time>".

@@ -419,7 +419,7 @@
         });
       }
       // Focus inside the card when it goes away (a Load's gap; it is swept after this render) returns to the next card's line once.
-      if(!trace.selected){var gone=host.querySelector('details.dv-trace-request');if(gone && gone.contains(doc.activeElement))host._traceCardFocus=true;if(slot)el(slot,'p','hint','dv-trace-slot-hint',trace.direct.busy?'Loading trace…':'Load a trace to show it here');if(trace.entries.length)returnedTraces(body);return;}
+      if(!trace.selected){stopListCap();var gone=host.querySelector('details.dv-trace-request');if(gone && gone.contains(doc.activeElement))host._traceCardFocus=true;if(slot)el(slot,'p','hint','dv-trace-slot-hint',trace.direct.busy?'Loading trace…':'Load a trace to show it here');if(trace.entries.length)returnedTraces(body);return;}
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(slot || body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
       // #1173: the request card (Returned traces and the selected request's details) is one collapsed line while it is shown.
       // #1186: the card shares its line with Show on diagram and Open trace, which sit outside the summary so they never toggle it.
@@ -534,27 +534,30 @@
       if(page && view && view.innerHeight){if(ib.top<0 || ib.height>view.innerHeight)page.scrollTop+=ib.top-8;else if(ib.bottom>view.innerHeight)page.scrollTop+=ib.bottom-view.innerHeight+8;}
       else if(node.scrollIntoView)node.scrollIntoView({block:'nearest',inline:'nearest'});
     }
-    // A successful Load's reveal of its own trace (#1230), then a flowview-trace-reveal event on the request line, so a host
-    // (or a test) can see that the gesture revealed its trace even when nothing had to move.
+    // A successful Load's reveal of its own trace (#1230): the request line, by the least scroll.
     function revealLoadedTrace(){
-      var target=traceRevealTarget();if(!target || !target.getClientRects || !target.getClientRects().length)return;
-      revealInView(target,false);
-      var view=doc.defaultView || (typeof window!=='undefined'?window:null),Make=view && view.CustomEvent;
-      if(Make && target.dispatchEvent)target.dispatchEvent(new Make('flowview-trace-reveal',{bubbles:true,composed:true}));
+      var target=traceRevealTarget();if(target && target.getClientRects && target.getClientRects().length)revealInView(target,false);
     }
-    // #1280: the Edit-mode cap runs from the list's top to the window's bottom (CSS --dv-trace-list-top), measured when the
-    // cap turns on and again on a window resize while it is on, so every row reaches the screen by scrolling the list alone.
+    // #1280: the Edit-mode cap runs from the list's top to the window's bottom (CSS --dv-trace-list-top). It is measured when
+    // the cap turns on, and again once per animation frame after a resize or any scroll while it is on, so every row reaches
+    // the screen by scrolling the list alone wherever the page is scrolled. The listeners exist only while the cap is on.
     function measureListCap(list){
       if(!list.getBoundingClientRect || !list.style || !list.style.setProperty)return;
       list.style.setProperty('--dv-trace-list-top',Math.max(0,Math.round(list.getBoundingClientRect().top))+'px');
     }
     function watchListCap(list){
-      var view=doc.defaultView;if(!view || !view.addEventListener)return;
-      host._traceCapList=list;
-      if(list && !host._traceCapResize){
-        host._traceCapResize=function(){var l=host._traceCapList;if(!live || !l || !l.isConnected){view.removeEventListener('resize',host._traceCapResize);host._traceCapResize=null;return;}measureListCap(l);};
-        view.addEventListener('resize',host._traceCapResize);
-      }else if(!list && host._traceCapResize){view.removeEventListener('resize',host._traceCapResize);host._traceCapResize=null;}
+      var view=doc.defaultView;if(!list){stopListCap();return;}
+      host._traceCapList=list;if(host._traceCapWatch || !view || !view.addEventListener)return;
+      var frame=view.requestAnimationFrame?function(f){view.requestAnimationFrame(f);}:function(f){view.setTimeout(f,16);},queued=false;
+      var watch=host._traceCapWatch=function(){
+        if(queued)return;queued=true;
+        frame(function(){queued=false;var l=host._traceCapList;if(live && host._traceCapWatch===watch && l && l.isConnected)measureListCap(l);});
+      };
+      watch._view=view;view.addEventListener('resize',watch);view.addEventListener('scroll',watch,true);
+    }
+    function stopListCap(){
+      var watch=host._traceCapWatch;host._traceCapList=null;if(!watch)return;host._traceCapWatch=null;
+      watch._view.removeEventListener('resize',watch);watch._view.removeEventListener('scroll',watch,true);
     }
     // #1280: a successful Load reveals the loaded trace's top line (its request line). The trace itself can be taller than the
     // window now that the Spans list grows, and revealing all of it would align its top to the window's and move the page.
@@ -664,6 +667,7 @@
       if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=activeElement();host._liveFocusControls={};
       sharedHeader(value);
       if(value && value.mode==='trace'){traceBody(value);sweep(host);revealTraceFocus();settleFocus(value);return;}
+      stopListCap();
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
       // #986/#1162: the first row is the counts, then the provider action, then First blocker in a fixed slot at its top right, so
       // neither changing counts nor a button appearing can move it. The counts wrap onto more lines so every one shows in full;
@@ -806,7 +810,7 @@
       if(focused && host.contains(focused) && activeElement()!==focused && focused.focus)focused.focus({preventScroll:true});
       settleFocus(value);
     }
-    function cleanup(){if(!live)return;live=false;stopFocusWatch();host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
+    function cleanup(){if(!live)return;live=false;stopFocusWatch();stopListCap();host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
     host._panelMotionCleanup=cleanup;
     function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(function(){var value=api.snapshot();value.metrics=Object.assign({},value.metrics,{proof:null,available:false,enabled:false});value.trace=Object.assign({},value.trace,{entries:[],selected:null,available:false,enabled:false});paint(value);cleanup();});}
     var controller=typeof liveStatusControllerFor==='function'?liveStatusControllerFor(host):null;

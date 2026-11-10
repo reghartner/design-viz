@@ -191,8 +191,14 @@ test('M4 desktop the Spans list scrolls itself only while Edit-mode span draggin
  m=await measure();expect([m.lists,m.capped,m.overflow],'Edit mode: capped and scrolling').toEqual([1,true,'auto']);
  // Review c4: the cap runs from the list's top to the window's bottom (at least 240 px), so the list ends on screen.
  expect(m.bottom,'the capped list ends on screen').toBeLessThanOrEqual(m.view+1);expect(m.height).toBeGreaterThanOrEqual(239);expect(m.scroll,m.rows+' rows scroll inside the list').toBeGreaterThan(m.client+40);
- // A window resize while the cap is on re-measures it.
- await page.setViewportSize({width:1440,height:800});await expect.poll(async()=>{const r=await measure();return r.capped && r.bottom<=r.view+1;},{message:'after a resize the list still ends on screen'}).toBe(true);
+ // Review c5: the cap follows a page scroll. Leave Edit, scroll the page down, start Edit there (a DOM click, so the page
+ // stays put), then scroll back up: the list's top moves down, and only a re-measured cap still ends on screen.
+ await panel.getByRole('button',{name:'Done',exact:true}).click();await expect(panel.getByRole('button',{name:'Edit',exact:true})).toBeVisible();
+ await page.evaluate(()=>{const spacer=document.createElement('div');spacer.style.height='3000px';document.body.appendChild(spacer);window.scrollTo(0,0);});
+ const top0=(await measure()).top;await page.evaluate(()=>window.scrollTo(0,200));expect(await page.evaluate(()=>Math.round(window.scrollY)),'the page scrolled down').toBe(200);
+ await panel.getByRole('button',{name:'Edit',exact:true}).evaluate(b=>b.click());await expect(span(panel,CURRENCY)).toHaveAttribute('draggable','true');
+ await page.evaluate(()=>window.scrollTo(0,0));
+ await expect.poll(async()=>{const r=await measure();return r.capped && Math.abs(r.top-top0)<=2 && r.bottom<=r.view+1;},{message:'scrolled back up, the re-measured cap still ends on screen'}).toBe(true);
  await panel.getByRole('button',{name:'Done',exact:true}).click();await expect(panel.getByRole('button',{name:'Edit',exact:true})).toBeVisible();
  m=await measure();expect([m.lists,m.capped,m.overflow],'after Done: the cap is gone').toEqual([1,false,'visible']);expect(m.scroll,'no inner scroll in the reading view').toBeLessThanOrEqual(m.client+1);
 });

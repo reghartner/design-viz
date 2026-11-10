@@ -314,10 +314,13 @@ document.documentElement.classList.add('workbench-booting');
         <button class="bbtn" id="local-sources-site" disabled title="Stop using the local source repository. Imports resolve from this site's published diagram library; Undo returns to the local snapshot.">Use site library</button>
         <button class="bbtn" id="working-file-retry" hidden>Retry file save</button>
         <button class="bbtn" id="file-import">import Flowview / Mermaid / draw.io&#8230;</button>
+        <button class="bbtn" type="button" id="live-snapshot-open" title="Show an agent's snapshot of real Jira and metrics data (tools/live-snapshot.js) in the preview. Preview only: never saved, exported or published.">Load snapshot&#8230;</button>
         <button class="bbtn" type="button" id="file-show-exports" aria-controls="workspace-export">All exports in the Export menu</button>
         <input type="file" id="file-input" accept=".json,application/json" hidden>
         <input type="file" id="file-import-input" accept=".spec.json,.json,.mmd,.mermaid,.md,.markdown,.drawio,.xml,application/json,application/xml,text/plain,text/markdown,text/xml" hidden>
+        <input type="file" id="live-snapshot-input" accept=".json,application/json" hidden>
         </div>
+      <p id="live-snapshot-status" role="status" hidden></p>
       <p id="local-sources-status" role="status">Local refresh requires a repository root containing canon.json.</p>
       <details class="ssec" id="sec-insert">
         <summary>import</summary>

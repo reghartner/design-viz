@@ -26,7 +26,9 @@ Export project keeps the existing `tracking.jira.epic` setting. In the connected
 viewer, Jira identifies the parent type automatically. Initiatives show their
 Epics and descendant stories, with separate Epic counts and story coverage.
 The desktop **Demo live status** preview uses sample states without querying
-Jira, so it cannot infer parent type from a key. See [live status](live-status.md).
+Jira, so it cannot infer parent type from a key. **File → Load snapshot…** shows an agent's
+snapshot of real Jira and metrics data instead, labelled **Snapshot from <time>**; it is preview
+only and never saved or exported. See [live status](live-status.md).
 
 **Status board settings** (the **Board settings** button at the top of Inspect and in Find objects)
 holds the board-level settings in five sections: Jira, Metrics, Traces,

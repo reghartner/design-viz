@@ -252,7 +252,12 @@ test('manual card cancellation and stale gestures never publish; direct and nest
   const card=page.locator('#docview .dv-metrics-card[data-metrics-card="'+id+'"]'),initial=await positionOf(card),before=await page.locator('#src').inputValue();
   await card.scrollIntoViewIfNeeded();await dragCard(page,card,40,25);
   const next=JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.topologyImports[ordinal].edgeTracking[key].telemetry;
-  expect(next).toEqual({...binding,card:{...binding.card,position:{x:initial.x+40,y:initial.y+25}}});
+  // #1266: the overlay stores only the moved position; the resolved binding is the provider binding with it.
+  const position={x:initial.x+40,y:initial.y+25};
+  expect(next).toEqual({extends:true,card:{position}});
+  const [from,to]=id.split('->');
+  const resolved=await page.evaluate(({from,to})=>{const doc=FlowTopology.resolveSource(JSON.parse(document.getElementById('src').value),window.metricsImportContext);return doc.page.sections[0].diagram.edges.find(e=>e.from===from && e.to===to).telemetry;},{from,to});
+  expect(resolved).toEqual({...binding,card:{...binding.card,position}});
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();
  }
  expect(await page.evaluate(()=>window.metricsImportContext.specs[0])).toEqual(provider);expect(await page.evaluate(()=>window.metricsImportContext.specs[1])).toEqual(middle);

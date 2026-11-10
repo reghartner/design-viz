@@ -198,6 +198,8 @@ function topologyTrackingTarget(text,raw,section,kind,id,context,index){
   t.local=trackingStoredRefs(local);if(local && local.missingWork===true)t.local.missingWork=true;if(local && local.existsWhen==='tickets-done')t.local.existsWhen=local.existsWhen;
   // A consumer telemetry binding rides the same overlay entry; ticket edits keep it as authored.
   if(local && Object.prototype.hasOwnProperty.call(local,'telemetry'))t.local.telemetry=builderClone(local.telemetry);
+  // #1290: so does the consumer's trace span overlay.
+  if(local && Object.prototype.hasOwnProperty.call(local,'trace'))t.local.trace=builderClone(local.trace);
   // Resolve without this consumer addition to distinguish inherited duplicates
   // even when a refreshed provider now carries a formerly local reference.
   var base=builderClone(raw),imp=specValueAt(base,t.got.path).topologyImports[t.index];
@@ -250,6 +252,7 @@ function topologyTrackingPlan(text,raw,t,context){
   if(t.local.missingWork)value.missingWork=true;
   if(t.local.existsWhen)value.existsWhen=t.local.existsWhen;
   if(Object.prototype.hasOwnProperty.call(t.local,'telemetry'))value.telemetry=t.local.telemetry;
+  if(Object.prototype.hasOwnProperty.call(t.local,'trace'))value.trace=t.local.trace;
   return topologyLocalPlan(text,raw,t,t.field,t.relative,Object.keys(value).length?value:null,context);
 }
 function builderEdgeLayoutTarget(text,raw,section,index,key,context){

@@ -1,0 +1,26 @@
+{
+  "page": {
+    "title": "Order platform with declared trace spans",
+    "canon": {"version":1,"id":"orders-platform","kind":"canonical","owner":"group:default/platform"},
+    "sections": [{
+      "id": "orders", "heading": "Order services",
+      "diagram": {
+        "nodes": {
+          "api": {"title":"Order API", "trace":{"spans":{
+            "process": {"serviceName":"order-api", "operation":"POST /orders", "role":"process"}
+          }}},
+          "worker": {"title":"Order worker", "trace":{"spans":{
+            "process": {"serviceName":"order-worker", "operation":"process orders", "role":"process"},
+            "find": {"serviceName":"order-worker", "operationPrefix":"find ", "role":"database"},
+            "cache": {"serviceName":"order-worker", "attributes":{"db.system":"redis"}, "role":"cache"}
+          }}}
+        },
+        "rows": [["api", "worker"]],
+        "edges": [{"from":"api", "to":"worker", "label":"Publish order", "trace":{"spans":{
+          "send": {"serviceName":"order-api", "operation":"publish orders", "role":"send"}
+        }}}],
+        "topologyExports": {"core":{"nodes":["api","worker"], "edges":["api->worker"]}}
+      }
+    }]
+  }
+}

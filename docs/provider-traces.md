@@ -382,6 +382,64 @@ without changing the authored query: Honeycomb always returns that column.
 The Status panel’s Trace mode supersedes the former step-owned trace disclosure
 and fallback rail. Selecting or navigating steps never opens or selects a trace.
 
+## Trace spans declared on nodes and connections (#1290)
+
+A node or connection can declare the trace spans that belong to it under `trace.spans`,
+an object keyed by a short span name (a letter, then letters, digits, `-` or `_`):
+
+```json
+"worker": {"title": "Order worker", "trace": {"spans": {
+  "process": {"serviceName": "order-worker", "operation": "process orders", "role": "process"},
+  "find":    {"serviceName": "order-worker", "operationPrefix": "find ", "role": "database"},
+  "cache":   {"serviceName": "order-worker", "attributes": {"db.system": "redis"}, "role": "cache"}
+}}}
+```
+
+A declaration has `serviceName` and exactly one way to name its spans: an exact
+`operation`, an `operationPrefix` of at least two characters, or neither with at least
+one `attributes` value (every span of that service with those values). `namespace` and
+`attributes` narrow any of the three. `attributes` uses the allowlist of
+[Allowed match attributes](#allowed-match-attributes). `role` is required and is a label,
+not a matcher: `process`, `database`, `cache`, `call` or `work` on a node; `send` or
+`receive` on a connection. Budgets and `optional` belong to steps, not declarations.
+`src/canon.js` reports a malformed declaration with the carrier and span name, for
+example `nodes.worker.trace.spans.find: operation and operationPrefix cannot be combined`.
+Step `traceMatch` is unchanged. Pages that declare spans need the `flow.trace-spans`
+capability.
+
+**Imports.** Declarations hold no node ids, so a topology import carries them on the
+imported node and connection under the `as::` id, nested re-exports included. The
+importer changes, adds or hides one span through its existing `nodeTracking` /
+`edgeTracking` overlay; every other span and field keeps coming from the provider:
+
+```json
+"nodeTracking": {"worker": {"trace": {
+  "spans": {
+    "process": {"operation": "process orders v2"},
+    "audit": {"serviceName": "order-worker", "operation": "audit write", "role": "database"}
+  },
+  "hide": ["cache"]
+}}}
+```
+
+An entry is a field patch (`null` deletes that field); a `null` entry or a name in `hide`
+hides that span. A hide for a span the provider does not declare is kept in case it
+returns, with a warning; a span both hidden and patched warns and the hide wins. Setting
+`operation` removes an inherited `operationPrefix`, and the reverse. To match by
+attributes alone, set `operation` (or `operationPrefix`) to `null` and give `attributes`;
+`attributes` is replaced as a whole. Hiding every span removes the carrier's `trace`. A
+resolved snapshot may edit `trace` on imported carriers; their structure stays read only.
+`examples/canon/topology/orders-platform.json` and `orders-board.json` are a worked pair.
+
+**Invalid provider declarations.** The provider's own validation reports them. A consumer
+does not fail on them: an inherited span its validation rejects is not used on that board,
+with a warning naming the provider path, unless the consumer's patch fixes it. When the
+reason is an attribute this board's trace connections do not allow, the warning names it.
+A patch that breaks a valid provider span, or that names a span the provider does not
+declare without giving a full declaration, is an error at the overlay
+(`topologyImports[i].nodeTracking.<id>.trace.spans.<name>`), and that span is left out.
+Honeycomb number or boolean attribute values warn, as for step `traceMatch`.
+
 ## Honeycomb lookback
 
 The Load trace form says under the trace ID field which time window a load

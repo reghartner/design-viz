@@ -15,13 +15,15 @@ const diagram=raw=>raw.page.sections[0].diagram;
 
 async function open(page,server){
   await page.setViewportSize({width:1440,height:1000});
+  // Open Links at the left so the right-hand canvas drop targets are not under it.
+  await page.addInitScript(()=>{try{localStorage.setItem('dv-workbench-floating-v1',JSON.stringify({tool:'inspect',windows:{links:{open:false,x:84,y:120,w:380,h:760}}}));}catch(_){}});
   await page.goto(server.origin+'/workbench.html');
   const text=JSON.stringify(fixture,null,2);await paste(page,text);
   await expect(page.locator('#docview g.node[data-dv-node="ctrl"]')).toBeVisible();await closeTools(page);
   await page.locator('#editor-tab-links').click();
   const links=page.locator('#workspace-window-links');await expect(links).toBeVisible();
-  // Fit leaves room for the open Links window, so canvas drop targets are not under it.
-  await page.locator('#workspace-fit').click();
+  // In diagram mode, Fit leaves room for the open Links window; a static board has no Fit button.
+  if(await page.locator('#workspace-fit').isVisible())await page.locator('#workspace-fit').click();
   return {links,text};
 }
 

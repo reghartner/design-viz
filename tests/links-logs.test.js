@@ -112,8 +112,22 @@ test('LL7 a search is marked dropped from the validator text itself: unknown fie
   assert.deepEqual(plain(got.byId.hint),['placeholder is not a log search field']);
   assert.match(got.byId['Bad id'][0],/^its id must start with a letter/);
   assert.match(got.byId.broken[0],/^the search must be an object/);
-  assert.deepEqual(plain(got.byId.span),['fields.other is not a log search field']);
+  assert.deepEqual(plain(got.byId.span),['fields.other is not a trace or span ID field']);
   assert.deepEqual(plain(got.general),[]);
+  // An invalid id that looks like another id plus a field path keeps its own warning.
+  const twin=board(),t=twin.page.tracking.telemetry.lookups;
+  t.dev={label:'Device '.repeat(14).trim(),query:'{a="$value"}'};t['dev.label']={label:'Twin',query:'{a="b"}'};
+  const tw=c.validate(c.normalize(twin)).warnings.filter(w=>w.indexOf('tracking.telemetry.lookups')===0);
+  const split=c.linksLogSearchIgnored(tw,model(twin).rows.map(r=>r.id));
+  assert.deepEqual(plain(split.byId.dev),['the label must be plain text of 1–80 characters']);
+  assert.equal(split.byId['dev.label'].length,1);assert.match(split.byId['dev.label'][0],/^its id must start with a letter/);
+  // Plain wording for the other lookup warnings.
+  const words=board(),w=words.page.tracking.telemetry.lookups;
+  w.errors.values=['ERROR'];w.camera.values=[];w.device.datasource='';
+  const ww=c.validate(c.normalize(words)).warnings.filter(x=>x.indexOf('tracking.telemetry.lookups')===0),said=c.linksLogSearchIgnored(ww,model(words).rows.map(r=>r.id));
+  assert.deepEqual(plain(said.byId.errors),['the search has suggested values but its query has no $value']);
+  assert.deepEqual(plain(said.byId.camera),['suggested values must be a list of 1–50 values']);
+  assert.deepEqual(plain(said.byId.device),['the Loki datasource UID must not be empty']);
   const general=c.linksLogSearchIgnored(['tracking.telemetry.lookups: must be an object of named log lookups — ignored'],['camera']);
   assert.deepEqual(plain(general.general),['tracking.telemetry.lookups: must be an object of named log lookups — ignored']);
 });

@@ -68,14 +68,14 @@ function linksLogSearchSubject(path,message){
   var m;
   if(!path)return /^lookup ids/.test(message)?'its id must start with a letter and use only letters, digits, - and _':'the search '+message;
   if(path==='.label')return 'the label '+message;
-  if(path==='.query')return 'the query '+message;
-  if(path==='.values')return 'the suggested values '+message;
+  if(path==='.query')return /^has suggested values but no \$value slot$/.test(message)?'the search has suggested values but its query has no $value':'the query '+message;
+  if(path==='.values')return /^must be an array of 1–50/.test(message)?'suggested values must be a list of 1–50 values':'the suggested values '+message;
   if((m=/^\.values\[(\d+)\]$/.exec(path)))return 'suggested value '+(Number(m[1])+1)+' '+message;
-  if(path==='.datasource')return 'the Loki datasource UID '+message;
+  if(path==='.datasource')return /^must be a non-empty/.test(message)?'the Loki datasource UID must not be empty':'the Loki datasource UID '+message;
   if(path==='.fields')return 'the trace and span ID fields '+message;
   if(path==='.fields.traceId')return 'the trace ID field '+message;
   if(path==='.fields.spanId')return 'the span ID field '+message;
-  if(message==='unknown field')return path.slice(1)+' is not a log search field';
+  if(message==='unknown field')return path.indexOf('.fields.')===0?path.slice(1)+' is not a trace or span ID field':path.slice(1)+' is not a log search field';
   return path.slice(1)+' '+message;
 }
 function linksLogSearchIgnored(warnings,ids){
@@ -84,7 +84,8 @@ function linksLogSearchIgnored(warnings,ids){
     var id=null;
     if(text.indexOf(LINKS_LOG_PREFIX+'.')===0){
       var rest=text.slice(LINKS_LOG_PREFIX.length+1);
-      id=sorted.find(function(k){return rest.indexOf(k)===0 && /^[.:[]/.test(rest.charAt(k.length));}) || null;
+      // An id that fails the id pattern only ever gets "<id>: lookup ids …"; a valid id gets ".field", "[i]" or ": …".
+      id=sorted.find(function(k){return telemetryNamePattern.test(k)?rest.indexOf(k)===0 && /^[.:[]/.test(rest.charAt(k.length)):rest.indexOf(k+': lookup ids')===0;}) || null;
     }
     var ignored=/ — lookup ignored$/.test(text);
     if(!id || !ignored){out.general.push(text);return;}

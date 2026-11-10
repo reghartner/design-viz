@@ -154,7 +154,7 @@ test('L8 searches the Trace view would drop are named, not drawn; warnings sit b
   const {panel,text}=await open(page,server,spec);
   for(const id of ['camera','device','errors','hint','Bad id'])await expect(row(panel,id).locator('.links-log-ignored')).toContainText('Not shown in the Trace view');
   await expect(row(panel,'camera').locator('.links-log-ignored')).toHaveText('Not shown in the Trace view: the label must be plain text of 1–80 characters.');
-  await expect(row(panel,'errors').locator('.links-log-ignored')).toContainText('no $value slot');
+  await expect(row(panel,'errors').locator('.links-log-ignored')).toHaveText('Not shown in the Trace view: the search has suggested values but its query has no $value.');
   await expect(row(panel,'hint').locator('.links-log-ignored')).toContainText('placeholder is not a log search field');
   await expect(row(panel,'Bad id').locator('.links-log-ignored')).toContainText('its id must start with a letter');
   const preview=panel.getByRole('region',{name:'Trace view preview (read only)'});

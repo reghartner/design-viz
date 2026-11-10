@@ -257,3 +257,18 @@ for(const failing of ['run_query','get_trace'])test('#1252 a failed '+failing+' 
  assert.equal(h.bridge.calls.filter(c=>c.name===failing).length,before+1,'Retry calls '+failing+' again');
  assert.equal(h.api.snapshot().map.a?.exemplars?.length,1,'and the trace appears: '+JSON.stringify(h.api.status()));
 });
+
+/* #1256 review c2: a rejection that arrives after its cache entry was replaced leaves the newer entry cached.
+   The adapter's provider is called directly, as a poll does: the held first search, then a changed binding whose
+   search replaces the entry, then the late rejection, then the changed binding again (cached: no new search). */
+test('#1252 a late rejection does not delete the entry that replaced it',async t=>{
+ let release=null,first=true;const h=await setup({wrap:b=>{const call=b.callTool;b.callTool=async(...args)=>{if(args[1]==='run_query' && first){first=false;await new Promise(r=>release=r);throw {code:'tool_error',message:'temporary outage'};}return call(...args);};}});t.after(()=>h.close());
+ h.api.setEnabled(true);await settle();assert.ok(release,'the first search is held');
+ const poll=bindings=>h.adapter.options.provider(bindings,new h.C.AbortController().signal,{note(){}});
+ const changed=plain(h.api.bindings());changed[0].signals.trace.query.results_limit=1;
+ const replaced=await poll(changed);assert.equal(replaced.a?.exemplars?.length,1,'the changed binding\'s search replaced the entry');
+ const searches=()=>h.bridge.calls.filter(c=>c.name==='run_query').length,before=searches();
+ release();await settle();
+ const again=await poll(changed);await settle();
+ assert.equal(searches(),before,'the newer entry is still cached after the late rejection');assert.equal(again.a?.exemplars?.length,1);
+});

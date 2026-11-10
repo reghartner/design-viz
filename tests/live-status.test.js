@@ -4639,10 +4639,13 @@ test('#1252 Cancel request during a Load keeps the shown trace and its focus; Cl
  let selected=api.snapshot().trace.selected;const span=selected.exemplar.spans[1].id;assert.equal(api.selectTraceSpan({context:selected.context,spanId:span}),true);
  hold={};hold.promise=new Promise(r=>hold.release=r);api.setDirectTraceField({field:'input',value:'5ab0'.repeat(8)});const pending=api.loadDirectTrace(false);for(let i=0;i<6;i++)await settle();h.flush();
  assert.equal(api.snapshot().trace.direct.busy,true,'B is loading');
- const cancel=m.body.querySelectorAll('button').find(b=>b.textContent==='Cancel request');assert.ok(cancel,'Cancel request is offered');cancel.dispatchEvent({type:'click'});
+ const cancel=m.body.querySelectorAll('button').find(b=>b.textContent==='Cancel request');assert.ok(cancel,'Cancel request is offered');cancel.dispatchEvent({type:'click'});h.flush();
+ selected=api.snapshot().trace.selected;assert.ok(selected && selected.manual && selected.exemplar.traceId===COMPACT_ID,'A is shown again at once');
+ // Review c2: the reader focuses another span of A before B's late answer; that focus is kept.
+ const other=selected.exemplar.spans[2].id;assert.equal(api.selectTraceSpan({context:selected.context,spanId:other}),true);
  const release=hold.release;hold=null;release();assert.equal(await pending,null,'B is stopped');for(let i=0;i<6;i++)await settle();h.flush();
- selected=api.snapshot().trace.selected;assert.ok(selected && selected.manual && selected.exemplar.traceId===COMPACT_ID,'A is shown again');
- assert.equal(selected.focus && selected.focus.spanId,span,'with its span focus');assert.equal(api.snapshot().trace.direct.report,null,'no report');
+ selected=api.snapshot().trace.selected;assert.ok(selected && selected.manual && selected.exemplar.traceId===COMPACT_ID,'A stays');
+ assert.equal(selected.focus && selected.focus.spanId,other,'the reader\'s newer focus is not replaced');assert.equal(api.snapshot().trace.direct.report,null,'no report');
  const clear=m.body.querySelectorAll('button').find(b=>b.textContent==='Clear loaded trace');assert.ok(clear);clear.dispatchEvent({type:'click'});h.flush();
  assert.equal(api.snapshot().trace.selected,null,'idle: Clear loaded trace clears');assert.equal(calls.length,2);
  api.destroy();

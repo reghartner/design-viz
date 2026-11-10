@@ -1082,9 +1082,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   function clearTraceFocus(){traceFocus=null;traceFocusEpoch++;traceChooser=null;}
   // #1252: the loaded trace's span focus, kept across a Load that does not replace it.
-  function shownDirectFocus(){var e=directTrace.snapshot().exemplar;return traceFocus && e && e.spans.some(function(s){return s.id===traceFocus.spanId;})?{traceId:e.traceId,spanId:traceFocus.spanId,choiceKey:traceFocus.choiceKey}:null;}
+  // Only a focus on the loaded trace itself (its context), not on an example that shares a span id.
+  function shownDirectFocus(){
+    var e=traceFocus && directTrace.snapshot().exemplar,entry=e && traceSources().entries.find(function(x){return x.manual && x.exemplar.traceId===e.traceId;});
+    return entry && traceFocus.context===traceContext(entry) && e.spans.some(function(s){return s.id===traceFocus.spanId;})?{traceId:e.traceId,spanId:traceFocus.spanId,choiceKey:traceFocus.choiceKey}:null;
+  }
+  // A focus the reader set meanwhile (e.g. after Cancel request, before B's late answer) wins.
   function restoreDirectFocus(saved){
-    var e=saved && directTrace.snapshot().exemplar;if(!e || e.traceId!==saved.traceId)return;
+    var e=saved && !traceFocus && directTrace.snapshot().exemplar;if(!e || e.traceId!==saved.traceId)return;
     var entry=traceSources().entries.find(function(x){return x.manual && x.exemplar.traceId===saved.traceId;});
     if(entry)traceFocus={context:traceContext(entry),spanId:saved.spanId,choiceKey:saved.choiceKey};
   }

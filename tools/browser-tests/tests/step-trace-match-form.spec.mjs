@@ -30,7 +30,8 @@ async function inspectStep(page){
   const form=page.locator('#guide fieldset.trace-match-editor');await expect(form).toBeVisible();
   return form;
 }
-const field=(form,name)=>form.getByRole('textbox',{name,exact:true});
+// By accessible name: inputs with a datalist of attribute names are comboboxes, not textboxes.
+const field=(form,name)=>form.getByLabel(name,{exact:true});
 
 test('1: service name and operation write traceMatch from the form; Undo restores',async({page,server})=>{
   await open(page,server,{});
@@ -73,6 +74,9 @@ test('2: Add alternative makes the alternatives array; removing one returns the 
 test('3: an attribute row writes attributes.<key>; JSON-only fields survive form edits; the Node list writes imported nodes',async({page,server})=>{
   await open(page,server,{traceMatch:{serviceName:'orders-db',operation:'INSERT orders',...JSON_ONLY}});
   let form=await inspectStep(page);
+  // Advanced (JSON) starts closed; its summary opens it.
+  await expect(form.getByRole('textbox',{name:'advanced JSON',exact:true})).toBeHidden();
+  await form.locator('details.trace-match-advanced > summary').click();
   await expect(form.getByRole('textbox',{name:'advanced JSON',exact:true})).toHaveValue(JSON.stringify(JSON_ONLY,null,2));
   await field(form,'new attribute name').fill('deployment.environment.name');
   await field(form,'new attribute value').fill('prod');await field(form,'new attribute value').press('Enter');

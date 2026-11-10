@@ -2273,9 +2273,12 @@ function boardForm(){
     var tracking=specObject(doc.page.tracking)?doc.page.tracking:{},jiraBlock=specObject(tracking.jira)?tracking.jira:{},jiraStatus=[];
     if(typeof jiraBlock.site==='string'){try{jiraStatus.push(new URL(jiraBlock.site).host);}catch(ex){}}
     jiraStatus=jiraStatus.concat(trackingEpics(doc.page));
+    var scope=trackingGithubScope(doc.page),excluded=trackingExclusions(doc.page).length;
+    if(scope.repos.length || scope.org)jiraStatus.push('GitHub scope');
+    if(excluded)jiraStatus.push(excluded+' excluded');
     var hasTelemetry=Object.prototype.hasOwnProperty.call(tracking,'telemetry');
     var jira=section('jira','Jira',count(warnings.jira) || jiraStatus.join(' · ') || 'Not set',warnings.jira.length>0);
-    var metrics=section('metrics','Metrics',count(warnings.metrics) || (!hasTelemetry?'Not set':telemetry.enabled===false?'Off':''),hasTelemetry || warnings.metrics.length>0);
+    var metrics=section('metrics','Metrics',count(warnings.metrics) || (!hasTelemetry?(statusBoardHasBindings(raw)?'No page settings':'Not set'):telemetry.enabled===false?'Off':''),hasTelemetry || warnings.metrics.length>0);
     var traces=section('traces','Traces',count(warnings.traces) || 'No settings yet',warnings.traces.length>0);
     var environments=section('environments','Environments',count(warnings.environments) || environmentIds.join(', '),warnings.environments.length>0);
     var lookups=section('lookups','Log searches',count(warnings.lookups) || 'No settings yet',warnings.lookups.length>0);

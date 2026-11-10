@@ -69,6 +69,15 @@ function planMakeStatusBoard(text,raw){
   }
   return {text:out};
 }
+/* True when any local carrier or consumer overlay has a metrics binding. */
+function statusBoardHasBindings(raw){
+  function bound(map){return specObject(map) && Object.keys(map).some(function(key){return specObject(map[key]) && Object.prototype.hasOwnProperty.call(map[key],'telemetry');});}
+  return specSectionPaths(raw).some(function(rec){
+    var d=specValueAt(raw,rec.diagram);if(!specObject(d))return false;
+    return bound(d.nodes) || (Array.isArray(d.edges) && bound(Object.assign({},d.edges))) ||
+      (Array.isArray(d.topologyImports) && d.topologyImports.some(function(imp){return specObject(imp) && (bound(imp.nodeTracking) || bound(imp.edgeTracking));}));
+  });
+}
 /* Validator warnings for the page tracking block, split by Status board section. */
 var STATUS_BOARD_WARNING_SECTIONS=[['environments',/^tracking\.telemetry\.environments?[.:[]/],['lookups',/^tracking\.telemetry\.lookups[.:[]/],
   ['traces',/^tracking\.telemetry\.traceConnections[.:[]/],['metrics',/^tracking\.telemetry[.:[]/],['jira',/^tracking\.[A-Za-z]/],['board',/^tracking:/]];

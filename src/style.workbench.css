@@ -1565,6 +1565,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 
 /* #1236: three entries share one row in the desktop Inspect window (about 380px wide). */
 .document-settings-entry{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:12px 12px;border-bottom:1px solid var(--line);}
+.document-settings-entry>.bbtn{min-height:28px;padding-left:6px;padding-right:6px;}
 .document-source-heading{margin-top:10px;font-size:12px;}
 .document-advanced{margin-top:10px;font-size:12px;}
 .document-advanced>summary{cursor:pointer;margin-bottom:8px;}

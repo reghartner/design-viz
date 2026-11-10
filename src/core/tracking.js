@@ -447,6 +447,60 @@ function telemetryExpand(raw,templates,invalid){
   });
   return out;
 }
+/* #1266: a consumer overlay on an imported carrier. `{extends:true, ...}` merges with the
+   inherited (provider) binding: kind replaces when set; `hide` removes inherited signals with
+   their limits and any ratio limit based on them; signals, proof, links and card patch per
+   entry and field (null deletes a field; a signal name the provider lacks is a new local
+   signal). An overlay without `extends` replaces the inherited binding (the original rule). */
+var TELEMETRY_MERGE_FIELDS=['extends','kind','signals','hide','proof','links','card'];
+function telemetryMergeOverlay(overlay){return telemetryObject(overlay) && overlay.extends===true;}
+function telemetryPatch(target,patch){
+  Object.keys(patch).forEach(function(key){if(patch[key]===null)delete target[key];else target[key]=telemetryClone(patch[key]);});
+  return target;
+}
+function telemetryDropSignal(binding,name){
+  if(telemetryObject(binding.signals))delete binding.signals[name];
+  if(!telemetryObject(binding.proof))return;
+  delete binding.proof[name];
+  Object.keys(binding.proof).forEach(function(key){
+    var limit=binding.proof[key];if(!telemetryObject(limit) || limit.maxRatioOf!==name)return;
+    // max next to maxRatioOf is a ratio: it goes with its base signal; min stays.
+    delete limit.maxRatioOf;delete limit.max;if(!Object.keys(limit).length)delete binding.proof[key];
+  });
+}
+function telemetryMergeImported(inherited,overlay){
+  var out=telemetryObject(inherited)?telemetryClone(inherited):{};
+  if(telemetryOwn(overlay,'kind'))out.kind=telemetryClone(overlay.kind);
+  (Array.isArray(overlay.hide)?overlay.hide:[]).forEach(function(name){if(typeof name==='string')telemetryDropSignal(out,name);});
+  ['signals','proof','links','card'].forEach(function(field){
+    var patch=overlay[field];if(!telemetryObject(patch))return;
+    var target=telemetryObject(out[field])?out[field]:{};
+    if(field==='links' || field==='card')telemetryPatch(target,patch);
+    else Object.keys(patch).forEach(function(name){
+      var entry=patch[name];
+      if(entry===null){if(field==='signals')telemetryDropSignal(out,name);else delete target[name];return;}
+      if(!telemetryObject(entry))return;
+      var merged=telemetryPatch(telemetryObject(target[name])?target[name]:{},entry);
+      if(Object.keys(merged).length)target[name]=merged;else delete target[name];
+    });
+    if(Object.keys(target).length)out[field]=target;else delete out[field];
+  });
+  return out;
+}
+/* Shape warnings for a merge overlay as authored; the merged binding is validated where it resolves. */
+function telemetryMergeOverlayWarnings(overlay,invalid){
+  var warn=telemetryWarn(invalid);
+  telemetryUnknown(overlay,TELEMETRY_MERGE_FIELDS,warn);
+  if(telemetryOwn(overlay,'kind') && TELEMETRY_KINDS.indexOf(overlay.kind)<0)warn('.kind','must be one of '+TELEMETRY_KINDS.join(', ')+' — ignored');
+  if(telemetryOwn(overlay,'hide') && !(Array.isArray(overlay.hide) && overlay.hide.every(function(name){return typeof name==='string' && telemetryNamePattern.test(name);})))warn('.hide','must be an array of inherited signal names — ignored');
+  ['signals','proof','links','card'].forEach(function(field){
+    if(!telemetryOwn(overlay,field))return;
+    if(!telemetryObject(overlay[field])){warn('.'+field,'must be an object — ignored');return;}
+    if(field==='signals' || field==='proof')Object.keys(overlay[field]).forEach(function(name){
+      var entry=overlay[field][name];if(entry!==null && !telemetryObject(entry))warn('.'+field+'.'+name,'must be an object of changed fields or null — ignored');
+    });
+  });
+}
 function carrierTelemetry(obj,templates,invalid,environment){
   var warn=telemetryWarn(invalid);
   if(!telemetryObject(obj) || !telemetryOwn(obj,'telemetry'))return null;

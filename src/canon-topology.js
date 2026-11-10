@@ -103,8 +103,9 @@ var FlowTopology = (function(){
     var inherited=trackingStoredRefs(value),local=trackingStoredRefs(addition);
     var merged=trackingStoredRefs({tickets:inherited.tickets.concat(local.tickets),prs:inherited.prs.concat(local.prs)});
     ['tickets','prs'].forEach(function(field){if(merged[field].length)value[field]=merged[field];});
-    // A consumer binding replaces the provider's whole binding; signals never merge across specs.
-    if(own(addition,'telemetry'))value.telemetry=clone(addition.telemetry);
+    // #1266: an `extends` overlay merges with the inherited binding; any other consumer binding
+    // replaces it (the original rule, so existing documents keep their meaning).
+    if(own(addition,'telemetry'))value.telemetry=telemetryMergeOverlay(addition.telemetry)?telemetryMergeImported(value.telemetry,addition.telemetry):clone(addition.telemetry);
   }
   // Provider `use` bindings name the provider page's templates and expand only
   // with them, while that page is known. A binding the provider cannot expand
@@ -117,8 +118,8 @@ var FlowTopology = (function(){
     var problems=[],expanded=telemetryExpand(value.telemetry,templates,function(path,message){problems.push({path:path,message:message});});
     if(expanded){value.telemetry=expanded;return;}
     delete value.telemetry;
-    // A consumer binding replaces this one anyway; its problem is the provider's own.
-    if(!(object(overlay) && own(overlay,'telemetry')))problems.forEach(record);
+    // A replacing consumer binding makes this problem moot; a merge overlay still builds on it.
+    if(!(object(overlay) && own(overlay,'telemetry') && !telemetryMergeOverlay(overlay.telemetry)))problems.forEach(record);
   }
 
   function validateOverlaySelection(imp,nodes,edges,where){

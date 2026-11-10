@@ -22,6 +22,7 @@ var FlowviewCompatibility = (function(){
     'flow.missing-work':['Authored missing-work coverage markers','0.2.0'],
     'flow.ticket-availability':['Ticket-gated node and connection availability','0.2.0'],
     'flow.telemetry':['Telemetry signal bindings','0.2.0'],
+    'flow.telemetry-merge':['Imported metrics bindings that merge with the provider','0.2.0'],
     'layout.controls-scale':['Whole step-control sizing in both placements','0.2.0'],
     'layout.playback-position':['Play buttons above or beside steps','0.2.0'],
     'content.edge-json-contracts':['Edge JSON contracts and step replacements','0.2.0'],
@@ -74,7 +75,7 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
-      function tracked(value){if(object(value) && Object.prototype.hasOwnProperty.call(value,'telemetry'))used['flow.telemetry']=true;if(object(value) && value.missingWork===true){used['flow.missing-work']=true;used['flow.live-status']=true;}if(object(value) && value.existsWhen==='tickets-done')used['flow.ticket-availability']=true;return object(value) && ['tickets','prs'].some(function(key){return Array.isArray(value[key]) && value[key].length;});}
+      function tracked(value){if(object(value) && Object.prototype.hasOwnProperty.call(value,'telemetry')){used['flow.telemetry']=true;if(object(value.telemetry) && value.telemetry.extends===true)used['flow.telemetry-merge']=true;}if(object(value) && value.missingWork===true){used['flow.missing-work']=true;used['flow.live-status']=true;}if(object(value) && value.existsWhen==='tickets-done')used['flow.ticket-availability']=true;return object(value) && ['tickets','prs'].some(function(key){return Array.isArray(value[key]) && value[key].length;});}
       Object.values(d.nodes || {}).forEach(function(value){if(object(value) && value.missingWork===true){used['flow.missing-work']=true;used['flow.live-status']=true;}});
       Object.values(d.nodes || {}).concat(Array.isArray(d.edges)?d.edges:[]).forEach(function(value){if(tracked(value))used['flow.live-status']=true;});
       (Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp){

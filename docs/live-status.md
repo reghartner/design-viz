@@ -334,9 +334,16 @@ any valid signal leaves the carrier unbound. Text boxes never carry telemetry.
 A board with bindings needs a live-status panel, like a board with tickets.
 
 Imported Canon topology accepts the same field in
-`topologyImports[].nodeTracking` and `edgeTracking`. A consumer binding replaces
-the provider's binding for that carrier as a whole; signals never merge across
-specs. A provider binding that uses one of the provider page's templates is
+`topologyImports[].nodeTracking` and `edgeTracking`. A consumer binding marked
+`"extends": true` merges with the provider's binding (#1266): `signals` adds new
+signals or changes only the named fields of inherited ones (`null` removes a
+field), `hide` lists inherited signals to leave out together with their limits and
+any ratio limit based on them, `proof`, `links` and `card` change only the named
+fields, and `kind` replaces the inherited kind when set. For example
+`{"extends": true, "signals": {"lag": {"grafana": "max(lag)"}}, "hide": ["errors"]}`.
+Later provider changes still reach the consumer unless hidden or changed there. A
+consumer binding without `extends` replaces the provider's binding as a whole, as
+before. A provider binding that uses one of the provider page's templates is
 expanded with those templates before it reaches the consumer. When the provider
 cannot expand it (an unknown template or a missing parameter), the binding is
 dropped and the imported carrier is unbound, even if the consumer defines a
@@ -541,12 +548,15 @@ into editable raw signals.
 1000) place its metrics card. **Card title** replaces the connection label on the card
 and **Card width** (140 to 480; default 240) sets its width; empty restores the default. The validator's warnings for the binding are listed
 under the controls with the same text. An imported node or connection shows the
-provider's binding read only. Its **Metrics kind** starts at the inherited kind, marked
-(inherited). An inherited connection still shows the four card
-controls; its first card edit saves the inherited binding with that change in the
-consumer's `edgeTracking` entry, one Undo step. A binding saved there is stored in the consumer's
-`nodeTracking` or `edgeTracking` entry and replaces the inherited binding for this
-consumer only; **Remove metrics** restores the inherited one.
+provider's binding merged with this document's changes. Inherited signals are tagged
+"inherited": **Add signal** adds to them, a "hidden for this document" checkbox hides
+one (with its limits) and a hidden list shows it again, and editing an inherited
+field stores only that change (**Revert … to inherited** removes it). Card and link
+edits store only the changed field. Each step is one Undo; the changes live in the
+consumer's `nodeTracking` or `edgeTracking` entry as an `extends` binding, and
+**Revert all metrics to inherited** removes them. Its **Metrics kind** starts at the
+inherited kind, marked (inherited). A consumer that saved a whole replacing binding
+before merging existed keeps it; **Remove metrics** restores the inherited one.
 
 **Status board settings → Metrics** edits the page
 `tracking.telemetry` block: the Grafana Prometheus, Loki, Tempo and SQL datasource
@@ -707,7 +717,9 @@ fields keep their existing requirements.
 Telemetry bindings declare `flow.telemetry`, also introduced in Flowview 0.2.0.
 A `telemetry` field on any node or edge, in a `nodeTracking` or `edgeTracking`
 overlay entry, or a page `tracking.telemetry` field declares it automatically,
-even when its content is invalid.
+even when its content is invalid. An overlay binding with `"extends": true` also declares
+`flow.telemetry-merge`, so a runtime without merging reports it instead of
+treating it as a replacing binding.
 
 ## Rendering
 

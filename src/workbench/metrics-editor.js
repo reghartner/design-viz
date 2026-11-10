@@ -137,6 +137,11 @@ function createFlowMetricsEditor(o){
   if(s.imported)d.note(box,'Inherited metrics from '+s.provider+': '+(!s.inherited?'none yet. Signals added here are kept as additions, so a binding the provider adds later merges with them.':
     s.merge?telemetrySummary(s.inherited)+'. Signals you add here are added to the provider\'s in this document; you can hide or change inherited ones. The provider is unchanged.':
     telemetrySummary(s.inherited)+'. This document replaces it with its own binding (saved before merging was available); Remove metrics restores the inherited binding.'),'metrics-inherited');
+  // #1266: additions on a carrier whose provider no longer has a binding need their own kind.
+  if(s.merge && b && telemetryObject(b.signals) && Object.keys(b.signals).length && TELEMETRY_KINDS.indexOf(b.kind)<0){
+    d.note(box,'The provider no longer has a metrics binding here, so this document\'s signals need their own kind. Set kind here stores the selected Metrics kind.','metrics-status');
+    box.appendChild(c.action('Set kind here',function(){return commit({op:'kind',value:TELEMETRY_KINDS.indexOf(kind.value)>=0?kind.value:'call'});})).setAttribute('title','Store the selected Metrics kind in this document so its signals stay a valid binding.');
+  }
   if(s.merge && s.merge.allHidden)d.note(box,'All inherited signals are hidden for this document, so it shows no metrics here. Show one again under Hidden inherited signals, or add a signal.','metrics-status');
   if(s.imported && s.inherited && !s.merge && b){
     var effects=s.mergeEffects || [],about='Store these metrics as changes to the provider binding, so later provider changes reach this document'+(effects.length?'. Also: '+effects.join('; '):'')+'.';

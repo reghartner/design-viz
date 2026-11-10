@@ -347,8 +347,9 @@ has one. Hiding every signal leaves the carrier unbound in this document. A hide
 a signal the provider no longer has is kept in case it returns. A consumer binding
 without `extends` replaces the provider's binding as a whole, as before; the
 Workbench writes `extends` on every imported carrier, also before its provider has a
-binding, and stores the kind, so this document's additions stay a valid binding if
-the provider later removes its own. A provider binding that uses one of the provider page's templates is
+binding. It stores a kind only when it differs from the provider's, so provider kind
+changes keep flowing; if the provider later removes its whole binding, the editor
+reports the missing kind and **Set kind here** stores one in one step. A provider binding that uses one of the provider page's templates is
 expanded with those templates before it reaches the consumer. When the provider
 cannot expand it (an unknown template or a missing parameter), the binding is
 dropped and the imported carrier is unbound, even if the consumer defines a

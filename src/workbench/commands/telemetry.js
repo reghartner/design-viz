@@ -416,10 +416,9 @@ function telemetryDiffImported(inherited,effective,previous){
   var inheritedSignals=telemetryObject(inherited.signals)?Object.keys(inherited.signals):[],signals=telemetryObject(effective.signals)?effective.signals:{};
   var hide=inheritedSignals.filter(function(name){return !telemetryOwn(signals,name);}),base=telemetryClone(inherited),out={extends:true};
   hide.forEach(function(name){telemetryDropSignal(base,name);});
-  // The kind is stored when the overlay is created (and kept after), so this document's additions
-  // stay a valid binding if the provider later removes its own binding.
-  var keepKind=!telemetryMergeOverlay(previous) || telemetryOwn(previous,'kind');
-  if(telemetryOwn(effective,'kind') && (effective.kind!==base.kind || keepKind))out.kind=effective.kind;
+  // Only a kind that differs from the provider's is stored (none inherited counts as different),
+  // so provider kind changes keep flowing.
+  if(telemetryOwn(effective,'kind') && effective.kind!==base.kind)out.kind=effective.kind;
   // Keep hides for names the provider does not have now, so a signal it re-adds stays hidden.
   if(telemetryMergeOverlay(previous) && Array.isArray(previous.hide))previous.hide.forEach(function(name){if(inheritedSignals.indexOf(name)<0 && hide.indexOf(name)<0)hide.push(name);});
   if(hide.length)out.hide=hide;
@@ -452,14 +451,13 @@ function telemetryEditMerge(inherited,overlay,edit,options){
       ['signals','proof'].forEach(function(field){telemetryDropEmpty(o,field);});
     }
     if(hidden.length)o.hide=hidden;else delete o.hide;
-    if(!telemetryMergeOverlay(overlay) && TELEMETRY_KINDS.indexOf(inherited.kind)>=0)o.kind=inherited.kind;
   }else{
     // With nothing inherited or added yet, the first Add signal creates the binding (and its kind).
     var effective=FlowTopology.mergeTelemetry(inherited,o),result=telemetryEditBinding(Object.keys(effective).length?effective:null,edit,options);if(result.error)return result;
     o=telemetryDiffImported(inherited,result.value,telemetryMergeOverlay(overlay)?overlay:null);
   }
-  // Only the stored kind left (no additions, hides or changes): nothing to keep.
-  return {value:Object.keys(o).filter(function(key){return key!=='extends' && key!=='kind';}).length?o:null};
+  // Nothing left that differs from the inherited binding (kind included): nothing to keep.
+  return {value:Object.keys(o).length>1?o:null};
 }
 function planCarrierTelemetry(text,raw,target,edit,context){
   var t=telemetryCarrierTarget(text,raw,target,context);if(t.error)return t;

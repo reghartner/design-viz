@@ -1479,15 +1479,16 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function popoverMarkup(nodes){return nodes.every(function(node){return typeof node.outerHTML==='string';})?nodes.map(function(node){return node.outerHTML;}).join(''):null;}
   // Unchanged content stays as it is (text selection, hover); focus inside goes back to the same control, else to Close.
   function rebuildPopover(trigger){
-    var c=trigger._liveCarrier,root=pop.getRootNode?pop.getRootNode():document,focused=root && root.activeElement,key=focused && focused!==pop && pop.contains(focused)?popoverControlKey(focused):null;
-    var block=pop.querySelector('.dv-live-production');if(block)block.remove();
+    var c=trigger._liveCarrier,root=pop.getRootNode?pop.getRootNode():document,focused=root && root.activeElement;
+    // The Metrics section stays in place (never detached): a control focused inside it keeps its focus.
+    var block=pop.querySelector('.dv-live-production'),inBlock=!!(block && focused && block.contains(focused)),key=focused && focused!==pop && !inBlock && pop.contains(focused)?popoverControlKey(focused):null;
     var question=asked && editing() && editor.question(),box=document.createElement('div'),filled=fillPopover(box,trigger,c.value,c.tracking,c.label,c.waiting,c.availability,c.ref,question || null),dismiss=filled.dismiss;asked=!!filled.asking;
-    var fresh=Array.prototype.slice.call(box.children),old=popoverMarkup(Array.prototype.slice.call(pop.children));
-    if(old==null || old!==popoverMarkup(fresh)){
-      pop.replaceChildren.apply(pop,fresh);
-      if(key){var again=Array.prototype.find.call(pop.querySelectorAll('a,button'),function(el){return popoverControlKey(el)===key;}) || dismiss;again.focus({preventScroll:true});}
+    var fresh=Array.prototype.slice.call(box.children),old=Array.prototype.filter.call(pop.children,function(node){return node!==block;}),before=popoverMarkup(old);
+    if(before==null || before!==popoverMarkup(fresh)){
+      old.forEach(function(node){node.remove();});
+      fresh.forEach(function(node){pop.insertBefore(node,block || null);});
+      if(key){var again=Array.prototype.find.call(pop.querySelectorAll('a,button'),function(el){return !(block && block.contains(el)) && popoverControlKey(el)===key;}) || dismiss;again.focus({preventScroll:true});}
     }
-    if(block)pop.appendChild(block);
     paintProduction(trigger);place(trigger);
   }
   function show(trigger,value,tracking,label,waiting,availability,ref,asking){

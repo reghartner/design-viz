@@ -4566,10 +4566,12 @@ test('#1194 an authored empty scope is kept and hides the scope on the card; whi
 /* #1253 sweep: the Jira view, its popover and the artifact Edit mode. */
 // Records each focus() and makes it the document's active element, as a browser does. Compare elements with
 // assert.ok(a===b): a failing assert.equal on two elements makes the test runner serialize both trees.
+// Removing an element that holds focus blurs it, as in a browser.
 function trackFocus(){
- const proto=Element.prototype,original=proto.focus,seen={el:null};
+ const proto=Element.prototype,original=proto.focus,remove=proto.remove,seen={el:null};
  proto.focus=function(){seen.el=this;let root=this;while(root.parentNode)root=root.parentNode;if(root.ownerDocument)root.ownerDocument.activeElement=this;};
- seen.restore=()=>{proto.focus=original;};return seen;
+ proto.remove=function(){const doc=this.ownerDocument;if(doc && doc.activeElement && this.contains(doc.activeElement)){doc.activeElement=null;seen.el=null;}return remove.call(this);};
+ seen.restore=()=>{proto.focus=original;proto.remove=remove;};return seen;
 }
 // The fake DOM matches only the last part of a selector, so a node's card is found in two steps.
 const cardOf=(h,id)=>h.view.querySelector('[data-dv-node="'+id+'"]').querySelector('.card');
@@ -4764,4 +4766,14 @@ test('#1253 review: the post-drop question stays open through a repaint without 
 test('#1253 review: a board with only Missing work and no ticket references shows no Jira connector note',()=>{
  const h=harness({page:{sections:[{id:'main',diagram:{nodes:{a:{title:'A',missingWork:true}},rows:[['a']],panels:[{id:'status',type:'live-status',title:'Status'}]}}]}}),{body}=mountStatus(h);
  assert.equal(h.ctl.liveStatus.snapshot().noProvider,null);assert.doesNotMatch(textOf(body),/needs a host with a Jira connector/);h.ctl.liveStatus.destroy();
+});
+test('#1253 review: a repaint keeps focus on a link inside the popover\'s Metrics section',async()=>{
+ const focus=trackFocus();try{
+  const {h,api,card,pop}=await roundFivePopup();
+  h.view.dispatchEvent({type:'click',target:card(),button:0,preventDefault(){},stopPropagation(){}});
+  const link=pop().querySelector('.dv-live-production').querySelector('a');assert.ok(link,'precondition: the Metrics section has a link');
+  link.focus();h.ctl.telemetry.apply({'a->b':{signals:{rate:{value:5500},errors:{value:40}}}});h.flush();
+  assert.equal(pop().hidden,false);assert.ok(h.doc.activeElement===link && link.isConnected,'the focused Metrics link keeps focus through the repaint');
+  api.destroy();
+ }finally{focus.restore();}
 });

@@ -759,6 +759,16 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .delta-link-editor legend{padding:0 5px;font-size:11px;font-weight:700;}
 .step-ticket-filter{min-width:0;margin:8px 0;padding:8px;border:1px solid var(--line);border-radius:8px;}
 .step-ticket-filter legend{padding:0 5px;font-size:11px;font-weight:700;}
+.trace-match-editor{min-width:0;margin:8px 0;padding:8px;border:1px solid var(--line);border-radius:8px;display:grid;gap:5px;}
+.trace-match-editor legend{padding:0 5px;font-size:11px;font-weight:700;}
+.trace-match-alternative{min-width:0;margin:4px 0;padding:6px 8px;border:1px dashed var(--line);border-radius:6px;display:grid;gap:5px;}
+.trace-match-editor .fnote{margin:0;line-height:1.45;overflow-wrap:anywhere;}
+.trace-match-editor .trace-match-warning{margin:0 0 2px 96px;padding-left:6px;border-left:3px solid #D99A1E;color:var(--ink);}
+.trace-match-editor .trace-match-attr-type{flex:0 0 92px;width:auto;}
+.trace-match-editor .bbtn{min-height:24px;}
+.trace-match-editor .rowx{min-width:24px;}
+.trace-match-editor .fctl[aria-invalid="true"]{border-color:#D99A1E;}
+.trace-match-editor .trace-match-actions{margin-top:4px;}
 .patchedit{min-width:0; border:1px solid var(--line); border-radius:6px; padding:6px 8px;}
 .patchedit > summary{cursor:pointer; font:600 11px/1.5 'IBM Plex Mono',monospace; color:var(--sub); overflow-wrap:anywhere;}
 .patchedit > summary:hover{color:var(--ink);}

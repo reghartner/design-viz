@@ -318,6 +318,8 @@ var FlowCanon = (function(){
     (value && Array.isArray(value.codeRefs) ? value.codeRefs : []).forEach(function(ref){add('Code · '+(ref.label || ref.id),codeUrl(ref));});
     return out;
   }
-  return {version:1,traceWarnings:traceWarnings,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
+  /* #1238: the attribute names traceMatch.attributes accepts on this page, for the Workbench form. */
+  function traceAttributeNames(raw){return traceAttributes.concat(Object.keys(profileAttributes(raw)).filter(function(k){return traceAttributes.indexOf(k)<0;}));}
+  return {version:1,traceWarnings:traceWarnings,traceAttributeNames:traceAttributeNames,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
     referenceErrors:referenceErrors,locate:locate,codeUrl:codeUrl,references:references,validate:validate,links:links};
 })();

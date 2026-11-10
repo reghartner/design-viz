@@ -525,8 +525,15 @@
         return;
       }
       stopFocusWatch();host._traceFocusPending=null;list._traceFocusShown=pending.key;
-      // The row with its opened detail, so a click shows the detail too; the row itself never leaves the window.
-      revealInView(pending.item,pending.auto);
+      // The row with its opened detail, so a click shows the detail too; the row itself never leaves the window. The item's
+      // trailing space (the detail's bottom margin, the item's padding and border) is not content: CI run 42899309527 put
+      // the item's bottom at the edge less 8 px and the detail itself 8.6 px higher.
+      var item=pending.item,box=item.getBoundingClientRect(),detail=item.querySelector('.dv-trace-span-detail'),view=doc.defaultView || (typeof window!=='undefined'?window:null),trim=0;
+      if(detail && view && view.getComputedStyle){
+        var detailStyle=view.getComputedStyle(detail),itemStyle=view.getComputedStyle(item);
+        trim=(parseFloat(detailStyle && detailStyle.marginBottom) || 0)+(parseFloat(itemStyle && itemStyle.paddingBottom) || 0)+(parseFloat(itemStyle && itemStyle.borderBottomWidth) || 0);
+      }
+      revealInView(item,pending.auto,{top:box.top,bottom:Math.max(box.top,box.bottom-trim)});
     }
     /* #1280: bring `node` into view by the least scroll. Already fully visible: nothing moves. Below the edge: its bottom
        comes to the edge (8 px margin). Above the edge, or taller than the view less the margins: its top comes to the top
@@ -543,8 +550,9 @@
       var style=view.getComputedStyle?view.getComputedStyle(host):null,value=style && style.getPropertyValue?parseFloat(style.getPropertyValue('--flowview-navigation-bottom')):NaN;
       return isFinite(value)?Math.max(0,value-8):0;
     }
-    function revealInView(node,pageOff){
-      var holder=scrollHolder(node),ib=node.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement,delta;
+    // box: the part of `node` to show ({top, bottom} in viewport px); default its whole rect.
+    function revealInView(node,pageOff,box){
+      var holder=scrollHolder(node),ib=box || node.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement,delta;
       if(holder){var hb=holder.getBoundingClientRect();delta=revealDelta(ib.top,ib.bottom,hb.top,hb.bottom);if(delta)holder.scrollTop+=delta;return;}
       if(pageOff)return;
       if(page && view && view.innerHeight){delta=revealDelta(ib.top,ib.bottom,pageTop(view),view.innerHeight);if(delta)page.scrollTop+=delta;}

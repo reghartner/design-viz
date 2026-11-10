@@ -5020,3 +5020,18 @@ test('#1280 a log-line Load leaves the focused span in view; it does not scroll 
   assert.equal(scroller.scrollTop,1138,'revealed once by the least scroll (2030 - 900 + 8), not sent back up to the request line');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
 });
+/* #1283 CI (run 42899309527): the least scroll is measured to the detail's own bottom, not the item's. The item adds the
+   detail's 8 px bottom margin and its 1 px border, so revealing the item put the detail 8.6 px above the edge less 8 px. */
+test('#1280 the reveal ends the opened detail itself at the window edge less 8px, not the item with its trailing margin',async()=>{
+ const {h,api}=await stage2Loaded();
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,scroller={scrollTop:0};
+ proto.getClientRects=function(){return [1];};
+ proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-span-item'))return {top:700,bottom:1009,left:0,right:100,width:100,height:309};return bound.call(this);};
+ h.doc.scrollingElement=scroller;
+ h.doc.defaultView={innerHeight:900,getComputedStyle:el=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>'',
+  marginBottom:el.classList && el.classList.contains('dv-trace-span-detail')?'8px':'0px',borderBottomWidth:el.classList && el.classList.contains('dv-trace-span-item')?'1px':'0px',paddingBottom:'0px'})};
+ try{
+  const t=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t.context,spanId:t.exemplar.spans[20].id}),true);h.flush();
+  assert.equal(scroller.scrollTop,108,'the detail (bottom 1000) ends at 892: 1000 - 900 + 8, not 1009 - 900 + 8');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
+});

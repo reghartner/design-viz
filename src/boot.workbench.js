@@ -281,7 +281,8 @@ var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSki
   present:function(skin){setSkinButtons(skin);applySkinClasses(document.body,view,skin);},
   arrangementSection:function(request,next,previous){return workbenchBuilder?workbenchBuilder.arrangementSection(request,next,previous):null;},
   beforeReplace:function(request){if(workspace)workspace.canvas.capture();if(workbenchBuilder)workbenchBuilder.beforePreviewReplace(request);},
-  completed:function(outcome){if(workspace)workspace.canvas.rendered(outcome);if(workbenchBuilder)workbenchBuilder.previewRendered(outcome);}
+  completed:function(outcome){if(workspace)workspace.canvas.rendered(outcome);if(workbenchBuilder)workbenchBuilder.previewRendered(outcome);},
+  liveSnapshotChanged:function(state){describeLiveSnapshot(state);}
 });
 
 /* one button per skin, generated from SKIN_NAMES so a new skin appears
@@ -405,14 +406,25 @@ workspace.canvas.bind(workbenchPreview.controller,workbenchPreview.page);
 var canonContext, loadingCanon=false;
 /* #1265: File → Load snapshot… shows an agent's snapshot of real Jira and metrics data in the preview. It is
    preview state only; another project forgets it. */
-var liveSnapshotStatus=document.getElementById('live-snapshot-status');
+var liveSnapshotStatus=document.getElementById('live-snapshot-status'),liveSnapshotName='',LIVE_SNAPSHOT_MAX_BYTES=8*1024*1024;
 function sayLiveSnapshot(text,kind){if(!liveSnapshotStatus)return;liveSnapshotStatus.textContent=text || '';liveSnapshotStatus.hidden=!text;liveSnapshotStatus.setAttribute('data-kind',kind || 'info');}
+/* The status line always describes the snapshot as it is now: shown or not, how much of the open board it
+   covers, and the errors the agent's run recorded. Refreshed after every Snapshot or Demo change. */
+function describeLiveSnapshot(state){
+  var read=state && state.snapshot;if(!read){sayLiveSnapshot('');return;}
+  var page=workbenchPreview.page(),keys=page?Object.keys(workbenchDemoStatus(page)):[],covered=read.covers(keys),kind='info',parts=[];
+  parts.push((state.showing?'Showing ':'Loaded, not shown: ')+read.label+(liveSnapshotName?' ('+liveSnapshotName+')':'')+': '+read.tickets+' tickets, '+read.carriers+' carriers with metrics.');
+  if(keys.length && !covered){kind='warn';parts.push('None of this board\'s '+keys.length+' tickets are in it'+(read.board?' (it was taken of '+read.board+')':'')+', so they show as missing.');}
+  else if(keys.length && covered<keys.length)parts.push(covered+' of this board\'s '+keys.length+' tickets are in it.');
+  if(read.errors){kind='warn';parts.push('The agent\'s run recorded '+read.errors+' error'+(read.errors===1?'':'s')+'; first: '+read.firstError+'.');}
+  if(!state.showing)parts.push('Check it beside Preview to show it.');
+  sayLiveSnapshot(parts.join(' '),kind);
+}
 function showLiveSnapshot(text,name,turnOn){
   var read=workbenchLiveSnapshot(text);
   if(!read.ok){sayLiveSnapshot('Snapshot not loaded: '+read.error,'error');return false;}
   if(!workbenchPreview.page()){sayLiveSnapshot('Open a board first, then load its snapshot.','warn');return false;}
-  workbenchPreview.setLiveSnapshot(read,turnOn);
-  sayLiveSnapshot((turnOn?'Showing ':'Found ')+read.label+(name?' ('+name+')':'')+': '+read.tickets+' tickets, '+read.carriers+' carriers with metrics.'+(turnOn?'':' Turn it on beside Preview.'),'info');
+  liveSnapshotName=name || '';workbenchPreview.setLiveSnapshot(read,turnOn);
   return true;
 }
 (function(){
@@ -421,6 +433,7 @@ function showLiveSnapshot(text,name,turnOn){
   open.addEventListener('click',function(){input.value='';input.click();});
   input.addEventListener('change',function(){
     var file=input.files && input.files[0];if(!file)return;
+    if(file.size>LIVE_SNAPSHOT_MAX_BYTES){sayLiveSnapshot('Snapshot not loaded: '+file.name+' is larger than 8 MB.','error');return;}
     file.text().then(function(text){showLiveSnapshot(text,file.name,true);},function(){sayLiveSnapshot('Snapshot not loaded: the file could not be read.','error');});
   });
 })();
@@ -433,7 +446,7 @@ var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: functio
   isActive:function(){return !document.getElementById('workbench-workspace').hidden;},
   beforeProjectLoad:function(){
     workspace.canvas.reset();
-    workbenchPreview.forgetDocument();sayLiveSnapshot('');
+    workbenchPreview.forgetDocument();liveSnapshotName='';sayLiveSnapshot('');
     if(!loadingCanon){
       if(welcome && welcome.localProjectOpened)welcome.localProjectOpened();
       if(canonContext && canonContext.detach)canonContext.detach();

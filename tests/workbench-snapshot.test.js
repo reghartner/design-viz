@@ -28,3 +28,11 @@ test('#1265 review: a time range past the Date range is refused with a reason, n
  // Anything that throws while reading becomes a reason.
  const odd=valid();odd.days[0].issues={'AA-1':{state:'done',links:{length:1}}};const read=C.workbenchLiveSnapshot(JSON.stringify(odd));assert.equal(typeof read.ok,'boolean');
 });
+test('#1265 review: the label names the time zone and an old year; errors and board coverage are reported',()=>{
+ const C=context(),v=valid();v.snapshotAt='2024-03-05T15:04:00.000Z';v.errors=[{source:'grafana',tool:'ingest rate',message:'Grafana Prometheus answered HTTP 500'},{source:'jira',tool:null,message:'x'}];v.board='other.spec.json';
+ const read=C.workbenchLiveSnapshot(JSON.stringify(v));assert.equal(read.ok,true);
+ assert.match(read.label,/2024/,'a snapshot from another year names it');assert.match(read.label,/[A-Z]{2,5}|GMT|UTC/,'the time zone is named');
+ const now=valid();now.snapshotAt=new Date().toISOString();assert.doesNotMatch(C.workbenchLiveSnapshot(JSON.stringify(now)).label,new RegExp(String(new Date().getFullYear())),'this year is not repeated');
+ assert.equal(read.errors,2);assert.equal(read.firstError,'grafana ingest rate: Grafana Prometheus answered HTTP 500');assert.equal(read.board,'other.spec.json');
+ assert.equal(read.covers(['AA-1','BB-1']),1);assert.equal(read.covers(['BB-1']),0);
+});

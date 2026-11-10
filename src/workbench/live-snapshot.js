@@ -2,9 +2,11 @@
    Workbench preview. The file is one day of the demo story format plus snapshotAt; the Workbench never
    calls Jira or a metrics provider. The snapshot is preview state only: never saved, exported or published. */
 var WORKBENCH_LIVE_SNAPSHOT_KIND='flowview-live-snapshot';
-function workbenchLiveSnapshotTime(at){
-  var date=new Date(at);
-  try{return date.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}catch(e){return date.toISOString();}
+// "Nov 10, 6:02 AM EST"; the year is added when it is not this year.
+function workbenchLiveSnapshotTime(at,now){
+  var date=new Date(at),options={month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'};
+  if(date.getFullYear()!==new Date(now==null?Date.now():now).getFullYear())options.year='numeric';
+  try{return date.toLocaleString(undefined,options);}catch(e){return date.toISOString();}
 }
 // {ok:true, at, label, map(keys), telemetry(), tickets, carriers} or {ok:false, error}.
 function workbenchLiveSnapshot(text){
@@ -29,8 +31,12 @@ function workbenchLiveSnapshotRead(text){
   var epics=data.epics && typeof data.epics==='object'?data.epics:{},telemetry=liveStatusDemoTelemetry(day);
   // Read every ticket once now, so a malformed one is refused here and not during a render.
   liveStatusDemoMap(day,[],epics);
+  var errors=Array.isArray(data.errors)?data.errors.filter(function(e){return e && typeof e.message==='string';}):[];
+  var first=errors[0]?String((errors[0].source || '')+(errors[0].tool?' '+errors[0].tool:'')).trim()+': '+errors[0].message.replace(/\s+/g,' ').slice(0,160):'';
   return {ok:true,at:at,label:'Snapshot from '+workbenchLiveSnapshotTime(at),board:typeof data.board==='string'?data.board:'',
-    tickets:Object.keys(day.issues).length,carriers:Object.keys(telemetry).length,
+    tickets:Object.keys(day.issues).length,carriers:Object.keys(telemetry).length,errors:errors.length,firstError:first,
+    // How many of the open board's ticket keys the snapshot holds.
+    covers:function(keys){return keys.filter(function(key){return Object.prototype.hasOwnProperty.call(day.issues,key);}).length;},
     map:function(keys){return liveStatusDemoMap(day,keys,epics);},
     telemetry:function(){return liveStatusDemoTelemetry(day);}};
 }

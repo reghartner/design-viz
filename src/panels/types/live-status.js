@@ -833,7 +833,7 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-live-connection-dot,.dv-live-metrics-dot{width:8px;height:8px;margin-top:.45em;border-radius:50%;background:var(--dfaint,var(--dv-live-todo));flex:none;}
 .dv-live-connection[data-state="connected"] .dv-live-connection-dot,.dv-live-connection[data-state="demo"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connected"] .dv-live-metrics-dot,.dv-live-metrics-connection[data-state="demo"] .dv-live-metrics-dot{background:var(--dv-live-done);}
 .dv-live-connection[data-state="connecting"] .dv-live-connection-dot,.dv-live-connection[data-state="approval"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="connecting"] .dv-live-metrics-dot,.dv-live-metrics-connection[data-state="approval"] .dv-live-metrics-dot{background:var(--dv-live-active);}
-.dv-live-connection[data-state="snapshot"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="snapshot"] .dv-live-metrics-dot{background:#a78bfa;}
+.dv-live-connection[data-state="snapshot"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="snapshot"] .dv-live-metrics-dot{background:var(--dv-live-todo);}
 .dv-live-connection[data-state="error"] .dv-live-connection-dot,.dv-live-metrics-connection[data-state="error"] .dv-live-metrics-dot{background:var(--dv-live-blocked);}
 .dv-live-connection[data-busy="true"] .dv-live-connection-dot,.dv-live-metrics-connection[data-busy="true"] .dv-live-metrics-dot{animation:dv-live-connection-pulse 1.2s ease-in-out infinite;}
 .dv-live-connection-github::before{content:'· ';}

@@ -348,8 +348,9 @@ function createWorkbenchPreviewController(opts){
     if(disposed || !ctl || !page)return;
     // Checking Demo while a snapshot shows turns the snapshot off.
     ctl.demoLiveStatus=on;if(on)ctl.liveSnapshot=false;
-    replace(page,renderedText,opts.skin(page),{origin:'demo-live-status'});
+    replace(page,renderedText,opts.skin(page),{origin:'demo-live-status'});snapshotChanged();
   }
+  function snapshotChanged(){if(opts.liveSnapshotChanged)opts.liveSnapshotChanged({snapshot:liveSnapshot,showing:!!(ctl && ctl.liveSnapshot)});}
   /* #1265: a loaded snapshot belongs to the open document; another project forgets it. `show` turns it on
      (File → Load snapshot…); a snapshot found beside the board is only offered. */
   function setLiveSnapshot(read,show){
@@ -357,12 +358,12 @@ function createWorkbenchPreviewController(opts){
     if(!ctl || !page)return;
     // The demo stays the author's choice underneath; an offered snapshot never shows unasked.
     ctl.liveSnapshot=!!(show && liveSnapshot);
-    replace(page,renderedText,opts.skin(page),{origin:'live-snapshot'});
+    replace(page,renderedText,opts.skin(page),{origin:'live-snapshot'});snapshotChanged();
   }
   function setSnapshotLiveStatus(on){
     if(disposed || !ctl || !page || !liveSnapshot)return;
     ctl.liveSnapshot=on;
-    replace(page,renderedText,opts.skin(page),{origin:'live-snapshot'});
+    replace(page,renderedText,opts.skin(page),{origin:'live-snapshot'});snapshotChanged();
   }
   function setMetricsPreview(on){
     if(disposed || !ctl || !page || ctl.metricsPreview===!!on)return;

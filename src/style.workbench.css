@@ -365,6 +365,10 @@ body.workspace-dragging,body.workspace-dragging *{user-select:none!important;cur
 .editor-json-actions,.editor-clipboard{flex:none;}
 #editor-json .diffbox{flex:none;max-height:40%;overflow:auto;}
 .editor-file-tools{gap:8px!important;}
+/* #1265: the Load snapshot status line; a warning or a refusal is marked, never only coloured. */
+#live-snapshot-status{margin:8px 0 0;padding:7px 10px;border-left:3px solid var(--bdr);background:var(--card);color:var(--sub);font-size:12px;line-height:1.5;overflow-wrap:anywhere;}
+#live-snapshot-status[data-kind="warn"]{border-left-color:var(--warn,#b66a16);color:var(--text,inherit);}
+#live-snapshot-status[data-kind="error"]{border-left-color:var(--danger,#a13b32);color:var(--danger,#a13b32);}
 .editor-pane .canon-tools{font-size:12px;padding:12px 14px;border-top:1px solid var(--line);}
 .canon-tools summary{cursor:pointer;}
 .canon-tools textarea{display:block;box-sizing:border-box;width:100%;min-height:90px;font:11px monospace;}

@@ -43,6 +43,7 @@ test('W1 W2 File → Load snapshot shows the snapshot as Snapshot from <time>, a
  const file=info.outputPath('doorbell.snapshot.json');await mkdir(path.dirname(file),{recursive:true});await writeFile(file,JSON.stringify(snapshotFile()));
  await loadSnapshot(page,file);
  await expect(snapshotToggle(page)).toBeChecked();await expect(demoToggle(page)).not.toBeChecked();
+ const status=page.locator('#live-snapshot-status');await expect(status).toContainText('Showing Snapshot from');await expect(status).toContainText('7 tickets');
  // FW-45 is blocked in the snapshot; the controller node holds FW-45 and FW-46.
  await expect(node(view,'mcu')).toHaveClass(/dv-live-blocked/);await expect(node(view,'button')).toHaveClass(/dv-live-done/);
  const connection=panel.locator('.dv-live-connection');await expect(connection).toHaveAttribute('data-state','snapshot');await expect(connection).toHaveText(/^Snapshot from /);
@@ -52,6 +53,7 @@ test('W1 W2 File → Load snapshot shows the snapshot as Snapshot from <time>, a
  await page.screenshot({path:info.outputPath('snapshot-workbench.png')});
  // One choice at a time.
  await demoToggle(page).check();await expect(snapshotToggle(page)).not.toBeChecked();await expect(panel.locator('.dv-live-connection')).toHaveAttribute('data-state','demo');
+ await expect(status).toContainText('Loaded, not shown');
  await snapshotToggle(page).check();await expect(demoToggle(page)).not.toBeChecked();await expect(panel.locator('.dv-live-connection')).toHaveAttribute('data-state','snapshot');
  // Off again brings back the demo the author had on (review c1); with both off nothing is painted.
  await snapshotToggle(page).uncheck();await expect(demoToggle(page)).toBeChecked();await demoToggle(page).uncheck();await expect(node(view,'mcu')).not.toHaveClass(/dv-live-blocked/);await snapshotToggle(page).check();

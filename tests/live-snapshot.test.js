@@ -44,17 +44,22 @@ test('S1 the snapshot is one demo story day with exactly the mock day\'s state p
 
 /* A local Jira REST and Grafana HTTP server, reached through https names (the script refuses http):
    `fetch` maps https://jira.test and https://grafana.test to it and records each URL asked for. */
-function providers({failQuery=null}={}){
+function providers({failQuery=null,pages=false,failJira=null}={}){
  const seen=[],asked=[];
  const issue=(key,status,category)=>({key,fields:{summary:'Work '+key,status:{name:status,statusCategory:{key:category}},assignee:{displayName:'Pat'},updated:'2026-10-24T10:00:00.000+0000'}});
  const server=http.createServer((req,res)=>{let body='';req.on('data',c=>body+=c);req.on('end',()=>{
   const url=new URL(req.url,'http://x');seen.push({method:req.method,path:url.pathname,query:Object.fromEntries(url.searchParams),auth:req.headers.authorization||'',body});
   const send=(code,value)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
   if(url.pathname==='/rest/api/3/search/jql'){
-   const jql=JSON.parse(body).jql;if(/Flagged/.test(jql))return send(200,{issues:[],isLast:true});
+   if(failJira){res.writeHead(failJira,{'Content-Type':'application/json','Retry-After':'30'});return res.end('{}');}
+   const ask=JSON.parse(body),jql=ask.jql;
+   // FW-46 is flagged as an impediment: blocked whatever its status.
+   if(/Flagged/.test(jql))return send(200,{issues:/FW-46/.test(jql)?[issue('FW-46','Done','done')]:[],isLast:true});
    if(/^parent = /.test(jql))return send(200,{issues:[],isLast:true});
    const keys=(/key in \(([^)]+)\)/.exec(jql) || [,''])[1].split(', ').filter(Boolean);
-   return send(200,{issues:keys.filter(k=>k!=='UX-89').map((k,i)=>issue(k,i%2?'In Progress':'Done',i%2?'indeterminate':'done')),isLast:true});
+   const all=keys.filter(k=>k!=='UX-89').map((k,i)=>issue(k,i%2?'In Progress':'Done',i%2?'indeterminate':'done'));
+   if(pages){if(ask.nextPageToken==='p2')return send(200,{issues:all.slice(3),isLast:true});return send(200,{issues:all.slice(0,3),nextPageToken:'p2',isLast:false});}
+   return send(200,{issues:all,isLast:true});
   }
   if(url.pathname.endsWith('/api/v1/query_range')){
    if(failQuery && url.searchParams.get('query').includes(failQuery))return send(500,{error:'boom '+(req.headers.authorization||'')});
@@ -96,7 +101,9 @@ test('S2 the CLI calls the REST APIs with the credentials, prints one line and n
   assert.ok(p.asked.every(url=>/^https:\/\/(jira|grafana)\.test\//.test(url)),'every request goes to the hosts the environment names');
   const text=fs.readFileSync(r.out,'utf8'),snapshot=JSON.parse(text);noSecret([text,r.lines[0]]);
   assert.equal(snapshot.days[0].issues['UX-89'],undefined,'a ticket Jira did not return is left out (the board shows it missing)');
-  assert.equal(snapshot.days[0].issues['HW-123'].state,'done');
+  // Each key's state from its REST status category; the flagged one is blocked.
+  const want={'HW-123':'done','FW-45':'active','FW-46':'blocked','HW-124':'active','BE-67':'done','BE-68':'active'};
+  for(const [key,state] of Object.entries(want))assert.equal(snapshot.days[0].issues[key].state,state,key);
   const C=runtime(),telemetry=plain(C.liveStatusDemoTelemetry(snapshot.days[0]));assert.equal(telemetry.ingest.signals.rate.value,14,'the current value');assert.deepEqual(telemetry.ingest.signals.rate.series.map(p=>p[1]),[10,12,14]);
   // It is a valid demo timeline: tools/inject.py --timeline accepts it.
   execFileSync('python3',['-c','import sys;sys.path.insert(0,"tools");import inject;inject.load_timeline(sys.argv[1])',r.out]);
@@ -169,10 +176,10 @@ test('S6 the process exits soon after --timeout when a host never answers',async
  try{
   const started=Date.now(),child=spawn(process.execPath,[path.resolve(__dirname,'..','tools','live-snapshot.js'),board,'--timeout','2'],
    {env:{PATH:process.env.PATH,JIRA_SITE:'https://127.0.0.1:'+server.address().port,...SECRET},stdio:['ignore','pipe','pipe']});
-  let out='';child.stdout.on('data',c=>out+=c);
+  let out='',err='';child.stdout.on('data',c=>out+=c);child.stderr.on('data',c=>err+=c);
   const code=await new Promise((resolve,reject)=>{const kill=setTimeout(()=>{child.kill();reject(new Error('still running after 20 s'));},20000);child.on('exit',c=>{clearTimeout(kill);resolve(c);});});
   const took=Date.now()-started;
-  assert.ok(took<10000,'exited in '+took+' ms');assert.equal(out.split('\n').filter(Boolean).length,1,'one line');assert.match(out,/no answer within 2 s|not written/);noSecret([out]);
+  assert.ok(took<10000,'exited in '+took+' ms');assert.equal(out.split('\n').filter(Boolean).length,1,'one line');assert.equal(err,'','nothing on stderr');assert.match(out,/no answer within 2 s|not written/);noSecret([out]);
   assert.equal(typeof code,'number');
  }finally{sockets.forEach(s=>s.destroy());await new Promise(r=>server.close(r));}
 });
@@ -196,5 +203,40 @@ test('S8 every signal the script does not read, and every authored PR, is one re
   for(const want of ['honeycomb api spans','grafana db rows','grafana db cpu','github https://github.com/acme/api/pull/7'])assert.ok(by.includes(want),'one error for '+want+': '+JSON.stringify(by));
   assert.equal(by.filter(e=>e==='grafana db rows').length,1,'one per signal, not per call');
   assert.ok(!by.includes('grafana api rate'),'a read signal has no error');assert.match(r.lines[0],/errors \(/);
+ }finally{await p.close();}
+});
+
+test('S9 the real CLI prints exactly one line and nothing on stderr',async()=>{
+ const dir=tmp(),board=path.join(dir,'doorbell.spec.json');fs.copyFileSync(BOARD,board);
+ const child=spawn(process.execPath,[path.resolve(__dirname,'..','tools','live-snapshot.js'),board],{env:{PATH:process.env.PATH},stdio:['ignore','pipe','pipe']});
+ let out='',err='';child.stdout.on('data',c=>out+=c);child.stderr.on('data',c=>err+=c);
+ const code=await new Promise(resolve=>child.on('exit',resolve));
+ assert.equal(code,1);assert.equal(err,'');assert.equal(out,'snapshot not written: jira: JIRA_EMAIL, JIRA_API_TOKEN are not set; grafana: GRAFANA_URL, GRAFANA_TOKEN are not set\n');
+});
+test('S10 Jira pages are followed; a Jira that never answers leaves the tickets unknown and no file',async()=>{
+ const env={JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET};
+ let p=await providers({pages:true});
+ try{
+  const r=await cli(env,tmp(),{fetchImpl:p.fetch}),issues=JSON.parse(fs.readFileSync(r.out,'utf8')).days[0].issues;
+  assert.deepEqual(Object.keys(issues).filter(k=>/^(HW|FW|BE)-/.test(k)).sort(),['BE-67','BE-68','FW-45','FW-46','HW-123','HW-124'],'both pages are read');
+  assert.ok(p.seen.some(s=>s.path==='/rest/api/3/search/jql' && JSON.parse(s.body).nextPageToken==='p2'),'the second page asks with nextPageToken');
+ }finally{await p.close();}
+ p=await providers({failJira:429});
+ try{
+  const dir=tmp(),r=await cli(env,dir,{fetchImpl:p.fetch});
+  assert.equal(r.code,1);assert.equal(r.lines.length,1);assert.match(r.lines[0],/^snapshot not written: every Jira call failed, so the board's 7 tickets are unknown \(first: Jira search is rate limited \(HTTP 429, retry after 30\)\)/);
+  assert.doesNotMatch(r.lines[0],/missing/);assert.equal(fs.existsSync(r.out),false);
+ }finally{await p.close();}
+});
+test('S11 a datasource uid that is not one path segment is refused before any request',async()=>{
+ const p=await providers(),dir=tmp(),board=path.join(dir,'uid.spec.json');
+ try{
+  const raw=JSON.parse(fs.readFileSync(BOARD,'utf8'));raw.page.tracking.telemetry.grafana.prometheus='../admin';delete raw.page.tracking.jira;
+  for(const section of raw.page.sections || [])for(const node of Object.values(section.diagram && section.diagram.nodes || {})){delete node.tickets;delete node.prs;}
+  fs.writeFileSync(board,JSON.stringify(raw));
+  const r=await cli({GRAFANA_URL:'https://grafana.test',GRAFANA_TOKEN:SECRET.GRAFANA_TOKEN},dir,{fetchImpl:p.fetch,board});
+  assert.ok(!p.asked.some(url=>url.includes('/..') || url.includes('%2E%2E') || url.includes('admin')),'no request leaves the datasource proxy');
+  const file=path.join(dir,'doorbell.snapshot.json'),text=r.lines.join('')+(fs.existsSync(file)?fs.readFileSync(file,'utf8'):'');
+  assert.match(text,/datasource uid \\?"\.\.\/admin\\?" is not valid/);
  }finally{await p.close();}
 });

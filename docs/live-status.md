@@ -1413,7 +1413,7 @@ zero samples, so it is distinguishable from unavailable telemetry.
 ## Agent snapshot (#1265)
 
 The Workbench never calls Jira or a metrics provider. To look at real data without publishing,
-ask your agent for a snapshot, for example "take a live snapshot of diagrams/doorbell/doorbell.spec.json".
+ask your agent for a snapshot, for example "take a live snapshot of examples/live-status/live-status.spec.json".
 The agent runs one command:
 
 ```
@@ -1442,9 +1442,11 @@ board authored elsewhere cannot send the agent's token to another host. Every pr
 recorded message is scrubbed of the credential values.
 
 Provider responses never reach the agent: the script prints exactly one line, for example
-`snapshot diagrams/doorbell/doorbell.snapshot.json at 2026-11-10T11:02:00.000Z: 7 tickets (0 missing) ·
+`snapshot examples/live-status/live-status.snapshot.json at 2026-11-10T11:02:00.000Z: 7 tickets (0 missing) ·
 6 carriers, 11 of 14 signals · no errors`. It exits 1 without writing a file when neither
-provider could run.
+provider could run, and when every Jira call failed: the tickets are then unknown, and a snapshot
+showing them all as missing would be wrong. A rate-limited call (HTTP 429) is recorded with its
+Retry-After; a datasource uid that is not one path segment is refused.
 
 The snapshot is written next to the board as `<board>.snapshot.json` (`--out` chooses another
 path). `*.snapshot.json` is ignored by git, so real ticket titles, assignees and metric values
@@ -1462,9 +1464,10 @@ agent. An agent with only MCP connectors cannot avoid that, because every tool r
 context. Its low-token recipe: one `getAccessibleAtlassianResources`, one
 `searchJiraIssuesUsingJql` for `key in (<the board's tickets>) OR parent in (<its epics>)` asking
 only for `summary, status, assignee, updated, issuelinks, parent, issuetype` (one more page per
-100 issues), and one Grafana query per bound signal over the board's window. For a board with
-seven tickets, one epic and 14 signals that is 16 calls; the agent then writes the file in the
-format above.
+100 issues), the same search with `AND Flagged = Impediment` added (the viewer reads a flagged
+ticket as blocked), and one Grafana query per bound signal over the board's window. For a board
+with seven tickets, one epic and 14 signals that is 17 calls; the agent then writes the file in
+the format above.
 
 ## Over time
 

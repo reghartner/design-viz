@@ -10,7 +10,10 @@ function linksTraceKey(m){return m.serviceName+' · '+m.operation;}
 function linksTraceSameStep(draft,e){
   if(!draft || !e || e.kind!=='step')return false;
   if(draft.stepId!=null || e.stepId!=null)return draft.stepId===e.stepId;
-  return (draft.caption || '')===(e.caption || '') && (draft.caption || '')!=='';
+  // No ids: the caption and which of the same-caption steps it is (two "retry" steps differ).
+  if(draft.caption || e.caption)return (draft.caption || '')===(e.caption || '') && (draft.occurrence || 0)===(e.occurrence || 0);
+  // No id and no caption: only the position can tell, so the draft stays where it was opened.
+  return draft.id===linksElementId(e);
 }
 /* canon: a step with a trace match needs a stable id. */
 var LINKS_TRACE_NEEDS_ID=' has no id, and a step with a trace match needs one. Give this step an id in Inspect first.';
@@ -60,7 +63,8 @@ function linksTraceModel(text,raw,context){
         uses.push(use);if(!use.key)return;
         var g=groups[use.key] || (groups[use.key]={key:use.key,serviceName:use.serviceName,operation:use.operation,uses:[]});g.uses.push(use);
       });
-      var el={kind:'step',section:section,index:index,stepId:typeof st.id==='string'?st.id:null,label:label,caption:typeof st.text==='string'?st.text:'',matches:matches,form:alts!==null,
+      var caption=typeof st.text==='string'?st.text:'',occurrence=stepEls.filter(function(x){return x.caption===caption;}).length;
+      var el={kind:'step',section:section,index:index,stepId:typeof st.id==='string'?st.id:null,label:label,caption:caption,occurrence:occurrence,matches:matches,form:alts!==null,
         edgeKeys:stepKeys(st).concat(Object.keys(stepFailures(st))),editable:true};
       if(alts===null)el.reason=label+'’s traceMatch is not a selector object or a list of them. Fix it in JSON or Inspect first.';
       // Static drop checks look a source step up through its model.

@@ -187,7 +187,18 @@ test('LT12 a New trace match draft stays with its step: by id, or by caption for
   const idless={stepId:null,caption:a.caption};
   assert.equal(c.linksTraceSameStep(idless,a),true);
   assert.equal(c.linksTraceSameStep(idless,b),false,'an id-less step that shifts into its place is a different step');
-  assert.equal(c.linksTraceSameStep({stepId:null,caption:''},Object.assign({},a,{caption:''})),false,'no id and no caption: never assume the same step');
+  const blank=Object.assign({},a,{caption:''});
+  assert.equal(c.linksTraceSameStep({id:'step:0:2',stepId:null,caption:''},blank),true,'no id and no caption: the position keeps the draft, so the form opens');
+  assert.equal(c.linksTraceSameStep({id:'step:0:1',stepId:null,caption:''},blank),false);
+});
+
+test('LT16 two id-less steps with the same caption are told apart by which one they are',()=>{
+  const spec=board();d(spec).steps.forEach(st=>{delete st.id;});d(spec).steps[2].text='retry';d(spec).steps[3].text='retry';
+  const m=model(spec),first=el(m,'step',2),second=el(m,'step',3);
+  assert.equal(first.occurrence,0);assert.equal(second.occurrence,1);
+  const draft={id:'step:0:2',stepId:null,caption:'retry',occurrence:0};
+  assert.equal(c.linksTraceSameStep(draft,first),true);
+  assert.equal(c.linksTraceSameStep(draft,second),false,'the second "retry" is a different step');
 });
 
 test('LT13 the inline editor refuses an attribute name trace matching does not support, before any write',()=>{

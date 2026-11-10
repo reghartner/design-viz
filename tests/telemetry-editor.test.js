@@ -777,6 +777,7 @@ test('#1266 c1 imported carriers merge before the provider has a binding, keep s
   const resolvedEdges=context=>diagramOf(C.FlowTopology.resolveSource(raw,context)).edges;
   const edge={kind:'edge',section:0,index:resolvedEdges(f.context).findIndex(e=>e.from==='shared::api' && e.to==='shared::store')};
   assert.equal(C.telemetryCarrierState(raw,edge,f.context).binding,null,'nothing inherited and nothing added: unbound');
+  assert.match(C.planCarrierTelemetry(text,raw,edge,{op:'use',name:'svc'},f.context).error || '',/template would replace them\. To use a template's signals here, add them with New signal/,'the template refusal says why and what to do instead');
   apply(edge,{op:'addSignal',name:'local',source:'grafana',query:PROM_RATE,kind:'call'});
   assert.deepEqual(diagramOf(raw).topologyImports[0].edgeTracking['api->store'].telemetry,{extends:true,kind:'call',signals:{local:{grafana:PROM_RATE}}},'always an extends overlay on an imported carrier');
   const later=structuredClone(f.provider);diagramOf(later).edges[0].telemetry={kind:'call',signals:{rate:{loki:LOKI_IN}}};

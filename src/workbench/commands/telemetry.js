@@ -436,7 +436,7 @@ function telemetryDiffImported(inherited,effective,previous){
 function telemetryEditMerge(inherited,overlay,edit,options){
   inherited=telemetryObject(inherited)?inherited:{};
   var o=telemetryMergeOverlay(overlay)?telemetryClone(overlay):{extends:true},op=edit && edit.op,names=telemetryObject(inherited.signals)?inherited.signals:{};
-  if(op==='use')return {error:'Templates do not apply to an imported node or connection: its metrics merge with the provider. Add signals here, or hide inherited ones.'};
+  if(op==='use')return {error:'A template cannot be used on an imported node or connection: its metrics merge with the provider\'s, and a template would replace them. To use a template\'s signals here, add them with New signal; they are kept as this document\'s additions.'};
   if(op==='remove')return {value:null};
   var staleHide=op==='hide' && !edit.value && Array.isArray(o.hide) && o.hide.indexOf(edit.name)>=0;
   if(op==='hide' || op==='revert'){

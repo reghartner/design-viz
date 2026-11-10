@@ -1945,3 +1945,14 @@ body.links-dragging,body.links-dragging *{cursor:grabbing !important;user-select
 .links-field-error{display:block;flex:1 1 100%;font-size:11px;color:var(--links-bad);}
 .links-merge{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px;border:1px solid var(--links-warn);border-radius:6px;}
 .links-merge-text{flex:1 1 100%;font-size:12px;}
+/* #1243 part 2: Trace match tab inline editor and rename. */
+.links-chip-trace .links-chip-note{color:var(--sub);}
+.links-trace-editor{flex:1 1 100%;display:flex;flex-direction:column;gap:6px;margin:4px 0 0 40px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);}
+.links-trace-field{display:grid;grid-template-columns:110px minmax(0,1fr);align-items:center;gap:6px;font-size:12px;}
+.links-trace-label{color:var(--sub);font-size:11px;}
+.links-trace-input{min-height:26px;min-width:0;}
+.links-trace-attr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:end;}
+.links-trace-attr .links-trace-field{grid-template-columns:1fr;}
+.links-trace-actions{display:flex;flex-wrap:wrap;gap:6px;}
+.links-trace-danger{color:var(--links-bad);}
+.links-trace-rename .links-trace-field{flex:1 1 100%;}

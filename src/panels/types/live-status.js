@@ -371,7 +371,7 @@
         });
       }
       // Focus inside the card when it goes away (a Load's gap; it is swept after this render) returns to the next card's line once.
-      if(!trace.selected){var gone=host.querySelector('details.dv-trace-request');if(gone && gone.contains(doc.activeElement))host._traceCardFocus=true;if(slot)el(slot,'p','hint','dv-trace-slot-hint','Load a trace to show it here');if(trace.entries.length)returnedTraces(body);return;}
+      if(!trace.selected){var gone=host.querySelector('details.dv-trace-request');if(gone && gone.contains(doc.activeElement))host._traceCardFocus=true;if(slot)el(slot,'p','hint','dv-trace-slot-hint',trace.direct.busy?'Loading trace…':'Load a trace to show it here');if(trace.entries.length)returnedTraces(body);return;}
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(slot || body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
       // #1173: the request card (Returned traces and the selected request's details) is one collapsed line while it is shown.
       // #1186: the card shares its line with Show on diagram and Open trace, which sit outside the summary so they never toggle it.

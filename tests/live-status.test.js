@@ -4051,7 +4051,8 @@ test('#1173 #1230 with a trace shown the request card is one collapsed line abov
  const {h,api,m}=compactHarness(['prod']),config=()=>m.body.querySelector('details.dv-trace-config'),request=()=>m.body.querySelector('details.dv-trace-request');
  assert.equal(config().open,true,'with no trace shown the search section is open');assert.equal(request(),null,'no request card yet');
  const slot=()=>m.body.querySelector('.dv-trace-slot');assert.ok(slot(),'the reserved space');assert.equal(textOf(slot()).trim(),'Load a trace to show it here');
- api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
+ api.setDirectTraceField({field:'input',value:COMPACT_ID});const loading=api.loadDirectTrace(false);h.flush();
+ assert.equal(textOf(slot()).trim(),'Loading trace…','while the Load runs the reserved space says so');await loading;h.flush();
  assert.equal(config().open,true,'the search section stays open');assert.ok(slot().querySelector('.dv-trace-selected'),'the trace is in the reserved space');
  assert.match(textOf(config().querySelector('summary')).replace(/\s+/g,' ').trim(),/^Fixture Honeycomb · Production · Change trace$/);
  assert.ok(request(),'one request card');assert.equal(request().open,false,'collapsed');

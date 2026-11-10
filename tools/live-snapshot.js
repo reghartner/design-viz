@@ -85,7 +85,9 @@ function providerBase(value){
 }
 function atlassianCloud(value){try{const url=new URL(String(value));return url.protocol==='https:' && !url.username && !url.password && /\.atlassian\.net$/i.test(url.hostname);}catch(ex){return false;}}
 const REQUEST_MS=30000;
-function unsupported(message){return {code:'unsupported',message:String(message)};}
+// An ordinary tool error to the viewer's adapter, which then fails only that signal; `unsupported` keeps it out of
+// the recorded errors, since takeSnapshot records one error per unread signal itself.
+function unsupported(message){return {code:'tool_error',unsupported:true,message:String(message)};}
 
 /* REST transports built from the environment. `missing` names each variable a provider lacks, `refused` each
    one the URL rules refuse; `secrets` are the values every printed or recorded message is scrubbed of. */
@@ -168,7 +170,7 @@ function mcpHandlerTransport(handlers,env){
 /* The connector namespace the adapters expect, over a transport. A watch answers once: a snapshot never polls. */
 function connectorNamespace(transport,errors,signal,answered){
   const call=(server,tool,input)=>Promise.resolve().then(()=>transport.call(server,tool,input,signal)).then(payload=>{if(answered)answered[/grafana/i.test(server)?'grafana':'jira']++;return {payload};},error=>{
-    if(!(error && error.code==='unsupported') && !(signal && signal.aborted))errors.push({source:/grafana/i.test(server)?'grafana':'jira',tool,message:String(error && error.message || error)});throw error;});
+    if(!(error && error.unsupported) && !(signal && signal.aborted))errors.push({source:/grafana/i.test(server)?'grafana':'jira',tool,message:String(error && error.message || error)});throw error;});
   return {
     listTools:()=>Promise.resolve(transport.servers()),
     callTool:(server,tool,input)=>call(server,tool,input),
@@ -182,7 +184,16 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 // Signal sources the REST transport reads; every other bound signal is recorded as one error.
 const READ_SOURCES=['grafana','loki'];
 // A copy of `text` with every secret replaced: nothing printed or written may carry one.
-function scrub(text,secrets){let out=String(text);(secrets || []).filter(s=>s && s.length>=4).forEach(secret=>{out=out.split(secret).join('***');});return out.replace(/(Basic|Bearer)\s+[A-Za-z0-9+/=._-]{8,}/g,'$1 ***');}
+// Also the URL-encoded forms of each secret (a token or a base64 value in a query string or a path).
+function scrub(text,secrets){
+  let out=String(text);const forms=new Set();
+  (secrets || []).filter(s=>s && s.length>=4).forEach(secret=>{
+    const encoded=encodeURIComponent(secret);
+    [secret,encoded,encoded.replace(/%[0-9A-F]{2}/g,m=>m.toLowerCase()),encodeURI(secret)].forEach(form=>forms.add(form));
+  });
+  [...forms].sort((a,b)=>b.length-a.length).forEach(form=>{out=out.split(form).join('***');});
+  return out.replace(/(Basic|Bearer)\s+[A-Za-z0-9+/=._%-]{8,}/g,'$1 ***');
+}
 async function takeSnapshot({specText,board='board',transport,now=()=>Date.now(),timeoutMs=60000}){
   const run=new AbortController(),errors=[],answered={jira:0,grafana:0},doc=headlessDocument(),namespace=connectorNamespace(transport,errors,run.signal,answered);
   try{return await snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,namespace,answered});}
@@ -210,7 +221,9 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
   const metricsDone=()=>{if(!hasMetrics)return true;const s=ctl.telemetry.status();return !s.busy && (!!s.refreshedAt || s.state==='error' || s.state==='absent' || s.state==='approval');};
   while(!(jiraDone() && metricsDone()) && Date.now()-started<timeoutMs)await sleep(20);
   const timedOut=!(jiraDone() && metricsDone());
-  if(timedOut)errors.push({source:!jiraDone()?'jira':'grafana',tool:null,message:'no answer within '+Math.round(timeoutMs/1000)+' s'});
+  // Every provider still busy at the deadline is named.
+  if(!jiraDone())errors.push({source:'jira',tool:null,message:'no answer within '+Math.round(timeoutMs/1000)+' s'});
+  if(!metricsDone())errors.push({source:'grafana',tool:null,message:'no answer within '+Math.round(timeoutMs/1000)+' s'});
   const live=api.snapshot(),evidence=hasMetrics?ctl.telemetry.snapshot():{map:{}};
   if(hasJira && live.note && live.note.text && live.note.kind!=='info')errors.push({source:'jira',tool:null,message:live.note.text});
   const metricsNote=hasMetrics && ctl.telemetry.status().note;if(metricsNote && ctl.telemetry.status().state==='error')errors.push({source:'grafana',tool:null,message:metricsNote});

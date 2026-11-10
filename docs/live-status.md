@@ -1436,7 +1436,8 @@ Credentials come from the environment and are never written to the snapshot:
 `JIRA_EMAIL` and `JIRA_API_TOKEN` (an Atlassian API token), and `GRAFANA_URL` with
 `GRAFANA_TOKEN` (a service account token). A provider whose variables are missing is skipped and
 its variables are named. Credentials go only to a host the environment names: `JIRA_SITE` and
-`GRAFANA_URL`, which must use https and hold no user name or password. Without `JIRA_SITE`, the
+`GRAFANA_URL`, which must use https and hold no user name or password. There is no opt-in for
+plain http: an internal Grafana or Jira served over http is refused. Without `JIRA_SITE`, the
 Jira host is the board's `tracking.jira.site` only when it is an https `*.atlassian.net` site; a
 board authored elsewhere cannot send the agent's token to another host. Every printed and
 recorded message is scrubbed of the credential values.

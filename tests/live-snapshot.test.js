@@ -203,6 +203,9 @@ test('S8 every signal the script does not read, and every authored PR, is one re
   for(const want of ['honeycomb api spans','grafana db rows','grafana db cpu','github https://github.com/acme/api/pull/7'])assert.ok(by.includes(want),'one error for '+want+': '+JSON.stringify(by));
   assert.equal(by.filter(e=>e==='grafana db rows').length,1,'one per signal, not per call');
   assert.ok(!by.includes('grafana api rate'),'a read signal has no error');assert.match(r.lines[0],/errors \(/);
+  // Unread SQL, CloudWatch and Honeycomb signals beside it never cost the signals the script reads.
+  assert.ok(snapshot.days[0].telemetry.carriers.api && snapshot.days[0].telemetry.carriers.api.rate,'api rate is observed: '+JSON.stringify(Object.keys(snapshot.days[0].telemetry.carriers)));
+  assert.match(r.lines[0],/1 carriers, 1 of 4 signals/);
  }finally{await p.close();}
 });
 
@@ -239,4 +242,36 @@ test('S11 a datasource uid that is not one path segment is refused before any re
   const file=path.join(dir,'doorbell.snapshot.json'),text=r.lines.join('')+(fs.existsSync(file)?fs.readFileSync(file,'utf8'):'');
   assert.match(text,/datasource uid \\?"\.\.\/admin\\?" is not valid/);
  }finally{await p.close();}
+});
+
+test('S12 an unread SQL or CloudWatch signal on the example board leaves every read signal in place',async()=>{
+ const env={JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET};
+ const p=await providers();
+ try{
+  const base=await cli(env,tmp(),{fetchImpl:p.fetch}),before=JSON.parse(fs.readFileSync(base.out,'utf8')).days[0].telemetry.carriers,count=o=>Object.values(o).reduce((n,c)=>n+Object.keys(c).length,0);
+  assert.ok(count(before)>0,'precondition: the example board has read signals');
+  for(const extra of [{q:{sql:'select 1',unit:'rows'}},{cpu:{cloudwatch:{namespace:'AWS/RDS',metric:'CPUUtilization',statistic:'Average',region:'us-east-1',accountId:'123456789012',dimensions:{DBInstanceIdentifier:'db'}},unit:'%'}}]){
+   const raw=JSON.parse(fs.readFileSync(BOARD,'utf8')),dir=tmp(),board=path.join(dir,'extra.spec.json');
+   raw.page.tracking.telemetry.grafana.sql='sql-main';raw.page.tracking.telemetry.grafana.cloudwatch='cw-main';
+   const ingest=raw.page.sections.map(s=>s.diagram && s.diagram.nodes && s.diagram.nodes.ingest).find(Boolean);Object.assign(ingest.telemetry.signals,extra);
+   fs.writeFileSync(board,JSON.stringify(raw));
+   const r=await cli(env,dir,{fetchImpl:p.fetch,board}),after=JSON.parse(fs.readFileSync(r.out,'utf8')).days[0].telemetry.carriers;
+   assert.equal(count(after),count(before),Object.keys(extra)[0]+': every read signal is still observed');
+   assert.ok(JSON.parse(fs.readFileSync(r.out,'utf8')).errors.some(e=>e.tool==='ingest '+Object.keys(extra)[0]),'the unread one is one error');
+  }
+ }finally{await p.close();}
+});
+test('S13 scrub removes each secret in plain, URL-encoded and lower-case encoded forms',()=>{
+ const {scrub}=require(SNAP),secret='ab+c/d=e?f&g',basic=Buffer.from('a@b.test:'+secret).toString('base64');
+ const text=['plain '+secret,'encoded '+encodeURIComponent(secret),'lower '+encodeURIComponent(secret).replace(/%[0-9A-F]{2}/g,m=>m.toLowerCase()),'basic '+basic,'encoded basic '+encodeURIComponent(basic),'header Bearer '+secret].join(' | ');
+ const out=scrub(text,[secret,basic]);
+ for(const form of [secret,encodeURIComponent(secret),encodeURIComponent(secret).toLowerCase(),basic,encodeURIComponent(basic)])assert.ok(!out.includes(form),'gone: '+form);
+ assert.equal((out.match(/\*\*\*/g) || []).length>=6,true);
+});
+test('S14 at the deadline every provider still busy is named',async()=>{
+ const snap=require(SNAP),hang=(url,options)=>new Promise((_,reject)=>{options.signal.addEventListener('abort',()=>reject(options.signal.reason || new Error('aborted')));});
+ const transport=snap.restTransport({JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET},hang,()=>Date.now(),'https://acme.atlassian.net');
+ const {summary}=await snap.takeSnapshot({specText:fs.readFileSync(BOARD,'utf8'),transport,timeoutMs:1000});
+ const late=summary.errors.filter(e=>/no answer within 1 s/.test(e.message)).map(e=>e.source).sort();
+ assert.deepEqual(late,['grafana','jira']);
 });

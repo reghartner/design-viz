@@ -545,9 +545,12 @@ function traceMatchFormEdit(value,edit){
     var inForm=Object.keys(extra).filter(function(k){return TRACE_MATCH_FORM_KEYS.indexOf(k)>=0;});
     if(inForm.length)return {error:'Edit '+inForm.join(', ')+' in the form fields, not in Advanced JSON.'};
     var rebuilt={};
-    // Form keys keep their place; advanced keys follow in the order given.
-    Object.keys(m).forEach(function(k){if(TRACE_MATCH_FORM_KEYS.indexOf(k)>=0)rebuilt[k]=m[k];});
-    Object.keys(extra).forEach(function(k){rebuilt[k]=extra[k];});
+    // Every key that stays keeps its place; new advanced keys follow in the order given.
+    Object.keys(m).forEach(function(k){
+      if(TRACE_MATCH_FORM_KEYS.indexOf(k)>=0)rebuilt[k]=m[k];
+      else if(Object.prototype.hasOwnProperty.call(extra,k))rebuilt[k]=extra[k];
+    });
+    Object.keys(extra).forEach(function(k){if(!Object.prototype.hasOwnProperty.call(rebuilt,k))rebuilt[k]=extra[k];});
     next[i]=rebuilt;return done();
   }
   return {error:'Unknown trace match edit.'};

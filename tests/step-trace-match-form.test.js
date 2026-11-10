@@ -100,6 +100,11 @@ test('F3 Advanced JSON replaces only the keys the form does not edit',()=>{
   d.refuse({op:'advanced',alternative:0,value:[1]},/is an object/);
   d.apply({op:'advanced',alternative:0,value:null});
   assert.deepEqual(plain(d.match),{serviceName:'payment',operation:'Charge',nodeId:'payment'});
+  // Keys that stay keep their authored place; new keys follow.
+  const mixed=driver(C,board({serviceName:'payment',maxDurationMs:500,operation:'Charge',optional:true,nodeId:'payment'}));
+  mixed.apply({op:'advanced',alternative:0,value:{optional:false,maxDurationMs:600,role:'database'}});
+  assert.deepEqual(Object.keys(mixed.match),['serviceName','maxDurationMs','operation','optional','nodeId','role']);
+  assert.deepEqual(plain(mixed.match),{serviceName:'payment',maxDurationMs:600,operation:'Charge',optional:false,nodeId:'payment',role:'database'});
   assert.deepEqual(plain(C.traceMatchFormEdit(undefined,{op:'create',serviceName:' svc ',operation:'op'})),{value:{serviceName:'svc',operation:'op'}},'a new trace match is the object form with both strings');
   assert.match(C.traceMatchFormEdit(undefined,{op:'create',serviceName:'svc',operation:' '}).error,/Enter both/);
   assert.match(C.traceMatchFormEdit({serviceName:'a',operation:'b'},{op:'create',serviceName:'svc',operation:'op'}).error,/already has a trace match/);
@@ -230,4 +235,54 @@ test('F6 validator messages for this step\'s trace match sit beside the field th
   const odd=harness(board('payment')).select(STEP);
   const box=odd.h.guide.querySelectorAll('.frow').find(r=>r.querySelector('.flab')?.textContent==='Trace match JSON');
   assert.ok(box,'a non-object trace match is edited as JSON');
+});
+
+test('F7 Inspect keeps every source fixable: occurrence with repeat, string occurrence, true/false values, drafts, one reveal, cached validation',()=>{
+  const ui=harness(board({serviceName:'payment',operation:'Charge',occurrence:2,repeat:'attempts'})).select(STEP);
+  const match=()=>stepOf(ui.raw).traceMatch;
+  assert.match(ui.warningFor('occurrence'),/occurrence and repeat cannot be combined/);
+  assert.equal(ui.control('occurrence').disabled,false,'a source with both stays fixable from Occurrence');
+  assert.equal(ui.control('retry attempts').disabled,false,'and from Retry attempts');
+  assert.equal(ui.control('retry attempts').checked,true);
+  oneStep(ui,()=>ui.set('occurrence',''));
+  assert.deepEqual(plain(match()),{serviceName:'payment',operation:'Charge',repeat:'attempts'},'clearing Occurrence leaves a valid trace match in one Undo step');
+  assert.equal(ui.warningFor('retry attempts'),'');assert.equal(ui.warningFor('occurrence'),'');
+  // The other way round: unchecking Retry attempts fixes it too.
+  const other=harness(board({serviceName:'payment',operation:'Charge',occurrence:2,repeat:'attempts'})).select(STEP);
+  oneStep(other,()=>other.check('retry attempts',false));assert.deepEqual(plain(stepOf(other.raw).traceMatch),{serviceName:'payment',operation:'Charge',occurrence:2});
+  // Only repeat:"attempts" shows as checked.
+  for(const repeat of [false,'retries'])assert.equal(harness(board({serviceName:'a',operation:'b',repeat})).select(STEP).control('retry attempts').checked,false,'repeat '+JSON.stringify(repeat)+' is not checked');
+  // A string occurrence is normalized by entering the same number.
+  const text=harness(board({serviceName:'a',operation:'b',occurrence:'2'})).select(STEP);
+  assert.equal(text.control('occurrence').value,'2');
+  oneStep(text,()=>text.set('occurrence','2'));assert.equal(stepOf(text.raw).traceMatch.occurrence,2);
+  // True/false attributes pick their value from a list; an empty name is refused, × deletes.
+  const attrs=harness(board({serviceName:'a',operation:'b',attributes:{'flow.backpressure':true,'service.version':'1'}})).select(STEP);
+  const flag=attrs.control('attribute 1 value');assert.equal(flag.tagName,'SELECT');assert.deepEqual(flag.options.map(o=>o.value),['true','false']);assert.equal(flag.value,'true');
+  oneStep(attrs,()=>attrs.set('attribute 1 value','false'));assert.equal(stepOf(attrs.raw).traceMatch.attributes['flow.backpressure'],false);
+  oneStep(attrs,()=>attrs.set('attribute 2 type','boolean'));assert.equal(stepOf(attrs.raw).traceMatch.attributes['service.version'],false,'text that is not true/false starts as false');
+  let before=attrs.text;attrs.set('attribute 1 name','');assert.equal(attrs.text,before);assert.match(attrs.error(),/needs a name\. To delete flow\.backpressure, use its × button/);
+  attrs.select(STEP);attrs.control('new attribute type').value='boolean';attrs.control('new attribute type').fire('change');
+  assert.equal(attrs.control('new attribute value').hidden,true);assert.equal(attrs.control('new attribute true/false value').hidden,false);
+  attrs.control('new attribute name').value='flow.delivery_failed';attrs.control('new attribute true/false value').value='false';
+  oneStep(attrs,()=>attrs.click('Add attribute'));assert.equal(stepOf(attrs.raw).traceMatch.attributes['flow.delivery_failed'],false);
+  // Add-row text survives a re-render of the same selection; a new selection starts empty.
+  attrs.control('new attribute name').value='service.namespace';attrs.control('new attribute name').fire('input');
+  attrs.control('new attribute value').value='shop';attrs.control('new attribute value').fire('input');
+  attrs.select(STEP);assert.equal(attrs.control('new attribute name').value,'service.namespace');assert.equal(attrs.control('new attribute value').value,'shop');
+  attrs.select({kind:'step',section:0,index:0});attrs.select(STEP);assert.equal(attrs.control('new attribute name').value,'','another selection drops the draft');
+  const fresh=harness(board()).select(STEP);
+  fresh.control('new trace match service name').value='payment';fresh.control('new trace match service name').fire('input');
+  fresh.select(STEP);assert.equal(fresh.control('new trace match service name').value,'payment');
+  // Advanced (JSON) opens once for a new message, then the author's choice holds.
+  const adv=harness(board({serviceName:'a',operation:'b',maxDurationMs:-1})).select(STEP);
+  assert.equal(adv.h.guide.querySelector('details.trace-match-advanced').hasAttribute('data-inspector-reveal'),true);
+  adv.select(STEP);assert.equal(adv.h.guide.querySelector('details.trace-match-advanced').hasAttribute('data-inspector-reveal'),false,'the same message does not reopen it');
+  adv.set('advanced JSON','{"maxDurationMs": -1, "parentStepId": "nope"}');assert.equal(stepOf(adv.raw).traceMatch.parentStepId,'nope');
+  assert.equal(adv.h.guide.querySelector('details.trace-match-advanced').hasAttribute('data-inspector-reveal'),true,'a new message opens it again');
+  // Re-rendering the same source reuses the two validations.
+  const cached=harness(board({serviceName:'a',operation:'b'})),validate=cached.h.session.validate;let calls=0;
+  cached.h.session.validate=(...args)=>{calls++;return validate(...args);};
+  cached.select(STEP);const first=calls;cached.select(STEP);cached.select(STEP);
+  assert.equal(first,2);assert.equal(calls,2,'no validation for an unchanged source');
 });

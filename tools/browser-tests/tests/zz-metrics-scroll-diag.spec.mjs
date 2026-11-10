@@ -1,38 +1,39 @@
-/* TEMPORARY #1228 diagnostic: records which code moves the Inspector scroll after a metrics edit. Not for merge. */
+/* TEMPORARY #1228 diagnostic (round 2): Card width commit variants. Not for merge. */
 import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
 const binding={kind:'call',signals:{rate:{grafana:'up',unit:'req/h'},errors:{grafana:'errors',unit:'req/h'}},card:{side:'below',offset:0}};
 const raw={page:{title:'Metrics authoring',sections:[{id:'flow',heading:'Delivery',diagram:{nodes:{a:{title:'Sender'},b:{title:'Receiver'},c:{title:'Unbound'}},rows:[['a','b','c']],edges:[{from:'a',to:'b',label:'delivery',telemetry:binding},{from:'b',to:'c',label:'Unbound delivery'}],panels:[{id:'status',type:'live-status'}]}}]}};
-async function instrument(page){
-  await page.evaluate(()=>{
-    const log=window.__scrollLog=[];const guide=document.getElementById('guide');
-    const d=Object.getOwnPropertyDescriptor(Element.prototype,'scrollTop');
-    Object.defineProperty(Element.prototype,'scrollTop',{configurable:true,get:d.get,set(v){if(this.id==='guide' || (this.contains && this.contains(guide)))log.push({set:v,el:this.id || this.className,before:d.get.call(this),stack:new Error().stack.split('\n').slice(2,7).map(s=>s.trim()).join(' | ')});d.set.call(this,v);}});
-    const st=Element.prototype.scrollIntoView;Element.prototype.scrollIntoView=function(o){log.push({scrollIntoView:this.id || this.className || this.tagName,stack:new Error().stack.split('\n').slice(2,6).map(s=>s.trim()).join(' | ')});return st.call(this,o);};
-    const fc=HTMLElement.prototype.focus;HTMLElement.prototype.focus=function(o){if(!(o && o.preventScroll))log.push({focusNoPrevent:this.id || this.getAttribute('aria-label') || this.tagName,stack:new Error().stack.split('\n').slice(2,6).map(s=>s.trim()).join(' | ')});return fc.call(this,o);};
-    document.addEventListener('scroll',ev=>{const t=ev.target;if(t===document || !t.contains)return;if(t===guide || t.contains(guide))log.push({scroll:t.id || t.className,top:t.scrollTop,active:document.activeElement && (document.activeElement.getAttribute('aria-label') || document.activeElement.id || document.activeElement.tagName)});},true);
-    const ih=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');
-    Object.defineProperty(Element.prototype,'innerHTML',{configurable:true,get:ih.get,set(v){if(this===guide)log.push({clear:true,top:guide.scrollTop,stack:new Error().stack.split('\n').slice(2,6).map(s=>s.trim()).join(' | ')});ih.set.call(this,v);}});
-  });
+function imports(){
+ const spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=spec('provider',{nodes:{a:{title:'Provider A'},b:{title:'Provider B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Provider delivery',telemetry:binding}],topologyExports:{core:{nodes:['a','b'],edges:['a->b']}}});
+ const consumer=spec('consumer',{nodes:{x:{title:'Local X'},y:{title:'Local Y'}},rows:[['x','y']],edges:[{from:'x',to:'y',label:'Local'}],topologyImports:[{spec:'provider',export:'core',as:'direct',position:{x:50,y:250}}]});
+ return {provider,consumer};
 }
-async function state(page){return page.evaluate(()=>{const g=document.getElementById('guide');const chain=[];for(let el=g;el;el=el.parentElement){if(el.scrollHeight>el.clientHeight+1)chain.push({el:el.id || el.className,top:el.scrollTop,sh:el.scrollHeight,ch:el.clientHeight,ov:getComputedStyle(el).overflowY});}return {chain,active:document.activeElement && (document.activeElement.getAttribute('aria-label') || document.activeElement.id)};});}
-for(const variant of ['label-enter','label-tab','card-preview-enter','unit-enter']){
-  test('diag '+variant,async({page,server})=>{
+const metric=page=>page.evaluate(()=>{const g=document.getElementById('guide'),w=[...g.querySelectorAll('.frow')].find(r=>r.querySelector('.flab')?.textContent==='Card width');
+  const a=document.activeElement;return {top:g.scrollTop,widthAt:w?Math.round(w.getBoundingClientRect().top-g.getBoundingClientRect().top):null,active:a && (a.getAttribute('aria-label') || a.id || a.tagName),sh:g.scrollHeight};});
+for(const variant of ['inherited-card-enter','inherited-label-enter','local-click-title','local-click-canvas','local-position-enter','local-input-blur-tab']){
+  test('diag2 '+variant,async({page,server})=>{
     await page.setViewportSize({width:1440,height:900});
-    await page.goto(server.origin+(variant.startsWith('card')?'/lifetime/index.html':'/workbench.html'));await paste(page,JSON.stringify(raw,null,2));await prepareEditorSurface(page);
-    const guide=page.locator('#guide');
-    if(variant.startsWith('card')){await page.getByRole('checkbox',{name:'Preview metrics layout',exact:true}).check();await page.locator('#docview .dv-metrics-card').click();}
+    const inherited=variant.startsWith('inherited');
+    const spec=JSON.parse(JSON.stringify(raw));if(variant==='local-position-enter')spec.page.sections[0].diagram.edges[0].telemetry.card.position={x:40,y:80};
+    await page.goto(server.origin+'/lifetime/index.html');await paste(page,JSON.stringify(spec,null,2));await prepareEditorSurface(page);
+    if(inherited){const {provider,consumer}=imports();await page.evaluate(({provider,consumer})=>{window.ctx={version:1,id:'consumer',specs:[provider,consumer]};window.__editorTest.builder.loadText(JSON.stringify(consumer),window.ctx);},{provider,consumer});}
+    const guide=page.locator('#guide'),toggle=page.getByRole('checkbox',{name:'Preview metrics layout',exact:true});
+    if(variant!=='inherited-label-enter' && variant!=='local-click-title' && variant!=='local-click-canvas')await toggle.check();
+    if(variant==='inherited-card-enter')await page.locator('#docview .dv-metrics-card[data-metrics-card="direct::a->direct::b"]').click();
+    else if(variant==='inherited-label-enter')await page.locator('#docview text.lbl').filter({hasText:'Provider delivery'}).first().click();
+    else if(variant==='local-position-enter')await page.locator('#docview .dv-metrics-card').click();
     else await page.locator('#docview text.lbl[data-dv-edge="0"]').click();
     await page.locator('#editor-tab-inspect').click();
-    const label=variant==='unit-enter'?'errors unit':'Card width';
-    const control=guide.getByLabel(label,{exact:true});await expect(control).toHaveCount(1);
-    await instrument(page);
-    await control.evaluate(el=>el.scrollIntoView({block:'center'}));
-    const before=await state(page);
-    await control.click();await control.fill(variant==='unit-enter'?'msgs':'300');
-    await control.press(variant==='label-tab'?'Tab':'Enter');
+    const control=guide.getByLabel('Card width',{exact:true});await expect(control).toHaveCount(1);
+    await control.evaluate(el=>{const g=document.getElementById('guide');g.scrollTop+=el.getBoundingClientRect().top-g.getBoundingClientRect().top-g.clientHeight/2;});
+    const before=await metric(page);
+    await control.click();await control.fill('300');
+    if(variant==='local-click-title')await guide.getByLabel('Card title',{exact:true}).click();
+    else if(variant==='local-click-canvas')await page.locator('#docview text.lbl[data-dv-edge="0"]').click();
+    else if(variant==='local-input-blur-tab')await control.press('Tab');
+    else await control.press('Enter');
     await page.waitForTimeout(800);
-    const after=await state(page),log=await page.evaluate(()=>window.__scrollLog);
-    const src=JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.edges[0].telemetry;
-    expect(JSON.stringify({variant,before,after,src,log},null,1)).toBe('DIAG');
+    const after=await metric(page),src=await page.locator('#src').inputValue();
+    expect(JSON.stringify({variant,before,after,width300:src.includes('"width": 300')})).toBe('DIAG');
   });
 }

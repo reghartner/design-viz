@@ -4,7 +4,7 @@
 | W1 Load snapshot | the doorbell example board pasted; File → Load snapshot… with a snapshot file | the "Snapshot from <time>" checkbox appears checked beside Demo live status; carriers wear the snapshot states; the Epic status connection line reads "Snapshot from …" with data-state snapshot; the Metrics line reads "Metrics: snapshot from …"; the bound edge mcu → ingest has a metrics card showing the snapshot's rate (cards are drawn on edges; nodes get cues); Demo turns Snapshot off and Snapshot turns Demo off | snapshot data shown as Demo or as live; a control that only appears in the source |
 | W2 never exported | W1, then Export project | the editor source is unchanged and no exported file holds a snapshot title, assignee or the snapshot kind | snapshot data leaking into a saved, exported or published board |
 | W3 offered next to the board | a working folder holding doorbell.spec.json and doorbell.snapshot.json | after Choose working folder… the "Snapshot from <time>" checkbox is offered unchecked and the carriers are not painted; checking it paints them | a snapshot that turns itself on |
-| W2 SVG export (review c1) | W1 with Snapshot on, then off | while it shows, Download SVG is refused with a reason and nothing downloads; once it is off the SVG holds no live class and no snapshot value | real states or metric numbers in a diagram-only SVG |
+| W2 SVG export (review c1) | W1 with Snapshot on, then off | while it shows, Download SVG is refused with a reason and nothing downloads; once it is off the SVG has exactly the live-status names an export before any snapshot had (the board's ticket buttons), no state paint and no snapshot value | real states or metric numbers in a diagram-only SVG |
 | W4 the author's choices come back (review c1) | Demo live status and Preview metrics layout on, then Load snapshot, then Snapshot off | while the snapshot shows both are off (metrics disabled); unchecking Snapshot brings back Demo and Preview metrics layout | a snapshot that silently switches the author's choices off |
 W1–W3 fail at the baseline: there is no Load snapshot… control and no Snapshot choice. */
 import {test,expect,paste,prepareEditorSurface,closeTools} from '../helpers/test.mjs';
@@ -24,6 +24,9 @@ function snapshotFile(){
    'HW-124':issue('done','Snapshot title HW-124'),'BE-67':issue('active','Snapshot title BE-67'),'BE-68':issue('todo','Snapshot title BE-68'),'UX-89':issue('todo','Snapshot title UX-89')},
    telemetry:{start:'2026-11-10T10:44:00.000Z',stepSeconds:360,carriers:{ingest:{rate:{values,unit:'req/h'},errors:{values:[0,0,1],unit:'req/h'}},'mcu->ingest':{rate:{values:[1200,1350,1462],unit:'req/h'},errors:{values:[0,0,0],unit:'req/h'}}}}}],errors:[]};
 }
+// The live-status class and custom property names in an exported SVG.
+const liveTokens=svg=>[...new Set(svg.match(/(?:--)?dv-live-[a-z-]+/g) || [])].sort();
+async function downloadSvg(page){const pending=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-svg').click();return readFile(await (await pending).path(),'utf8');}
 const node=(view,id)=>view.locator('g.node[data-dv-node="'+id+'"]').first();
 const metricsToggle=page=>page.getByRole('checkbox',{name:'Preview metrics layout',exact:true});
 const snapshotToggle=page=>page.getByRole('checkbox',{name:/^Snapshot from /});
@@ -40,6 +43,8 @@ test('W1 W2 File → Load snapshot shows the snapshot as Snapshot from <time>, a
  const view=page.locator('#docview'),panel=view.locator('.pt-live-status');
  // Contrasting precondition: without a snapshot there is no Snapshot choice and no paint.
  await expect(snapshotToggle(page)).toHaveCount(0);await expect(node(view,'mcu')).not.toHaveClass(/dv-live-blocked/);
+ // The board's own live-status markup (ticket buttons and the like) is in every export; only snapshot paint must not be.
+ const baseline=liveTokens(await downloadSvg(page));
  const file=info.outputPath('doorbell.snapshot.json');await mkdir(path.dirname(file),{recursive:true});await writeFile(file,JSON.stringify(snapshotFile()));
  await loadSnapshot(page,file);
  await expect(snapshotToggle(page)).toBeChecked();await expect(demoToggle(page)).not.toBeChecked();
@@ -67,9 +72,10 @@ test('W1 W2 File → Load snapshot shows the snapshot as Snapshot from <time>, a
  await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-svg').click();
  await expect(page.locator('#guide')).toContainText('SVG export is off while the preview shows a snapshot');await page.waitForTimeout(500);expect(downloads).toBe(0);
  await snapshotToggle(page).uncheck();await expect(node(view,'mcu')).not.toHaveClass(/dv-live-blocked/);
- const svgDownload=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-svg').click();
- const svg=await readFile(await (await svgDownload).path(),'utf8');
- for(const leak of ['dv-live-','--dv-live','1,462','Snapshot title'])expect(svg.includes(leak),'the SVG holds "'+leak+'"').toBe(false);
+ const svg=await downloadSvg(page);
+ expect(liveTokens(svg),'the same live-status names as before any snapshot').toEqual(baseline);
+ for(const paint of ['dv-live-todo','dv-live-active','dv-live-testing','dv-live-done','dv-live-blocked','dv-live-missing','--dv-live-ink'])expect(svg.includes(paint) && !baseline.includes(paint),'snapshot paint "'+paint+'" in the SVG').toBe(false);
+ for(const leak of ['1,462','Snapshot title','Snapshot Person'])expect(svg.includes(leak),'the SVG holds "'+leak+'"').toBe(false);
 });
 
 test('W4 turning the snapshot off brings back Demo live status and Preview metrics layout',async({page,server},info)=>{

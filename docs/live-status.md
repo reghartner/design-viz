@@ -3157,17 +3157,23 @@ names lookups in `tracking.telemetry.lookups`:
 
 | field | meaning |
 |---|---|
-| `label` | required; the lookup's name in the form and the label of its value box (1–80 characters) |
+| `label` | required; the name of the lookup's search box and of its value field (1–80 characters) |
 | `query` | required; a LogQL log query (at most 2000 characters). `$value` or `${value}` is where the reader's value goes; a query without it runs as written |
 | `values` | optional suggested values (1–50) the reader can pick; the query must then have a `$value` slot |
 | `datasource` | optional Loki datasource UID; default `tracking.telemetry.grafana.loki` of the active environment |
 | `fields` | optional `{traceId, spanId}` field names; default `trace_id` and `span_id` |
 
 The reader opens Status → Trace → **Load trace**, chooses a connection and
-environment, then uses **Find a trace from a log line**: picks a lookup, types or
-picks a value and clicks **Find log lines**. The form also offers **Type a LogQL
-query** for a reader-typed log query. `lookups: {}` offers only that box. Each
-Find makes one `query_loki_logs` call to the Grafana connector that offers that
+environment, then uses **Find a trace from a log line** (#1233). Each lookup is its
+own search box, in authored order, with any number of them: its label, a value
+field (with the suggested `values` to pick from) when the query has a `$value`
+slot, and its own **Find log lines** button (accessible name "Find log lines for
+<label>"). Enter in the value field runs that box's Find. Each box keeps its own
+value. Below them, **Type a LogQL query** is a collapsible box for a reader-typed
+log query (Ctrl+Enter or Cmd+Enter runs it); it starts collapsed when lookups are
+authored, and `lookups: {}` offers only that box, open. The results and a load
+error sit directly under the box that ran (#1230); typing in that box clears its
+results, typing in another box does not. Each Find makes one `query_loki_logs` call to the Grafana connector that offers that
 tool (the one `loki` signals use, preferring a connector named Grafana):
 
 ```json

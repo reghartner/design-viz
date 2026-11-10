@@ -1424,17 +1424,26 @@ The script runs the viewer's own Jira and Grafana adapters on a headless copy of
 it makes the calls a published board makes, and sends each call to the provider's REST API:
 Jira search and issue reads (`POST /rest/api/3/search/jql`, `GET /rest/api/3/issue/{key}`),
 and Grafana Prometheus and Loki range queries through the board's datasource uids
-(`/api/datasources/proxy/uid/{uid}/…`) plus `/api/annotations`. Grafana SQL and CloudWatch
-signals, Honeycomb, traces and log searches are not read yet: each such signal is one recorded
-error (carrier id and signal name) and the run goes on. Pull request states are not read either
+(`/api/datasources/proxy/uid/{uid}/…`) plus `/api/annotations`; Grafana SQL and CloudWatch
+signals through `POST /api/ds/query` with the same datasource uids (#1270); and Honeycomb signals
+through the Honeycomb Query API: it creates the query (`POST /1/queries/{dataset}`), runs it
+(`POST /1/query_results/{dataset}`) and polls the result (at most 20 s, or half of `--timeout`).
+The board window becomes the query's `time_range`; the dataset is
+`tracking.telemetry.honeycomb.dataset` (`__all__` without one), and the key must belong to its
+`environment` (checked once through `/1/auth`). A signal's snapshot value is the viewer's
+measurement for the window (a CloudWatch Sum, a Honeycomb aggregate), its series the buckets.
+Grafana CloudWatch Logs signals, traces, Honeycomb span attributes and log searches are not read
+yet: each such signal is one recorded error (carrier id and signal name) and the run goes on. A
+rate-limited Grafana or Honeycomb call fails only its signal. Pull request states are not read either
 (no GitHub transport yet): each authored PR is one recorded error. A board that imports shared
 topology (`topologyImports`) is refused, because the script does not resolve imported carriers
 yet. It takes today's state only (no Over time history). Every request ends after 30 s or at
 `--timeout` (default 60 s), and the process exits once its line is printed.
 
 Credentials come from the environment and are never written to the snapshot:
-`JIRA_EMAIL` and `JIRA_API_TOKEN` (an Atlassian API token), and `GRAFANA_URL` with
-`GRAFANA_TOKEN` (a service account token). A provider whose variables are missing is skipped and
+`JIRA_EMAIL` and `JIRA_API_TOKEN` (an Atlassian API token), `GRAFANA_URL` with
+`GRAFANA_TOKEN` (a service account token), and `HONEYCOMB_API_KEY` (sent as `X-Honeycomb-Team`;
+`HONEYCOMB_API_URL` chooses another https API host, such as `https://api.eu1.honeycomb.io`). A provider whose variables are missing is skipped and
 its variables are named. Credentials go only to a host the environment names: `JIRA_SITE` and
 `GRAFANA_URL`, which must use https and hold no user name or password. There is no opt-in for
 plain http: an internal Grafana or Jira served over http is refused. Without `JIRA_SITE`, the
@@ -1445,9 +1454,11 @@ recorded message is scrubbed of the credential values.
 Provider responses never reach the agent: the script prints exactly one line, for example
 `snapshot examples/live-status/live-status.snapshot.json at 2026-11-10T11:02:00.000Z: 7 tickets (0 missing) ·
 6 carriers, 11 of 14 signals · no errors`. It exits 1 without writing a file when neither
-provider could run, and when Jira answered no search for the board's tickets (the Flagged search
-and the epic lookup do not count): the tickets are then unknown, and a snapshot showing them all as
-missing would be wrong. A rate-limited call (HTTP 429) is retried once after its Retry-After (at most
+provider could run, and when no ticket state is known: a ticket is known only when a search that
+covered it answered (a key search naming it, or the epic-children search returning it as a child;
+the Flagged search does not count), and the viewer shows no ticket state until every search
+answered. A snapshot showing them all as missing would be wrong. A ticket left unknown in an
+otherwise complete answer is written with state `unknown`, which shows no status, never missing. A rate-limited call (HTTP 429) is retried once after its Retry-After (at most
 10 s) and recorded only if it still fails; a datasource uid that is not one path segment is refused.
 
 The snapshot is written next to the board as `<board>.snapshot.json` (`--out` chooses another

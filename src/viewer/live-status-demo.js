@@ -37,7 +37,8 @@ function liveStatusDemoTelemetry(day){
       var signal=signals[name],values=signal && Array.isArray(signal.values)?signal.values:null;
       if(!values || !values.length || typeof values[values.length-1]!=='number' || !isFinite(values[values.length-1]))return;
       var series=values.map(function(v,k){return typeof v==='number' && isFinite(v)?[start+(k+1)*step,v]:null;}).filter(Boolean);
-      out[name]={value:series[series.length-1][1],series:series,unit:typeof signal.unit==='string'?signal.unit:null};
+      // A signal's `value` (an agent snapshot, #1270) is the window's measurement, such as a CloudWatch Sum; else the last step.
+      out[name]={value:typeof signal.value==='number' && isFinite(signal.value)?signal.value:series[series.length-1][1],series:series,unit:typeof signal.unit==='string'?signal.unit:null};
       end=Math.max(end,start+values.length*step);any=true;
     });
     if(any)map[id]={signals:out};

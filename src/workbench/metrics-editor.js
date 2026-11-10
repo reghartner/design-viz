@@ -79,10 +79,15 @@ function flowMetricsDom(o){
       if(overridden)box.appendChild(c.action('Revert '+name+' to inherited',function(){return commit({op:'revert',name:name});}));
       if(!inherited)box.appendChild(c.action(prefix?'Remove '+prefix+'signal '+name:'Remove signal '+name,function(){return commit({op:'removeSignal',name:name});}));
     });
-    if(merge && merge.hidden.length){
+    if(merge && (merge.hidden.length || merge.staleHidden.length)){
       var hidden=fold(parent,'metrics-hidden','Hidden inherited signals');
+      if(merge.allHidden)note(hidden,'All inherited signals are hidden for this document, so it shows no metrics here. Show one again, or add a signal.','metrics-status');
       note(hidden,'Hidden in this document only; the provider still has them. Uncheck to show one again.');
       merge.hidden.forEach(function(name){hideToggle(hidden,prefix+name+' hidden for this document',true,name,commit);});
+      if(merge.staleHidden.length){
+        note(hidden,'Not in the provider now; kept hidden in case it returns. Uncheck to forget the hide.');
+        merge.staleHidden.forEach(function(name){hideToggle(hidden,prefix+name+' hidden for this document',true,name,commit);});
+      }
     }
     var add=fold(parent,'metrics-add',prefix?'New '+prefix+'signal':'New signal'),label=prefix?prefix+'new signal':'New signal';
     var nameInput=keptDraft(add,label+' name','text',null,''),source=keptDraft(add,label+' source','select',sourceOptions,'grafana');
@@ -130,10 +135,14 @@ function createFlowMetricsEditor(o){
     d.note(cardBox,'Drag the card in Preview metrics layout, or focus it and use Arrow keys (10 units; Shift moves 50). Drag a corner handle or press Alt+Left/Right to change its width; resizing pins the card where you see it. Manual placement overrides Card side and offset; Reset card to automatic restores them. Card width is 140–480 units (default 240); an empty Card title shows the connection label. Readers see the saved placement when Metrics is on.');
     return cardBox;
   }
-  if(s.imported)d.note(box,'Inherited metrics from '+s.provider+': '+(!s.inherited?'none. A binding saved here applies only in this document.':
+  if(s.imported)d.note(box,'Inherited metrics from '+s.provider+': '+(!s.inherited?'none yet. Signals added here are kept as additions, so a binding the provider adds later merges with them.':
     s.merge?telemetrySummary(s.inherited)+'. Signals you add here are added to the provider\'s in this document; you can hide or change inherited ones. The provider is unchanged.':
     telemetrySummary(s.inherited)+'. This document replaces it with its own binding (saved before merging was available); Remove metrics restores the inherited binding.'),'metrics-inherited');
-  if(s.imported && s.inherited && !s.merge && b)box.appendChild(c.action('Merge with provider',function(){return commit({op:'mergeWithProvider'});})).setAttribute('title','Keep these metrics exactly as they are, stored as changes to the provider binding, so later provider changes reach this document.');
+  if(s.imported && s.inherited && !s.merge && b){
+    var effects=s.mergeEffects || [],about='Store these metrics as changes to the provider binding, so later provider changes reach this document'+(effects.length?'. Also: '+effects.join('; '):'')+'.';
+    if(effects.length)d.note(box,'Merge with provider: '+effects.join('; ')+'.');
+    box.appendChild(c.action('Merge with provider',function(){return commit({op:'mergeWithProvider'});})).setAttribute('title',about);
+  }
   // An imported carrier that inherits a provider binding is bound; only a carrier with neither is unbound.
   if(!b && !s.inherited)d.note(box,'Unbound: no metrics overlay and no proof verdict. Choose a kind, then add a signal'+(templateNames.length?' or pick a template':'')+'.','metrics-status');
   // An unbound carrier's kind is a draft: it is written with the first signal or template.

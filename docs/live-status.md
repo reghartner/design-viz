@@ -342,8 +342,12 @@ any ratio limit based on them, `proof`, `links` and `card` change only the named
 fields, and `kind` replaces the inherited kind when set. For example
 `{"extends": true, "signals": {"lag": {"grafana": "max(lag)"}}, "hide": ["errors"]}`.
 Later provider changes still reach the consumer unless hidden or changed there. A
-consumer binding without `extends` replaces the provider's binding as a whole, as
-before. A provider binding that uses one of the provider page's templates is
+signal entry that names a source replaces the inherited source, so a signal always
+has one. Hiding every signal leaves the carrier unbound in this document. A hide for
+a signal the provider no longer has is kept in case it returns. A consumer binding
+without `extends` replaces the provider's binding as a whole, as before; the
+Workbench writes `extends` on every imported carrier, also before its provider has a
+binding. A provider binding that uses one of the provider page's templates is
 expanded with those templates before it reaches the consumer. When the provider
 cannot expand it (an unknown template or a missing parameter), the binding is
 dropped and the imported carrier is unbound, even if the consumer defines a

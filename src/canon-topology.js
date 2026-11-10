@@ -100,7 +100,8 @@ var FlowTopology = (function(){
      and an importer may add, change or hide parts of it. Reusable for other imported kinds:
      rules.fields maps each overlay field to 'replace' (the overlay value replaces), 'fields'
      (a field patch; null deletes a field) or 'entries' (keyed entries, each a field patch;
-     a null entry is dropped through rules.drop, as is each name in the overlay's `hide`).
+     a null entry is dropped through rules.drop, as is each name in the overlay's `hide`;
+     rules.entry(field, current, patch) may adjust an inherited entry before its patch).
      Objects left empty are removed. */
   function patchFields(target,patch){
     Object.keys(patch).forEach(function(key){if(patch[key]===null)delete target[key];else target[key]=clone(patch[key]);});
@@ -121,7 +122,9 @@ var FlowTopology = (function(){
         var entry=patch[key];
         if(entry===null){drop(field,key);return;}
         if(!object(entry))return;
-        var merged=patchFields(object(target[key])?target[key]:{},entry);
+        var current=object(target[key])?target[key]:{};
+        if(rules.entry)rules.entry(field,current,entry);
+        var merged=patchFields(current,entry);
         if(Object.keys(merged).length)target[key]=merged;else delete target[key];
       });
       if(object(out[field]) && !Object.keys(out[field]).length)delete out[field];
@@ -131,7 +134,13 @@ var FlowTopology = (function(){
   // Metrics on top of the generic merge: a hidden or removed signal takes its limit and any
   // ratio limit based on it (telemetryDropSignal); kind replaces; the rest patch per field.
   var TELEMETRY_OVERLAY_RULES={hide:'signals',fields:{kind:'replace',signals:'entries',proof:'entries',links:'fields',card:'fields'},
-    drop:function(out,field,key){if(field==='signals')telemetryDropSignal(out,key);else if(object(out[field]))delete out[field][key];}};
+    drop:function(out,field,key){if(field==='signals')telemetryDropSignal(out,key);else if(object(out[field]))delete out[field][key];},
+    // A signal has exactly one source: a patch that names a source replaces the inherited one,
+    // so a later provider source switch, or a provider signal of the same name, cannot add a second.
+    entry:function(field,current,patch){
+      if(field!=='signals' || !TELEMETRY_SOURCES.some(function(source){return patch[source]!=null;}))return;
+      TELEMETRY_SOURCES.forEach(function(source){if(!own(patch,source))delete current[source];});
+    }};
   function mergeTelemetry(inherited,overlay){return mergeOverlay(inherited,overlay,TELEMETRY_OVERLAY_RULES);}
   function applyTracking(value,addition){
     if(!addition)return;
@@ -142,7 +151,14 @@ var FlowTopology = (function(){
     ['tickets','prs'].forEach(function(field){if(merged[field].length)value[field]=merged[field];});
     // #1266: an `extends` overlay merges with the inherited binding; any other consumer binding
     // replaces it (the original rule, so existing documents keep their meaning).
-    if(own(addition,'telemetry'))value.telemetry=telemetryMergeOverlay(addition.telemetry)?mergeTelemetry(value.telemetry,addition.telemetry):clone(addition.telemetry);
+    if(own(addition,'telemetry')){
+      if(!telemetryMergeOverlay(addition.telemetry))value.telemetry=clone(addition.telemetry);
+      else{
+        // Hiding every signal leaves no binding for this consumer: the carrier is quietly unbound.
+        var merged=mergeTelemetry(value.telemetry,addition.telemetry);
+        if(object(merged.signals) && Object.keys(merged.signals).length)value.telemetry=merged;else delete value.telemetry;
+      }
+    }
   }
   // Provider `use` bindings name the provider page's templates and expand only
   // with them, while that page is known. A binding the provider cannot expand
@@ -382,7 +398,7 @@ var FlowTopology = (function(){
           // carriers this import selects, unless a consumer binding replaces them.
           (telemetryDrops.get(provider) || []).forEach(function(drop){
             var id=drop.kind==='nodes'?prefix+drop.id:importedEdge(drop.id),overlay=((drop.kind==='nodes'?imp.nodeTracking:imp.edgeTracking) || {})[drop.id];
-            if(!(drop.kind==='nodes'?nodeIds:edgeIds).includes(id) || object(overlay) && own(overlay,'telemetry'))return;
+            if(!(drop.kind==='nodes'?nodeIds:edgeIds).includes(id) || object(overlay) && own(overlay,'telemetry') && !telemetryMergeOverlay(overlay.telemetry))return;
             drops.push({kind:drop.kind,id:id,spec:drop.spec,path:drop.path,message:drop.message});
           });
           ((provider.topologyProvenance || {}).imports || []).forEach(function(nested){

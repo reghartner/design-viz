@@ -8,8 +8,10 @@ const rawQuery=()=>({query_spec:{filters:[{column:'service.name',op:'=',value:'e
 const binding=(source='honeycomb')=>({kind:'service',signals:{trace:source==='tempo'?{tempo:'{ resource.service.name = "event-ingest" }'}:{honeycomb:rawQuery()}}});
 const pageSpec=(source='honeycomb')=>({tracking:{telemetry:{honeycomb:{environment:'flowview-demo',dataset:'doorbell'},grafana:{tempo:'tempo-main',prometheus:'prom-main'}}},sections:[{id:'main',diagram:{nodes:{a:{telemetry:binding(source)}},rows:[['a']]}}]});
 function context(){const timers=new Map();let serial=0;class Clock extends Date{static now(){return Date.parse('2026-10-30T00:00:00Z');}}const C={URL,AbortController,TextDecoder,TextEncoder,Date:Clock,console,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id),document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint('standalone').body,C);return {C,timers};}
-async function setup({page=pageSpec(),transport,wrap,host=false,hosted=false,permission='granted'}={}){
+async function setup({page=pageSpec(),transport,wrap,host=false,hosted=false,permission='granted',spyTraces}={}){
  const {createMockBridge}=await import('./helpers/honeycomb-bridge.mjs'),bridge=createMockBridge({day:9,transport}),{C,timers}=context();if(wrap)wrap(bridge);
+ // #1289: a test can hold the Traces adapter and the facade the providers hand it.
+ if(spyTraces){const create=C.createTelemetryTraces;C.createTelemetryTraces=(...args)=>{const adapter=create(...args);if(adapter){const attach=adapter.attach;adapter.attach=(next,nextPage)=>{spyTraces.adapter=adapter;spyTraces.facade=next.telemetry;return attach(next,nextPage);};}return adapter;};}
  let permissions=[];
  if(hosted){const list=bridge.listTools;bridge.listTools=async()=>{const servers=await list();return servers.map(s=>({...s,tools:s.tools.map(t=>({name:t.name,description:t.description,annotations:t.annotations}))}));};bridge.describeTool=async(server,name)=>{const servers=await list();return servers.find(s=>s.server===server).tools.find(t=>t.name===name);};}
  const p=C.normalize(page),win={claude:{use:async name=>name==='permissions'?{request:async names=>{permissions.push(...names);return Object.fromEntries(names.map(n=>[n,typeof permission==='function'?permission(n):permission]));}}:bridge}},adapter=host?null:C.createTelemetryProviders(p,win);
@@ -293,4 +295,30 @@ test('a reused answer keeps example traces choosable under fresh tokens, without
  const chosen=await h.api.chooseExemplar('a',again.selectionToken,other.traceId);assert.equal(chosen.traceId,other.traceId);
  const after=h.bridge.calls.slice(before).map(c=>c.name);
  assert.ok(after.includes('get_trace'),'choosing loads that trace\'s detail: '+JSON.stringify(after));assert.ok(!after.includes('run_query'),'and runs no new trace search: '+JSON.stringify(after));
+});
+
+/* #1289 review c3: the restore guards. Each row fails if its guard is removed (mutation-checked):
+| row | guard | fixture | assertion |
+|---|---|---|---|
+| G0 | none (control) | Metrics on, Traces available, matching provider | restore lists the example trace under a fresh token |
+| G1 | Metrics must be on | Metrics off | the Traces adapter restores nothing |
+| G2 | the Traces part must be available | the Traces part reports unavailable (its tools removed or denied) while Grafana and Honeycomb stay on | the providers restore nothing, and off/on lists no example trace |
+| G3 | the cached trace's provider must have a current contract | a cached trace from another provider (tempo) for a honeycomb trace signal | the Traces adapter restores nothing |
+*/
+test('restore guards: Metrics on, the Traces part available, a current contract for the cached provider',async t=>{
+ const {nativeQuery,EVENT_QUERY}=await import('./helpers/honeycomb-bridge.mjs'),p=pageSpec();p.sections[0].diagram.nodes.a.telemetry.signals={rate:{grafana:EVENT_QUERY},zero:{honeycomb:nativeQuery('notify->app')},trace:{honeycomb:rawQuery()}};
+ const spy={},h=await setup({page:p,spyTraces:spy,wrap:b=>{b.day=11;}});t.after(()=>h.close());
+ h.api.setEnabled(true);await settle();const cached=plain(h.api.snapshot().map),first=cached.a?.exemplars?.[0];assert.ok(first && spy.adapter && spy.facade,'an example trace and the Traces adapter');
+ const restore=map=>plain(spy.adapter.options.restoreExemplars(map)),viaProviders=map=>plain(h.adapter.options.restoreExemplars(map));
+ // G0: the control. A restore while Metrics is on lists the trace under a fresh token.
+ const control=restore(cached);assert.equal(control.a?.traceId,first.traceId,'G0 the control restores');assert.notEqual(control.a.selectionToken,first.selectionToken);
+ // G3: a cached trace whose provider has no matching contract is not restored.
+ const tempo=plain(cached);tempo.a.exemplars[0].provider='tempo';assert.deepEqual(restore(tempo),{},'G3 another provider\'s cached trace');
+ // G1: with Metrics off nothing is restored.
+ h.api.setEnabled(false);assert.deepEqual(restore(cached),{},'G1 Metrics off');
+ // G2: the Traces part is unavailable (its tools were removed or denied) while the numeric parts stay on.
+ h.api.setEnabled(true);await settle();assert.ok(h.api.snapshot().map.a?.exemplars?.length,'traces are back after a fresh on');
+ spy.facade.setAvailable(false,'Trace tools removed.');await settle();assert.equal(h.api.snapshot().available,true,'Metrics stays available for Grafana and Honeycomb');
+ assert.deepEqual(viaProviders(cached),{},'G2 the providers restore nothing while the Traces part is unavailable');
+ h.api.setEnabled(false);h.api.setEnabled(true);await settle();assert.equal(h.api.snapshot().map.a?.exemplars,undefined,'G2 off/on lists no example trace');
 });

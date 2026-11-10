@@ -2400,6 +2400,17 @@ count: `16.1 ms across 2 spans`. A board that keeps one step per transport reads
 `2 operations · 1 unknown · 16.1 ms` (the other transport's step is missing); make them one
 step with alternatives.
 
+**Declared spans (#1290).** A node that declares trace spans (`trace.spans`, see
+[provider traces](provider-traces.md#trace-spans-declared-on-nodes-and-connections-1290))
+is annotated from a loaded trace even when no step lights it: one row whose label is the
+union time of its matched spans (`45 ms across 5 spans`) and whose title lists each
+declaration, for example `Declared spans: process 40 ms; find (database) 10 ms across 2 spans;
+audit (database): not in this trace; region (cache): attribute cache.region not recorded`.
+A span that a step also maps counts once. A declared node with no span in the trace shows no
+label. Imported nodes use the consumer's merged declarations. Connection declarations do not
+draw yet. A board whose only mapping is declarations is trace-ready: company trace profiles
+apply and nothing calls the provider before **Load trace**.
+
 A step that may be absent from a trace (for example, its operation runs in a different
 trace) can carry `traceMatch.optional: true`; with alternatives, set it on every
 alternative ([canon rules](canon.md#reference-traces-and-incident-alternates)). A step whose

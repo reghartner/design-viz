@@ -276,6 +276,12 @@ test('S11 overlay findings name the overlay and say what happened',()=>{
   page=resolved(fixtures({spans:{procss:{operation:'process orders v2'}}}));
   assert.deepEqual(errors(page),[at+'.spans.procss: the provider declares no span procss on this carrier, so this entry is a new span and needs a full declaration: serviceName required; role must be one of process, database, cache, call, work']);
   assert.equal(diagramOf(page).nodes['shared::worker'].trace.spans.process.operation,'process orders','the provider span is unchanged');
+  // A full declaration under a new name with another fault does not get the new-span prefix.
+  page=resolved(fixtures({spans:{'db:x':{serviceName:'worker',operation:'find',role:'database'}}}));
+  assert.deepEqual(errors(page),[at+'.spans.db:x: span names start with a letter and use letters, digits, - and _']);
+  // A malformed provider trace: its drop warns, and a consumer hide adds no "no such span" warning.
+  page=resolved(fixtures({hide:['cache']},undefined,providerSpec({spans:[]})));
+  assert.deepEqual(warnings(page),['sections[0].diagram.nodes.shared::worker.trace: provider "provider" sections[0].diagram.nodes.worker.trace: expected {"spans": {<name>: <span declaration>}}; not used on this board']);
   // Hide plus patch of the same span: the hide wins.
   page=resolved(fixtures({hide:['cache'],spans:{cache:{operation:'hget'}}}));
   assert.deepEqual(warnings(page),[at+'.spans.cache: span cache is both hidden and patched; the hide wins']);

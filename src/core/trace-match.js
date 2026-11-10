@@ -95,5 +95,28 @@ function selector(step,result){
   const m=step && step.traceMatch;
   return Array.isArray(m)?m[result && result.alternative || 0] || null:m || null;
 }
-return {baseSteps:baseSteps,mapTrace:mapTrace,selector:selector};
+/* #1290: spans declared on nodes and edges (trace.spans). A declaration matches spans of its
+   serviceName by exact operation, by operationPrefix, or, with neither, by its attributes;
+   namespace and attributes narrow every mode. Declarations describe carriers, so one span may
+   match several. notRecorded names declared attributes that no span of that service
+   (and operation) records at all, so the reader can tell "not recorded" from "not here". */
+function carrierSpans(d,trace){
+  const out={nodes:{},edges:{}},own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+  const object=v=>!!v && typeof v==='object' && !Array.isArray(v);
+  function declarations(value){
+    const spans=object(value) && object(value.trace) && object(value.trace.spans)?value.trace.spans:{};
+    return Object.keys(spans).filter(key=>object(spans[key])).map(key=>{
+      const m=spans[key],attrs=object(m.attributes)?m.attributes:{};
+      const named=trace.spans.filter(s=>s.serviceName===m.serviceName &&
+        (own(m,'operation')?s.operation===m.operation:own(m,'operationPrefix')?typeof s.operation==='string' && s.operation.startsWith(m.operationPrefix):true) &&
+        (!m.namespace || (s.attributes || {})['service.namespace']===m.namespace));
+      const matched=named.filter(s=>Object.keys(attrs).every(k=>(s.attributes || {})[k]===attrs[k]));
+      return {key,role:m.role,spans:matched,notRecorded:named.length?Object.keys(attrs).filter(k=>named.every(s=>(s.attributes || {})[k]===undefined)):[]};
+    });
+  }
+  Object.keys(object(d.nodes)?d.nodes:{}).forEach(id=>{const list=declarations(d.nodes[id]);if(list.length)out.nodes[id]=list;});
+  (Array.isArray(d.edges)?d.edges:[]).forEach(e=>{if(!object(e))return;const list=declarations(e);if(list.length)out.edges[e.from+'->'+e.to]=list;});
+  return out;
+}
+return {baseSteps:baseSteps,mapTrace:mapTrace,selector:selector,carrierSpans:carrierSpans};
 })();

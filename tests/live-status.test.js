@@ -4423,7 +4423,7 @@ test('#1186 #1280 a span focused while the panel is hidden is scrolled into the 
  let hidden=true;const watchers=[];h.C.ResizeObserver=class{constructor(f){this.f=f;this.off=false;watchers.push(this);}observe(t){this.t=t;}disconnect(){this.off=true;}};
  const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView;
  proto.getClientRects=function(){return hidden?[]:[1];};
- proto.getBoundingClientRect=function(){if(this===m.body)return {top:0,bottom:300,left:0,right:100,width:100,height:300};if(this.classList.contains('dv-trace-span'))return {top:900,bottom:1100,left:0,right:100,width:100,height:200};return bound.call(this);};
+ proto.getBoundingClientRect=function(){if(this===m.body)return {top:0,bottom:300,left:0,right:100,width:100,height:300};if(this.classList.contains('dv-trace-span-item'))return {top:900,bottom:1100,left:0,right:100,width:100,height:200};return bound.call(this);};
  h.doc.defaultView={getComputedStyle:el=>({overflowY:el===m.body?'auto':'visible'})};m.body.scrollHeight=4000;m.body.clientHeight=300;
  try{
   const t=api.snapshot().trace.selected,span=t.exemplar.spans[41];assert.equal(api.selectTraceSpan({context:t.context,spanId:span.id}),true);h.flush();
@@ -4800,7 +4800,7 @@ test('#1252 typing in Trace ID keeps the loaded trace and its focus; a failed Lo
   assert.equal(await api.loadDirectTrace(false),null,'a trace whose ID does not match fails');h.flush();
   selected=api.snapshot().trace.selected;assert.ok(selected && selected.exemplar.traceId===COMPACT_ID,'the failed Load keeps the shown trace');assert.ok(api.snapshot().trace.direct.report.error,'and reports its error');
   assert.equal(selected.focus && selected.focus.spanId,span,'review c1: and its span focus');assert.equal(selected.focus.auto,true,'the kept focus is not a new request');
-  assert.equal(scroller.scrollTop,0,'the page did not scroll to the kept row');assert.equal(pageCalls.filter(c=>/(^| )dv-trace-span( |$)/.test(c)).length,0,'no scrollIntoView');
+  assert.equal(scroller.scrollTop,0,'the page did not scroll to the kept row');assert.equal(pageCalls.filter(c=>/dv-trace-span-item/.test(c)).length,0,'no scrollIntoView');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;h.doc.defaultView=view;delete h.doc.scrollingElement;}
  api.clearDirectTrace();h.flush();assert.equal(api.snapshot().trace.selected,null,'Clear removes it');assert.equal(calls.length,2);
  api.destroy();
@@ -4895,7 +4895,7 @@ test('#1280 an automatic span focus never scrolls the page; a reader\'s focus sc
  const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,calls=[];
  proto.getClientRects=function(){return [1];};proto.getBoundingClientRect=function(){return {top:900,bottom:930,left:0,right:100,width:100,height:30};};
  proto.scrollIntoView=function(options){calls.push([this.className,options]);};h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible'})};
- const page=()=>calls.filter(c=>/(^| )dv-trace-span( |$)/.test(c[0]));
+ const page=()=>calls.filter(c=>/dv-trace-span-item/.test(c[0]));
  try{
   const t=api.snapshot().trace.selected,span=t.exemplar.spans[41].id;
   assert.equal(api.selectTraceSpan({context:t.context,spanId:span,auto:true}),true);h.flush();
@@ -4923,7 +4923,7 @@ test('#1280 a span focus restored after an edit re-render never scrolls the page
    for(let i=0;i<3;i++){b.h.flush();runTimers(b.h);}b.h.flush();
    const restored=b.api.snapshot().trace.selected;assert.ok(restored && restored.focus && restored.focus.spanId===MAP_SPAN,(auto?'auto':'reader')+': the focus is restored');
    assert.equal(restored.focus.auto,true,'a restored focus is marked as nobody\'s new request');
-   assert.equal(scroller.scrollTop,0,(auto?'auto':'reader')+': the page did not scroll');assert.equal(calls.filter(c=>/(^| )dv-trace-span( |$)/.test(c)).length,0,'no scrollIntoView');
+   assert.equal(scroller.scrollTop,0,(auto?'auto':'reader')+': the page did not scroll');assert.equal(calls.filter(c=>/dv-trace-span-item/.test(c)).length,0,'no scrollIntoView');
    // Review c2: the reader then focusing the same span is a request, so the page scrolls by the least needed.
    assert.equal(b.api.selectTraceSpan({context:restored.context,spanId:MAP_SPAN}),true);b.h.flush();
    assert.equal(b.api.snapshot().trace.selected.focus.auto,false);assert.equal(scroller.scrollTop,1038,(auto?'auto':'reader')+': a reader focus of the same span after a restore scrolls (1930 - 900 + 8)');
@@ -4939,13 +4939,13 @@ test('#1280 Edit-mode span dragging caps the list; a focused row scrolls inside 
  assert.ok(list().classList.contains('dv-trace-waterfall-edit'),'Edit mode with span dragging: the cap class is on');
  const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,calls=[],scroller={scrollTop:0};
  proto.getClientRects=function(){return [1];};
- proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-waterfall'))return {top:200,bottom:900,left:0,right:100,width:100,height:700};if(this.classList.contains('dv-trace-span'))return {top:1500,bottom:1530,left:0,right:100,width:100,height:30};return bound.call(this);};
+ proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-waterfall'))return {top:200,bottom:900,left:0,right:100,width:100,height:700};if(this.classList.contains('dv-trace-span-item'))return {top:1500,bottom:1530,left:0,right:100,width:100,height:30};return bound.call(this);};
  proto.scrollIntoView=function(){calls.push(this.className);};
  b.h.doc.scrollingElement=scroller;b.h.doc.defaultView={getComputedStyle:el=>({overflowY:el.classList && el.classList.contains('dv-trace-waterfall-edit')?'auto':'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
  const l=list();l.scrollHeight=1600;l.clientHeight=700;l.scrollTop=0;
  try{
   const s=b.api.snapshot().trace.selected;assert.equal(b.api.selectTraceSpan({context:s.context,spanId:MAP_SPAN}),true);b.h.flush();
-  assert.equal(l.scrollTop,638,'the row scrolls inside the capped list (1530 - 900 + 8)');assert.equal(scroller.scrollTop,0,'not the page');assert.equal(calls.filter(c=>/(^| )dv-trace-span( |$)/.test(c)).length,0);
+  assert.equal(l.scrollTop,638,'the row scrolls inside the capped list (1530 - 900 + 8)');assert.equal(scroller.scrollTop,0,'not the page');assert.equal(calls.filter(c=>/dv-trace-span-item/.test(c)).length,0);
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;}
  active=false;b.api.setTraceShow(false);b.api.setTraceShow(true);b.h.flush();
  assert.ok(!list().classList.contains('dv-trace-waterfall-edit'),'Edit mode ended: no cap');
@@ -4971,16 +4971,20 @@ test('#1280 the Edit-mode cap listeners exist only while the cap is on and are g
  }
  assert.equal(views.reduce((n,v)=>n+v.count(),0),0,'none left after three boards');
 });
-/* #1283 CI (run 42886692965): a click on a row that is in view never moves the page. Its detail opens below it and may run
-   past the window; the reveal looks at the row, not the row with its detail. */
-test('#1280 a reader focus of a row in view does not scroll the page even when its detail runs past the window',async()=>{
+/* #1283 CI follow-up (lead's rule): a click reveals the row with its opened detail by the least scroll; when the two are
+   taller than the window the row is aligned to the top edge, so it never leaves the window; already visible, nothing moves. */
+test('#1280 a reader focus reveals row and detail by the least scroll; taller than the window, the row goes to the top',async()=>{
  const {h,api}=await stage2Loaded();
- const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,scroller={scrollTop:0};
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView;
+ let item={top:300,bottom:600};
  proto.getClientRects=function(){return [1];};
- proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-span'))return {top:800,bottom:830,left:0,right:100,width:100,height:30};if(this.classList.contains('dv-trace-span-item'))return {top:800,bottom:1300,left:0,right:100,width:100,height:500};return bound.call(this);};
- h.doc.scrollingElement=scroller;h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
+ proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-span-item'))return {top:item.top,bottom:item.bottom,left:0,right:100,width:100,height:item.bottom-item.top};return bound.call(this);};
+ h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
+ const focus=(i,box)=>{item=box;const scroller={scrollTop:0};h.doc.scrollingElement=scroller;const t=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t.context,spanId:t.exemplar.spans[i].id}),true);h.flush();return scroller.scrollTop;};
  try{
-  const t=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t.context,spanId:t.exemplar.spans[20].id}),true);h.flush();
-  assert.equal(api.snapshot().trace.selected.focus.auto,false,'a reader focus');assert.equal(scroller.scrollTop,0,'the row is in view: the page stays where it is');
+  assert.equal(focus(10,{top:300,bottom:600}),0,'row and detail already visible: nothing moves');
+  assert.equal(focus(20,{top:700,bottom:1000}),108,'row near the bottom: the least scroll shows the detail (1000 - 900 + 8); the row stays at 592');
+  assert.equal(focus(30,{top:500,bottom:1600}),492,'taller than the window: the row is aligned to the top edge (500 - 8)');
+  assert.equal(focus(40,{top:-200,bottom:100}),-208,'above the window: the row comes to the top edge');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
 });

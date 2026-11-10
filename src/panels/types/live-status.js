@@ -522,18 +522,23 @@
         return;
       }
       stopFocusWatch();host._traceFocusPending=null;list._traceFocusShown=pending.key;
-      // The row, not the row with its opened detail: a click on a visible row never moves the page (the detail opens
-      // below it), and an off-screen row is brought to the edge by the least scroll.
-      revealInView(pending.item.querySelector('.dv-trace-span') || pending.item,pending.auto);
+      // The row with its opened detail, so a click shows the detail too; the row itself never leaves the window.
+      revealInView(pending.item,pending.auto);
     }
-    /* #1280: bring `node` into view by the least scroll. A scrolling ancestor below the page (the capped Edit-mode list, a
-       fixed-height container holding the panel) moves first. Without one, only a reveal the reader asked for (pageOff false)
-       scrolls the page, and only this document's scrolling element, never a frame around the board. */
+    /* #1280: bring `node` into view by the least scroll. Already fully visible: nothing moves. Below the edge: its bottom
+       comes to the edge (8 px margin). Above the edge, or taller than the view less the margins: its top comes to the top
+       edge, so the top (the focused row) never leaves the window. A scrolling ancestor below the page (the capped Edit-mode
+       list, a fixed-height container holding the panel) moves first. Without one, only a reveal the reader asked for
+       (pageOff false) scrolls the page, and only this document's scrolling element, never a frame around the board. */
+    function revealDelta(top,bottom,edgeTop,edgeBottom){
+      if(top>=edgeTop && bottom<=edgeBottom)return 0;
+      return top<edgeTop || bottom-top>edgeBottom-edgeTop-16?top-edgeTop-8:bottom-edgeBottom+8;
+    }
     function revealInView(node,pageOff){
-      var holder=scrollHolder(node),ib=node.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement;
-      if(holder){var hb=holder.getBoundingClientRect();if(ib.top<hb.top || ib.bottom>hb.bottom)holder.scrollTop+=ib.top<hb.top || ib.height>hb.height?ib.top-hb.top-8:ib.bottom-hb.bottom+8;return;}
+      var holder=scrollHolder(node),ib=node.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement,delta;
+      if(holder){var hb=holder.getBoundingClientRect();delta=revealDelta(ib.top,ib.bottom,hb.top,hb.bottom);if(delta)holder.scrollTop+=delta;return;}
       if(pageOff)return;
-      if(page && view && view.innerHeight){if(ib.top<0 || ib.height>view.innerHeight)page.scrollTop+=ib.top-8;else if(ib.bottom>view.innerHeight)page.scrollTop+=ib.bottom-view.innerHeight+8;}
+      if(page && view && view.innerHeight){delta=revealDelta(ib.top,ib.bottom,0,view.innerHeight);if(delta)page.scrollTop+=delta;}
       else if(node.scrollIntoView)node.scrollIntoView({block:'nearest',inline:'nearest'});
     }
     // A successful Load's reveal of its own trace (#1230): the request line, by the least scroll.

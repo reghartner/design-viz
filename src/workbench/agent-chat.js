@@ -214,6 +214,9 @@ function initWorkbenchAgentChat(opts){
   }
   function restoreRecoveryForProject(current){
     if(adoptingProject || !current.open || seenProject===current.project)return;
+    // #1276: superseding an in-flight connection makes this call the owner of the panel status:
+    // the old attempt's guards return silently, so say here that nothing was connected.
+    var interrupted=connecting && !state.connected;
     generation++;background.cancelDelay(timer);background.release();
     var retired=client,unlock=releaseLock;client=null;releaseLock=null;connecting=false;cacheReady=false;
     if(retired)retired.disconnect().catch(function(){}).finally(function(){retired.destroy();if(unlock)unlock();});else if(unlock)unlock();
@@ -225,6 +228,10 @@ function initWorkbenchAgentChat(opts){
       if(!state.connected && remembered.sourceKey===key){state.transcript=remembered.transcript;state.changes=remembered.changes;}
     }
     cacheReady=true;paint({});
+    if(interrupted){
+      if(pendingFileChoice){var choice=pendingFileChoice;pendingFileChoice=null;choice.reject(new DOMException('Folder selection cancelled.','AbortError'));}
+      get('file-choice').hidden=true;stage('folder');status('The open diagram changed while the folder was connecting, so nothing was connected. Choose the folder again when ready.');
+    }
   }
   function paintRecovery(){
     recoveryCard.hidden=freshProject===opts.snapshot().project || !cacheReady || state.connected || !remembered || !remembered.folderName;

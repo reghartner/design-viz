@@ -1140,8 +1140,16 @@ function traceMatchEditor(val,ctx,t){
       var plan=planStepTraceMatch(parsed.text,parsed.raw,t.section,t.index,edit);
       if(plan.noop){refreshFormSoon();return true;}
       if(plan.error){formError(plan.error);return false;}
+      /* A document that imports nodes refuses a source whose resolved spec is
+         invalid. Check first, so the form and the typed text stay and say why. */
+      if(session.resolve && session.topologyContext && session.topologyContext()){
+        try{session.resolve(JSON.parse(plan.text));}catch(ex){formError('This edit was not applied: '+ex.message);return false;}
+      }
       formError('');
-      return applyPlan(plan,{after:refreshFormSoon},parsed);
+      var ok=applyPlan(plan,{after:refreshFormSoon},parsed);
+      // Add-row drafts are kept per alternative position; removing one shifts the positions.
+      if(ok && edit.op==='remove-alternative')dropDrafts('attr:');
+      return ok;
     }
     function warn(parent,control,texts){
       if(!texts || !texts.length)return;
@@ -1209,7 +1217,7 @@ function traceMatchEditor(val,ctx,t){
       textRow('Namespace','namespace','orders','Matches the span service.namespace attribute. Empty matches any namespace.');
       /* Each control is disabled only while the other is set and it is not, so a
          source holding both (a validator error) stays fixable from either one. */
-      var hasRepeat=m.repeat!==undefined,hasOccurrence=m.occurrence!==undefined;
+      var hasRepeat=m.repeat!=null,hasOccurrence=m.occurrence!=null;
       var occurrence=named(textControl(m.occurrence,function(v){return commit({op:'set',alternative:i,field:'occurrence',value:v});},{placeholder:'any',commitUnchanged:true}),lead+'occurrence',
         hasRepeat && !hasOccurrence?'Turn off Retry attempts to pick one call by order.':'Pick the Nth serial call of this service and operation (1 is the first). Empty matches a single span.');
       occurrence.className+=' fnum';occurrence.disabled=hasRepeat && !hasOccurrence;
@@ -1246,9 +1254,9 @@ function traceMatchEditor(val,ctx,t){
           listen(value,'change',function(){if(commit({op:'attribute',alternative:i,key:key,name:key,value:value.value,type:type})===false)value.value=String(attrs[key]);});
         }else value=named(textControl(String(attrs[key]),function(v){return commit({op:'attribute',alternative:i,key:key,name:key,value:v==null?'':v,type:type});},{placeholder:'value'}),rowLead+'value');
         var types=typeSelect(type,rowLead+'type');
-        // To true/false, a value that is not "true" or "false" starts as false.
         listen(types,'change',function(){
-          var text=String(attrs[key]);if(types.value==='boolean' && text!=='true' && text!=='false')text='false';
+          var text=String(attrs[key]);
+          if(types.value==='boolean' && text!=='true' && text!=='false'){formError('Value \''+text+'\' is not true or false; change the value first.');types.value=type;return;}
           if(commit({op:'attribute',alternative:i,key:key,name:key,value:text,type:types.value})===false)types.value=type;
         });
         var remove=actionButton('×',function(){return commit({op:'attribute',alternative:i,key:key,name:null});},'rowx');

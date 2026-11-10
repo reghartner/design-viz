@@ -479,7 +479,10 @@ then press **Add signal** or Enter. A Honeycomb query is a JSON object such as
 fields, proof limits (**min**, **max** and **ratio of** another signal) and a
 **Remove signal** button. Renaming a signal moves its limit and every ratio that
 names it. Removing the last signal removes the binding; **Remove metrics**
-removes it at once.
+removes it at once. Each signal, **New signal**, the links and the
+connection's **Card** controls sit in collapsible sections that start closed on a
+new selection and stay open while you edit the same carrier; Document settings
+folds **Environments**, each template and **New template** the same way.
 
 When the page has templates, **Signals from** switches between raw signals and a
 template. A template binding gets one **Template parameter** input per declared

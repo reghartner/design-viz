@@ -128,3 +128,19 @@ test('W5 W6 the snapshot status line keeps a refusal through a Demo change and f
  await page.locator('#editor-tab-json').click();await page.locator('#src').fill(JSON.stringify(edited,null,2));await page.locator('#go').click();
  await expect(status).toContainText('7 of this board\'s 8 tickets are in it');
 });
+
+/* #1279 review: a snapshot that cannot be read for the board when the preview draws.
+| row | fixture | assertion | rejects |
+|---|---|---|---|
+| W7 a render-time read failure is named | a loaded snapshot whose day reader then throws (page-script read with a throwing map) | the line says "Snapshot not shown: doorbell.snapshot.json could not be read for this board.", data-kind error, no exception text; the Snapshot box is unticked | a silent untick |
+No file reaches this path (every ticket is read once at load), so the test swaps the reader in the page. */
+test('W7 a snapshot that cannot be read when the preview draws is named in plain words and left unticked',async({page,server},info)=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
+ await paste(page,JSON.stringify(raw,null,2));await prepareEditorSurface(page);
+ const file=info.outputPath('doorbell.snapshot.json');await mkdir(path.dirname(file),{recursive:true});await writeFile(file,JSON.stringify(snapshotFile()));
+ await loadSnapshot(page,file);await expect(snapshotToggle(page)).toBeChecked();
+ await page.evaluate(text=>{const read=workbenchLiveSnapshot(text);read.map=()=>{throw new TypeError('Cannot read properties of undefined (reading \'state\')');};workbenchPreview.setLiveSnapshot(read,true);},JSON.stringify(snapshotFile()));
+ const status=page.locator('#live-snapshot-status');
+ await expect(status).toHaveText('Snapshot not shown: doorbell.snapshot.json could not be read for this board.');await expect(status).toHaveAttribute('data-kind','error');
+ await expect(snapshotToggle(page)).not.toBeChecked();
+});

@@ -521,7 +521,6 @@ function telemetryLookups(raw,warn){
     var at='.lookups.'+id,entry=raw[id],ok=true;
     function bad(path,message){warn(at+path,message+' — lookup ignored');ok=false;}
     if(!telemetryNamePattern.test(id)){bad('','lookup ids start with a letter and use letters, digits, - and _');return;}
-    if(Object.keys(out).length>=16){bad('','a board has at most 16 lookups');return;}
     if(!telemetryObject(entry)){bad('','must be an object {label, query, values?, datasource?, fields?}');return;}
     Object.keys(entry).forEach(function(key){if(TELEMETRY_LOOKUP_FIELDS.indexOf(key)<0)bad('.'+key,'unknown field');});
     if(!telemetryText(entry.label) || entry.label.length>80 || /[\x00-\x1f\x7f]/.test(entry.label))bad('.label','must be plain text of 1–80 characters');

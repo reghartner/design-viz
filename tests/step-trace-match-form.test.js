@@ -188,6 +188,11 @@ test('F6 Inspect form controls over a consumer with imported nodes: one Undo ste
   oneStep(ui,()=>ui.set('advanced JSON','{"maxDurationMs": 900, "optional": true}'));assert.equal(match().maxDurationMs,900);assert.equal(match().optional,true);
   assert.equal(ui.warningFor('advanced JSON'),'');
   // A refused edit leaves the source and history alone and says why.
+  // In a document that imports nodes an invalid resolved spec is refused before applying; the form and the typed text stay.
+  ui.select(STEP);let held=ui.text;const area=ui.control('advanced JSON');area.value='{"maxDurationMs": -1}';area.fire('change');ui.h.flush();
+  assert.equal(ui.text,held,'the source is unchanged');assert.match(ui.error(),/^This edit was not applied: .*nonnegative number required/);
+  assert.ok(ui.h.guide.querySelector('fieldset.trace-match-editor'),'the form stays');assert.equal(ui.control('advanced JSON'),area,'the same textarea stays');assert.equal(area.value,'{"maxDurationMs": -1}','the typed text stays');
+  assert.equal(ui.h.session.undo(),true);assert.notEqual(ui.text,held,'Undo still reverts the previous real edit');assert.equal(ui.h.session.redo(),true);assert.equal(ui.text,held);ui.select(STEP);
   let before=ui.text;ui.set('occurrence','0');assert.equal(ui.text,before);assert.match(ui.error(),/whole number from 1/);
   ui.select(STEP);before=ui.text;ui.set('operation','');assert.equal(ui.text,before,'emptying a required field is refused');assert.match(ui.error(),/needs a service name and an operation\. To delete it, use Remove trace match/);
   // Alternatives: labels name the alternative; removing back to one returns the object form.
@@ -252,6 +257,8 @@ test('F7 Inspect keeps every source fixable: occurrence with repeat, string occu
   oneStep(other,()=>other.check('retry attempts',false));assert.deepEqual(plain(stepOf(other.raw).traceMatch),{serviceName:'payment',operation:'Charge',occurrence:2});
   // Only repeat:"attempts" shows as checked.
   for(const repeat of [false,'retries'])assert.equal(harness(board({serviceName:'a',operation:'b',repeat})).select(STEP).control('retry attempts').checked,false,'repeat '+JSON.stringify(repeat)+' is not checked');
+  const unset=harness(board({serviceName:'a',operation:'b',repeat:null,occurrence:null})).select(STEP);
+  assert.equal(unset.control('occurrence').disabled,false,'repeat:null does not disable Occurrence');assert.equal(unset.control('retry attempts').disabled,false,'occurrence:null does not disable Retry attempts');
   // A string occurrence is normalized by entering the same number.
   const text=harness(board({serviceName:'a',operation:'b',occurrence:'2'})).select(STEP);
   assert.equal(text.control('occurrence').value,'2');
@@ -260,8 +267,12 @@ test('F7 Inspect keeps every source fixable: occurrence with repeat, string occu
   const attrs=harness(board({serviceName:'a',operation:'b',attributes:{'flow.backpressure':true,'service.version':'1'}})).select(STEP);
   const flag=attrs.control('attribute 1 value');assert.equal(flag.tagName,'SELECT');assert.deepEqual(flag.options.map(o=>o.value),['true','false']);assert.equal(flag.value,'true');
   oneStep(attrs,()=>attrs.set('attribute 1 value','false'));assert.equal(stepOf(attrs.raw).traceMatch.attributes['flow.backpressure'],false);
-  oneStep(attrs,()=>attrs.set('attribute 2 type','boolean'));assert.equal(stepOf(attrs.raw).traceMatch.attributes['service.version'],false,'text that is not true/false starts as false');
-  let before=attrs.text;attrs.set('attribute 1 name','');assert.equal(attrs.text,before);assert.match(attrs.error(),/needs a name\. To delete flow\.backpressure, use its × button/);
+  let before=attrs.text;attrs.set('attribute 2 type','boolean');
+  assert.equal(attrs.text,before,'a value that is not true/false is never dropped by a type change');
+  assert.equal(attrs.error(),"Value '1' is not true or false; change the value first.");assert.equal(attrs.control('attribute 2 type').value,'string','the type select reverts');
+  attrs.select(STEP);before=attrs.text;attrs.set('attribute 2 type','number');assert.equal(stepOf(attrs.raw).traceMatch.attributes['service.version'],1,'"1" becomes the number 1');
+  attrs.select(STEP);before=attrs.text;attrs.set('attribute 2 value','v1');assert.equal(attrs.text,before);assert.match(attrs.error(),/enter a number/);
+  attrs.select(STEP);before=attrs.text;attrs.set('attribute 1 name','');assert.equal(attrs.text,before);assert.match(attrs.error(),/needs a name\. To delete flow\.backpressure, use its × button/);
   attrs.select(STEP);attrs.control('new attribute type').value='boolean';attrs.control('new attribute type').fire('change');
   assert.equal(attrs.control('new attribute value').hidden,true);assert.equal(attrs.control('new attribute true/false value').hidden,false);
   attrs.control('new attribute name').value='flow.delivery_failed';attrs.control('new attribute true/false value').value='false';
@@ -271,6 +282,12 @@ test('F7 Inspect keeps every source fixable: occurrence with repeat, string occu
   attrs.control('new attribute value').value='shop';attrs.control('new attribute value').fire('input');
   attrs.select(STEP);assert.equal(attrs.control('new attribute name').value,'service.namespace');assert.equal(attrs.control('new attribute value').value,'shop');
   attrs.select({kind:'step',section:0,index:0});attrs.select(STEP);assert.equal(attrs.control('new attribute name').value,'','another selection drops the draft');
+  // Removing an alternative drops the add-row drafts, which are kept by position.
+  const two=harness(board([{serviceName:'a',operation:'b'},{serviceName:'c',operation:'d'}])).select(STEP);
+  two.control('Alternative 1 new attribute name').value='service.version';two.control('Alternative 1 new attribute name').fire('input');
+  two.select(STEP);assert.equal(two.control('Alternative 1 new attribute name').value,'service.version');
+  oneStep(two,()=>two.click('Remove alternative 1'));assert.deepEqual(plain(stepOf(two.raw).traceMatch),{serviceName:'c',operation:'d'});
+  assert.equal(two.control('new attribute name').value,'','the removed alternative\'s draft does not reappear');
   const fresh=harness(board()).select(STEP);
   fresh.control('new trace match service name').value='payment';fresh.control('new trace match service name').fire('input');
   fresh.select(STEP);assert.equal(fresh.control('new trace match service name').value,'payment');

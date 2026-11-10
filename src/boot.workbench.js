@@ -415,7 +415,8 @@ function sayLiveSnapshot(text,kind){if(!liveSnapshotStatus)return;liveSnapshotSt
 function describeLiveSnapshot(state){
   // Without a loaded snapshot the line keeps what it says (a refusal stays until another load or project).
   var read=state && state.snapshot;if(!read)return;
-  if(state.failure){sayLiveSnapshot('Snapshot not shown: '+read.label+' could not be read for this board ('+state.failure+').','error');return;}
+  // Plain words only: the exception text is for developers, not the author.
+  if(state.failure){sayLiveSnapshot('Snapshot not shown: '+(liveSnapshotName || 'the snapshot')+' could not be read for this board.','error');return;}
   var page=workbenchPreview.page(),keys=page?Object.keys(workbenchDemoStatus(page)):[],covered=read.covers(keys),kind='info',parts=[];
   parts.push((state.showing?'Showing ':'Loaded, not shown: ')+read.label+(liveSnapshotName?' ('+liveSnapshotName+')':'')+': '+read.tickets+' tickets, '+read.carriers+' carriers with metrics.');
   if(keys.length && !covered){kind='warn';parts.push('None of this board\'s '+keys.length+' tickets are in it'+(read.board?' (it was taken of '+read.board+')':'')+', so they show as missing.');}

@@ -164,9 +164,9 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   var demoWanted=hasTickets && !!(saved && saved.demoLiveStatus),metricsWanted=!!(saved && saved.metricsPreview);
   var liveSnapshot=lifecycle && lifecycle.liveSnapshot && lifecycle.liveSnapshot(),snapshotOn=!!liveSnapshot && !!(saved && saved.liveSnapshot);
   var snapshotMap=null,snapshotTelemetry=null;
-  // A snapshot that cannot be read for this board is not shown, and the File status line names why.
-  var snapshotFailure='';
-  if(snapshotOn){try{snapshotMap=liveSnapshot.map(Object.keys(demoMap));snapshotTelemetry=liveSnapshot.telemetry();}catch(ex){snapshotOn=false;snapshotFailure=String(ex && ex.message || ex).slice(0,200);}}
+  // A snapshot that cannot be read for this board is not shown; the File status line says so. No exception text is kept.
+  var snapshotFailure=false;
+  if(snapshotOn){try{snapshotMap=liveSnapshot.map(Object.keys(demoMap));snapshotTelemetry=liveSnapshot.telemetry();}catch(ex){snapshotOn=false;snapshotFailure=true;}}
   var demoOn=demoWanted && !snapshotOn,metricsOn=metricsWanted && !snapshotOn;
   var renderOptions={autoplay:false,authoring:true,layoutTarget:'default',telemetry:false,metricsPreview:metricsOn,loadDetail:lifecycle && lifecycle.loadDetail};
   if(snapshotOn){
@@ -353,7 +353,7 @@ function createWorkbenchPreviewController(opts){
     replace(page,renderedText,opts.skin(page),{origin:'demo-live-status'});snapshotChanged();
   }
   function snapshotChanged(){if(opts.liveSnapshotChanged)opts.liveSnapshotChanged(snapshotState());}
-  function snapshotState(){return {snapshot:liveSnapshot,showing:!!(ctl && ctl.liveSnapshot),failure:ctl && ctl.liveSnapshotFailure || ''};}
+  function snapshotState(){return {snapshot:liveSnapshot,showing:!!(ctl && ctl.liveSnapshot),failure:!!(ctl && ctl.liveSnapshotFailure)};}
   /* #1265: a loaded snapshot belongs to the open document; another project forgets it. `show` turns it on
      (File → Load snapshot…); a snapshot found beside the board is only offered. */
   function setLiveSnapshot(read,show){

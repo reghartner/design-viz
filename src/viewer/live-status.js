@@ -935,9 +935,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       },telemetry.config());
       scope.querySelectorAll('svg').forEach(function(svg){
         if(svg._layoutStatusCoins)svg._layoutStatusCoins();
-        // #1255: Workbench Preview metrics layout grows the diagram frame to fit its cards, as the
-        // live overlay does after painting its cues, so a card below its edge is not clipped.
-        if(cardsView && cardsView.preview && svg._refreshStatusFrame)svg._refreshStatusFrame();
+        // #1255: the status frame refresh after this paint grows the viewBox for the cards; Workbench
+        // Preview metrics layout also asks its board camera to grow its box so the cards are not clipped.
+        svg._dvGrowFrame=!!(authoring && cardsView && cardsView.preview);
       });
     });
   }

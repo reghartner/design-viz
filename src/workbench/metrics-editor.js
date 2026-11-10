@@ -19,7 +19,7 @@ function flowMetricsDom(o){
     if(kind==='text')input.type='text';
     (options || []).forEach(function(option){var item=el('option',null,option[1]);item.value=option[0];input.appendChild(item);});
     if(value!=null)input.value=value;
-    return kept(row(parent,label,input),label);
+    return row(parent,label,input);
   }
   /* #1255: unsaved New … fields survive a same-selection re-render (o.drafts is inspector-owned
      and cleared when the selection changes); a successful add forgets them. */
@@ -29,6 +29,8 @@ function flowMetricsDom(o){
     o.listen(input,'input',keep);o.listen(input,'change',keep);return input;
   }
   function forget(keys){keys.forEach(function(key){drafts.delete('metrics:'+key);});}
+  // draft() stores nothing itself: callers with their own draft keys (the Log searches editor) wrap it.
+  function keptDraft(parent,label,kind,options,value){return kept(draft(parent,label,kind,options,value),label);}
   function warnings(parent,list,label){
     if(!list.length)return;
     var ul=el('ul','metrics-warnings');ul.setAttribute('aria-label',label);
@@ -61,8 +63,8 @@ function flowMetricsDom(o){
       box.appendChild(c.action(prefix?'Remove '+prefix+'signal '+name:'Remove signal '+name,function(){return commit({op:'removeSignal',name:name});}));
     });
     var add=fold(parent,'metrics-add',prefix?'New '+prefix+'signal':'New signal'),label=prefix?prefix+'new signal':'New signal';
-    var nameInput=draft(add,label+' name','text',null,''),source=draft(add,label+' source','select',sourceOptions,'grafana');
-    var query=draft(add,label+' query','textarea',null,''),unit=draft(add,label+' unit','text',null,'');
+    var nameInput=keptDraft(add,label+' name','text',null,''),source=keptDraft(add,label+' source','select',sourceOptions,'grafana');
+    var query=keptDraft(add,label+' query','textarea',null,''),unit=keptDraft(add,label+' unit','text',null,'');
     nameInput.placeholder='rate, errors, lag';unit.placeholder='req/h, msgs, ms';
     function submit(){
       var edit={op:'addSignal',name:nameInput.value.trim(),source:source.value,query:query.value,unit:unit.value.trim() || null};
@@ -88,7 +90,7 @@ function flowMetricsDom(o){
       row(parent,label,c.text(telemetryObject(links)?links[link[0]]:null,function(v){return commit({op:'link',key:link[0],value:v});},{placeholder:placeholders && placeholders[link[0]]?'Template: '+placeholders[link[0]]:'https://…'}));
     });
   }
-  return {el:el,note:note,row:row,relabel:relabel,group:group,fold:fold,draft:draft,kept:kept,forget:forget,drafts:drafts,warnings:warnings,signalEditors:signalEditors,proofEditors:proofEditors,linkEditors:linkEditors,sourceOptions:sourceOptions};
+  return {el:el,note:note,row:row,relabel:relabel,group:group,fold:fold,draft:draft,keptDraft:keptDraft,kept:kept,forget:forget,drafts:drafts,warnings:warnings,signalEditors:signalEditors,proofEditors:proofEditors,linkEditors:linkEditors,sourceOptions:sourceOptions};
 }
 
 /* o: {document, state: telemetryCarrierState(...), controls:{row,text,select,number,action}, listen, commit(edit)} */
@@ -179,7 +181,7 @@ function createFlowMetricsSettings(o){
     d.row(set,id+' metrics variables',c.text(profile.variables?JSON.stringify(profile.variables):null,function(v){return commit({op:'environmentSetting',name:id,source:'variables',value:v});},{textarea:true,placeholder:'Named string values; inherit shared defaults'}));
     set.appendChild(c.action('Remove environment '+id,function(){return commit({op:'removeEnvironment',name:id});}));
   });
-  var environmentName=d.draft(environments,'New environment id','text',null,'');environmentName.placeholder='qa, stg or prd';
+  var environmentName=d.keptDraft(environments,'New environment id','text',null,'');environmentName.placeholder='qa, stg or prd';
   function addEnvironment(){var ok=commit({op:'addEnvironment',name:environmentName.value.trim()});if(ok)d.forget(['New environment id']);return ok;}
   o.listen(environmentName,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addEnvironment();}});
   environments.appendChild(c.action('Add environment',addEnvironment));
@@ -202,9 +204,9 @@ function createFlowMetricsSettings(o){
     set.appendChild(c.action('Remove template '+name,function(){return commit({op:'removeTemplate',name:name});}));
   });
   var add=d.fold(box,'metrics-add','New template');
-  var name=d.draft(add,'New template name','text',null,''),kind=d.draft(add,'New template kind','select',[['','(set on each carrier)']].concat(TELEMETRY_KINDS.map(function(k){return [k,k];})),'');
-  var params=d.draft(add,'New template parameters','text',null,''),signal=d.draft(add,'New template signal name','text',null,'');
-  var source=d.draft(add,'New template signal source','select',d.sourceOptions,'grafana'),query=d.draft(add,'New template signal query','textarea',null,''),unit=d.draft(add,'New template signal unit','text',null,'');
+  var name=d.keptDraft(add,'New template name','text',null,''),kind=d.keptDraft(add,'New template kind','select',[['','(set on each carrier)']].concat(TELEMETRY_KINDS.map(function(k){return [k,k];})),'');
+  var params=d.keptDraft(add,'New template parameters','text',null,''),signal=d.keptDraft(add,'New template signal name','text',null,'');
+  var source=d.keptDraft(add,'New template signal source','select',d.sourceOptions,'grafana'),query=d.keptDraft(add,'New template signal query','textarea',null,''),unit=d.keptDraft(add,'New template signal unit','text',null,'');
   name.placeholder='kafka-topic';params.placeholder='topic, group';signal.placeholder='lag';
   function submit(){
     var ok=commit({op:'addTemplate',name:name.value.trim(),kind:kind.value || null,params:params.value,

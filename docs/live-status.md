@@ -551,7 +551,8 @@ commas and a first signal. Each template then has its own kind, parameters,
 signals, proof limits and link fields. A template keeps at least one signal, and
 a template that a carrier still uses cannot be removed. Renaming or removing a template signal
 renames or removes the limits that carriers using the template set on it, in the same
-Undo step.
+Undo step; a ratio limit on a removed signal loses its ratio max too. A carrier that
+defines a signal of that name itself keeps its own limits.
 
 Each change is one Undo/Redo step, and Export project keeps every binding,
 template and setting in its JSON. The Workbench stores queries only: it never runs

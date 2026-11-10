@@ -36,14 +36,15 @@ function telemetryRenameKey(object,from,to){
 }
 function telemetryDropEmpty(object,key){if(telemetryObject(object[key]) && !Object.keys(object[key]).length)delete object[key];}
 /* #1255: a renamed signal (next) or a removed one (next null) carries its proof limit and
-   every maxRatioOf reference with it; limits and a proof left empty are dropped. */
+   every maxRatioOf reference with it. max next to maxRatioOf is a ratio, so removing the base
+   signal drops that max with it (min stays); limits and a proof left empty are dropped. */
 function telemetryProofSignal(binding,name,next){
   if(!telemetryObject(binding) || !telemetryObject(binding.proof))return binding;
   if(telemetryOwn(binding.proof,name)){if(next==null)delete binding.proof[name];else binding.proof=telemetryRenameKey(binding.proof,name,next);}
   Object.keys(binding.proof).forEach(function(key){
     var limit=binding.proof[key];if(!telemetryObject(limit) || limit.maxRatioOf!==name)return;
     if(next!=null){limit.maxRatioOf=next;return;}
-    delete limit.maxRatioOf;if(!Object.keys(limit).length)delete binding.proof[key];
+    delete limit.maxRatioOf;delete limit.max;if(!Object.keys(limit).length)delete binding.proof[key];
   });
   telemetryDropEmpty(binding,'proof');return binding;
 }
@@ -417,7 +418,9 @@ function planPageTelemetry(text,raw,edit){
   return plan.error?plan:telemetryTemplateSignalCarriers(plan,raw,current,result.value,edit);
 }
 /* #1255: renaming or removing a template signal moves or drops the limits that carriers
-   using the template set on it (proof keys and maxRatioOf), in the same plan and Undo step. */
+   using the template set on it (proof keys and maxRatioOf), in the same plan and Undo step.
+   A carrier that defines a signal of the old or new name itself keeps its limits unchanged:
+   that signal is the carrier's own, not the template's. */
 function telemetryTemplateSignalCarriers(plan,raw,before,after,edit){
   var inner=edit && edit.op==='template' && edit.edit;
   if(!inner || !(inner.op==='removeSignal' || inner.op==='signal' && inner.field==='name'))return plan;
@@ -428,6 +431,8 @@ function telemetryTemplateSignalCarriers(plan,raw,before,after,edit){
   var text=plan.text;
   telemetryTemplateCarriers(raw,edit.template).forEach(function(carrier){
     if(plan.error || !telemetryObject(carrier.telemetry.proof))return;
+    var own=telemetryObject(carrier.telemetry.signals)?carrier.telemetry.signals:{};
+    if(telemetryOwn(own,inner.name) || next!=null && telemetryOwn(own,next))return;
     var updated=telemetryProofSignal(telemetryClone(carrier.telemetry),inner.name,next);
     if(JSON.stringify(updated)===JSON.stringify(carrier.telemetry))return;
     var step=planSetField(text,JSON.parse(text),carrier.path,'telemetry',JSON.stringify(updated,null,2));

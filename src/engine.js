@@ -1544,7 +1544,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     if(boxes.length)extendFrame(unionGraphFrame(null,boxes,4));
     // Metrics can add cards and move coins without resizing the board itself.
     // Notify its screen camera only after the complete overlay geometry settles.
-    if(svg.dispatchEvent && typeof CustomEvent!=='undefined')svg.dispatchEvent(new CustomEvent('dv:boardcontentchange',{bubbles:true}));
+    // #1255: Workbench Preview metrics layout (svg._dvGrowFrame) asks a fixed-height board to grow to fit.
+    if(svg.dispatchEvent && typeof CustomEvent!=='undefined')svg.dispatchEvent(new CustomEvent('dv:boardcontentchange',{bubbles:true,detail:{grow:!!svg._dvGrowFrame}}));
   };
   refreshFrame();
   /* Ink measured before webfonts settle, or skipped while an inactive tab
@@ -3177,7 +3178,16 @@ function createBoardNavigation(board, group, legend, changed){
     var scroller=outerScrollerY(delta);if(!scroller || !ev.cancelable)return;
     ev.preventDefault();scroller.scrollTop+=delta;
   }
-  function contentChanged(){if(!enabled())return;if(autoFit)requestFit();else changed();}
+  function contentChanged(ev){if(!enabled())return;if(autoFit)requestFit();else if(ev && ev.detail && ev.detail.grow)growToContent();else changed();}
+  /* #1255: a board kept at a fixed viewport height (a restored or manual camera) grows, at its
+     current zoom, until the content fits vertically. It never shrinks and never changes zoom. */
+  function growToContent(){
+    var svg=graph();changed();
+    if(!svg || !board.clientWidth || !board.classList.contains('board-zoomed'))return;
+    var ink=boardContentBounds(svg),scale=ratio();if(!ink || !scale)return;
+    var need=Math.ceil(legend.offsetHeight+ink.h*scale+2);
+    if(need>board.clientHeight){board.style.setProperty('--board-viewport-height',need+(board.offsetHeight-board.clientHeight)+'px');changed();}
+  }
   board.addEventListener('dv:boardcontentchange',contentChanged);
   var listeners={pointerdown:down,pointermove:move,pointerup:up,pointercancel:cancel,lostpointercapture:lost,keydown:key};
   Object.keys(listeners).forEach(function(type){board.addEventListener(type,listeners[type]);});
@@ -3198,6 +3208,8 @@ function createBoardNavigation(board, group, legend, changed){
     // Composition can borrow and return a board before its first layout. Only
     // that still-pending fit resumes; a saved manual camera always wins.
     if(state.pendingFit)requestFit();
+    // #1255: a restored camera keeps its zoom and scroll, but still grows to fit preview cards.
+    else if(enabled()){var svg=graph();if(svg && svg._dvGrowFrame)growToContent();}
   }
   function camera(value){
     var svg=graph();if(!enabled() || !svg || !board.clientWidth)return null;

@@ -256,3 +256,15 @@ test('table Change column is optional with matching widths and empty spans, with
     assert.match(C.softwarePanelHTML(p,state),/>Change</);
   }
 });
+
+/* #1252 item 21: imported fractional durations are rounded where shown (waterfall rows and total, step text);
+   the panel data keeps the raw values. */
+test('#1252 imported fractional durations are rounded in the waterfall, its total and the step text',()=>{
+  const input=clone(fixture);input[0].duration_ms=300.234111;input[1].duration_ms=5.123456789;
+  const d=C.traceToSpec(input).spec.page.blocks[0].diagram,timing=d.panels.find(p=>p.type==='waterfall');
+  assert.equal(timing.spans.find(s=>s.id==='cache').ms,5.123456789,'the data keeps the raw duration');
+  const html=C.softwarePanelHTML(timing,{});
+  assert.deepEqual(html.match(/\d+\.\d{3,}/g),null,'no unrounded number is shown');assert.match(html,/5\.12 ms/);assert.match(html,/300\.2 ms/);
+  const text=d.steps.find(s=>/idempotency lookup/.test(s.text)).text;assert.match(text,/duration 5\.12 ms/);assert.doesNotMatch(text,/\d\.\d{3,}/);
+  assert.equal(C.waterfallModel([{ms:20},{ms:30}],{}).totalLabel,'50 ms','whole numbers are unchanged');
+});

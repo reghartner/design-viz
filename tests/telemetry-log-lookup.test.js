@@ -20,11 +20,11 @@ function entry({at='1794044533123456789',meta={cameraModel:'arch',deviceId:'cam-
  return {timestamp:at,line,labels,...(meta?{structuredMetadata:meta}:{})};
 }
 const GRAFANA={server:'Grafana',tools:[{name:'query_loki_logs',annotations:{readOnlyHint:true}}]},DETAIL={server:fixture.server,tools:[{name:'get_trace',annotations:{readOnlyHint:true}}]};
-function setup({p=board(),data=[entry()],servers=[DETAIL,GRAFANA],lookback={start:'',end:'',lookback:'2h'},C=context(),answer,day}={}){
+function setup({p=board(),data=[entry()],servers=[DETAIL,GRAFANA],lookback={start:'',end:'',lookback:'2h'},C=context(),answer,day,wanted,failList=0}={}){
  const calls=[],counts={lists:0};let changes=0;
- const mcp={listTools:async()=>{counts.lists++;return clone(servers);},callTool:async(server,tool,args)=>{calls.push({server,tool,args:clone(args)});if(answer)return answer();return {content:[{type:'text',text:JSON.stringify({data,metadata:{linesReturned:data.length,maxLinesAllowed:10,resultsTruncated:false}})}]};}};
+ const mcp={listTools:async()=>{counts.lists++;if(failList>0){failList--;throw new Error('listing failed');}return clone(servers);},callTool:async(server,tool,args)=>{calls.push({server,tool,args:clone(args)});if(answer)return answer();return {content:[{type:'text',text:JSON.stringify({data,metadata:{linesReturned:data.length,maxLinesAllowed:10,resultsTruncated:false}})}]};}};
  const transport=C.createTelemetryProviders(p,{claude:{use:async()=>mcp}}).options.directTrace;
- const api=C.createTelemetryLogLookup(p,transport,{config:()=>C.telemetryEnvironmentConfig(p,'stg'),lookback:()=>lookback,changed:()=>changes++,...(day?{day}:{})});
+ const api=C.createTelemetryLogLookup(p,transport,{config:()=>C.telemetryEnvironmentConfig(p,'stg'),lookback:()=>lookback,changed:()=>changes++,...(day?{day}:{}),...(wanted?{wanted}:{})});
  return {C,p,api,calls,counts,changes:()=>changes};
 }
 const rows=api=>clone(api.snapshot().result.rows).map(r=>[r.time,r.value,r.traceId,r.spanId,r.missing]);
@@ -240,4 +240,18 @@ test('#1233 each search keeps its own value and Find runs the box it is given',a
  assert.equal(Object.prototype.hasOwnProperty.call(values,'constructor'),false,'no value yet');assert.equal(typeof values.constructor,'undefined','not the built-in');
  own.api.set('value','cam-9','constructor');await own.api.find('constructor');assert.equal(own.calls.at(-1).args.logql,'{env="stg"} |= "Handling camera stats message" | deviceId="cam-9"'+FILTER);
  assert.equal(own.api.snapshot().form.values.constructor,'cam-9');
+});
+
+/* #1252 item 12: a missing Grafana connector is looked for again: on "Check again" (recheck), on entering the
+   Trace view, and after a listing error. */
+test('#1252 connector discovery retries after absent or a listing error',async()=>{
+ const servers=[DETAIL],h=setup({servers});h.api.snapshot();await settle();assert.equal(h.api.snapshot().state,'absent');
+ servers.push(GRAFANA);h.api.snapshot();await settle();assert.equal(h.api.snapshot().state,'absent','a repaint alone does not list tools again at once');
+ assert.equal(typeof h.api.recheck,'function','recheck exists');h.api.recheck();await settle();assert.equal(h.api.snapshot().state,'ready','Check again finds the added connector');
+ h.api.set('value','arch');await h.api.find();assert.equal(h.calls.length,1,'Find then runs');
+ // Entering the Trace view again looks once more.
+ let want=true;const s2=[DETAIL],v=setup({servers:s2,wanted:()=>want});v.api.snapshot();await settle();assert.equal(v.api.snapshot().state,'absent');
+ s2.push(GRAFANA);want=false;v.api.snapshot();want=true;v.api.snapshot();await settle();assert.equal(v.api.snapshot().state,'ready','re-entering Trace mode finds it');
+ // A thrown listing is retryable too.
+ const x=setup({failList:1});x.api.snapshot();await settle();assert.equal(x.api.snapshot().state,'absent');x.api.recheck();await settle();assert.equal(x.api.snapshot().state,'ready');
 });

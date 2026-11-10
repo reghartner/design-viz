@@ -4562,3 +4562,40 @@ test('#1194 an authored empty scope is kept and hides the scope on the card; whi
  assert.equal(content.scope,'','the card content carries no scope');
  h.ctl.liveStatus.destroy();
 });
+
+/* #1252 item 11: typing the next trace ID (or a Trace start or end) keeps the shown trace and its span focus; a Load
+   that fails keeps it too. Only a successful Load or Clear replaces it. */
+test('#1252 typing in Trace ID keeps the loaded trace and its focus; a failed Load keeps it too',async()=>{
+ const {h,api,m,calls}=compactHarness(['prod']);
+ api.setDirectTraceField({field:'input',value:COMPACT_ID});await api.loadDirectTrace(false);h.flush();
+ let selected=api.snapshot().trace.selected;const span=selected.exemplar.spans[1].id;assert.equal(api.selectTraceSpan({context:selected.context,spanId:span}),true);
+ for(const [field,value] of [['input','5ab0'],['start','-6h'],['end','']]){api.setDirectTraceField({field,value});h.flush();
+  selected=api.snapshot().trace.selected;assert.ok(selected && selected.manual,field+': the trace stays');assert.equal(selected.exemplar.traceId,COMPACT_ID);assert.equal(selected.focus && selected.focus.spanId,span,field+': the span focus stays');
+  assert.ok(m.body.querySelector('.dv-trace-slot .dv-trace-selected'),field+': still drawn');}
+ api.setDirectTraceField({field:'start',value:''});api.setDirectTraceField({field:'input',value:'f'.repeat(32)});assert.equal(await api.loadDirectTrace(false),null,'a trace whose ID does not match fails');h.flush();
+ selected=api.snapshot().trace.selected;assert.ok(selected && selected.exemplar.traceId===COMPACT_ID,'the failed Load keeps the shown trace');assert.ok(api.snapshot().trace.direct.report.error,'and reports its error');
+ api.clearDirectTrace();h.flush();assert.equal(api.snapshot().trace.selected,null,'Clear removes it');assert.equal(calls.length,2);
+ api.destroy();
+});
+/* #1252 item 13: Enter in "Trace ID or link" runs Load trace when the button is enabled. */
+test('#1252 Enter in Trace ID or link runs Load trace',async()=>{
+ const {h,api,m,calls}=compactHarness(['prod']),input=()=>m.body.querySelectorAll('input').find(el=>el.getAttribute('aria-label')==='Trace ID or link');
+ let prevented=0;const enter=()=>input().dispatchEvent({type:'keydown',key:'Enter',preventDefault(){prevented++;}});
+ enter();for(let i=0;i<6;i++)await settle();assert.equal(calls.length,0,'an empty box loads nothing');
+ api.setDirectTraceField({field:'input',value:COMPACT_ID});h.flush();enter();for(let i=0;i<6;i++)await settle();h.flush();
+ assert.equal(calls.length,1,'Enter loads');assert.ok(prevented>0);assert.equal(api.snapshot().trace.selected.exemplar.traceId,COMPACT_ID);
+ api.destroy();
+});
+/* #1252 item 22: a log line's time is shown in local time like the trace card, with the UTC time in its title. */
+test('#1252 log result times are local, with UTC in the title',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json')));
+ const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+ const line={timestamp:'1794044533123456789',line:'Handling camera stats message',labels:{},structuredMetadata:{cameraModel:'arch',trace_id:COMPACT_ID}};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async()=>({data:[line]})}}}),api=h.ctl.liveStatus;
+ api.setStatusMode('trace');for(let i=0;i<6;i++)await settle();const m=mountStatus(h);api.setLogLookupField({field:'value',value:'arch'});await api.findLogLines();h.flush();
+ const time=m.body.querySelector('.dv-trace-log-row .dv-trace-log-time');assert.ok(time,'one row');
+ assert.equal(time.getAttribute('title'),'2026-11-07 09:42:13Z UTC');assert.equal(time.getAttribute('datetime'),'2026-11-07T09:42:13.123Z');
+ const d=new Date('2026-11-07T09:42:13.123Z');assert.equal(time.textContent,h.C.liveStatusReadableTime('2026-11-07T09:42:13.123Z',true));
+ assert.ok(time.textContent.includes(d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'})),'local time with seconds: '+time.textContent);assert.doesNotMatch(time.textContent,/Z$/);
+ api.destroy();
+});

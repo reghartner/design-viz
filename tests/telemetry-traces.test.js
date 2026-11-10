@@ -247,3 +247,13 @@ test('#1076 a start-0 row with no span ID is dropped as a missing-root placehold
  const matched=withPlaceholder(rootless()).replace('collapsed_nodes: 1','collapsed_nodes: 0').replace('total_spans: 77','total_spans: 54').replace('visible_spans: 55','visible_spans: 54').replace('view_mode: auto','view_mode: full').replaceAll('| true |','| false |');
  const m=C.telemetryHoneycombTrace({payload:matched},recordedId);assert.equal(m.completeness,'partial');assert.deepEqual(plain(m.warnings),['Root span not stored; timeline starts at the earliest stored span.']);
 });
+
+/* #1252 item 1: a failed trace search or detail call is not cached; the next poll or Retry calls again. */
+for(const failing of ['run_query','get_trace'])test('#1252 a failed '+failing+' is not cached: Retry calls it again and the trace appears',async t=>{
+ let fail=1;const h=await setup({wrap:b=>{const call=b.callTool;b.callTool=async(...args)=>{if(args[1]===failing && fail>0){fail--;throw {code:'tool_error',message:'temporary outage'};}return call(...args);};}});t.after(()=>h.close());
+ h.api.setEnabled(true);await settle();assert.equal(h.api.snapshot().map.a?.exemplars,undefined,'the outage leaves no trace');
+ const before=h.bridge.calls.filter(c=>c.name===failing).length;
+ h.api.retry();await settle();h.api.snapshot();await settle();
+ assert.equal(h.bridge.calls.filter(c=>c.name===failing).length,before+1,'Retry calls '+failing+' again');
+ assert.equal(h.api.snapshot().map.a?.exemplars?.length,1,'and the trace appears: '+JSON.stringify(h.api.status()));
+});

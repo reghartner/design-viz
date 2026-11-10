@@ -830,6 +830,26 @@ a `path.dv-metrics-ghost[data-metrics-edge]`. A node's cues sit in a
 Metrics packets reuse the ordinary packet motion along the edge path but never the
 `.pkt` or `.comm-packet` classes, so step packets and failure packets are untouched.
 
+### Metrics style: Cards or Outline (#1294)
+
+While **Metrics overlay** is on, a **Cards | Outline** choice sits right of the switch.
+**Cards** (the default) draws a metric card beside each bound connection. **Outline**
+draws no cards. Each bound connection gets a wide halo under its line and each bound
+node a ring a few pixels outside its border, in the metric verdict colour: green
+healthy, amber degraded, red breach (an error signal outside its limit), grey no
+data. A carrier with several signals takes the worst one. The Jira colours stay on
+the node border and the line, so the two remain distinct. Imported and loaded-detail
+carriers are outlined the same way.
+
+Hovering or focusing an outlined carrier shows its card, the same card Cards draws,
+beside it on a side with free room. A click, Enter or Space opens the full detail
+popover on the carrier, and Escape closes it. On a touch screen the first tap shows
+the card; a second tap, or a tap on the card, opens the detail. The choice is
+remembered per viewer and board in browser storage. Workbench authoring and the
+preview always draw cards. A connection halo is a `path.dv-metrics-outline`, a node
+ring a `rect.dv-metrics-outline`, each with `data-metrics-carrier` and
+`data-metric-state`; the hidden card has `data-metrics-style="outline"`.
+
 ## Live status panel
 
 Always add an authored `live-status` panel to a tracked page:

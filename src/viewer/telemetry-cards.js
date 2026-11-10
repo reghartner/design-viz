@@ -2,7 +2,7 @@
    The renderer accepts a view of samples, so Workbench can reuse it with synthetic
    values without installing a provider or changing the authored binding. */
 function telemetryClearCards(scope){
-  scope.querySelectorAll('.dv-metrics-card,.dv-metrics-leader').forEach(function(el){el.remove();});
+  scope.querySelectorAll('.dv-metrics-card,.dv-metrics-leader,.dv-metrics-outline').forEach(function(el){el.remove();});
   scope.querySelectorAll('.dv-metrics-label-hidden').forEach(function(el){el.classList.remove('dv-metrics-label-hidden');el.removeAttribute('data-metrics-preview');});
 }
 /* Given the board window, a value whose signal covers another span ends in ' · last <span>'. */
@@ -193,9 +193,82 @@ function telemetryCardPlaceHandles(card,w){
     q.setAttribute('x',-mark/2);q.setAttribute('y',-mark/2);q.setAttribute('width',mark);q.setAttribute('height',mark);
   });
 }
-function telemetryPaintCards(scope,diagram,templates,view,window,activate,config){
+/* One metric card for a carrier (an edge, or a node in the Outline style, #1294): the same component either way. */
+function telemetryCardBuild(doc,svg,carrier,binding,id,attrs,view,window){
+  var result=view.verdicts.carriers[id],content=telemetryCardContent(carrier,binding,view.map[id],result,window,view.pending && view.pending[id]);
+  if(view.preview){content.note='Preview · synthetic';content.state='preview';}
+  var card=telemetrySvg(doc,'g',Object.assign({'class':'dv-metrics-card','data-metrics-card':id,'data-state':content.state,'data-verdict':view.preview?'preview':result && result.verdict || 'unobserved'},attrs),svg),metricState=view.preview?null:telemetryCardMetricState(binding,view.map[id],result);
+  if(metricState)card.setAttribute('data-metric-state',metricState);
+  // Authored card.width or 240, with measured wrapping, never stretched glyphs.
+  // Height is the actual rendered content and participates in obstacle packing.
+  var w=binding.card && binding.card.width || 240,y=15,rect=telemetrySvg(doc,'rect',{'class':'dv-metrics-card-box',rx:7,width:w},card);
+  var bar=telemetrySvg(doc,'path',{'class':'dv-metrics-card-bar'},card);
+  function wrapped(value,cls,width,maxLines,x){
+    x=x==null?10:x;
+    var el=telemetrySvg(doc,'text',{'class':cls,x:x,y:y},card),line='',lines=[];
+    function fits(value){el.textContent=value;return el.getComputedTextLength()<=width;}
+    String(value || '').split(/\s+/).filter(Boolean).forEach(function(word){
+      var next=line?line+' '+word:word;if(fits(next)){line=next;return;}
+      if(line){lines.push(line);line='';}
+      // Only a single overlong token needs character fallback.
+      Array.from(word).forEach(function(ch){if(line && !fits(line+ch)){lines.push(line);line=ch;}else line+=ch;});
+    });if(line)lines.push(line);
+    var omitted=maxLines && lines.length>maxLines;if(omitted)lines=lines.slice(0,maxLines);
+    if(omitted){line=lines[lines.length-1];el.textContent=line+'…';while(line && el.getComputedTextLength()>width){line=line.slice(0,-1);el.textContent=line+'…';}lines[lines.length-1]=line+'…';}
+    el.textContent='';lines.forEach(function(value,i){var span=telemetrySvg(doc,'tspan',{x:x,dy:i?14:0},el);span.textContent=value+(i<lines.length-1?' ':'');});
+    y+=Math.max(1,lines.length)*14;return el;
+  }
+  wrapped(content.title,'t1 dv-metrics-card-title',w-20,2);y+=3;
+  var scopes=content.rows.map(function(row){return telemetryCardScope(binding.signals[row.name]);});
+  var sharedScope=scopes[0] && scopes.every(function(scope){return scope===scopes[0];})?scopes[0]:null;
+  content.rows.forEach(function(row,index){
+    var top=y,formatted=row.text.indexOf(' (formatted text; may be rounded)')>=0;
+    var display=formatted?row.text.replace(' (formatted text; may be rounded)',''):row.text;
+    var value=telemetrySvg(doc,'text',{'class':'t1 dv-metrics-card-value',x:10,y:top,'data-signal':row.name},card);value.textContent=display;
+    var valueWidth=value.getComputedTextLength(),label;
+    if(valueWidth<=w-108){
+      // A small table: numbers align at the right, labels use the remainder (at least 56 units).
+      value.setAttribute('x',w-32-valueWidth);
+      label=wrapped(row.label,'t2 dv-metrics-card-label',w-52-valueWidth,2);
+    }else{
+      value.remove();label=wrapped(row.label,'t2 dv-metrics-card-label',w-42,2);
+      value=wrapped(display,'t1 dv-metrics-card-value',w-42,3);value.setAttribute('data-signal',row.name);
+    }
+    label.setAttribute('data-signal',row.name);
+    value.setAttribute('data-metric-health',view.preview?'preview':row.health);
+    if(row.health==='failing' && !view.preview)wrapped('Outside limit','t2 dv-metrics-card-failure',w-42,1).setAttribute('data-signal',row.name);
+    if(formatted)wrapped('formatted text; may be rounded','t2 dv-metrics-card-provenance',w-42,2);
+    if(!sharedScope && scopes[index])wrapped(scopes[index],'t2 dv-metrics-card-scope',w-42,2);
+    if(row.url){
+      var link=telemetrySvg(doc,'a',{'class':'dv-metrics-query-link',href:row.url,target:'_blank',rel:'noopener noreferrer',tabindex:0,'aria-label':'Open '+row.label+' source query in a new tab','data-signal':row.name},card);
+      telemetrySvg(doc,'rect',{x:w-28,y:top-11,width:22,height:16,fill:'transparent'},link);
+      var icon=telemetrySvg(doc,'svg',{x:w-26,y:top-9,width:16,height:16,viewBox:'0 0 24 24','class':'fv-icon fv-icon--mono','aria-hidden':'true',focusable:'false'},link);icon.innerHTML=FlowIcons.glyph('external-link',{monochrome:true});
+      ['pointerdown','click','keydown'].forEach(function(type){link.addEventListener(type,function(ev){ev.stopPropagation();});});
+    }
+    y+=2;
+  });
+  if(content.series.length){telemetryPaintSparkline(doc,card,content.series,10,y,Math.min(100,w-20),12,telemetryWindowMs(window),content.chartRange,content.intervalMs);y+=20;}
+  if(sharedScope)wrapped(sharedScope,'t2 dv-metrics-card-scope',w-20,2);
+  if(content.hidden && !view.preview)wrapped(content.hidden,'t2 dv-metrics-card-hidden',w-20,2);
+  wrapped(content.note,'t2 dv-metrics-card-note',w-20,2);
+  if(content.countNote)wrapped('COUNT: source rows/events','t2 dv-metrics-card-scope',w-20,2);
+  var height=y+3;rect.setAttribute('height',height);bar.setAttribute('d','M3 7V'+(height-7));
+  return {card:card,w:w,height:height,state:metricState};
+}
+/* #1294 Outline: the verdict colour of a carrier, worst signal first; no data is 'waiting'. */
+function telemetryOutlineState(binding,view,id){return telemetryCardMetricState(binding,view.map[id],view.verdicts.carriers[id]) || 'waiting';}
+/* #1294 Outline: a node card sits beside the node on the first side with free room, never over it. */
+function telemetryNodeCardPlace(nodeBox,w,h,boxes){
+  var gap=14,sides=[{x:nodeBox.x+nodeBox.w+gap,y:nodeBox.y+nodeBox.h/2-h/2},{x:nodeBox.x-gap-w,y:nodeBox.y+nodeBox.h/2-h/2},{x:nodeBox.x+nodeBox.w/2-w/2,y:nodeBox.y+nodeBox.h+gap},{x:nodeBox.x+nodeBox.w/2-w/2,y:nodeBox.y-gap-h}];
+  var mids=[{x:nodeBox.x+nodeBox.w,y:nodeBox.y+nodeBox.h/2},{x:nodeBox.x,y:nodeBox.y+nodeBox.h/2},{x:nodeBox.x+nodeBox.w/2,y:nodeBox.y+nodeBox.h},{x:nodeBox.x+nodeBox.w/2,y:nodeBox.y}];
+  for(var i=0;i<sides.length;i++){var box={x:sides[i].x,y:sides[i].y,w:w,h:h};if(!boxes.some(function(b){return boardBoxesOverlap(box,b,6);}))return {box:box,mid:mids[i]};}
+  return {box:{x:sides[0].x,y:sides[0].y,w:w,h:h},mid:mids[0]};
+}
+function telemetryPaintCards(scope,diagram,templates,view,window,activate,config,style){
   telemetryClearCards(scope);
   if(!view || !diagram)return;
+  // #1294: Outline draws a verdict-colour outline per carrier; its card is drawn hidden and shown on hover, focus or tap.
+  var outline=style==='outline' && !view.preview;
   scope.querySelectorAll('svg').forEach(function(svg){
     var boxes=[],labels=[],doc=svg.ownerDocument;
     svg.querySelectorAll('.node .card,.node .icbg,.node use,.node image,.node text,.handoff-stripe,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff],.dvdelta,.node-review-badge,.comm-break,text.lbl,.dv-trace-overlay text').forEach(function(el){if(el.closest('.coin'))return;var box=boardControlBox(el,svg);if(box)boxes.push(box);if(box && el.closest('.dv-trace-overlay'))labels.push(box);});
@@ -206,72 +279,42 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       var index=Number(path.getAttribute('data-dv-edge')),edge=(diagram.edges || [])[index],binding=edge && carrierTelemetry(edge,templates,null,config);
       var liveBreak=svg.querySelector('.dv-live-comm-failure[data-dv-edge="'+index+'"]');
       if(!binding || !telemetryMetricNames(telemetryCardBinding(binding)).length || edge.hidden===true || !boardControlBox(path,svg) && !boardControlBox(liveBreak,svg))return;
-      var id=edge.from+'->'+edge.to,result=view.verdicts.carriers[id],content=telemetryCardContent(edge,binding,view.map[id],result,window,view.pending && view.pending[id]);
-      if(view.preview){content.note='Preview · synthetic';content.state='preview';}
-      var card=telemetrySvg(doc,'g',{'class':'dv-metrics-card','data-dv-edge':index,'data-metrics-card':id,'data-state':content.state,'data-verdict':view.preview?'preview':result && result.verdict || 'unobserved'},svg),metricState=view.preview?null:telemetryCardMetricState(binding,view.map[id],result);
-      if(metricState)card.setAttribute('data-metric-state',metricState);
-      // Authored card.width or 240, with measured wrapping, never stretched glyphs.
-      // Height is the actual rendered content and participates in obstacle packing.
-      var w=binding.card && binding.card.width || 240,y=15,rect=telemetrySvg(doc,'rect',{'class':'dv-metrics-card-box',rx:7,width:w},card);
-      var bar=telemetrySvg(doc,'path',{'class':'dv-metrics-card-bar'},card);
-      function wrapped(value,cls,width,maxLines,x){
-        x=x==null?10:x;
-        var el=telemetrySvg(doc,'text',{'class':cls,x:x,y:y},card),line='',lines=[];
-        function fits(value){el.textContent=value;return el.getComputedTextLength()<=width;}
-        String(value || '').split(/\s+/).filter(Boolean).forEach(function(word){
-          var next=line?line+' '+word:word;if(fits(next)){line=next;return;}
-          if(line){lines.push(line);line='';}
-          // Only a single overlong token needs character fallback.
-          Array.from(word).forEach(function(ch){if(line && !fits(line+ch)){lines.push(line);line=ch;}else line+=ch;});
-        });if(line)lines.push(line);
-        var omitted=maxLines && lines.length>maxLines;if(omitted)lines=lines.slice(0,maxLines);
-        if(omitted){line=lines[lines.length-1];el.textContent=line+'…';while(line && el.getComputedTextLength()>width){line=line.slice(0,-1);el.textContent=line+'…';}lines[lines.length-1]=line+'…';}
-        el.textContent='';lines.forEach(function(value,i){var span=telemetrySvg(doc,'tspan',{x:x,dy:i?14:0},el);span.textContent=value+(i<lines.length-1?' ':'');});
-        y+=Math.max(1,lines.length)*14;return el;
-      }
-      wrapped(content.title,'t1 dv-metrics-card-title',w-20,2);y+=3;
-      var scopes=content.rows.map(function(row){return telemetryCardScope(binding.signals[row.name]);});
-      var sharedScope=scopes[0] && scopes.every(function(scope){return scope===scopes[0];})?scopes[0]:null;
-      content.rows.forEach(function(row,index){
-        var top=y,formatted=row.text.indexOf(' (formatted text; may be rounded)')>=0;
-        var display=formatted?row.text.replace(' (formatted text; may be rounded)',''):row.text;
-        var value=telemetrySvg(doc,'text',{'class':'t1 dv-metrics-card-value',x:10,y:top,'data-signal':row.name},card);value.textContent=display;
-        var valueWidth=value.getComputedTextLength(),label;
-        if(valueWidth<=w-108){
-          // A small table: numbers align at the right, labels use the remainder (at least 56 units).
-          value.setAttribute('x',w-32-valueWidth);
-          label=wrapped(row.label,'t2 dv-metrics-card-label',w-52-valueWidth,2);
-        }else{
-          value.remove();label=wrapped(row.label,'t2 dv-metrics-card-label',w-42,2);
-          value=wrapped(display,'t1 dv-metrics-card-value',w-42,3);value.setAttribute('data-signal',row.name);
-        }
-        label.setAttribute('data-signal',row.name);
-        value.setAttribute('data-metric-health',view.preview?'preview':row.health);
-        if(row.health==='failing' && !view.preview)wrapped('Outside limit','t2 dv-metrics-card-failure',w-42,1).setAttribute('data-signal',row.name);
-        if(formatted)wrapped('formatted text; may be rounded','t2 dv-metrics-card-provenance',w-42,2);
-        if(!sharedScope && scopes[index])wrapped(scopes[index],'t2 dv-metrics-card-scope',w-42,2);
-        if(row.url){
-          var link=telemetrySvg(doc,'a',{'class':'dv-metrics-query-link',href:row.url,target:'_blank',rel:'noopener noreferrer',tabindex:0,'aria-label':'Open '+row.label+' source query in a new tab','data-signal':row.name},card);
-          telemetrySvg(doc,'rect',{x:w-28,y:top-11,width:22,height:16,fill:'transparent'},link);
-          var icon=telemetrySvg(doc,'svg',{x:w-26,y:top-9,width:16,height:16,viewBox:'0 0 24 24','class':'fv-icon fv-icon--mono','aria-hidden':'true',focusable:'false'},link);icon.innerHTML=FlowIcons.glyph('external-link',{monochrome:true});
-          ['pointerdown','click','keydown'].forEach(function(type){link.addEventListener(type,function(ev){ev.stopPropagation();});});
-        }
-        y+=2;
-      });
-      if(content.series.length){telemetryPaintSparkline(doc,card,content.series,10,y,Math.min(100,w-20),12,telemetryWindowMs(window),content.chartRange,content.intervalMs);y+=20;}
-      if(sharedScope)wrapped(sharedScope,'t2 dv-metrics-card-scope',w-20,2);
-      if(content.hidden && !view.preview)wrapped(content.hidden,'t2 dv-metrics-card-hidden',w-20,2);
-      wrapped(content.note,'t2 dv-metrics-card-note',w-20,2);
-      if(content.countNote)wrapped('COUNT: source rows/events','t2 dv-metrics-card-scope',w-20,2);
-      var height=y+3;rect.setAttribute('height',height);bar.setAttribute('d','M3 7V'+(height-7));
-      var placed=telemetryCardPlace(path,w,height,binding.card || {},boxes),box=placed.box;
+      var id=edge.from+'->'+edge.to,attrs={'data-dv-edge':index};if(outline)attrs['data-metrics-style']='outline';
+      var built=telemetryCardBuild(doc,svg,edge,binding,id,attrs,view,window),card=built.card,height=built.height;
+      // An outline card is shown alone, so other cards are not obstacles.
+      var placed=telemetryCardPlace(path,built.w,height,outline?{side:(binding.card || {}).side}:binding.card || {},boxes),box=placed.box;
       card.setAttribute('data-metrics-anchor-x',placed.mid.x);card.setAttribute('data-metrics-anchor-y',placed.mid.y);
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');card.setAttribute('data-side',placed.side);
       var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-dv-edge':index,d:telemetryCardLeaderTo(placed.mid,box,labels),'pointer-events':'none','aria-hidden':'true'});
       if(view.preview)leader.setAttribute('data-metrics-preview','true');
-      svg.insertBefore(leader,card);boxes.push(box);
-      var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label){label.classList.add('dv-metrics-label-hidden');if(view.preview)label.setAttribute('data-metrics-preview','true');}
-      if(activate)activate(card,path,edge,index,binding);
+      svg.insertBefore(leader,card);
+      if(!outline){
+        boxes.push(box);
+        var label=svg.querySelector('text.lbl[data-dv-edge="'+index+'"]');if(label){label.classList.add('dv-metrics-label-hidden');if(view.preview)label.setAttribute('data-metrics-preview','true');}
+        if(activate)activate(card,path,edge,index,binding);
+        return;
+      }
+      leader.setAttribute('data-metrics-style','outline');
+      var ring=telemetrySvg(doc,'path',{'class':'dv-metrics-outline',d:path.getAttribute('d'),'data-dv-edge':index,'data-metrics-carrier':id,'data-metric-state':telemetryOutlineState(binding,view,id)});
+      path.parentNode.insertBefore(ring,path);
+      ring._metricsCard=card;ring._metricsLeader=leader;card._metricsOutline=ring;
+      if(activate)activate(card,path,edge,index,binding,ring);
+    });
+    if(!outline)return;
+    svg.querySelectorAll('g.node[data-dv-node]').forEach(function(group){
+      var id=group.getAttribute('data-dv-node'),node=(diagram.nodes || {})[id],shape=group.querySelector('.card'),binding=node && carrierTelemetry(node,templates,null,config);
+      if(!binding || !shape || node.hidden===true || !telemetryMetricNames(telemetryCardBinding(binding)).length)return;
+      var nodeBox=boardControlBox(shape,svg);if(!nodeBox)return;
+      var built=telemetryCardBuild(doc,svg,{label:node.title || id,telemetry:node.telemetry},binding,id,{'data-metrics-node':id,'data-metrics-style':'outline'},view,window),card=built.card;
+      var placed=telemetryNodeCardPlace(nodeBox,built.w,built.height,boxes),box=placed.box;
+      card.setAttribute('transform','translate('+box.x+' '+box.y+')');
+      var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-metrics-node':id,'data-metrics-style':'outline',d:telemetryCardLeaderTo(placed.mid,box,labels),'pointer-events':'none','aria-hidden':'true'});
+      svg.insertBefore(leader,card);
+      var b=shape.getBBox(),pad=8,rx=Number(shape.getAttribute('rx')) || 0;
+      var ring=telemetrySvg(doc,'rect',{'class':'dv-metrics-outline',x:b.x-pad,y:b.y-pad,width:b.width+2*pad,height:b.height+2*pad,rx:rx+pad,'data-metrics-carrier':id,'data-metric-state':telemetryOutlineState(binding,view,id)});
+      group.insertBefore(ring,group.firstChild);
+      ring._metricsCard=card;ring._metricsLeader=leader;card._metricsOutline=ring;
+      if(activate)activate(card,group,node,null,binding,ring);
     });
   });
 }

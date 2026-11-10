@@ -1979,3 +1979,7 @@ body.links-dragging,body.links-dragging *{cursor:grabbing !important;user-select
 .links-preview-label{font-size:11px;color:var(--sub);}
 .links-preview-control{font-size:12px;padding:3px 8px;border:1px solid var(--line);border-radius:5px;color:var(--sub);background:var(--card);}
 .links-preview-fixed{text-align:center;color:var(--ink);}
+.links-log-warning{margin:0;font-size:11px;color:var(--links-warn);}
+.links-log-row-ignored{border-color:var(--links-warn);}
+.links-preview-ignored{border-style:dashed;}
+.links-preview-skip{font-size:11px;color:var(--links-warn);}

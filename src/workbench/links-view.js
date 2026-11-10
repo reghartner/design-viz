@@ -698,7 +698,7 @@ function initWorkbenchLinksView(opts){
       var sv=service.querySelector('input').value,op=operation.querySelector('input').value;
       if(!sv.trim()){fieldError(service.querySelector('input'),'Enter the service name of the span this step stands for.');return;}
       if(!op.trim()){fieldError(operation.querySelector('input'),'Enter the operation of the span this step stands for.');return;}
-      var keep={id:linksElementId(e),stepId:e.stepId,caption:e.caption,serviceName:sv,operation:op};state.traceCreate=null;
+      var keep={id:linksElementId(e),stepId:e.stepId,caption:e.caption,occurrence:e.occurrence,serviceName:sv,operation:op};state.traceCreate=null;
       if(!traceEdit(e,0,{op:'create',serviceName:sv,operation:op})){
         // Keep what was typed; the reason shows beside the service field.
         var msg=error.textContent;state.traceCreate=keep;render();
@@ -791,7 +791,7 @@ function initWorkbenchLinksView(opts){
             var addMatch=button('links-assign','+ Add trace match','Add trace match to '+e.label);
             chips.appendChild(addMatch);
             if(!e.stepId)refusedReason(addMatch,e.label+LINKS_TRACE_NEEDS_ID,chips);
-            rowsLife.listen(addMatch,'click',function(){if(refused(addMatch)){say('Cannot add a trace match: '+addMatch.title);return;}state.traceCreate={id:linksElementId(e),stepId:e.stepId,caption:e.caption,serviceName:'',operation:''};state.traceEdit=null;render();var f=list.querySelector('[data-links-field="'+cssEscape(linksElementId(e)+'|new|serviceName')+'"]');if(f)f.focus();});
+            rowsLife.listen(addMatch,'click',function(){if(refused(addMatch)){say('Cannot add a trace match: '+addMatch.title);return;}state.traceCreate={id:linksElementId(e),stepId:e.stepId,caption:e.caption,occurrence:e.occurrence,serviceName:'',operation:''};state.traceEdit=null;render();var f=list.querySelector('[data-links-field="'+cssEscape(linksElementId(e)+'|new|serviceName')+'"]');if(f)f.focus();});
           }
         }else{
           if(!e.via.length)chips.appendChild(el('span','links-none','No step with a match '+(e.kind==='node'?'names it':'lights it')));

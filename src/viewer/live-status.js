@@ -918,7 +918,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var metricsStyle=(function(){try{return view.ownerDocument.defaultView.localStorage.getItem(metricsStyleKey)==='outline'?'outline':'cards';}catch(ex){return 'cards';}})();
   function metricsStyleShown(){return authoring || metricsPreview?'cards':metricsStyle;}
   var OUTLINE_WORDS={held:'healthy',flowing:'healthy',failing:'degraded',error:'breach',waiting:'no data'};
-  function outlineLabel(outline,label){outline.setAttribute('aria-label','Metrics for '+label+' · '+(OUTLINE_WORDS[outline.getAttribute('data-metric-state')] || 'no data')+'. Focus shows the card; Enter opens the details.');}
+  // The carrier button's own name (ticket state, waiting, availability) is kept; the metric verdict is appended.
+  function outlineLabel(outline,label){var own=outline.getAttribute('aria-label') || 'Metrics for '+label;outline.setAttribute('aria-label',own+' · metrics '+(OUTLINE_WORDS[outline.getAttribute('data-metric-state')] || 'no data')+'. Focus shows the metric card; Enter opens the details.');}
   function paintMetrics(){
     // The Metrics overlay draws in every view (Chuck 2026-11-08, D13); the Trace view keeps Jira work colouring off its cards.
     var metricsView=telemetryHooks.view(),references=referencesAvailable(),workPaint=statusMode!=='trace';
@@ -1729,8 +1730,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(i<0 && ev.target===owner && !ev.shiftKey){ev.preventDefault();links[0].focus();return;}
     if(i===0 && ev.shiftKey){ev.preventDefault();owner.focus();return;}
     if(i===links.length-1 && !ev.shiftKey){
-      var stops=Array.prototype.filter.call(view.querySelectorAll('a[href],button,input,select,textarea,[tabindex]'),function(el){return el.tabIndex>=0 && !el.disabled && !el.closest('.dv-metrics-card[data-metrics-style="outline"]') && el.getClientRects().length;}),next=stops[stops.indexOf(owner)+1];
-      if(next){ev.preventDefault();next.focus();}
+      // The next real stop after the carrier button; a hidden one is skipped. Tab is taken over only once focus has moved.
+      var stops=Array.prototype.filter.call(view.querySelectorAll('a[href],button,input,select,textarea,[tabindex]'),function(el){
+        return el.tabIndex>=0 && !el.disabled && !el.closest('.dv-metrics-card[data-metrics-style="outline"]') && el.getClientRects().length && (typeof el.checkVisibility!=='function' || el.checkVisibility({visibilityProperty:true}));
+      }),at=stops.indexOf(owner),root=view.getRootNode?view.getRootNode():view.ownerDocument;
+      if(at<0)return;
+      for(var n=at+1;n<stops.length;n++){stops[n].focus();if(root.activeElement===stops[n]){ev.preventDefault();return;}}
     }
   }
   function peekBlur(ev){if(metricsOutlineOf(ev.target) && metricsOutlineOf(ev.relatedTarget)!==metricsOutlineOf(ev.target))metricsUnpeek();}
@@ -2072,6 +2077,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         // Only these cards transfer the ticket button to the separate Jira cue.
         if(target.closest('.handoff-link')){
           var carrier=target._liveCarrier,id=target.getAttribute('data-live-carrier');clearTarget(target);
+          // #1294: an Outline ring or card that pointed at this card now opens the cue that took over its button.
+          view.querySelectorAll('.dv-live-pointer').forEach(function(el){if(el._livePointerTarget===target)el._livePointerTarget=marker;});
           if(carrier){marker.removeAttribute('aria-hidden');carrierTarget(marker,id,carrier.value,carrier.state,carrier.tracking,carrier.label,carrier.waiting,carrier.availability,carrier.ref);}
         }else carrierPointer(marker,target);
         obstacles.push({el:marker,box:{x:point.x-11,y:point.y-11,w:22,h:22}});

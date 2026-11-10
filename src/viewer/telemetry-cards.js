@@ -278,11 +278,16 @@ function telemetryPathBoxes(path){
   return out;
 }
 /* #1294 Outline: a node card sits beside the node on the first side with free room, never over it. */
-function telemetryNodeCardPlace(nodeBox,w,h,boxes){
+function telemetryNodeCardPlace(nodeBox,w,h,boxes,frame){
   var gap=14,sides=[{x:nodeBox.x+nodeBox.w+gap,y:nodeBox.y+nodeBox.h/2-h/2},{x:nodeBox.x-gap-w,y:nodeBox.y+nodeBox.h/2-h/2},{x:nodeBox.x+nodeBox.w/2-w/2,y:nodeBox.y+nodeBox.h+gap},{x:nodeBox.x+nodeBox.w/2-w/2,y:nodeBox.y-gap-h}];
   var mids=[{x:nodeBox.x+nodeBox.w,y:nodeBox.y+nodeBox.h/2},{x:nodeBox.x,y:nodeBox.y+nodeBox.h/2},{x:nodeBox.x+nodeBox.w/2,y:nodeBox.y+nodeBox.h},{x:nodeBox.x+nodeBox.w/2,y:nodeBox.y}];
   for(var i=0;i<sides.length;i++){var box={x:sides[i].x,y:sides[i].y,w:w,h:h};if(!boxes.some(function(b){return boardBoxesOverlap(box,b,6);}))return {box:box,mid:mids[i]};}
-  return {box:{x:sides[0].x,y:sides[0].y,w:w,h:h},mid:mids[0]};
+  // Every side is blocked: take the side with the most room inside the frame, partly clipped if need be, never over the node.
+  var best=0,room=-1;sides.forEach(function(side,i){
+    var r=frame?Math.max(0,Math.min(side.x+w,frame.x+frame.width)-Math.max(side.x,frame.x))*Math.max(0,Math.min(side.y+h,frame.y+frame.height)-Math.max(side.y,frame.y)):w*h;
+    if(r>room){room=r;best=i;}
+  });
+  return {box:{x:sides[best].x,y:sides[best].y,w:w,h:h},mid:mids[best],fallback:true};
 }
 function telemetryPaintCards(scope,diagram,templates,view,window,activate,config,style){
   telemetryClearCards(scope);
@@ -327,7 +332,7 @@ function telemetryPaintCards(scope,diagram,templates,view,window,activate,config
       if(!binding || !shape || node.hidden===true || !telemetryMetricNames(telemetryCardBinding(binding)).length)return;
       var nodeBox=boardControlBox(shape,svg);if(!nodeBox)return;
       var built=telemetryCardBuild(doc,svg,{label:node.title || id,telemetry:node.telemetry},binding,id,{'data-metrics-node':id,'data-metrics-style':'outline'},view,window),card=built.card;
-      var placed=telemetryNodeCardPlace(nodeBox,built.w,built.height,boxes.concat(frame.boxes)),box=placed.box=frame.clamp(placed.box);
+      var placed=telemetryNodeCardPlace(nodeBox,built.w,built.height,boxes.concat(frame.boxes),svg.viewBox && svg.viewBox.baseVal),box=placed.box;
       card.setAttribute('transform','translate('+box.x+' '+box.y+')');
       var leader=telemetrySvg(doc,'path',{'class':'dv-metrics-leader','data-metrics-node':id,'data-metrics-style':'outline',d:telemetryCardLeaderTo(placed.mid,box,labels),'pointer-events':'none','aria-hidden':'true'});
       svg.insertBefore(leader,card);

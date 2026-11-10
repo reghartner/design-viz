@@ -34,7 +34,9 @@ function workbenchLiveSnapshotRead(text){
   var errors=Array.isArray(data.errors)?data.errors.filter(function(e){return e && typeof e.message==='string';}):[];
   var first=errors[0]?String((errors[0].source || '')+(errors[0].tool?' '+errors[0].tool:'')).trim()+': '+errors[0].message.replace(/\s+/g,' ').slice(0,160):'';
   return {ok:true,at:at,label:'Snapshot from '+workbenchLiveSnapshotTime(at),board:typeof data.board==='string'?data.board:'',
-    tickets:Object.keys(day.issues).length,carriers:Object.keys(telemetry).length,errors:errors.length,firstError:first,
+    // `tickets` counts the tickets with a state; `unknown` the ones no answered Jira search covered.
+    tickets:Object.keys(day.issues).filter(function(key){return !(day.issues[key] && day.issues[key].state==='unknown');}).length,
+    unknown:Object.keys(day.issues).filter(function(key){return day.issues[key] && day.issues[key].state==='unknown';}).length,carriers:Object.keys(telemetry).length,errors:errors.length,firstError:first,
     // How many of the open board's ticket keys the snapshot holds a state for (an `unknown` row is a ticket no
     // answered Jira search covered).
     covers:function(keys){return keys.filter(function(key){var issue=Object.prototype.hasOwnProperty.call(day.issues,key) && day.issues[key];return !!issue && issue.state!=='unknown';}).length;},

@@ -118,6 +118,11 @@ export async function openInspectorGroup(group){
   await expect(group).toHaveCount(1);
   if(await group.getAttribute('open')===null)await group.locator(':scope > summary').click();
 }
+// #1228 Metrics editor folds: a <details class="metrics-fold"> whose summary is exactly title, opened by its header.
+export function metricsFold(scope,title){
+  return scope.locator('details.metrics-fold').filter({has:scope.page().locator(':scope > summary',{hasText:new RegExp('^'+title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$')})});
+}
+export async function openMetricsFold(scope,title){const fold=metricsFold(scope,title);await openInspectorGroup(fold);return fold;}
 export async function paste(page,text){
   await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(text);
   await page.locator('#welcome-paste-form button[type=submit]').click();

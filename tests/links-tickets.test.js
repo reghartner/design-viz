@@ -181,3 +181,22 @@ test('L13 Edit key onto an existing key asks first; with merge it joins the two'
   assert.deepEqual(d(s.raw).nodes.ctrl.tickets,['https://acme.atlassian.net/browse/FW-46','BE-67']);
   assert.deepEqual(d(s.raw).edges[1].tickets,['BE-67']);
 });
+
+test('L14 perf guard: the Move to… / Copy to… list uses static checks only, with no plan dry runs, on a 400-node board',()=>{
+  const nodes={},row=[],edges=[],steps=[];
+  for(let i=0;i<400;i++){nodes['n'+i]={title:'Node '+i,tickets:i%5?[]:['FW-'+i]};row.push('n'+i);if(i)edges.push({from:'n'+(i-1),to:'n'+i});}
+  for(let i=0;i<150;i++)steps.push({id:'s'+i,text:'Step '+i,nodes:['n'+(i*2)]});
+  const spec={page:{title:'Big',sections:[{heading:'Flow',diagram:{nodes,rows:[row],edges,steps}}]}};
+  const text=JSON.stringify(spec),m=c.linksTicketModel(text,JSON.parse(text),null),from=el(m,'node','n0');
+  const calls={n:0},saved={move:c.planLinksTicketMove,one:c.planLinksTicket,carrier:c.linksCarrierTicketPlan,step:c.linksStepTicketPlan};
+  c.planLinksTicketMove=function(){calls.n++;return saved.move.apply(null,arguments);};c.planLinksTicket=function(){calls.n++;return saved.one.apply(null,arguments);};
+  c.linksCarrierTicketPlan=function(){calls.n++;return saved.carrier.apply(null,arguments);};c.linksStepTicketPlan=function(){calls.n++;return saved.step.apply(null,arguments);};
+  try{
+    const started=Date.now();let offered=0;
+    for(const copy of [false,true])for(const target of m.elements)if(c.linksDropRefusal(from,target,'FW-0',copy)===null)offered++;
+    const ms=Date.now()-started;
+    assert.equal(calls.n,0,'no planner runs while listing targets');
+    assert.ok(ms<250,'checking '+(2*m.elements.length)+' targets took '+ms+' ms');
+    assert.ok(offered>700,'most targets are offered: '+offered);
+  }finally{c.planLinksTicketMove=saved.move;c.planLinksTicket=saved.one;c.linksCarrierTicketPlan=saved.carrier;c.linksStepTicketPlan=saved.step;}
+});

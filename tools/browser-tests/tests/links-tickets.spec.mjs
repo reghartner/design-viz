@@ -180,7 +180,9 @@ test('B7 highlighting scrolls the Steps row into view, and Esc on the canvas cle
   await expect(page.locator('#docview g.node[data-dv-node="ingest"]')).toBeInViewport();
   await page.locator('#docview g.node[data-dv-node="button"]').click();
   await expect(page.locator('#workspace-window-links .links-key:focus')).toHaveCount(0);
+  // The first Esc may be used by the canvas (it clears the node selection); the highlight clears once Esc is free.
   await page.keyboard.press('Escape');
+  if(await page.locator('#docview .dv-links-lit').count())await page.keyboard.press('Escape');
   await expect(page.locator('#docview .dv-links-lit')).toHaveCount(0);await expect(page.locator('.links-canvas-pill')).toBeHidden();
 });
 

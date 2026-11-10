@@ -10,7 +10,7 @@ function initWorkbenchLinksView(opts){
   life.own(function(){rowsLife.destroy();popLife.destroy();});
   var TABS=[['tickets','Tickets'],['metrics','Metrics'],['trace','Trace match'],['logs','Log searches']];
   var state={tab:'tickets',by:'ticket',show:'all',filter:'',drafts:[],highlight:null,popover:null,drag:null,editing:null,adding:false};
-  var byId=Object.create(null),byKey=Object.create(null),visible=false,filterTimer=null,dryRuns=Object.create(null),model=null,modelKey=null,stale=false,suppressClick=false,uid='links-'+Math.random().toString(36).slice(2);
+  var modelRev=0,byId=Object.create(null),byKey=Object.create(null),visible=false,filterTimer=null,dryRuns=Object.create(null),model=null,modelKey=null,stale=false,suppressClick=false,uid='links-'+Math.random().toString(36).slice(2);
 
   function el(tag,cls,text){var n=doc.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;}
   function button(cls,text,label,title){var b=el('button',cls,text);b.type='button';if(label)b.setAttribute('aria-label',label);if(title)b.title=title;return b;}
@@ -100,7 +100,7 @@ function initWorkbenchLinksView(opts){
     stale=s.renderedText!=null && s.renderedText!==s.text;
     var key=JSON.stringify([s.project,s.text,s.topologyRevision]);
     if(key!==modelKey){
-      modelKey=key;dryRuns=Object.create(null);model=linksTicketModel(s.text,s.raw,context());
+      modelKey=key;modelRev++;dryRuns=Object.create(null);model=linksTicketModel(s.text,s.raw,context());
       // Lookups by element id and ticket key stay constant-time on large boards.
       byId=Object.create(null);byKey=Object.create(null);
       if(!model.error){model.elements.forEach(function(e){byId[linksElementId(e)]=e;});model.tickets.forEach(function(t){byKey[t.key]=t;});}
@@ -133,9 +133,10 @@ function initWorkbenchLinksView(opts){
         same:key+(remove?' is not on ':' is already on ')+describe(e)+'.'});
   }
   function rename(from,value,key,merge){
+    // Re-key a highlight on the old key before the edit renders, so it follows the rename.
+    var lit=state.highlight && state.highlight.type==='ticket' && state.highlight.key===from;if(lit)state.highlight.key=key;
     var ok=commit(function(text,raw,ctx){return planLinksTicketRename(text,raw,from,value,ctx,merge);},{ok:(merge?'Merged '+from+' into ':'Renamed '+from+' to ')+key+' everywhere it is attached here. Undo restores it.'});
-    if(ok && state.highlight && state.highlight.type==='ticket' && state.highlight.key===from){state.highlight.key=key;applyHighlight();}
-    if(!ok)render();
+    if(!ok){if(lit && state.highlight)state.highlight.key=from;render();}
     var row=list.querySelector('[data-links-ticket="'+cssEscape(ok?key:from)+'"] .links-key');if(row)row.focus();
     return ok;
   }
@@ -146,11 +147,15 @@ function initWorkbenchLinksView(opts){
   }
   /* Why a ticket cannot go onto an element, or null: the static source and
      target rules, then a dry run of the same plan the drop would make. */
-  function refusal(e,key,from,copy){
-    var why=linksDropRefusal(from || null,e,key,!!copy);if(why)return why;
-    var s=snapshot();if(s.error)return s.error;
-    var memo=JSON.stringify([modelKey,from && linksElementId(from),linksElementId(e),key,!!copy]);
+  /* Static rules only, for lists of many targets (Move to…, Copy to…). */
+  function refusal(e,key,from,copy){return linksDropRefusal(from || null,e,key,!!copy);}
+  /* The hovered drag target also gets a dry run of the real plan, once per
+     target and model revision, so a drop never glows amber and then fails. */
+  function dropRefusal(e,key,from,copy){
+    var why=refusal(e,key,from,copy);if(why)return why;
+    var memo=modelRev+'|'+(from?linksElementId(from):'')+'|'+linksElementId(e)+'|'+key+'|'+(copy?1:0);
     if(!(memo in dryRuns)){
+      var s=snapshot();if(s.error)return s.error;
       var plan=planLinksTicketMove(s.text,s.raw,copy?null:from,e,key,refOf(key),false,context());
       dryRuns[memo]=plan.error || null;
     }
@@ -553,7 +558,7 @@ function initWorkbenchLinksView(opts){
     }
     ev.preventDefault();d.copy=!!ev.altKey || d.copyOnly;
     d.ghost.style.left=(ev.clientX+12)+'px';d.ghost.style.top=(ev.clientY+10)+'px';
-    d.target=dropTarget(ev.clientX,ev.clientY);paintDrop();
+    d.last={x:ev.clientX,y:ev.clientY};d.target=dropTarget(ev.clientX,ev.clientY);paintDrop();
   }
   /* The Links window must not hide its own drop targets: over the window but not
      over one of its By element rows, look through it to the Steps list or canvas
@@ -564,9 +569,20 @@ function initWorkbenchLinksView(opts){
     var row=top.closest && top.closest('[data-links-element]');
     if(row && root.contains(row)){seeThrough(false);return {element:element(row.getAttribute('data-links-element')),marks:[row]};}
     var hit=hits.find(function(n){return n && !host.contains(n) && !(state.drag && state.drag.ghost && state.drag.ghost.contains(n));});
-    var under=!!(host.contains(top) && hit);
-    var found=hit?targetAt(hit):null;seeThrough(under && !!found);return found;
+    var under=!!(host.contains(top) && hit),found=hit?targetAt(hit):null;
+    // Over the list itself, look through only after a short hover on the same
+    // target, so a release over the rows does not land on the canvas behind them.
+    if(under && found && state.drag && list.contains(top)){
+      var id=linksElementId(found.element || {kind:'none',section:0,index:0}),d=state.drag,now=Date.now();
+      if(!d.peek || d.peek.id!==id){
+        d.peek={id:id,since:now};if(d.peekTimer)win.clearTimeout(d.peekTimer);
+        d.peekTimer=win.setTimeout(function(){if(state.drag===d && d.last){d.target=dropTarget(d.last.x,d.last.y);paintDrop();}},PEEK_MS+20);
+      }
+      if(now-d.peek.since<PEEK_MS){seeThrough(false);return null;}
+    }else if(state.drag)state.drag.peek=null;
+    seeThrough(under && !!found);return found;
   }
+  var PEEK_MS=450;
   function seeThrough(on){var host=root.closest('.workspace-window');if(host)host.classList.toggle('links-see-through',!!on);}
   function targetAt(hit){
     var stepRow=hit.closest('#steps-list [data-step-index]'),pick=doc.getElementById('steps-section');
@@ -584,13 +600,13 @@ function initWorkbenchLinksView(opts){
   function paintDrop(){
     var d=state.drag;d.marked.forEach(function(n){n.classList.remove('dv-links-drop','dv-links-refused');});d.marked=[];
     if(!d.target){say(d.from?'Dragging '+d.key+' from '+describe(d.from)+'. Drop on a node, connection, step or row. Esc cancels.':'Dragging '+d.key+'. Drop on a node, connection or step. Esc cancels.');return;}
-    var why=refusal(d.target.element,d.key,d.from,d.copy);
+    var why=dropRefusal(d.target.element,d.key,d.from,d.copy);
     d.target.marks.forEach(function(n){n.classList.add(why?'dv-links-refused':'dv-links-drop');d.marked.push(n);});
     var verb=d.from && !d.copyOnly?(d.copy?'copy':'move'):'attach';
     say(why?'Cannot drop here: '+why:'Drop to '+verb+' '+d.key+(d.from && !d.copy?' from '+describe(d.from):'')+' to '+describe(d.target.element)+(d.from && !d.copy?' · hold ⌥ to copy':'')+'.');
   }
   function endDrag(){
-    var d=state.drag;if(!d)return null;state.drag=null;seeThrough(false);
+    var d=state.drag;if(!d)return null;state.drag=null;seeThrough(false);if(d.peekTimer)win.clearTimeout(d.peekTimer);
     (d.off || []).forEach(function(off){off();});
     try{if(d.source.hasPointerCapture && d.source.hasPointerCapture(d.id))d.source.releasePointerCapture(d.id);}catch(_){}
     d.marked.forEach(function(n){n.classList.remove('dv-links-drop','dv-links-refused');});
@@ -604,7 +620,7 @@ function initWorkbenchLinksView(opts){
     d.copy=!!ev.altKey || d.copyOnly;d.target=dropTarget(ev.clientX,ev.clientY);
     endDrag();suppressClick=true;win.setTimeout(function(){suppressClick=false;},0);
     if(!d.target){say('Nothing changed: drop on a node, connection or step.');return;}
-    var why=refusal(d.target.element,d.key,d.from,d.copy);
+    var why=dropRefusal(d.target.element,d.key,d.from,d.copy);
     if(why){fail(why);say('');return;}
     move(d.copy?null:d.from,d.target.element,d.key,false);
   }
@@ -622,19 +638,22 @@ function initWorkbenchLinksView(opts){
     if(state.popover){ev.preventDefault();closePopover(true);return;}
     if(state.highlight){ev.preventDefault();ev.stopPropagation();setHighlight(null);say('Highlight cleared.');}
   });
-  // Esc on the canvas clears the highlight too (fields, dialogs and menus keep their own Esc).
+  // Esc on the canvas clears the highlight once nothing else used that Esc
+  // (a canvas drag, a menu, add-to-step); fields, dialogs and menus keep their own.
   life.listen(doc,'keydown',function(ev){
-    if(ev.key!=='Escape' || !state.highlight || root.contains(ev.target) || state.drag)return;
+    if(ev.key!=='Escape' || ev.defaultPrevented || !state.highlight || root.contains(ev.target) || state.drag)return;
     if(ev.target.isContentEditable || ev.target.closest && ev.target.closest('input,textarea,select,[role="dialog"],[role="menu"],dialog'))return;
     setHighlight(null);
-  },true);
+  });
 
   function shown(){var host=root.closest('.workspace-window');return !host || !host.hidden;}
   function refresh(){
     // Closed, the window keeps no work: the next open rebuilds from the source.
     if(!shown())return;
     ensureModel();
-    if(state.highlight && state.highlight.type==='element' && !element(state.highlight.id))state.highlight=null;
+    var h=state.highlight;
+    // A highlighted element or ticket that no longer exists (deleted, renamed, undone) ends the highlight.
+    if(h && !model.error && (h.type==='element'?!element(h.id):!ticketRow(h.key) && !state.drafts.some(function(d){return d.key===h.key;}))){state.highlight=null;say('');}
     render();
   }
   life.listen(doc,'workbench-tool-visibility',function(ev){

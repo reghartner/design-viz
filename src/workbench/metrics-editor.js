@@ -12,6 +12,8 @@ function flowMetricsDom(o){
   function row(parent,label,control){control.setAttribute('aria-label',label);parent.appendChild(c.row(label,control));return control;}
   function relabel(select,labels){Array.prototype.forEach.call(select.options,function(option){if(Object.prototype.hasOwnProperty.call(labels,option.value))option.textContent=labels[option.value];});return select;}
   function group(parent,cls,legend){var box=el('fieldset',cls);box.appendChild(el('legend',null,legend));parent.appendChild(box);return box;}
+  // #1228: an Inspector <details> fold; inspector.js disclosureNodes keeps its open state across same-selection refreshes.
+  function fold(parent,cls,title){var box=el('details','metrics-fold'+(cls?' '+cls:''));box.appendChild(el('summary',null,title));parent.appendChild(box);return box;}
   function draft(parent,label,kind,options,value){
     var input=el(kind==='select'?'select':kind==='textarea'?'textarea':'input','fctl');
     if(kind==='text')input.type='text';
@@ -30,7 +32,7 @@ function flowMetricsDom(o){
   function signalEditors(parent,binding,prefix,commit,extra){
     var signals=telemetryObject(binding.signals)?binding.signals:{},names=Object.keys(signals);
     names.forEach(function(name){
-      var entry=signals[name],source=telemetrySignalSource(entry),box=group(parent,'metrics-signal','Signal '+name);
+      var entry=signals[name],source=telemetrySignalSource(entry),box=fold(parent,'metrics-signal','Signal '+name);
       row(box,prefix+name+' name',c.text(name,function(v){return commit({op:'signal',name:name,field:'name',value:v});},{required:'A signal needs a name; use Remove signal to delete it.'}));
       row(box,prefix+name+' source',relabel(c.select(TELEMETRY_SOURCES,source || '',function(v){return commit({op:'signal',name:name,field:'source',value:v});}),TELEMETRY_SOURCE_LABELS));
       row(box,prefix+name+' query',c.text(source?telemetryQueryText(source,entry[source]):'',function(v){return commit({op:'signal',name:name,field:'query',value:v});},{textarea:true,placeholder:source==='honeycomb'?'{"calculations":[{"op":"COUNT"}],"filters":[]}':'Query text'}));
@@ -45,7 +47,7 @@ function flowMetricsDom(o){
       proofEditors(box,binding.proof,names,name,prefix,commit);
       box.appendChild(c.action(prefix?'Remove '+prefix+'signal '+name:'Remove signal '+name,function(){return commit({op:'removeSignal',name:name});}));
     });
-    var add=group(parent,'metrics-add',prefix?'Add '+prefix+'signal':'Add signal'),label=prefix?prefix+'new signal':'New signal';
+    var add=fold(parent,'metrics-add',prefix?'New '+prefix+'signal':'New signal'),label=prefix?prefix+'new signal':'New signal';
     var nameInput=draft(add,label+' name','text',null,''),source=draft(add,label+' source','select',sourceOptions,'grafana');
     var query=draft(add,label+' query','textarea',null,''),unit=draft(add,label+' unit','text',null,'');
     nameInput.placeholder='rate, errors, lag';unit.placeholder='req/h, msgs, ms';
@@ -71,7 +73,7 @@ function flowMetricsDom(o){
       row(parent,label,c.text(telemetryObject(links)?links[link[0]]:null,function(v){return commit({op:'link',key:link[0],value:v});},{placeholder:placeholders && placeholders[link[0]]?'Template: '+placeholders[link[0]]:'https://…'}));
     });
   }
-  return {el:el,note:note,row:row,relabel:relabel,group:group,draft:draft,warnings:warnings,signalEditors:signalEditors,proofEditors:proofEditors,linkEditors:linkEditors,sourceOptions:sourceOptions};
+  return {el:el,note:note,row:row,relabel:relabel,group:group,fold:fold,draft:draft,warnings:warnings,signalEditors:signalEditors,proofEditors:proofEditors,linkEditors:linkEditors,sourceOptions:sourceOptions};
 }
 
 /* o: {document, state: telemetryCarrierState(...), controls:{row,text,select,number,action}, listen, commit(edit)} */
@@ -80,12 +82,14 @@ function createFlowMetricsEditor(o){
   var box=d.el('fieldset','metrics-editor');box.appendChild(d.el('legend',null,'Metrics'));
   function cardRows(card){
     card=telemetryObject(card)?card:{};
-    d.row(box,'Card side',d.relabel(c.select(TELEMETRY_CARD_SIDES,typeof card.side==='string'?card.side:'',function(v){return commit({op:'card',field:'side',value:v});},true),{'':'(automatic)'}));
-    d.row(box,'Card offset',c.number(telemetryNumber(card.offset)?card.offset:null,function(v){return commit({op:'card',field:'offset',value:v});}));
-    d.row(box,'Card title',c.text(typeof card.title==='string'?card.title:'',function(v){return commit({op:'card',field:'title',value:v});},{placeholder:'(connection label)'}));
-    d.row(box,'Card width',c.number(telemetryNumber(card.width)?card.width:null,function(v){return commit({op:'card',field:'width',value:v});}));
-    if(card.position)box.appendChild(c.action('Reset card to automatic',function(){return commit({op:'card',field:'position',value:null});}));
-    d.note(box,'Drag the card in Preview metrics layout, or focus it and use Arrow keys (10 units; Shift moves 50). Manual placement overrides Card side and offset; Reset card to automatic restores them. Card width is 140–480 units (default 240); an empty Card title shows the connection label. Readers see the saved placement when Metrics is on.');
+    var cardBox=d.fold(box,'metrics-card','Card');
+    d.row(cardBox,'Card side',d.relabel(c.select(TELEMETRY_CARD_SIDES,typeof card.side==='string'?card.side:'',function(v){return commit({op:'card',field:'side',value:v});},true),{'':'(automatic)'}));
+    d.row(cardBox,'Card offset',c.number(telemetryNumber(card.offset)?card.offset:null,function(v){return commit({op:'card',field:'offset',value:v});}));
+    d.row(cardBox,'Card title',c.text(typeof card.title==='string'?card.title:'',function(v){return commit({op:'card',field:'title',value:v});},{placeholder:'(connection label)'}));
+    d.row(cardBox,'Card width',c.number(telemetryNumber(card.width)?card.width:null,function(v){return commit({op:'card',field:'width',value:v});}));
+    if(card.position)cardBox.appendChild(c.action('Reset card to automatic',function(){return commit({op:'card',field:'position',value:null});}));
+    d.note(cardBox,'Drag the card in Preview metrics layout, or focus it and use Arrow keys (10 units; Shift moves 50). Manual placement overrides Card side and offset; Reset card to automatic restores them. Card width is 140–480 units (default 240); an empty Card title shows the connection label. Readers see the saved placement when Metrics is on.');
+    return cardBox;
   }
   if(s.imported)d.note(box,'Inherited metrics from '+s.provider+' (read only): '+(s.inherited?telemetrySummary(s.inherited)+'. A binding saved here replaces it in this consumer.':'none. A binding saved here applies only in this consumer.'),'metrics-inherited');
   // An imported carrier that inherits a provider binding is bound; only a carrier with neither is unbound.
@@ -109,20 +113,19 @@ function createFlowMetricsEditor(o){
       });
       var signals=telemetryObject(effective.signals)?effective.signals:{},names=Object.keys(signals);
       d.note(box,'Template signals: '+(names.map(function(name){var source=telemetrySignalSource(signals[name]),unit=signals[name] && signals[name].unit;return name+' ('+(source || 'no source')+(telemetryText(unit)?', '+unit:'')+')';}).join(', ') || 'none')+'. Edit them in Document settings → Tracking → Metrics; limits set here apply only to this carrier.');
-      names.forEach(function(name){d.proofEditors(d.group(box,'metrics-signal','Signal '+name),effective.proof,names,name,'',commit);});
+      names.forEach(function(name){d.proofEditors(d.fold(box,'metrics-signal','Signal '+name),effective.proof,names,name,'',commit);});
     }
   }else{
     d.signalEditors(box,b || {},'',commit,function(edit){edit.kind=draftKind;});
   }
   if(b){
     d.note(box,'Proof limits: min is a floor and max a ceiling; with ratio of, max is the highest allowed ratio to that signal.');
-    d.linkEditors(box,b.links,'',commit,s.templateBase && s.templateBase.links);
+    d.linkEditors(d.fold(box,'metrics-links','Links'),b.links,'',commit,s.templateBase && s.templateBase.links);
     if(s.edge)cardRows(b.card);
     box.appendChild(c.action('Remove metrics',function(){return commit({op:'remove'});}));
   }else if(s.edge && s.inherited){
     // The first card edit of an inherited connection saves this consumer's copy of the binding.
-    cardRows(s.inherited.card);
-    d.note(box,'A card edit saves the inherited binding with that change as this consumer\'s override; the provider is unchanged.');
+    d.note(cardRows(s.inherited.card),'A card edit saves the inherited binding with that change as this consumer\'s override; the provider is unchanged.');
   }
   d.warnings(box,s.warnings || [],'Metrics warnings');
   return box;
@@ -144,7 +147,7 @@ function createFlowMetricsSettings(o){
   });
   d.row(box,'Shared metrics variables',c.text(t.variables?JSON.stringify(t.variables):null,function(v){return commit({op:'variables',value:v});},{textarea:true,placeholder:'{"iotAccount":"123456789012"}'}));
   var profiles=telemetryObject(t.environments)?t.environments:{},environmentIds=Object.keys(profiles);
-  var environments=d.group(box,'metrics-environments','Environments');
+  var environments=d.fold(box,'metrics-environments','Environments');
   d.note(environments,'Optional deployment profiles, such as qa, stg and prd. Blank values inherit shared settings. Readers can switch environments in Live status. Use $env or ${env} in queries, links and datasource values. Use ${name} for named variables in any signal string; profile variables override shared defaults.');
   if(environmentIds.length)d.row(environments,'Default environment',c.select(environmentIds,t.environment || environmentIds[0],function(v){return commit({op:'environment',value:v});}));
   environmentIds.forEach(function(id){
@@ -165,7 +168,7 @@ function createFlowMetricsSettings(o){
   d.row(box,'Metrics refresh ms',refresh);
   var templates=telemetryObject(t.templates)?t.templates:{};
   Object.keys(templates).forEach(function(name){
-    var template=templates[name],set=d.group(box,'metrics-template','Template '+name),prefix=name+' ';
+    var template=templates[name],set=d.fold(box,'metrics-template','Template '+name),prefix=name+' ';
     function edit(e){return commit({op:'template',template:name,edit:e});}
     if(!telemetryObject(template))d.note(set,'This template is not an object; remove it or repair it in JSON.');
     else{
@@ -178,7 +181,7 @@ function createFlowMetricsSettings(o){
     }
     set.appendChild(c.action('Remove template '+name,function(){return commit({op:'removeTemplate',name:name});}));
   });
-  var add=d.group(box,'metrics-add','Add template');
+  var add=d.fold(box,'metrics-add','New template');
   var name=d.draft(add,'New template name','text',null,''),kind=d.draft(add,'New template kind','select',[['','(set on each carrier)']].concat(TELEMETRY_KINDS.map(function(k){return [k,k];})),'');
   var params=d.draft(add,'New template parameters','text',null,''),signal=d.draft(add,'New template signal name','text',null,'');
   var source=d.draft(add,'New template signal source','select',d.sourceOptions,'grafana'),query=d.draft(add,'New template signal query','textarea',null,''),unit=d.draft(add,'New template signal unit','text',null,'');

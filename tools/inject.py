@@ -82,9 +82,10 @@ def telemetry_problems(at: str, block) -> list:
     """Shape of one day's telemetry (#944): hourly carrier signals and annotations.
 
     {start: RFC3339, stepSeconds: positive integer,
-     carriers: {carrierId: {signal: {unit?: text, values: [number | null, ...]}}},
+     carriers: {carrierId: {signal: {unit?: text, value?: number, values: [number | null, ...]}}},
      annotations?: [{time: RFC3339, text, id?: integer, tags?: [text]}]}
-    All values arrays of one day have the same length; null is an hour without a sample.
+    All values arrays of one day have the same length; null is an hour without a sample. `value` (an agent
+    snapshot, #1270) is the signal's measurement for the window when it is not the last step.
     Values must be finite: json.loads reads NaN and Infinity, a browser's JSON.parse does not.
     """
     if not isinstance(block, dict):
@@ -110,8 +111,11 @@ def telemetry_problems(at: str, block) -> list:
                 if not isinstance(signal, dict) or not isinstance(signal.get("values"), list) or not signal["values"]:
                     problems.append(f"{here} must be an object with a non-empty values array")
                     continue
-                if set(signal) - {"unit", "values"}:
-                    problems.append(f"{here} takes only unit and values")
+                if set(signal) - {"unit", "value", "values"}:
+                    problems.append(f"{here} takes only unit, value and values")
+                if "value" in signal and (isinstance(signal["value"], bool) or not isinstance(signal["value"], (int, float))
+                                          or not math.isfinite(signal["value"])):
+                    problems.append(f"{here}.value must be a finite number")
                 if "unit" in signal and not isinstance(signal["unit"], str):
                     problems.append(f"{here}.unit must be text")
                 values = signal["values"]

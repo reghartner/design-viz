@@ -201,3 +201,24 @@ test('LT13 the inline editor refuses an attribute name trace matching does not s
   assert.match(ren.error,/env is not a trace attribute/,'renaming an attribute is checked too');
   assert.ok(c.linksTraceAttributeNames(raw,null).includes('deployment.environment.name'));
 });
+
+test('LT14 a value edit on an attribute whose name was hand-written is not refused for the name; the short refusal names the list',()=>{
+  const spec=board();d(spec).steps[1].traceMatch.attributes={'event.type':'doorbell.press'};
+  const s=apply(spec,(t,r)=>c.planLinksTraceEdit(t,r,0,1,{op:'attribute',alternative:0,key:'event.type',name:'event.type',value:'doorbell.hold'},null));
+  assert.equal(d(s.raw).steps[1].traceMatch.attributes['event.type'],'doorbell.hold');
+  const text=JSON.stringify(board()),raw=JSON.parse(text);
+  assert.equal(c.planLinksTraceEdit(text,raw,0,1,{op:'attribute',alternative:0,key:null,name:'event.type',value:'x'},null).error,'event.type is not a trace attribute Flowview can match on. Pick one from the list.');
+});
+
+test('LT15 a step without an id cannot be given a trace match: Create, Assign, Move, Copy and the drop check refuse with the reason',()=>{
+  const spec=board();delete d(spec).steps[2].id;
+  const text=JSON.stringify(spec,null,2),raw=JSON.parse(text),m=model(spec),target=el(m,'step',2);
+  const needsId=/has no id, and a step with a trace match needs one\. Give this step an id in Inspect first\./;
+  assert.match(c.planLinksTraceEdit(text,raw,0,2,{op:'create',serviceName:'push-gw',operation:'apns.send'},null).error,needsId);
+  assert.match(c.planLinksTraceAssign(text,raw,{serviceName:'notify-svc',operation:'route.event'},step(2),false,null).error,needsId);
+  assert.match(c.planLinksTraceMove(text,raw,step(1),step(2),null,false,null).error,needsId);
+  assert.match(c.planLinksTraceMove(text,raw,step(1),step(2),null,true,null).error,needsId);
+  assert.match(c.linksTraceDropRefusal(step(1),target,null,false),needsId);
+  const ok=apply(board(),(t,r)=>c.planLinksTraceEdit(t,r,0,2,{op:'create',serviceName:'push-gw',operation:'apns.send'},null));
+  assert.deepEqual(plain(c.validate(c.normalize(ok.raw)).errors),[],'with an id, Create leaves a valid board');
+});

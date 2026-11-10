@@ -12,6 +12,9 @@ function linksTraceSameStep(draft,e){
   if(draft.stepId!=null || e.stepId!=null)return draft.stepId===e.stepId;
   return (draft.caption || '')===(e.caption || '') && (draft.caption || '')!=='';
 }
+/* canon: a step with a trace match needs a stable id. */
+var LINKS_TRACE_NEEDS_ID=' has no id, and a step with a trace match needs one. Give this step an id in Inspect first.';
+function linksTraceStepHasId(st){return !!st && typeof st.id==='string' && !!st.id.trim();}
 function linksTraceHasKey(list,key){return (list || []).some(function(m){return m && linksTraceKey(m)===key;});}
 /* Why "Add as alternative" cannot be offered for `key` on step element `to`, or null. */
 function linksTraceAlternativeRefusal(to,key){
@@ -87,6 +90,7 @@ function linksTraceDropRefusal(from,to,mode,copy){
   if(!to || to.kind!=='step')return 'Drop on a step: a trace match is saved on the step it stands for.';
   if(from && from.section===to.section && from.index===to.index)return 'The match is already here.';
   if(!to.form)return to.reason;
+  if(!to.stepId)return to.label+LINKS_TRACE_NEEDS_ID;
   if(from && to.model){
     var src=to.model.elements.find(function(e){return e.kind==='step' && e.section===from.section && e.index===from.index;});
     var use=src && src.matches[from.alternative || 0];
@@ -108,6 +112,7 @@ function planLinksTraceMove(text,raw,from,to,mode,copy,context){
   if(!src || !dst)return {error:'Step not found. Render and try again.'};
   if(!src.alternatives)return {error:src.label+'’s traceMatch is not a selector object or a list of them. Fix it in JSON first.'};
   if(!dst.alternatives)return {error:dst.label+'’s traceMatch is not a selector object or a list of them. Fix it in JSON first.'};
+  if(!linksTraceStepHasId(dst.st))return {error:dst.label+LINKS_TRACE_NEEDS_ID};
   var m=src.alternatives[from.alternative || 0];if(!m)return {error:'That alternative no longer exists. Render and try again.'};
   if(typeof m.nodeId==='string' && from.section!==to.section)return {error:'This match names a node in another section. Move it within its section, or clear its Node first.'};
   if(dst.alternatives.length && !mode)return {error:dst.label+' already has a trace match. Replace it, or add this one as an alternative.',choose:true};
@@ -126,7 +131,7 @@ function planLinksTraceAssign(text,raw,group,step,remove,context){
   if(!got.alternatives)return {error:got.label+'’s traceMatch is not a selector object or a list of them. Fix it in JSON first.'};
   var key=linksTraceKey(group),has=got.alternatives.filter(function(m){return linksTraceKey(m)===key;}).length>0,list=builderClone(got.alternatives);
   if(remove){if(!has)return {text:text};list=list.filter(function(m){return linksTraceKey(m)!==key;});}
-  else {if(has)return {text:text};list.push({serviceName:group.serviceName,operation:group.operation});}
+  else {if(has)return {text:text};if(!linksTraceStepHasId(got.st))return {error:got.label+LINKS_TRACE_NEEDS_ID};list.push({serviceName:group.serviceName,operation:group.operation});}
   return linksTraceSetPlan(text,raw,got,linksTraceValue(list,list.length>1));
 }
 /* Rename one service · operation on every step that uses it, in one plan.
@@ -171,9 +176,15 @@ function linksTraceAttributeNames(raw,context){
 /* One inline-editor edit (planStepTraceMatch), refusing an attribute name the
    validator would reject, so an edit never leaves the board invalid. */
 function planLinksTraceEdit(text,raw,section,index,edit,context){
-  if(edit && edit.op==='attribute' && typeof edit.name==='string' && edit.name.trim()){
+  if(edit && edit.op==='create'){
+    var got=builderStepAt(raw,section,index);
+    if(got && !linksTraceStepHasId(got.st))return {error:linksStepLabel(got.st,index)+LINKS_TRACE_NEEDS_ID};
+  }
+  // A new or renamed attribute must be one trace matching supports; a value edit on an
+  // existing (even hand-written) name is not re-checked here.
+  if(edit && edit.op==='attribute' && typeof edit.name==='string' && edit.name.trim() && edit.name.trim()!==edit.key){
     var names=linksTraceAttributeNames(raw,context),name=edit.name.trim();
-    if(names && names.indexOf(name)<0)return {error:name+' is not a trace attribute Flowview can match on. Use one of '+names.join(', ')+', or one your trace connection lists in allowedAttributes.',field:edit.key==null?'attr-new-name':'attr-name'};
+    if(names && names.indexOf(name)<0)return {error:name+' is not a trace attribute Flowview can match on. Pick one from the list.',field:edit.key==null?'attr-new-name':'attr-name'};
   }
   var plan=planStepTraceMatch(text,raw,section,index,edit);
   return plan.noop?{text:text}:plan;

@@ -608,3 +608,17 @@ test('#1228 Document settings → Tracking → Metrics folds Environments, each 
   ui.set('kafka-topic lag unit','items');assert.equal(ui.raw.page.tracking.telemetry.templates['kafka-topic'].signals.lag.unit,'items');
   assert.equal(template().open,true);assert.equal(find(nested(),'Signal lag').open,true);assert.equal(find(nested(),'Signal in').open,false);
 });
+
+// #1228 problem 1: the imported-element form returned before finishForm, so a same-selection refresh lost focus and the Inspector scroll.
+test('#1228 an inherited imported connection keeps focus on Card width across the refresh that saves the consumer override',()=>{
+  const f=topologyFixtures(),ui=harness(f.consumer);
+  ui.h.session.replaceProject(JSON.stringify(f.consumer,null,2),null,{topologyContext:f.context});
+  const C=ui.e.C,resolved=()=>diagramOf(C.FlowTopology.resolveSource(ui.raw,f.context));
+  const edge={kind:'edge',section:0,index:resolved().edges.findIndex(e=>e.from==='shared::api' && e.to==='shared::store')};ui.select(edge);
+  const width=ui.control('Card width');
+  assert.ok(width.getAttribute('data-inspector-control'),'the imported form finishes like other forms: controls carry their retention keys');
+  width.focus();ui.set('Card width','400');
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].edgeTracking['api->store'].telemetry.card,{width:400});
+  assert.equal(ui.e.doc.activeElement,ui.control('Card width'),'focus returns to Card width after the refresh');
+  assert.equal(ui.control('Card width').value,'400');
+});

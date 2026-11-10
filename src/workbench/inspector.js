@@ -2989,7 +2989,8 @@ function renderInspector(){
         }});
       },'danger');
       removeImport.setAttribute('aria-label','Remove referenced topology '+imported.as);
-      guide.appendChild(removeImport);return;
+      // #1228: imported forms restore scroll, focus, control keys and folds like every other form.
+      guide.appendChild(removeImport);finishForm(previous);return;
     }
 
     var p = document.createElement(loc ? 'button' : 'span');

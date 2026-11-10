@@ -113,16 +113,22 @@ test('W3 a snapshot next to the board in the working folder is offered, not turn
 |---|---|---|---|
 | W5 a refusal stays | a file that is not a snapshot, then Demo live status checked | the "Snapshot not loaded: …" line is still there after the Demo change | a refusal wiped by an unrelated toggle |
 | W6 coverage follows edits | the snapshot loaded, then a ticket the snapshot lacks added to the board in the JSON | the status line says 7 of this board's 8 tickets are in it | a count from before the edit | */
-test('W5 W6 the snapshot status line keeps a refusal through a Demo change and follows the board through an edit',async({page,server},info)=>{
+test('W5 the snapshot status line keeps a refusal through a Demo change',async({page,server},info)=>{
  await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
  const text=JSON.stringify(raw,null,2);await paste(page,text);await prepareEditorSurface(page);
- const status=page.locator('#live-snapshot-status'),bad=info.outputPath('not-a-snapshot.json'),good=info.outputPath('doorbell.snapshot.json');
- await mkdir(path.dirname(bad),{recursive:true});await writeFile(bad,JSON.stringify({version:1,days:[]}));await writeFile(good,JSON.stringify(snapshotFile()));
+ const status=page.locator('#live-snapshot-status'),bad=info.outputPath('not-a-snapshot.json');
+ await mkdir(path.dirname(bad),{recursive:true});await writeFile(bad,JSON.stringify({version:1,days:[]}));
  await loadSnapshot(page,bad);await expect(status).toContainText('Snapshot not loaded: The file is not a Flowview live snapshot');
  await demoToggle(page).check();await expect(page.locator('#docview .pt-live-status .dv-live-connection')).toHaveAttribute('data-state','demo');
  await expect(status).toContainText('Snapshot not loaded: The file is not a Flowview live snapshot');await expect(status).toHaveAttribute('data-kind','error');
  await demoToggle(page).uncheck();
- // W6: the board gains a ticket the snapshot does not hold.
+});
+test('W6 the snapshot status line follows the board through an edit',async({page,server},info)=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
+ const text=JSON.stringify(raw,null,2);await paste(page,text);await prepareEditorSurface(page);
+ const status=page.locator('#live-snapshot-status'),good=info.outputPath('doorbell.snapshot.json');
+ await mkdir(path.dirname(good),{recursive:true});await writeFile(good,JSON.stringify(snapshotFile()));
+ // Contrasting precondition: every board ticket is in the snapshot, so no coverage count shows.
  await loadSnapshot(page,good);await expect(status).toContainText('Showing Snapshot from');await expect(status).not.toContainText('of this board');
  const edited=JSON.parse(text),nodes=edited.page.sections.map(s=>s.diagram && s.diagram.nodes).find(n=>n && n.ingest);nodes.ingest.tickets=nodes.ingest.tickets.concat(['NEW-1']);
  await page.locator('#editor-tab-json').click();await page.locator('#src').fill(JSON.stringify(edited,null,2));await page.locator('#go').click();
@@ -157,6 +163,6 @@ test('W7 a snapshot that cannot be read when the preview draws is named in plain
   expect(stacks.length).toBeGreaterThan(0);
   for(const stack of stacks)expect(stack).toContain('liveStatusDemoMap');
  }finally{
-  await page.evaluate(()=>{if(window.__w7)JSON.stringify=window.__w7.original;});
+  if(!page.isClosed())await page.evaluate(()=>{if(window.__w7)JSON.stringify=window.__w7.original;});
  }
 });

@@ -219,14 +219,14 @@ function createReaderContents(ctl,nav,actions,options){
         // The number is drawn by CSS from data-page-index, so row text and names stay the section/View title.
         if(page>=0){choice.setAttribute('data-page-index',String(page+1));choice.setAttribute('aria-description','Page '+(page+1)+' of '+pages.length);}
         choice.classList.add('reader-tree-leaf');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-owner-selected',String(item.current===definition));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-current',selected?'page':'false');choice.setAttribute('aria-pressed',String(selected));
-        if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
+        if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description',(page>=0?'Page '+(page+1)+' of '+pages.length+'. ':'')+'Explore: pan and zoom the graph.');}
         if(selected)trail(parent);
       }
       function viewLeaf(definition,parent){
         var rec=definition.members[0].record.runtime,row=element('div','reader-tree-view-row',null,parent),choice=button(definition.name,definition.name,row,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-view');leaf(choice,definition,row,item.path+':'+definition.key);
       }
-      function sectionLeaf(definition,parent,index,key){
-        var rec=definition.members[0].record.runtime,li=element('li','',null,parent),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');if(canonical)choice.classList.add('reader-tree-single-view');if(index!==null)choice.setAttribute('data-page-number',String(index+1));leaf(choice,definition,li,key);
+      function sectionLeaf(definition,parent,key){
+        var rec=definition.members[0].record.runtime,li=element('li','',null,parent),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');if(canonical)choice.classList.add('reader-tree-single-view');leaf(choice,definition,li,key);
       }
       function disclosure(row,key,label){
         var expanded=!collapsedViews.has(key),control=button((expanded?'Collapse ':'Expand ')+label,expanded?'⌄':'›',row,function(){if(collapsedViews.has(key))collapsedViews.delete(key);else collapsedViews.add(key);drawTree();});control.classList.add('reader-view-disclosure');control.setAttribute('aria-expanded',String(expanded));control.setAttribute('data-reader-key',key+':disclosure');return expanded;
@@ -239,18 +239,18 @@ function createReaderContents(ctl,nav,actions,options){
         var sections=element('ol','reader-tree-sections',null,tab);
         groups.forEach(function(group){
           var rec=group.record.runtime,key=item.path+':section:'+rec.number;
-          if(group.definitions.length===1){sectionLeaf(group.definitions[0],sections,null,item.path+':'+group.definitions[0].key);return;}
+          if(group.definitions.length===1){sectionLeaf(group.definitions[0],sections,item.path+':'+group.definitions[0].key);return;}
           var li=element('li','',null,sections),row=element('div','reader-tree-view-row',null,li),heading=button(title(rec),title(rec),row,function(){choose(item,sectionViewDefault(item,group.record,item.views),rec);});heading.classList.add('reader-tree-section');heading.setAttribute('data-reader-key',key);heading.setAttribute('data-reader-section',rec.reference);
           if(disclosure(row,key,title(rec))){var views=element('div','reader-tree-views',null,li);group.definitions.forEach(function(definition){viewLeaf(definition,views);});}
         });return;
       }
-      if(groups.length===1){var sections=element('ol','reader-tree-sections',null,tab);sections.setAttribute('data-reader-view',groups[0].id);groups[0].definitions.forEach(function(definition,index){sectionLeaf(definition,sections,index,item.path+':'+groups[0].id+':'+definition.members[0].record.runtime.number);});return;}
+      if(groups.length===1){var sections=element('ol','reader-tree-sections',null,tab);sections.setAttribute('data-reader-view',groups[0].id);groups[0].definitions.forEach(function(definition){sectionLeaf(definition,sections,item.path+':'+groups[0].id+':'+definition.members[0].record.runtime.number);});return;}
       var views=element('div','reader-tree-views',null,tab);
       groups.forEach(function(group){
         if(group.definitions.length===1){viewLeaf(group.definitions[0],views);return;}
         var definition=group.definitions.find(function(d){return d.members[0].record.runtime===item.selected;}) || group.definitions[0],key=item.path+':'+group.id,row=element('div','reader-tree-view-row',null,views),choice=button(definition.name,definition.name,row,function(){choose(item,definition);});choice.classList.add('reader-tree-view');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-owner-selected',String(group.definitions.indexOf(item.current)>=0));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-pressed',String(item===owner && group.definitions.indexOf(item.current)>=0));
         if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
-        if(disclosure(row,key,definition.name)){var sections=element('ol','reader-tree-sections',null,views);sections.setAttribute('data-reader-view',definition.id);group.definitions.forEach(function(d,index){sectionLeaf(d,sections,index,key+':'+d.members[0].record.runtime.number);});}
+        if(disclosure(row,key,definition.name)){var sections=element('ol','reader-tree-sections',null,views);sections.setAttribute('data-reader-view',definition.id);group.definitions.forEach(function(d){sectionLeaf(d,sections,key+':'+d.members[0].record.runtime.number);});}
       });
     });
     tree.scrollTop=scroll;

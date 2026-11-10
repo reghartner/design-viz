@@ -487,7 +487,7 @@ test('header Tab title keeps about 30 characters unclipped at 1440 and names the
    H1 no pass-through open | real mouse sweep content → marker 3 → content | no overlay shown at any time (MutationObserver log on .reader-contents hidden) | opening on pointerenter without a delay
    H2 no edge trigger | real hover at the top bar's left edge and in the content just right of the rail, 600ms each | overlay never shown | a screen-edge hot zone
    H3 hover-intent overlay | real hover on marker 2 | .reader-contents visible with .reader-contents-overlay, opened 150–700ms after the rail's pointerenter; its left edge = rail right; #section-overview box unchanged; toggle still aria-expanded=false | a 0ms open; the pinned push sidebar; an overlay that moves the page
-   H4 numbered entries match (#1305) | overlay open | Tab rows that hold several pages carry no number; every numbered tree page row k (.reader-part-number = data-page-index = k) is rail marker k's page ("Page k: <section> · <View>") | unnumbered Contents; numbers that drift from the rail or the pager
+   H4 numbered entries match (#1305) | overlay open | Tab rows that hold several pages carry no number; every numbered tree page row k (drawn ::before number = data-page-index = k) is rail marker k's page ("Page k: <section> · <View>") | unnumbered Contents; numbers that drift from the rail or the pager
    H5 only real groups disclose | overlay open on a singleton part | the Answer and talk group aria-expanded=false; the other five parts have no aria-expanded | a redundant disclosure on a direct destination
    H6 mouse leave closes after a delay | real mouse move from the marker into the overlay, then to the page centre | crossing into the overlay keeps it open 600ms later; leaving it hides it 150–1000ms after the pointerleave; toggle aria-expanded=false | an overlay that stays until clicked; one that closes the instant the pointer leaves the rail
    E1 Esc closes | real hover open, then keyboard Escape | overlay hidden | Esc only handled inside the navigation
@@ -559,10 +559,11 @@ test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks
   await expectHoverOverlay(page,root,1);
   const tabs=root.locator('.reader-tree-tab');await expect(tabs).toHaveCount(6);
   expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('data-page-index')))).toEqual(['1','2',null,'7','8','9']);
+  expect(await drawnNumbers(tabs)).toEqual(['1','2','','7','8','9']);
   for(let i=0;i<6;i++)await expect(tabs.nth(i)).toHaveAccessibleName(atlasParts[i]);
   // #1305 H4: a numbered tree row k is page k, the same page as rail marker k.
   const numbered=side.locator('[data-page-index]');expect(await numbered.count()).toBeGreaterThan(0);
-  for(const row of await numbered.all()){const k=+await row.getAttribute('data-page-index');await expect(row).toHaveAttribute('aria-description','Page '+k+' of 9');await expect(marksOf(root).nth(k-1)).toHaveAccessibleName(pageName(k-1));}
+  for(const row of await numbered.all()){const k=+await row.getAttribute('data-page-index');expect(await drawnNumbers(row)).toEqual([String(k)]);await expect(row).toHaveAttribute('aria-description',new RegExp('^Page '+k+' of 9($|\\. )'));await expect(marksOf(root).nth(k-1)).toHaveAccessibleName(pageName(k-1));}
   expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual([null,null,'false',null,null,null]);
   const overlay=await side.boundingBox();await page.mouse.move(overlay.x+overlay.width/2,overlay.y+overlay.height/2);await page.waitForTimeout(600);await expect(side).toBeVisible();
   await takeLog(nav);await page.mouse.move(900,500);await expect(side).toBeHidden();await expect(toggle).toHaveAttribute('aria-expanded','false');
@@ -579,7 +580,8 @@ test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   // H4 with every Tab expanded: each page 1..9 has exactly one numbered row, and Answer and talk's section rows 3-6 name rail markers 3-6.
   expect((await side.locator('[data-page-index]').evaluateAll(els=>els.map(el=>+el.getAttribute('data-page-index')))).sort((a,b)=>a-b)).toEqual([1,2,3,4,5,6,7,8,9]);
-  for(const row of await side.locator('.reader-tree-section[data-page-index]').all()){const k=+await row.getAttribute('data-page-index');expect((await marksOf(root).nth(k-1).getAttribute('aria-label')).startsWith('Page '+k+': '+await row.getAttribute('aria-label')+' · ')).toBe(true);}
+  expect((await drawnNumbers(side.locator('[data-page-index]'))).map(Number).sort((a,b)=>a-b)).toEqual([1,2,3,4,5,6,7,8,9]);
+  for(const row of await side.locator('.reader-tree-section[data-page-index]').all()){const k=+await row.getAttribute('data-page-index');expect(await drawnNumbers(row)).toEqual([String(k)]);expect((await marksOf(root).nth(k-1).getAttribute('aria-label')).startsWith('Page '+k+': '+await row.getAttribute('aria-label')+' · ')).toBe(true);}
   expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual([null,null,'true',null,null,null]);
   expect((await root.locator('#section-motion').boundingBox()).x).toBeGreaterThanOrEqual((await side.boundingBox()).x+(await side.boundingBox()).width);
   await closeContents(root);await expectCurrentPart(root,6);
@@ -688,12 +690,14 @@ function compactContents(canonical){
   }
   return {page:{title:'Compact Contents',sections:[{tabs}]}};
 }
-// #1305: the numbered page rows of one Contents group, in order (numbers are drawn by CSS from data-page-index).
-async function expectPageIndexes(group,expected){expect(await group.locator('[data-page-index]').evaluateAll(els=>els.map(el=>el.getAttribute('data-page-index')))).toEqual(expected);}
+// #1305: page numbers are drawn by CSS (::before from data-page-index); read what is drawn, not only the attribute.
+async function drawnNumbers(rows){return rows.evaluateAll(els=>els.map(el=>{const c=getComputedStyle(el,'::before').content;return c==='none'||c==='normal'?null:JSON.parse(c);}));}
+// The numbered page rows of one Contents group, in order: attribute and drawn number both equal the expected page.
+async function expectPageIndexes(group,expected){const rows=group.locator('[data-page-index]');expect(await rows.evaluateAll(els=>els.map(el=>el.getAttribute('data-page-index')))).toEqual(expected);expect(await drawnNumbers(rows)).toEqual(expected);}
 async function assertCompactContents(page,root,canonical){
   const tree=root.locator('.reader-contents-tree'),group=name=>tree.locator('.reader-contents-tab').filter({has:tree.page().locator('.reader-tree-tab').filter({hasText:name})});
   const solo=group('Solo'),views=group('Views'),sections=group('Sections'),mixed=group('Mixed');
-  await expect(solo.getByRole('button')).toHaveText(['Solo']);await expect(solo.locator('.reader-tree-tab')).toHaveAttribute('data-page-index','1');await expect(solo.locator('.reader-tree-tab')).not.toHaveAttribute('aria-expanded');
+  await expect(solo.getByRole('button')).toHaveText(['Solo']);await expect(solo.locator('.reader-tree-tab')).toHaveAttribute('data-page-index','1');expect(await drawnNumbers(solo.locator('.reader-tree-tab'))).toEqual(['1']);await expect(solo.locator('.reader-tree-tab')).not.toHaveAttribute('aria-expanded');
   expect(await solo.locator('.reader-tree-tab').evaluate(el=>getComputedStyle(el,'::after').content)).toBe('none');
   await expect(views.getByRole('button')).toHaveText(['Views','Read','Map','Review']);
   await expect(views.locator(':scope > .reader-tree-views > .reader-tree-view-row > .reader-tree-leaf')).toHaveText(['Read','Map','Review']);await expectPageIndexes(views,['2','3','4']);

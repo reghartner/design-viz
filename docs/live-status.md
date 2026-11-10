@@ -435,9 +435,20 @@ and **Log searches**. Sections start closed, with a short status in each
 header; Metrics starts open when the page has a `tracking.telemetry` block. A
 section with validator warnings starts open and its header counts them, and
 each section lists the warnings for its own `tracking` paths. Dependencies,
-dependency link names and no-activity days are edited in JSON for now. Traces and Log searches show **No
-settings yet**; edit `tracking.telemetry.traceConnections` and
-`tracking.telemetry.lookups` in JSON for now. On a document that is not yet a
+dependency link names and no-activity days are edited in JSON for now. Traces shows **No
+settings yet**; edit `tracking.telemetry.traceConnections` in JSON for now.
+**Log searches** (#1233) edits `tracking.telemetry.lookups`: **Offer log searches
+in the Trace view** adds or removes the block (`{}` offers only the typed LogQL
+box), each search is a fold titled by its id with its label, query, suggested
+values (one per line), Loki datasource UID and trace and span ID field names, plus
+Move up, Move down and Remove. **New log search** takes a label and a query (the id
+is made from the label unless typed, accents dropped, and shown before saving) and
+keeps typed text while the form refreshes; Enter in the label adds it, opens the new
+search and moves focus to its label. After Move, focus stays on a usable Move
+button; after Remove, on the next search. While searches exist, the Offer checkbox
+says under it that they must be removed first. Each edit is one Undo step, and a validator warning sits under the
+field it names, such as "has suggested values but no $value slot" under the query.
+The header reads "Not set", "Typed query only" or the number of searches. On a document that is not yet a
 status board, **Make this a status board** adds what is missing (a page wrapper
 for a bare diagram, an empty `tracking` block and a Live status panel) as one
 Undo step.

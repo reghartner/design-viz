@@ -4,7 +4,7 @@ const {readSource}=require('../tools/source-loader.cjs');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
 const pureNames=['canon','validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology','workbench/commands/telemetry',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/inspector'];
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/log-searches-editor','workbench/inspector'];
 function environment(){return inspectorEnvironment(pureNames);}
 const home=()=>({nodes:{},rows:[],panels:[{id:'home',type:'homemap',outline:{w:300,h:164,future:'keep'}}],steps:[{panels:{home:{}}}]});
 const named=(guide,name)=>guide.querySelectorAll('.obj-field').find(label=>label.textContent===name)?.querySelector('input');

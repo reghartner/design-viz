@@ -206,3 +206,33 @@ test('#1158 review: a query whose last line ends with a # comment still gets the
  const authored=setup({p:board({camera:{label:'Camera model',query:QUERY+' # one camera model',values:['arch']}})});await settle();authored.api.set('value','arch');await authored.api.find();
  assert.deepEqual(authored.calls.map(c=>c.args.logql),[EXPANDED+' # one camera model\n| trace_id =~ "[0-9a-fA-F]{16,32}"']);
 });
+
+/* #1233 (plan 2): no fixed number of lookups; the per-field rules are unchanged. */
+test('#1233 plan 2: telemetryLookups accepts 20 lookups without a count warning; per-field validation unchanged',()=>{
+ const C=context(),warnings=[],lookups=Object.fromEntries(Array.from({length:20},(_,i)=>['search'+i,{label:'Search '+i,query:QUERY}]));
+ lookups.noSlot={label:'No slot',query:'{env="$env"} |= "x"',values:['arch']};
+ const parsed=C.trackingTelemetry({tracking:{telemetry:{lookups}}},(at,message)=>warnings.push(at+': '+message));
+ assert.equal(Object.keys(parsed.lookups).length,20,'all 20 good lookups are kept');assert.equal(parsed.lookups.noSlot,undefined);
+ assert.deepEqual(warnings,['.lookups.noSlot.query: has suggested values but no $value slot — lookup ignored']);
+ const result=C.validate({tracking:{telemetry:{lookups}},sections:[{id:'s',diagram:{nodes:{a:{}},rows:[['a']]}}]});
+ assert.ok(!result.warnings.some(w=>/at most \d+ lookups/.test(w)),'no count warning: '+result.warnings.join(' | '));
+ assert.ok(result.warnings.some(w=>w.startsWith('tracking.telemetry.lookups.noSlot.query:')));
+});
+/* #1233: each search box keeps its own value; Find on a box runs that box's lookup; typing in one box leaves
+   another box's results alone; the shared "Only lines with a trace ID" still clears them. */
+test('#1233 each search keeps its own value and Find runs the box it is given',async()=>{
+ const DEVICE='{env="$env"} |= "Handling camera stats message" | deviceId="$value"';
+ const h=setup({p:board({camera:{label:'Camera model',query:QUERY,values:['arch','wren']},device:{label:'Search for my device ID',query:DEVICE}})});await settle();
+ h.api.set('value','arch','camera');h.api.set('value','cam-7','device');assert.equal(h.calls.length,0);
+ assert.deepEqual(clone(h.api.snapshot().form.values || null),{camera:'arch',device:'cam-7'},'each box keeps its own value');
+ await h.api.find('device');
+ assert.deepEqual(h.calls.map(c=>c.args.logql),['{env="stg"} |= "Handling camera stats message" | deviceId="cam-7"'+FILTER],'the second box runs its own query with its own value');
+ let s=h.api.snapshot();assert.equal(s.result.lookup,'device');assert.equal(s.form.lookup,'device');
+ h.api.set('value','wren','camera');assert.equal(h.api.snapshot().result.lookup,'device','typing in another box keeps these results');
+ h.api.set('value','cam-8','device');assert.equal(h.api.snapshot().result,null,'typing in the box that ran clears its results');
+ await h.api.find('camera');assert.equal(h.calls.at(-1).args.logql,EXPANDED.replace('"arch"','"wren"')+FILTER);assert.equal(h.api.snapshot().result.lookup,'camera');
+ h.api.set('logql','{env="$env"}');assert.equal(h.api.snapshot().result.lookup,'camera','typing a LogQL query keeps an authored box\'s results');
+ await h.api.find(h.C.TELEMETRY_LOG_TYPED);assert.equal(h.calls.at(-1).args.logql,'{env="stg"}'+FILTER);assert.equal(h.api.snapshot().result.lookup,h.C.TELEMETRY_LOG_TYPED);
+ h.api.set('traced',false);assert.equal(h.api.snapshot().result,null,'the shared checkbox clears the results');
+ assert.equal(await h.api.find('nope'),null,'an unknown box runs nothing new');
+});

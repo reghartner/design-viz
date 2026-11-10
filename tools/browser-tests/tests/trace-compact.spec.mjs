@@ -84,7 +84,7 @@ test('#1186 a span focused from the diagram far down the list is scrolled into t
 test('#1230 at 1440x900 a loaded trace above an open search with eight log rows does not cover the search',async({page,server},info)=>{
  const ns=ago=>(BigInt(Date.now()-ago)*1000000n).toString(),lines={data:Array.from({length:8},(_,i)=>({timestamp:ns(60000*(i+1)),line:'order placed',labels:{env:'prod'},structuredMetadata:{order_id:'o-1',trace_id:ID}}))};
  const {panel}=await open(page,server,RECORDED,lines),logs=panel.locator('.dv-trace-logs');
- await logs.getByLabel('Order ID',{exact:true}).fill('o-1');await logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(logs.locator('.dv-trace-log-row')).toHaveCount(8);
+ await logs.getByLabel('Order ID',{exact:true}).fill('o-1');await logs.getByRole('button',{name:'Find log lines for Order ID',exact:true}).click();await expect(logs.locator('.dv-trace-log-row')).toHaveCount(8);
  await logs.getByRole('button',{name:'Load trace '+ID,exact:true}).first().click();await expect(panel.locator('.dv-trace-slot .dv-trace-span').first()).toBeVisible();
  const at=await panel.evaluate(p=>{const r=p.shadowRoot || p,q=s=>Array.from(r.querySelectorAll(s)),b=n=>n.getBoundingClientRect();
   const waterfall=q('.dv-trace-waterfall'),selected=q('.dv-trace-slot > .dv-trace-selected'),search=q('.dv-trace-direct'),rows=q('.dv-trace-log-row');

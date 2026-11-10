@@ -23,8 +23,8 @@ async function open(page,server,{grafana=true,lookups=true,lines=LINES}={}){
  await page.exposeFunction('logCall',(server,tool,args)=>{calls.push({server,tool,args});return tool==='query_loki_logs'?{content:[{type:'text',text:JSON.stringify(lines)}]}:{payload:args.trace_id===ID?RECORDED:notFound(args.trace_id)};});
  await page.addInitScript(()=>{window.claude={use:async name=>name==='permissions'?{request:keys=>window.logPermission(keys)}:{listTools:()=>window.logTools(),describeTool:()=>window.logDescribe(),callTool:(s,n,a)=>window.logCall(s,n,a)}};window.flowviewBooted=ctl=>{window.ctl=ctl;};});
  const telemetry={grafana:{loki:'loki-$env'},environment:'stg',environments:{stg:{},prd:{}},traceConnections:{company:PROFILE}};
- if(lookups)telemetry.lookups={camera:{label:'Camera model',query:QUERY,values:['arch','wren']}};
- const name='log-lookup-'+(grafana?'grafana':'absent')+(lookups?'':'-plain'),spec={page:{title:'Camera stats',tracking:{telemetry},sections:[{id:'main',diagram:{nodes:{consumer:{title:'Camera stats consumer'}},rows:[['consumer']],panels:[PANEL]}}]}};
+ if(lookups)telemetry.lookups=lookups===true?{camera:{label:'Camera model',query:QUERY,values:['arch','wren']}}:lookups;
+ const name='log-lookup-'+(grafana?'grafana':'absent')+(lookups?lookups===true?'':'-'+Object.keys(lookups).length:'-plain'),spec={page:{title:'Camera stats',tracking:{telemetry},sections:[{id:'main',diagram:{nodes:{consumer:{title:'Camera stats consumer'}},rows:[['consumer']],panels:[PANEL]}}]}};
  await writeFile(path.join(server.root,name+'.json'),JSON.stringify(spec));
  execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,name+'.json'),path.join(repo,'template/flowview.html'),path.join(server.root,name+'.html')],{stdio:'pipe'});
  await page.goto(server.origin+'/'+name+'.html');await page.waitForFunction(()=>!!window.ctl);
@@ -49,12 +49,12 @@ const formControls=root=>root.locator('.dv-trace-config').evaluate(config=>Array
 
 test('desktop authored log lookup lists the newest matching lines and loads the chosen trace focused on its span',async({page,server},info)=>{
  const h=await open(page,server);
- // #1173: one authored lookup is not a select; its field shows, and a text button switches to a typed query.
- await expect(h.logs.getByRole('combobox',{name:'Log lookup',exact:true})).toHaveCount(0);await expect(h.logs.getByRole('button',{name:'Type a LogQL query instead',exact:true})).toBeVisible();await expect(h.logs.getByRole('button',{name:'Find log lines',exact:true})).toBeEnabled();
+ // #1173, #1233: one authored lookup is its own box, not a select; the typed query is a separate collapsed box.
+ await expect(h.logs.getByRole('combobox',{name:'Log lookup',exact:true})).toHaveCount(0);await expect(h.logs.locator('details.dv-trace-log-typed > summary')).toHaveText('Type a LogQL query');await expect(h.logs.locator('details.dv-trace-log-typed')).toHaveJSProperty('open',false);await expect(h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true})).toBeEnabled();
  await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');expect(h.calls).toHaveLength(0);
  // #1158: unchecked, Find sends the query as before and lists every line.
  await h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true}).uncheck();
- await h.logs.getByRole('button',{name:'Find log lines',exact:true}).click();
+ await h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true}).click();
  const lines=h.logs.locator('.dv-trace-log-row');await expect(lines).toHaveCount(2);
  expect(h.calls).toEqual([{server:'Grafana',tool:'query_loki_logs',args:{datasourceUid:'loki-stg',logql:'{env="stg"} |= "Handling camera stats message" | cameraModel="arch"',startRfc3339:'now-2h',endRfc3339:'now',limit:10,direction:'backward',queryType:'range'}}]);
  await expect(lines.nth(0).locator('.dv-trace-log-time')).toHaveText('2026-11-07 09:42:13Z');await expect(lines.nth(0).locator('.dv-trace-log-value')).toHaveText('arch');await expect(lines.nth(0).locator('.dv-trace-log-id')).toHaveText(ID);
@@ -76,7 +76,7 @@ test('desktop without a Grafana connector the log lookup is disabled with a mess
  const plain=await open(await page.context().newPage(),server,{lookups:false});await expect(plain.logs).toHaveCount(0);const expected=await formControls(plain.root);
  const h=await open(page,server,{grafana:false});
  await expect(h.logs.getByRole('status')).toContainText('Log lookups need a Grafana connector with query_loki_logs');
- await expect(h.logs.getByRole('button',{name:'Type a LogQL query instead',exact:true})).toBeDisabled();await expect(h.logs.getByLabel('Camera model',{exact:true})).toBeDisabled();await expect(h.logs.getByRole('button',{name:'Find log lines',exact:true})).toBeDisabled();
+ await h.logs.locator('details.dv-trace-log-typed > summary').click();await expect(h.logs.getByLabel('LogQL log query',{exact:true})).toBeDisabled();await expect(h.logs.getByRole('button',{name:'Find log lines for LogQL query',exact:true})).toBeDisabled();await expect(h.logs.getByLabel('Camera model',{exact:true})).toBeDisabled();await expect(h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true})).toBeDisabled();
  expect(await formControls(h.root)).toEqual(expected);
  await info.attach('log-lookup-no-grafana',{body:await h.root.screenshot(),contentType:'image/png'});
  await h.root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();
@@ -87,7 +87,7 @@ test('desktop a log-line trace the provider did not keep says so and loads the n
  const MISSING='5ab0'.repeat(8),ns=ago=>(BigInt(Date.now()-ago)*1000000n).toString(),line=(ago,meta)=>({timestamp:ns(ago),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:meta});
  const h=await open(page,server,{lines:{data:[line(600000,{cameraModel:'arch',trace_id:MISSING}),line(900000,{cameraModel:'arch'}),line(1200000,{cameraModel:'arch',trace_id:ID,span_id:SPAN})]}});
  await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');await h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true}).uncheck();
- await h.logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(h.logs.locator('.dv-trace-log-row')).toHaveCount(3);
+ await h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true}).click();await expect(h.logs.locator('.dv-trace-log-row')).toHaveCount(3);
  await h.logs.getByRole('button',{name:'Load trace '+MISSING,exact:true}).click();
  const report=h.root.locator('.dv-trace-direct-report');await expect(report).toContainText('Trace not found. The provider may not have kept this trace (sampling). Try the next log line.');
  await expect(report).not.toContainText('longer lookback');await expect(h.root.locator('.dv-trace-time')).toHaveJSProperty('open',false);
@@ -106,13 +106,42 @@ test('desktop a log-line trace the provider did not keep says so and loads the n
  expect(h.calls.filter(c=>c.tool==='get_trace').map(c=>c.args.trace_id)).toEqual([MISSING,ID]);
 });
 
+/* #1233 (test plan 1): any number of authored log searches, each its own labeled box with its own Find in authored order.
+   Find on the second sends one query_loki_logs call with that lookup's query and its typed value, and the results sit
+   directly under that box only. Enter in a box runs its Find. The typed LogQL query is its own collapsed box. */
+test('desktop three authored log searches are three labeled boxes; Find on the second runs only its query and lists under it',async({page,server},info)=>{
+ const DEVICE='{env="$env"} |= "Handling camera stats message" | deviceId="$value"',ERRORS='{env="$env"} |= "Handling camera stats message" |= "error"';
+ const h=await open(page,server,{lookups:{camera:{label:'Camera model',query:QUERY,values:['arch','wren']},device:{label:'Search for my device ID',query:DEVICE},errors:{label:'Recent errors',query:ERRORS}}});
+ const seen=()=>h.root.evaluate(host=>{const r=host.shadowRoot || host;return Array.from(r.querySelectorAll('.dv-trace-logs [data-log-search]')).map(b=>{const input=b.querySelector(':scope input:not([type=checkbox]), :scope textarea'),box=b.getBoundingClientRect();
+  return {id:b.getAttribute('data-log-search'),label:(b.querySelector('.dv-trace-log-label, .dv-trace-log-name, summary') || {}).textContent || '',input:input && input.getAttribute('aria-label'),list:!!(input && input.list),
+   finds:Array.from(b.querySelectorAll('button.dv-trace-log-find')).map(f=>f.getAttribute('aria-label')),rows:b.querySelectorAll('.dv-trace-log-row').length,rowTops:Array.from(b.querySelectorAll('.dv-trace-log-row')).map(n=>n.getBoundingClientRect().top),top:box.top,bottom:box.bottom};});});
+ let at=await seen();
+ expect(at.map(b=>[b.id,b.label,b.input,b.list,b.finds]),'three labeled boxes in authored order, then the typed box').toEqual([
+  ['camera','Camera model','Camera model',true,['Find log lines for Camera model']],['device','Search for my device ID','Search for my device ID',false,['Find log lines for Search for my device ID']],
+  ['errors','Recent errors',null,false,['Find log lines for Recent errors']],[':logql','Type a LogQL query','LogQL log query',false,['Find log lines for LogQL query']]]);
+ expect(at.slice(0,3).every((b,i,all)=>!i || b.top>=all[i-1].bottom-1),'stacked top to bottom').toBe(true);
+ for(const name of ['Camera model','Search for my device ID','Recent errors'])await expect(h.logs.getByRole('button',{name:'Find log lines for '+name,exact:true})).toBeVisible();
+ await expect(h.logs.locator('details.dv-trace-log-typed')).toHaveJSProperty('open',false);
+ await h.logs.getByLabel('Search for my device ID',{exact:true}).fill('cam-7');await h.logs.getByRole('button',{name:'Find log lines for Search for my device ID',exact:true}).click();
+ await expect(h.logs.locator('[data-log-search="device"] .dv-trace-log-row')).toHaveCount(1);
+ expect(h.calls.map(c=>[c.tool,c.args.logql])).toEqual([['query_loki_logs','{env="stg"} |= "Handling camera stats message" | deviceId="cam-7"\n| trace_id =~ "[0-9a-fA-F]{16,32}"']]);
+ at=await seen();expect(at.map(b=>b.rows),'results under the box that ran only').toEqual([0,1,0,0]);
+ const device=at[1];expect(device.rowTops[0],'directly under its controls, inside the box').toBeGreaterThan(device.top);expect(device.bottom,'above the next box').toBeLessThanOrEqual(at[2].top+1);
+ await info.attach('log-search-boxes',{body:await h.root.screenshot(),contentType:'image/png'});
+ // Enter in the first box runs its Find; the list moves under it.
+ await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');await h.logs.getByLabel('Camera model',{exact:true}).press('Enter');
+ await expect(h.logs.locator('[data-log-search="camera"] .dv-trace-log-row')).toHaveCount(1);expect(h.calls).toHaveLength(2);expect(h.calls[1].args.logql).toContain('cameraModel="arch"');
+ at=await seen();expect(at.map(b=>b.rows)).toEqual([1,0,0,0]);
+ await expect(h.logs.getByLabel('Search for my device ID',{exact:true}),'each box keeps its value').toHaveValue('cam-7');
+});
+
 /* #1230 (test plan 2 and 3): a reserved space above the search holds the loaded trace. Before a load it is a short
    placeholder; a loaded log line's trace appears in it while the search and its results stay open below. */
 test('desktop the loaded trace goes in the reserved space above the search; the search and its results stay open',async({page,server},info)=>{
  const h=await open(page,server);let at=await layout(h.root);
  expect([at.slots,at.inSlot,at.selected,at.slotText],'before a load: one empty placeholder').toEqual([1,0,0,'Load a trace to show it here']);
  expect(at.slot.height,'the placeholder is short').toBeGreaterThan(0);expect(at.slot.height).toBeLessThan(80);expect(at.slot.bottom,'it sits above the search').toBeLessThanOrEqual(at.search.top+1);
- await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');await h.logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(h.logs.locator('.dv-trace-log-row')).toHaveCount(1);
+ await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');await h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true}).click();await expect(h.logs.locator('.dv-trace-log-row')).toHaveCount(1);
  await h.logs.getByRole('button',{name:'Load trace '+ID,exact:true}).click();await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);
  at=await layout(h.root);
  expect([at.slots,at.inSlot,at.selected],'the trace is in the reserved space').toEqual([1,1,1]);expect(at.slotText).not.toContain('Load a trace to show it here');
@@ -123,7 +152,7 @@ test('desktop the loaded trace goes in the reserved space above the search; the 
 
 /* #1158: "Only lines with a trace ID" is checked by default; Find then appends the trace ID label filter. */
 test('desktop "Only lines with a trace ID": checked by default; unchecked Find sends the query unchanged, checked Find appends the trace ID filter',async({page,server},info)=>{
- const h=await open(page,server),traced=h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true}),find=h.logs.getByRole('button',{name:'Find log lines',exact:true}),rows=h.logs.locator('.dv-trace-log-row');
+ const h=await open(page,server),traced=h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true}),find=h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true}),rows=h.logs.locator('.dv-trace-log-row');
  const query='{env="stg"} |= "Handling camera stats message" | cameraModel="arch"';
  await expect(traced).toBeChecked();await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');
  await traced.uncheck();await find.click();await expect(rows).toHaveCount(2);
@@ -156,7 +185,7 @@ test('desktop Over time Find searches the selected day: today to now, then the w
  await expect(logs.locator('.dv-trace-logs-window')).toHaveText(/^Loki · \d{4}-\d\d-\d\d 00:00–\d\d:\d\d local$/);
  await logs.getByLabel('Camera model',{exact:true}).fill('arch');const before=await page.evaluate(()=>Date.now());
  // #1158: "Only lines with a trace ID" is checked by default, so the line without one is not listed.
- await logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(rows).toHaveCount(1);
+ await logs.getByRole('button',{name:'Find log lines for Camera model',exact:true}).click();await expect(rows).toHaveCount(1);
  let sent=await calls();expect(sent).toHaveLength(1);expect([sent[0].startRfc3339,sent[0].limit,sent[0].direction]).toEqual([await midnight(0),10,'backward']);
  expect(sent[0].logql).toBe('{env="stg"} |= "Handling camera stats message" | cameraModel="arch"\n| trace_id =~ "[0-9a-fA-F]{16,32}"');
  const end=Date.parse(sent[0].endRfc3339);expect(end).toBeGreaterThanOrEqual(before);expect(end).toBeLessThanOrEqual(await page.evaluate(()=>Date.now()));
@@ -165,7 +194,7 @@ test('desktop Over time Find searches the selected day: today to now, then the w
  await root.getByRole('button',{name:'Previous day',exact:true}).click();await expect(rows).toHaveCount(0);
  await expect(logs.getByLabel('Camera model',{exact:true})).toHaveValue('arch');expect(await calls()).toHaveLength(1);
  await expect(logs.locator('.dv-trace-logs-window')).toHaveText(/^Loki · \d{4}-\d\d-\d\d 00:00–24:00 local$/);
- await logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(rows).toHaveCount(1);
+ await logs.getByRole('button',{name:'Find log lines for Camera model',exact:true}).click();await expect(rows).toHaveCount(1);
  sent=await calls();expect(sent).toHaveLength(2);expect([sent[1].startRfc3339,sent[1].endRfc3339]).toEqual([await midnight(1),await midnight(0)]);
  await info.attach('log-search-over-time-previous-day',{body:await root.screenshot(),contentType:'image/png'});
 });
@@ -192,7 +221,7 @@ test('desktop Load on a log line from two days back moves the view to that day',
  const dayKey=await page.evaluate(at=>{const d=new Date(at),pad=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());},at);
  await root.getByRole('button',{name:'Trace',exact:true}).click();await expect(root.locator('.dv-live-over-time-day')).toHaveCount(0);
  await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
- await logs.getByLabel('Camera model',{exact:true}).fill('arch');await logs.getByRole('button',{name:'Find log lines',exact:true}).click();
+ await logs.getByLabel('Camera model',{exact:true}).fill('arch');await logs.getByRole('button',{name:'Find log lines for Camera model',exact:true}).click();
  await expect(logs.locator('.dv-trace-log-row')).toHaveCount(1);await expect(logs.locator('.dv-trace-logs-moves')).toHaveText('Loading a trace moves the view to its date.');
  await info.attach('trace-day-live-log-line',{body:await root.screenshot(),contentType:'image/png'});
  const reach=()=>lookback(at+60000-3600000),before=reach();

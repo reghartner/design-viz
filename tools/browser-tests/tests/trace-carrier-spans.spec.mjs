@@ -146,14 +146,19 @@ test('desktop: a hand-off label keeps the old step time in its title, has the ed
     const scope=host.shadowRoot,box=el=>el.getBoundingClientRect(),hit=(a,b)=>Math.min(a.right,b.right)-Math.max(a.left,b.left)>.5 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>.5;
     const label=g=>g && g.querySelector('text'),handoff=label(scope.querySelector('.dv-trace-overlay[data-trace-edge="1"]')),step=label(scope.querySelector('.dv-trace-overlay[data-trace-edge="0"]'));
     const others=Array.from(scope.querySelectorAll('.dv-metrics-card-box,text.lbl,.dv-jira-cue')).map(el=>({cls:el.getAttribute('class'),text:el.textContent,box:box(el)}));
-    return {title:handoff.parentNode.querySelector('title').textContent,size:getComputedStyle(handoff).fontSize,stepSize:step && getComputedStyle(step).fontSize,
+    const look=t=>t && {size:parseFloat(getComputedStyle(t).fontSize),opacity:getComputedStyle(t.parentNode).opacity*getComputedStyle(t).opacity,height:box(t).height,plated:!!t.parentNode.querySelector('.dv-trace-label-plate')};
+    return {title:handoff.parentNode.querySelector('title').textContent,handoff:look(handoff),step:look(step),
       cards:scope.querySelectorAll('.dv-metrics-card-box').length,cues:scope.querySelectorAll('.dv-jira-cue').length,
       overlaps:others.filter(o=>hit(box(handoff),o.box)).map(o=>o.cls+' '+o.text)};
   });
-  expect(found.title,'the old step time stays readable').toContain("Step charge: 23.6 ms (the receiving span's own time, as before)");
+  expect(found.title,'the old step time stays readable').toMatch(/ Step charge, grpc\.msdemo\.PaymentService\/Charge: 23\.5\d* ms\./);
   expect(found.title).toMatch(/^Hand-off 0\.5 ms: from the start of the send span \(checkout msdemo\.PaymentService\/Charge\) to the start of the receiving span \(payment grpc\.msdemo\.PaymentService\/Charge\)\./);
-  expect(found.stepSize,'the undeclared PlaceOrder connection keeps its step label').toBeTruthy();
-  expect(found.size,'the hand-off label has the edge label size').toBe(found.stepSize);
+  expect(found.step,'the undeclared PlaceOrder connection keeps its step label').toBeTruthy();
+  // Readable as today's connection labels: the same type size on screen, not faded, at least 11px.
+  expect(found.handoff.size,'the hand-off label has the edge label size').toBe(found.step.size);
+  expect(found.handoff.size).toBeGreaterThanOrEqual(11);
+  expect(Math.abs(found.handoff.height-found.step.height),'the same rendered height').toBeLessThanOrEqual(found.step.height*.1);
+  expect(found.handoff.opacity,'not faded').toBeGreaterThanOrEqual(found.step.opacity);
   expect(found.cards).toBeGreaterThan(0);
   expect(found.cues,'Jira cues are not painted while the Trace view shows trace labels').toBe(0);
   expect(found.overlaps,'the hand-off label overlaps no metrics card, connection label or Jira cue').toEqual([]);

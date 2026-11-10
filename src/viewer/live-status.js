@@ -1097,7 +1097,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function restoreDirectFocus(saved){
     var e=saved && !traceFocus && directTrace.snapshot().exemplar;if(!e || e.traceId!==saved.traceId)return;
     var entry=traceSources().entries.find(function(x){return x.manual && x.exemplar.traceId===saved.traceId;});
-    if(entry)traceFocus={context:traceContext(entry),spanId:saved.spanId,choiceKey:saved.choiceKey};
+    // #1280: kept, not newly requested, so it never scrolls the page (the error stays in view).
+    if(entry)traceFocus={context:traceContext(entry),spanId:saved.spanId,choiceKey:saved.choiceKey,auto:true};
   }
   /* #1078: in board Edit mode, the steps of the trace's own diagram a span can be
      mapped to; null outside Edit mode. A step that has a traceMatch is marked

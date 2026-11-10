@@ -4791,9 +4791,17 @@ test('#1252 typing in Trace ID keeps the loaded trace and its focus; a failed Lo
  for(const [field,value] of [['input','5ab0'],['start','-6h'],['end','']]){api.setDirectTraceField({field,value});h.flush();
   selected=api.snapshot().trace.selected;assert.ok(selected && selected.manual,field+': the trace stays');assert.equal(selected.exemplar.traceId,COMPACT_ID);assert.equal(selected.focus && selected.focus.spanId,span,field+': the span focus stays');
   assert.ok(m.body.querySelector('.dv-trace-slot .dv-trace-selected'),field+': still drawn');}
- api.setDirectTraceField({field:'start',value:''});api.setDirectTraceField({field:'input',value:'f'.repeat(32)});assert.equal(await api.loadDirectTrace(false),null,'a trace whose ID does not match fails');h.flush();
- selected=api.snapshot().trace.selected;assert.ok(selected && selected.exemplar.traceId===COMPACT_ID,'the failed Load keeps the shown trace');assert.ok(api.snapshot().trace.direct.report.error,'and reports its error');
- assert.equal(selected.focus && selected.focus.spanId,span,'review c1: and its span focus');
+ api.setDirectTraceField({field:'start',value:''});api.setDirectTraceField({field:'input',value:'f'.repeat(32)});
+ // #1280 review c2 (probe P3): the kept focus does not scroll the page, so the error by the search stays in view.
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,pageCalls=[],scroller={scrollTop:0};
+ proto.getClientRects=function(){return [1];};proto.getBoundingClientRect=function(){return {top:1900,bottom:1930,left:0,right:100,width:100,height:30};};proto.scrollIntoView=function(){pageCalls.push(this.className);};
+ h.doc.scrollingElement=scroller;h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
+ try{
+  assert.equal(await api.loadDirectTrace(false),null,'a trace whose ID does not match fails');h.flush();
+  selected=api.snapshot().trace.selected;assert.ok(selected && selected.exemplar.traceId===COMPACT_ID,'the failed Load keeps the shown trace');assert.ok(api.snapshot().trace.direct.report.error,'and reports its error');
+  assert.equal(selected.focus && selected.focus.spanId,span,'review c1: and its span focus');assert.equal(selected.focus.auto,true,'the kept focus is not a new request');
+  assert.equal(scroller.scrollTop,0,'the page did not scroll to the kept row');assert.equal(pageCalls.filter(c=>/dv-trace-span-item/.test(c)).length,0,'no scrollIntoView');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;h.doc.defaultView=view;delete h.doc.scrollingElement;}
  api.clearDirectTrace();h.flush();assert.equal(api.snapshot().trace.selected,null,'Clear removes it');assert.equal(calls.length,2);
  api.destroy();
 });

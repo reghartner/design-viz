@@ -246,7 +246,8 @@ function telemetryEditPage(telemetry,edit){
   if(op==='enabled'){
     if(typeof edit.value!=='boolean')return {error:'Allow metrics must be true or false.'};
     if(telemetry!=null && !telemetryObject(telemetry))return {error:'Metrics settings are not an object; repair tracking.telemetry in JSON first.'};
-    t.enabled=edit.value;return done();
+    // #1254 item 9: true is the default, so it is not written.
+    if(edit.value)delete t.enabled;else t.enabled=false;return done();
   }
   if(op==='addEnvironment' || op==='removeEnvironment' || op==='environment' || op==='environmentSetting'){
     var profiles=telemetryObject(t.environments)?t.environments:{},id=edit.name;
@@ -402,7 +403,8 @@ function planPageTelemetry(text,raw,edit){
   var result=telemetryEditPage(current,edit);if(result.error)return result;
   if(JSON.stringify(result.value)===JSON.stringify(telemetryObject(current)?current:null) && (result.value!=null || current===undefined))return {text:text};
   if(!tracking)return result.value==null?{text:text}:planSetField(text,raw,doc.path,'tracking',JSON.stringify({telemetry:result.value},null,2));
-  if(result.value==null && Object.keys(tracking).every(function(key){return key==='telemetry';}))return planSetField(text,raw,doc.path,'tracking',null);
+  // An emptied tracking block is dropped, unless a Live status panel uses it to mark the status board (#1254).
+  if(result.value==null && Object.keys(tracking).every(function(key){return key==='telemetry';}) && statusBoardMissing(raw).panel)return planSetField(text,raw,doc.path,'tracking',null);
   return planSetField(text,raw,doc.path.concat(['tracking']),'telemetry',result.value==null?null:JSON.stringify(result.value,null,2));
 }
 /* Read model for the carrier editor. warnings are the validator's #937

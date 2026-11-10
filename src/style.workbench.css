@@ -1828,3 +1828,9 @@ body:not(.workbench-reader-preview-active) #docview .node[data-dv-hidden="true"]
 .dv-metrics-card[data-metrics-section]{cursor:grab;touch-action:none}
 .dv-metrics-card[data-metrics-section]:focus-visible .dv-metrics-card-box{stroke:var(--accent,#4c6ef5);stroke-width:2}
 .dv-metrics-card.dv-metrics-dragging{cursor:grabbing}
+/* #1254: a refusal or note shown beside the field that caused it. */
+.field-message{display:block;grid-column:1/-1;margin-top:4px;font-size:11px;line-height:1.35;overflow-wrap:anywhere;}
+.field-message-error{color:#C0392B;}
+.field-message-note{color:var(--sub);}
+.fctl[aria-invalid="true"]{border-color:#C0392B;}
+.tracking-unrecognised{color:#a05a00;}

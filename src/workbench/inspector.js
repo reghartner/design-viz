@@ -11,7 +11,26 @@ function createBuilderInspector(opts){
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
   var accentListId=prefix+'-accents',groupListId=prefix+'-groups';
   function parseEditor(){return session.snapshot();}
-  function applyPlan(plan,options,snapshot){return !disposed && opts.apply(plan,options,snapshot);}
+  function applyPlan(plan,options,snapshot){
+    if(disposed)return false;
+    var refused=plan && !plan.error?importRefusal(plan,snapshot):'';
+    if(refused){formError(refused);return false;}
+    return opts.apply(plan,options,snapshot);
+  }
+  /* #1254 item 27: in a document that imports nodes, session.accept refuses a source whose combined
+     document is invalid and its editError replaces the whole Inspector. Check first so the form, the
+     typed text and the Undo history stay, and the message is shown in the form. */
+  function importRefusal(plan,snapshot){
+    var context=session.topologyContext && session.topologyContext();
+    if(!context || !session.resolve || typeof plan.text!=='string')return '';
+    var next;try{next=JSON.parse(plan.text);}catch(ex){return '';}
+    try{session.resolve(next);}catch(ex){return 'This edit was not applied: '+ex.message;}
+    if(typeof FlowTopology!=='undefined' && FlowTopology.editError){
+      var before=snapshot && snapshot.raw || parseEditor().raw,error=before?FlowTopology.editError(before,next):null;
+      if(error)return 'This edit was not applied: '+error;
+    }
+    return '';
+  }
   function selectRange(range,force){if(!disposed)return opts.selection.range(range,force);}
   function selectTarget(target,focus,keepTool){if(!disposed)return opts.selection.select(target,focus,keepTool);}
   function rehighlight(){if(!disposed)return opts.selection.rehighlight();}
@@ -89,27 +108,54 @@ function createBuilderInspector(opts){
   }
   function assignControlKeys(){
     var counts=Object.create(null);
-    Array.prototype.forEach.call(guide.querySelectorAll('input,textarea,select'),function(control){
+    Array.prototype.forEach.call(guide.querySelectorAll('input,textarea,select,button'),function(control){
       var row=control.closest('.frow'),label=row && row.querySelector('.flab');
-      var name=JSON.stringify([label?label.textContent:'',control.getAttribute('aria-label'),
+      // #1254 item 18: buttons keep focus across a refresh; their text names them.
+      var name=control.tagName==='BUTTON'?JSON.stringify([label?label.textContent:'',control.getAttribute('aria-label'),control.textContent,'BUTTON']):
+        JSON.stringify([label?label.textContent:'',control.getAttribute('aria-label'),
         control.getAttribute('placeholder'),control.tagName,control.type || '']);
       var index=counts[name] || 0;counts[name]=index+1;
       control.setAttribute('data-inspector-control',name+':'+index);
     });
   }
+  function focusControls(){return Array.prototype.slice.call(guide.querySelectorAll('[data-inspector-control]'));}
+  function controlKey(control){return control.getAttribute('data-inspector-control');}
+  function shownControl(control){
+    if(control.disabled)return false;
+    for(var at=control.parentNode;at && at!==guide;at=at.parentNode)if(at.tagName==='DETAILS' && !at.open)return false;
+    return true;
+  }
   function captureFocus(){
     var active=document.activeElement;
     if(!active || !guide.contains(active) || !active.getAttribute)return null;
     var key=active.getAttribute('data-inspector-control');
-    return key?{key:key,start:active.selectionStart,end:active.selectionEnd,direction:active.selectionDirection,
-      scrollTop:active.scrollTop,scrollLeft:active.scrollLeft}:null;
+    if(!key)return null;
+    var controls=focusControls();
+    return {key:key,start:active.selectionStart,end:active.selectionEnd,direction:active.selectionDirection,
+      scrollTop:active.scrollTop,scrollLeft:active.scrollLeft,index:controls.indexOf(active),keys:controls.map(controlKey),
+      adding:active.tagName==='BUTTON' && /^(\+ )?add\b/i.test(String(active.textContent).trim())};
+  }
+  /* After an Add button, the first control of a container that is entirely new (a new signal, template or
+     environment); otherwise the first new control. Its folds open so it can take focus. */
+  function addedControl(saved,controls){
+    var known=new Set(saved.keys),fresh=controls.filter(function(control){return !known.has(controlKey(control)) && !control.disabled;});
+    var whole=fresh.find(function(control){
+      var box=control.closest('fieldset,details');
+      return box && box!==guide && Array.prototype.every.call(box.querySelectorAll('[data-inspector-control]'),function(item){return !known.has(controlKey(item));});
+    });
+    var found=whole || fresh[0] || null;
+    for(var at=found && found.parentNode;at && at!==guide;at=at.parentNode)if(at.tagName==='DETAILS')at.open=true;
+    return found;
   }
   function restoreFocus(saved){
     if(!saved)return;
-    var found=null;
-    Array.prototype.forEach.call(guide.querySelectorAll('[data-inspector-control]'),function(control){
-      if(control.getAttribute('data-inspector-control')===saved.key)found=control;
-    });
+    var controls=focusControls(),found=saved.adding?addedControl(saved,controls):null;
+    if(!found)found=controls.find(function(control){return controlKey(control)===saved.key;}) || null;
+    // A removed row: the control now in its place, or the nearest shown one after it, then before it.
+    if(!found && saved.index>=0){
+      for(var i=Math.min(saved.index,controls.length-1);i<controls.length && !found;i++)if(i>=0 && shownControl(controls[i]))found=controls[i];
+      for(var j=Math.min(saved.index,controls.length)-1;j>=0 && !found;j--)if(shownControl(controls[j]))found=controls[j];
+    }
     if(!found)return;
     found.focus({preventScroll:true});
     if(typeof saved.start==='number' && found.setSelectionRange){
@@ -144,10 +190,47 @@ function flashPositionLine(){
     guide.appendChild(n);
   }
 
+/* #1254 item 16: the control whose commit is running, so a refusal or note is shown beside it. */
+  var activeControl=null;
+  function withControl(control,fn){var previous=activeControl;activeControl=control;try{return fn();}finally{activeControl=previous;}}
+  function messageControl(){
+    if(activeControl && guide.contains(activeControl))return activeControl;
+    var active=document.activeElement;
+    return active && active!==guide && guide.contains(active) && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(active.tagName)?active:null;
+  }
+  function clearFieldMessages(){
+    Array.prototype.forEach.call(guide.querySelectorAll('.field-message'),function(node){node.remove();});
+    Array.prototype.forEach.call(guide.querySelectorAll('[data-field-message-for]'),function(control){
+      control.removeAttribute('aria-invalid');
+      var before=control.getAttribute('data-field-message-for');
+      if(before)control.setAttribute('aria-describedby',before);else control.removeAttribute('aria-describedby');
+      control.removeAttribute('data-field-message-for');
+    });
+  }
+  function fieldMessage(text,kind){
+    if(!guide)return;
+    clearFieldMessages();
+    var control=text && messageControl();if(!control)return;
+    var host=control.closest('.frow') || control.parentNode;if(!host)return;
+    var note=document.createElement('span');note.className='field-message field-message-'+kind;note.id=prefix+'-field-message';
+    note.setAttribute('role',kind==='error'?'alert':'status');note.textContent=text;host.appendChild(note);
+    control.setAttribute('data-field-message-for',control.getAttribute('aria-describedby') || '');
+    control.setAttribute('aria-describedby',((control.getAttribute('aria-describedby') || '')+' '+note.id).trim());
+    if(kind==='error')control.setAttribute('aria-invalid','true');
+    if(note.scrollIntoView)note.scrollIntoView({block:'nearest'});
+  }
+  /* #1254 item 25: a short note beside the field, not an error. */
+  function formNote(text,clear){
+    formError('');var control=messageControl();
+    if(clear && control && control.tagName==='INPUT')control.value='';
+    fieldMessage(text,'note');
+  }
+
 function formError(text){
     if(disposed)return;
     var slot = guide && guide.querySelector('.ierr');
     if (!slot){ if (text) inspectorMessage(text); return; }
+    fieldMessage(text,'error');
     slot.textContent = text || '';
     slot.hidden = !text;
   }
@@ -199,7 +282,7 @@ function commitValue(valueText){
   }
 
 function commitOnChange(input,getCommitValue,commit,commitUnchanged){
-    return wireBuilderCommit(input,function(){return commit(getCommitValue?getCommitValue(input.value):input.value);},
+    return wireBuilderCommit(input,function(){return withControl(input,function(){return commit(getCommitValue?getCommitValue(input.value):input.value);});},
       {commitUnchanged:commitUnchanged,listen:listen});
   }
   function textControl(value, commit, opts){
@@ -320,7 +403,7 @@ function checkboxControl(checked, commit){
     var input = document.createElement('input');
     input.type = 'checkbox'; input.checked = !!checked;
     formLife.listen(input,'change', function(){
-      if (commit(input.checked) === false) input.checked = !input.checked;
+      if (withControl(input,function(){return commit(input.checked);}) === false) input.checked = !input.checked;
     });
     wrap.appendChild(input);
     return wrap;
@@ -330,7 +413,7 @@ function actionButton(label, onClick, cls){
     var b = document.createElement('button');
     b.type = 'button'; b.className = 'bbtn ' + (cls || '');
     b.textContent = label;
-    formLife.listen(b,'click', function(ev){if(!disposed)return onClick.call(this,ev);});
+    formLife.listen(b,'click', function(ev){var self=this;if(!disposed)return withControl(b,function(){return onClick.call(self,ev);});});
     return b;
   }
 
@@ -505,15 +588,7 @@ function deltaControls(val){
 /* #1236: the page Jira and GitHub controls, rendered into Status board settings → Jira. */
 function pageTrackingControls(val,box){
     function update(edit){
-      return commitCascade(function(raw){
-        var doc=builderDocumentPage(raw);if(!doc)return {error:'Add document settings first.'};
-        var tracking=specObject(doc.page.tracking)?builderClone(doc.page.tracking):{};
-        // tracking.jira appears only when a Jira field is edited; a GitHub scope edit leaves an absent jira block absent.
-        var hadJira=specObject(tracking.jira),jira=hadJira?tracking.jira:{};
-        edit(jira,doc.page,tracking);
-        if(hadJira || Object.keys(jira).length)tracking.jira=jira;
-        return planSetField(session.text(),raw,doc.path,'tracking',JSON.stringify(tracking));
-      },{after:refreshFormSoon});
+      return commitCascade(function(raw){return planPageTracking(session.text(),raw,edit);},{after:refreshFormSoon});
     }
     var jira=val.tracking && val.tracking.jira || {};
     box.appendChild(frow('Jira site',textControl(jira.site,function(value){
@@ -531,7 +606,7 @@ function pageTrackingControls(val,box){
       if(value==null)return true;var key=value.trim();
       if(!trackingKeyPattern.test(key)){formError('Use a Jira key like DOOR-100.');return false;}
       var current=parseEditor();if(current.error){formError(current.error);return false;}
-      var doc=builderDocumentPage(current.raw);if(doc && trackingEpics(doc.page).indexOf(key)>=0){formError('');return true;}
+      var doc=builderDocumentPage(current.raw);if(doc && trackingEpics(doc.page).indexOf(key)>=0){formNote(key+' is already a parent.',true);return true;}
       return update(function(jira,page){jira.epic=trackingEpics(page).concat([key]);});
     },{placeholder:'DOOR-100'})));
     var excluded=document.createElement('p');excluded.className='fnote';excluded.textContent='Excluded stories do not count from parents. Manually attached tickets and dependencies displayed on the board still count.';box.appendChild(excluded);
@@ -545,7 +620,7 @@ function pageTrackingControls(val,box){
       if(value==null)return true;var key=value.trim();
       if(!trackingKeyPattern.test(key)){formError('Use a Jira key like DOOR-100.');return false;}
       var current=parseEditor();if(current.error){formError(current.error);return false;}
-      var doc=builderDocumentPage(current.raw);if(doc && trackingExclusions(doc.page).indexOf(key)>=0){formError('');return true;}
+      var doc=builderDocumentPage(current.raw);if(doc && trackingExclusions(doc.page).indexOf(key)>=0){formNote(key+' is already excluded.',true);return true;}
       return update(function(jira,page){jira.exclude=trackingExclusions(page).concat([key]);});
     },{placeholder:'DOOR-101'})));
     var scope=trackingGithubScope(val),scopeText=scope.repos.join(', ')+(scope.org?(scope.repos.length?', ':'')+'org:'+scope.org:'');
@@ -571,13 +646,18 @@ function trackingControls(val,overlay){
       if(parsed.error){formError(parsed.error);return false;}
       var path=builderTargetPath(parsed.raw,session.target),current=path && specValueAt(parsed.raw,path);
       if(!current)return false;
-      var refs=trackingStoredRefs(current)[field],identity=field==='tickets'?trackingTicket(ref).key:ref,index=trackingRefs(current)[field].indexOf(identity);
-      if(remove){if(index<0)return true;refs.splice(index,1);}
+      /* #1254 item 7: edit the authored list in place, so entries the form does not list (typos,
+         duplicates) are kept. A value that is not a list is left for the author to fix in JSON. */
+      var authored=current[field];
+      if(authored!=null && !Array.isArray(authored)){formError((field==='tickets'?'Tickets':'Pull requests')+' in the JSON is not a list (“'+field+'”). Fix it in JSON first; nothing was changed.');return false;}
+      var identity=field==='tickets'?trackingTicket(ref).key:ref,list=Array.isArray(authored)?authored.slice():[];
+      function same(entry){return field==='tickets'?(trackingTicket(entry) || {}).key===identity:deltaLinkUrl(entry)===identity;}
+      if(remove){if(!list.some(same))return true;list=list.filter(function(entry){return !same(entry);});}
       else {
-        if(index>=0){formError('');return true;}
-        refs.push(ref);
+        if(list.some(same)){formNote(identity+' is already attached.',true);return true;}
+        list.push(ref);
       }
-      var value=refs.length?JSON.stringify(refs):null;
+      var value=list.length?JSON.stringify(list):null;
       // #1103: a removed ticket also leaves the step filters that named it, in the same Undo step.
       var ok=remove && field==='tickets'?commitCascade(function(raw){
         var target=builderTargetPath(raw,session.target);if(!target)return {error:'element not found — click Render, then reselect'};
@@ -624,6 +704,18 @@ function trackingControls(val,overlay){
       });
       box.appendChild(list);
     });
+    // #1254 item 7: hand-written entries the form cannot list stay in the JSON; name them.
+    var unrecognised=[];
+    ['tickets','prs'].forEach(function(field){
+      if(Array.isArray(val[field]))val[field].forEach(function(entry){
+        if((field==='tickets'?trackingTicket(entry):deltaLinkUrl(entry))==null)unrecognised.push(typeof entry==='string'?entry:JSON.stringify(entry));
+      });
+      else if(val[field]!=null)unrecognised.push(field+' is not a list');
+    });
+    if(unrecognised.length){
+      var kept=document.createElement('p');kept.className='fnote tracking-unrecognised';
+      kept.textContent='Not recognised, kept as written (fix in JSON): '+unrecognised.join(', ')+'.';box.appendChild(kept);
+    }
     [['tickets','Add ticket','HW-123 or https://…/browse/HW-123','Jira key or browse URL, then Enter'],
       ['prs','Add PR','https://github.com/org/repo/pull/1','Absolute http(s) URL, then Enter']].forEach(function(field){
       var input=textControl('',function(value){
@@ -631,6 +723,11 @@ function trackingControls(val,overlay){
         var ticket=field[0]==='tickets'?trackingTicket(value.trim()):null;
         var ref=field[0]==='tickets'?(ticket && (ticket.url || ticket.key)):deltaLinkUrl(value);
         if(ref===null){formError(field[0]==='tickets'?'Use a Jira key like HW-123 or an absolute http(s) Jira browse URL.':'Use an absolute http(s) URL.');return false;}
+        // #1254 item 25: a reference already attached here or inherited from the provider says so and clears the field.
+        var identity=field[0]==='tickets'?ticket.key:ref;
+        if(refs[field[0]].indexOf(identity)>=0 || overlay && overlay.inherited[field[0]].indexOf(identity)>=0){
+          formNote(identity+' is already attached'+(refs[field[0]].indexOf(identity)<0?' (inherited from the provider)':'')+'.',true);return true;
+        }
         return update(field[0],ref,false);
       },{placeholder:field[2]});
       var help=document.createElement('p');help.className='fnote';help.id=prefix+'-'+field[0]+'-help';help.textContent=field[3];
@@ -1139,11 +1236,8 @@ function traceMatchEditor(val,ctx,t){
       var plan=planStepTraceMatch(parsed.text,parsed.raw,t.section,t.index,edit);
       if(plan.noop){refreshFormSoon();return true;}
       if(plan.error){formError(plan.error);return false;}
-      /* A document that imports nodes refuses a source whose resolved spec is
-         invalid. Check first, so the form and the typed text stay and say why. */
-      if(session.resolve && session.topologyContext && session.topologyContext()){
-        try{session.resolve(JSON.parse(plan.text));}catch(ex){formError('This edit was not applied: '+ex.message);return false;}
-      }
+      /* A document that imports nodes refuses a source whose resolved spec is invalid; applyPlan checks
+         first (importRefusal), so the form and the typed text stay and say why. */
       formError('');
       var ok=applyPlan(plan,{after:refreshFormSoon},parsed);
       // Add-row drafts are kept per alternative position; removing one shifts the positions.
@@ -2023,7 +2117,7 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true,l
       var b = document.createElement('button');
       b.type = 'button'; b.className = 'bbtn rowx'; b.textContent = text;
       b.title = title;
-      formLife.listen(b,'click', function(ev){if(!disposed)return onClick.call(this,ev);});
+      formLife.listen(b,'click', function(ev){var self=this;if(!disposed)return withControl(b,function(){return onClick.call(self,ev);});});
       return b;
     }
     function buildRow(base){

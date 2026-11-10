@@ -78,6 +78,30 @@ function statusBoardHasBindings(raw){
       (Array.isArray(d.topologyImports) && d.topologyImports.some(function(imp){return specObject(imp) && (bound(imp.nodeTracking) || bound(imp.edgeTracking));}));
   });
 }
+/* #1254 items 8 and 9: one page Jira or GitHub edit. edit(jira, page, tracking) changes clones.
+   Only `tracking.jira` and `tracking.github` are written, pretty-printed, so the rest of the block
+   keeps its authored text. An emptied jira block is dropped; an emptied tracking block is dropped
+   unless the page has a Live status panel, where `tracking: {}` marks the status board. */
+function planPageTracking(text,raw,edit){
+  var doc=builderDocumentPage(raw);if(!doc)return {error:'Add document settings first.'};
+  var authored=doc.page.tracking;
+  if(authored!=null && !specObject(authored))return {error:'Tracking is not an object; repair it in JSON first.'};
+  var before=specObject(authored)?authored:{},tracking=builderClone(before);
+  var hadJira=specObject(tracking.jira),jira=hadJira?tracking.jira:{},jiraBefore=JSON.stringify(jira);
+  edit(jira,doc.page,tracking);
+  if(Object.keys(jira).length)tracking.jira=jira;
+  else if(!hadJira || JSON.stringify(jira)!==jiraBefore)delete tracking.jira;
+  var pairs=[];
+  ['jira','github'].forEach(function(key){
+    if(JSON.stringify(before[key])===JSON.stringify(tracking[key]))return;
+    pairs.push([key,tracking[key]===undefined?null:JSON.stringify(tracking[key],null,2)]);
+  });
+  if(!pairs.length)return {text:text};
+  var keep=!statusBoardMissing(raw).panel;
+  if(!Object.keys(tracking).length && !keep)return authored===undefined?{text:text}:planSetField(text,raw,doc.path,'tracking',null);
+  if(authored===undefined)return planSetField(text,raw,doc.path,'tracking',JSON.stringify(tracking,null,2));
+  return planSetFields(text,raw,doc.path.concat(['tracking']),pairs);
+}
 /* Validator warnings for the page tracking block, split by Status board section. */
 var STATUS_BOARD_WARNING_SECTIONS=[['environments',/^tracking\.telemetry\.environments?[.:[]/],['lookups',/^tracking\.telemetry\.lookups[.:[]/],
   ['traces',/^tracking\.telemetry\.traceConnections[.:[]/],['metrics',/^tracking\.telemetry[.:[]/],['jira',/^tracking\.[A-Za-z]/],['board',/^tracking:/]];

@@ -12,7 +12,7 @@
 | T18 | 18 | Buttons keep focus across the refresh; Remove ticket N moves focus to the next control; Add environment / Add signal move focus into the new row and open its fold. | node with two tickets; board with telemetry; edge with one signal | focused element after each action | focus dropping to the body; a closed new fold |
 | T24 | 24 | The in-app guide names Missing work, Exists when tickets are complete, Exclude story, GitHub scope and Tickets on this step. | src/workbench/human-guide.html | each phrase present | missing guide text |
 | T25 | 25 | Adding a ticket, PR or Parent that is already attached says so next to the field and clears it, with no history entry. | node with HW-1 and a PR; board with Parent DOOR-100 | status note text; empty field; no Undo entry | silent no-op keeping the typed text |
-| T27 | 27 | In a document that imports nodes, an Inspector edit that makes the combined document invalid is refused inside the form. | consumer importing a provider; edge endpoint set to an unknown imported node | error "This edit was not applied: …"; form and source unchanged | replacing the Inspector or losing the form |
+| T27 | 27 | In a document that imports nodes, an Inspector edit that makes the combined document invalid is refused inside the form. | consumer importing a provider; the session resolver refuses one section heading (stand-in for a provider rule) | error "This edit was not applied: …"; form and source unchanged | replacing the Inspector or losing the form |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -155,9 +155,18 @@ test('T27 in a document that imports nodes a refused Inspector edit stays in the
   const consumer=spec('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],edges:[{from:'local',to:'canon::api',label:'call'}],topologyImports:[{spec:'provider',export:'core',as:'canon'}]});
   const ui=harness(consumer);
   ui.h.session.replaceProject(JSON.stringify(consumer,null,2),null,{topologyContext:{version:1,id:'consumer',specs:[provider,consumer]}});
-  ui.select(EDGE);const before=ui.text,to=ui.control('to');
-  to.value='canon::missing';to.fire('change');ui.h.flush();
+  // A resolver refusal the planners cannot see ahead of time (for example a provider rule): the
+  // session's import resolver throws for this one heading, as it does for an invalid combined document.
+  const resolve=ui.h.session.resolve;
+  ui.h.session.resolve=function(raw){if(JSON.stringify(raw).includes('Refused heading'))throw new Error('Topology consumer: invalid materialized spec');return resolve.apply(this,arguments);};
+  const SECTION={kind:'section',section:0};
+  ui.select(SECTION);const before=ui.text,heading=ui.control('heading');
+  heading.focus();heading.value='Refused heading';heading.fire('change');ui.h.flush();
   assert.equal(ui.text,before,'the source is unchanged');
-  assert.match(ui.error(),/^This edit was not applied: /);
-  assert.equal(ui.control('to'),to,'the form stays');
+  assert.match(ui.error(),/^This edit was not applied: Topology consumer: invalid materialized spec/);
+  assert.equal(ui.control('heading'),heading,'the form stays');assert.equal(heading.value,'Refused heading','the typed text stays');
+  assert.equal(heading.getAttribute('aria-invalid'),'true','the field is marked');
+  assert.equal(ui.h.session.canUndo(),false,'no history entry');
+  heading.value='Accepted heading';heading.fire('change');ui.h.flush();
+  assert.equal(ui.raw.page.sections[0].heading,'Accepted heading','a valid edit still applies');
 });

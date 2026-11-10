@@ -51,7 +51,7 @@ test('P1 desktop preview cards are explicit synthetic selection targets; side/of
  expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
 });
 
-for(const wrapped of [true,false])test('P2 Allow metrics false/true is one Undo each, preserves settings and bindings, suppresses preview and exports both booleans ('+(wrapped?'wrapped':'bare page')+')',async({page,server})=>{
+for(const wrapped of [true,false])test('P2 Allow metrics false/true is one Undo each, preserves settings and bindings, suppresses preview, exports false and omits the default true (#1254) ('+(wrapped?'wrapped':'bare page')+')',async({page,server})=>{
  const doc=value=>value.page || value,read=text=>doc(JSON.parse(text));
  await open(page,server,wrapped?raw:raw.page);await toggle(page).check();await expect(cards(page)).toHaveCount(1);await settings(page);
  const source=page.locator('#src'),before=await source.inputValue(),allow=page.getByRole('checkbox',{name:'Allow metrics',exact:true});
@@ -63,9 +63,9 @@ for(const wrapped of [true,false])test('P2 Allow metrics false/true is one Undo 
  expect(doc(await exported(page)).tracking.telemetry.enabled).toBe(false);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect(cards(page)).toHaveCount(1);
  await page.locator('#redo-builder').click();await expect(source).toHaveValue(disabled);await expect(cards(page)).toHaveCount(0);
- await settings(page);await allow.check();const enabled=await source.inputValue();expect(read(enabled).tracking.telemetry.enabled).toBe(true);await expect(cards(page)).toHaveCount(1);
+ await settings(page);await allow.check();await expect.poll(async()=>Object.hasOwn(read(await source.inputValue()).tracking.telemetry,'enabled')).toBe(false);const enabled=await source.inputValue();await expect(cards(page)).toHaveCount(1);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(disabled);await page.locator('#redo-builder').click();await expect(source).toHaveValue(enabled);
- expect(doc(await exported(page)).tracking.telemetry).toEqual({...raw.page.tracking.telemetry,enabled:true});expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
+ expect(doc(await exported(page)).tracking.telemetry).toEqual(raw.page.tracking.telemetry);expect(await page.evaluate(()=>window.metricToolCalls)).toEqual([]);
 });
 
 test('P3 invalid source retains preview identity; toggle preserves handwriting and old controls cannot resurrect a replaced project',async({page,server})=>{

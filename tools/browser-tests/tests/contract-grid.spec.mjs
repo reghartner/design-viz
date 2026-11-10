@@ -1,10 +1,10 @@
 /* #1304 section contract blocks as grid tables.
 | row | rule | fixture | assertion | broken implementation it rejects |
 |---|---|---|---|---|
-| B1 | Reader: a grid block is a real table named by its title, with column and row headers and a dash for a missing cell. | section (no diagram) with a 3-column grid | getByRole('table', name = title); column headers; row headers; dash cell | k/v/g rows; an unnamed table |
+| B1 | Reader: a grid block is a real table named by its title, with column and row headers and a dash for a missing cell; header text reaches 4.5:1 and the focus-ring colour 3:1 against the card in Aurora (dark) and Pastel (light). | section (no diagram) with a 3-column grid, skins aurora and pastel | getByRole('table', name = title); column headers; row headers; dash cell; measured contrast | k/v/g rows; an unnamed table; headers that inherit black on a dark card |
 | B2 | Reader: a wide grid (12 columns × 160px) scrolls inside its block, not the page; the scroll region is keyboard-focusable; the same at 390px wide (reading only). | 12-column grid | region scrollWidth > clientWidth; scrollLeft moves; page has no horizontal overflow; region focusable | page-wide overflow; a grid that clips columns |
 | B3 | Reader: a grid row with revealAt:1 (zero-based step index) is hidden at the first step and shown at the second. | section with a diagram and two steps, grid row revealAt:1 | row hidden at s=send, visible at s=reply | grid rows that ignore step reveals |
-| B4 | Workbench (desktop): Add grid table from the Add menu; Add column, reorder a column and edit a cell are each one Undo step; Use columns (grid) converts a classic block in one Undo step. | page with one classic block and a heading-only section | source after each edit and after its Undo | edits that need several Undo steps; no Add grid table entry |
+| B4 | Workbench (desktop): Add grid table from the Add menu; Add column, reorder a column and edit a cell are each one Undo step; Use columns (grid) converts a classic block in one Undo step. | one section with a grid block and a classic block | source after each edit and after its Undo | edits that need several Undo steps; no Add grid table entry |
 */
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -20,15 +20,32 @@ async function reader(page,server,name,raw,hash=''){
   await page.goto(server.origin+'/'+name+'.html'+hash);return page.locator('.docview');
 }
 
-test('B1 reader grid block is a real table named by its title',async({page,server},info)=>{
+// WCAG contrast of an element's text colour (or a CSS colour token) against the first opaque background behind it.
+async function contrast(locator,token){
+  return locator.evaluate((el,token)=>{
+    const rgb=c=>{const m=c.match(/[\d.]+/g).map(Number);return {r:m[0],g:m[1],b:m[2],a:m.length>3?m[3]:1};};
+    const lum=({r,g,b})=>{const f=v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);};return 0.2126*f(r)+0.7152*f(g)+0.0722*f(b);};
+    let fg;if(token){const probe=document.createElement('span');probe.style.color='var('+token+')';el.appendChild(probe);fg=rgb(getComputedStyle(probe).color);probe.remove();}
+    else fg=rgb(getComputedStyle(el).color);
+    let bg=null;for(let at=el;at && !bg;at=at.parentElement){const c=rgb(getComputedStyle(at).backgroundColor);if(c.a>0.99)bg=c;}
+    bg=bg || {r:255,g:255,b:255};
+    const opacity=+getComputedStyle(el).opacity,mix=k=>fg[k]*fg.a*opacity+bg[k]*(1-fg.a*opacity);
+    const a=lum({r:mix('r'),g:mix('g'),b:mix('b')}),b=lum(bg);return (Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);
+  },token);
+}
+
+for(const skin of ['aurora','pastel'])test('B1 reader grid block is a real table named by its title, readable in '+skin,async({page,server},info)=>{
   await page.setViewportSize({width:1280,height:900});
-  const root=await reader(page,server,'grid-b1',{page:{title:'Grid',sections:[{heading:'Calls',contracts:[grid()]}]}});
+  const root=await reader(page,server,'grid-b1-'+skin,{page:{title:'Grid',skin,sections:[{heading:'Calls',contracts:[grid()]}]}});
   const table=root.getByRole('table',{name:'Calls per location load',exact:true});await expect(table).toBeVisible();
   await expect(table.getByRole('columnheader')).toHaveText(['Scenario','Yoda','Jyn','Han']);
   await expect(table.getByRole('rowheader')).toHaveText(['SS3 location','SS2 location','Camera only']);
-  await expect(table.locator('tbody tr').nth(1).locator('td')).toHaveText(['3','—','—']);
-  await expect(table.locator('td.ctv,td.ctg')).toHaveCount(0);
-  await root.locator('.ctcard').screenshot({path:info.outputPath('grid-block.png')});
+  await expect(table.locator('tbody tr').nth(1).locator('td')).toHaveText(['3','—No value','—No value']);
+  await expect(table.locator('td.ctg')).toHaveCount(0);
+  for(const header of await table.getByRole('columnheader').all())expect(await contrast(header),skin+' column header contrast').toBeGreaterThanOrEqual(4.5);
+  const region=root.getByRole('region',{name:'Calls per location load',exact:true});
+  expect(await contrast(region,'--dink'),skin+' focus ring colour contrast').toBeGreaterThanOrEqual(3);
+  await root.locator('.ctcard').screenshot({path:info.outputPath('grid-block-'+skin+'.png')});
 });
 
 test('B2 reader wide grid scrolls inside its block, not the page, also at 390px',async({page,server},info)=>{

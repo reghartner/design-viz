@@ -5,12 +5,13 @@
 |---|---|---|---|---|
 | R3 | Guard: the data-contract panel renders byte-identical HTML after its column/cell code moves to shared helpers. | three panels: full (bad widths, duplicate ids, non-object cells, highlights), empty, bare | sha256 of render HTML equals main 18c39baa | a refactor that changes panel output |
 | R0 | Guard: a classic block (no `columns`) renders byte-identical HTML. | legacy + block with hot, link, delta, reveal, skipped rows | sha256 equals main 18c39baa | grid code leaking into classic blocks |
-| V1 | Grid validation: duplicate column ids, more than 12 columns, column width under 40, undeclared cell key, non-scalar cell, cells without columns, v/g beside columns and a non-text fieldLabel warn with their paths; a valid grid has no warnings. | grid blocks | warnings by path; valid grid warnings deepEqual [] | grids that fail silently or warn on valid input |
-| R1 | A grid renders a real table named by the block title: caption, column headers (fieldLabel + labels), row headers (k, role=rowheader on the classic .ctk cell so skins apply), a dash for a missing cell, widths, inside a keyboard-focusable scroll region. | grid with 3 columns, 3 rows | caption text; th scope=col list; th scope=row list; dash count; colgroup widths; table width; region role/label/tabindex | v/g columns for a grid; an unnamed table; page-wide overflow |
+| V1 | Grid validation: duplicate column ids, more than 12 columns, column width under 40, undeclared cell key, non-scalar cell, a cell over 120 characters (soft), cells without columns, v/g beside columns and a non-text fieldLabel warn with their paths; a valid grid has no warnings. | grid blocks | warnings by path; valid grid warnings deepEqual [] | grids that fail silently or warn on valid input |
+| R1 | A grid renders a real table named by the block title: caption, column headers (fieldLabel + labels), row headers (k, th scope=row with the classic .ctk class), a dash plus hidden "No value" text for a missing cell, widths, inside a keyboard-focusable scroll region. | grid with 3 columns, 3 rows | caption text; th scope=col list; th scope=row list; dash count; colgroup widths; table width; region role/label/tabindex | v/g columns for a grid; an unnamed table; page-wide overflow |
 | R2 | Grid rows keep hot, delta badge, link, revealAt/hideAt and the row identity used by the Workbench. | grid rows with each flag | class, badge, link, data-dv-reveal-at/hide-at, data-dv-crow | grid rows that drop row behaviour |
 | C1 | Compatibility reports content.contract-grids only when a block has columns. | grid page; classic page | feature lists | grids invisible to older-viewer checks |
 | W1 | Planners: Add grid table; columns add/rename/reorder/remove (remove prunes cells and says how many); rows add/edit (numbers stay numbers only when they were); single cell edit; fieldLabel; classic → grid conversion (v → Value, g → Notes, only used columns) is lossless. | section with a classic block | resulting JSON; removal message; conversion result | lossy conversion; orphan cells; silent removal |
-| W2 | Inspector: a classic block offers "Use columns (grid)" (one Undo step); a grid block shows First column name, Columns and Rows editors; a grid row shows one cell input per column; a cell edit is one Undo step. | section with a classic block | buttons/rows present; exact text after Undo; cells written | no conversion path; edits that take several Undo steps |
+| W2 | Inspector: a classic block offers "Use columns (grid)" (one Undo step); a grid block shows First column name, Columns and Rows editors with no raw JSON box (their rows are projections) and no second "+ Add field"; a grid row shows one cell input per column; a cell edit is one Undo step. | section with a classic block | buttons/rows present; no .rawjson in either editor; exact text after Undo; cells written | no conversion path; a raw box that writes _sourceIndex/cell0 into the block; edits that take several Undo steps |
+| S1 | Library search text includes grid column labels, fieldLabel and cell values. | grid section | contentSearchText includes them | grids invisible to library search |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),crypto=require('node:crypto'),fs=require('node:fs'),path=require('node:path');
 const {entrypoint}=require('../tools/source-loader.cjs');
@@ -53,6 +54,8 @@ test('V1 grid blocks validate columns, cells and their neighbours',()=>{
   for(const [needle,why] of [[at+'.fieldLabel','fieldLabel text'],[at+'.columns[3].id','duplicate column id'],[at+'.columns[4].width','width under 40'],[at+'.columns:','more than 12 columns'],
     [at+'.fields[0].cells.ghost','undeclared cell key'],[at+'.fields[1].cells.jyn','non-scalar cell'],[at+'.fields[2].v','v beside columns'],[at+'.fields[2].g','g beside columns']])
     assert.ok(warnings.some(w=>w.startsWith(needle)),why+': '+warnings.join(' | '));
+  const long=grid();long.fields[1].cells.jyn='x'.repeat(121);
+  assert.ok(warningsOf({heading:'Calls',contracts:[long]}).some(w=>w.startsWith('sections[0].contracts[0].fields[1].cells.jyn: grid cells are for short values')),'a long cell warns softly');
   const orphan=warningsOf({heading:'Calls',contracts:[{title:'Classic',fields:[{k:'a',v:'1',cells:{x:1}}]}]});
   assert.ok(orphan.some(w=>w.startsWith('sections[0].contracts[0].fields[0].cells')),'cells without columns: '+orphan.join(' | '));
 });
@@ -63,9 +66,10 @@ test('R1 a grid block renders a real table named by its title, with a dash for a
   assert.match(html,/<caption[^>]*>Calls per location load<\/caption>/,'the table is named by the block title');
   const cols=[...html.matchAll(/<th scope="col"[^>]*>([^<]*)<\/th>/g)].map(m=>m[1]);
   assert.deepEqual(cols,['Scenario','Yoda','Jyn','Han']);
-  const rows=[...html.matchAll(/<td class="ctk" role="rowheader"><span class="ctkey">([^<]*)<\/span>/g)].map(m=>m[1]);
+  const rows=[...html.matchAll(/<th scope="row" class="ctk"><span class="ctkey">([^<]*)<\/span>/g)].map(m=>m[1]);
   assert.deepEqual(rows,['SS3 location','SS2 location','Camera only']);
   assert.equal((html.match(/—/g)||[]).length,3,'three missing cells show a dash');
+  assert.equal((html.match(/<span class="ctmissing" aria-hidden="true">—<\/span><span class="ctgrid-sr">No value<\/span>/g)||[]).length,3,'a missing cell is a hidden dash plus visually hidden "No value" text');
   assert.match(html,/<td[^>]*data-contract-cell="han"[^>]*>0<\/td>/,'zero is a value, not a missing cell');
   assert.match(html,/<col style="width:70px">/);
   assert.match(html,/class="ctgrid-scroll" tabindex="0" role="region" aria-label="Calls per location load"/,'a keyboard-focusable scroll region named by the title');
@@ -78,11 +82,16 @@ test('R2 grid rows keep hot, delta, link, reveal and row identity',()=>{
   const g=grid();Object.assign(g.fields[1],{delta:'changed',link:'https://x.test/l',revealAt:2,hideAt:4});
   const html=C.contractBlocksHTML({contracts:[g]},'s');
   const row=i=>html.match(new RegExp('<tr[^>]*data-dv-crow="'+i+'"[^>]*>[\\s\\S]*?</tr>'))[0];
-  for(const i of [0,1,2])assert.match(row(i),/<td class="ctk" role="rowheader">[\s\S]*<td class="ctv ctcell" data-contract-cell=/,'grid row '+i+' has a row header and cells');
+  for(const i of [0,1,2])assert.match(row(i),/<th scope="row" class="ctk">[\s\S]*<td class="ctv ctcell" data-contract-cell=/,'grid row '+i+' has a row header and cells');
   assert.match(row(0),/class="ctrow hot"/);
   assert.match(row(1),/class="ctrow delta-changed"/);assert.match(row(1),/class="ctdelta"[^>]*>changed</);
   assert.match(row(1),/class="ctlink" href="https:\/\/x.test\/l"/);
   assert.match(row(1),/data-dv-reveal-at="2"/);assert.match(row(1),/data-dv-hide-at="4"/);
+});
+
+test('S1 library search indexes grid column labels, the first column name and cell values',()=>{
+  const text=C.FlowCanon.contentSearchText(doc({heading:'Calls',contracts:[grid()]}));
+  for(const needle of ['Scenario','Yoda','Jyn','Han','SS3 location','7','1'])assert.ok(text.includes(needle),needle);
 });
 
 test('C1 compatibility reports content.contract-grids only for blocks with columns',()=>{
@@ -153,6 +162,11 @@ test('W2 the Inspector converts a classic block and edits grid columns, rows and
   assert.ok(h.guide.querySelector('[data-contract-editor="columns"]'),'Columns editor');
   assert.ok(h.guide.querySelector('[data-contract-editor="rows"]'),'Rows editor');
   assert.equal(button('Use columns (grid)'),undefined,'no conversion on a grid');
+  assert.equal(button('+ Add field'),undefined,'a grid adds rows only through the Rows editor');assert.ok(button('+ Add row'));
+  for(const key of ['columns','rows']){
+    const editor=h.guide.querySelector('[data-contract-editor="'+key+'"]');
+    assert.equal(editor.querySelector('.rawjson'),null,key+' has no raw JSON box: its rows are projections, not source');
+  }
   select({kind:'crow',section:0,card:'0',index:1});
   assert.equal(rowControl('v'),null,'a grid row has no v field');
   const value=rowControl('Value');assert.ok(value,'one cell input per column');assert.ok(rowControl('Notes'));

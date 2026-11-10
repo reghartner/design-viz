@@ -10,7 +10,7 @@ function initWorkbenchLinksView(opts){
   life.own(function(){rowsLife.destroy();popLife.destroy();});
   var TABS=[['tickets','Tickets'],['metrics','Metrics'],['trace','Trace match'],['logs','Log searches']];
   var state={tab:'tickets',by:'ticket',show:'all',filter:'',drafts:[],highlight:null,popover:null,drag:null,editing:null,adding:false};
-  var dryRuns=Object.create(null),model=null,modelKey=null,stale=false,suppressClick=false,uid='links-'+Math.random().toString(36).slice(2);
+  var byId=Object.create(null),byKey=Object.create(null),visible=false,filterTimer=null,dryRuns=Object.create(null),model=null,modelKey=null,stale=false,suppressClick=false,uid='links-'+Math.random().toString(36).slice(2);
 
   function el(tag,cls,text){var n=doc.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;}
   function button(cls,text,label,title){var b=el('button',cls,text);b.type='button';if(label)b.setAttribute('aria-label',label);if(title)b.title=title;return b;}
@@ -55,7 +55,10 @@ function initWorkbenchLinksView(opts){
   var showSeg=segmented('Show',[['all','All'],['step','Steps'],['node','Nodes'],['edge','Connections']],state.show,function(value){state.show=value;render();});
   toolbar.appendChild(bySeg.el);toolbar.appendChild(showSeg.el);
   var filter=el('input','fctl links-filter');filter.type='search';filter.setAttribute('aria-label','Filter tickets, nodes, connections and steps');filter.placeholder='Filter tickets, nodes, connections, steps';
-  life.listen(filter,'input',function(){state.filter=filter.value;render();});
+  life.listen(filter,'input',function(){
+    if(filterTimer!=null)life.cancelDelay(filterTimer);
+    filterTimer=life.delay(function(){filterTimer=null;state.filter=filter.value;render();},120);
+  });
   toolbar.appendChild(filter);
   var addKey=button('bbtn links-new','+ New ticket key',null,'Start a ticket row, then drag it or use Assign to attach it');
   life.listen(addKey,'click',function(){state.adding=true;render();var input=tickets.querySelector('.links-new-input');if(input)input.focus();});
@@ -78,6 +81,15 @@ function initWorkbenchLinksView(opts){
   }
   function say(text){status.textContent=text || '';}
   function fail(text){error.textContent=text || '';error.hidden=!text;}
+  /* A refused key shows next to its own field (aria-invalid + describedby), as the Inspector does. */
+  var fieldIds=0;
+  function fieldError(input,text){
+    var msg=input.nextElementSibling && input.nextElementSibling.classList.contains('links-field-error')?input.nextElementSibling:null;
+    if(!text){input.removeAttribute('aria-invalid');input.removeAttribute('aria-describedby');if(msg)msg.remove();return;}
+    if(!msg){msg=el('span','links-field-error');msg.id=uid+'-field-'+(++fieldIds);msg.setAttribute('role','alert');input.after(msg);}
+    msg.textContent=text;input.setAttribute('aria-invalid','true');input.setAttribute('aria-describedby',msg.id);input.focus();
+  }
+  var KEY_HELP='Use a Jira key like HW-123 or an absolute http(s) Jira browse URL.';
 
   /* ---------- model ---------- */
   function snapshot(){return session.snapshot();}
@@ -87,14 +99,19 @@ function initWorkbenchLinksView(opts){
     if(s.error){stale=true;model={error:'Fix the JSON source to see links.'};return model;}
     stale=s.renderedText!=null && s.renderedText!==s.text;
     var key=JSON.stringify([s.project,s.text,s.topologyRevision]);
-    if(key!==modelKey){modelKey=key;dryRuns=Object.create(null);model=linksTicketModel(s.text,s.raw,context());}
+    if(key!==modelKey){
+      modelKey=key;dryRuns=Object.create(null);model=linksTicketModel(s.text,s.raw,context());
+      // Lookups by element id and ticket key stay constant-time on large boards.
+      byId=Object.create(null);byKey=Object.create(null);
+      if(!model.error){model.elements.forEach(function(e){byId[linksElementId(e)]=e;});model.tickets.forEach(function(t){byKey[t.key]=t;});}
+    }
     return model;
   }
-  function element(id){return model && model.elements && model.elements.find(function(e){return linksElementId(e)===id;}) || null;}
+  function element(id){return model && !model.error && byId[id] || null;}
   function sectionPrefix(e){return model.sections.length>1?'S'+(e.section+1)+' · ':'';}
   function kindName(e){return e.kind==='edge'?'connection':e.kind;}
   function describe(e){return kindName(e)+' '+e.label;}
-  function ticketRow(key){return model.tickets.find(function(t){return t.key===key;}) || null;}
+  function ticketRow(key){return model && !model.error && byKey[key] || null;}
   function refOf(key){var row=ticketRow(key);if(row)return row.ref;var draft=state.drafts.find(function(d){return d.key===key;});return draft?draft.ref:key;}
 
   /* ---------- writes ---------- */
@@ -114,6 +131,13 @@ function initWorkbenchLinksView(opts){
     return commit(function(text,raw,ctx){return planLinksTicket(text,raw,e,key,ref,remove,ctx);},
       {ok:(remove?(e.kind==='step'?'Hid '+key+' on ':'Removed '+key+' from '):(e.kind==='step'?'Showing '+key+' on ':'Attached '+key+' to '))+describe(e)+'. Undo restores it.',
         same:key+(remove?' is not on ':' is already on ')+describe(e)+'.'});
+  }
+  function rename(from,value,key,merge){
+    var ok=commit(function(text,raw,ctx){return planLinksTicketRename(text,raw,from,value,ctx,merge);},{ok:(merge?'Merged '+from+' into ':'Renamed '+from+' to ')+key+' everywhere it is attached here. Undo restores it.'});
+    if(ok && state.highlight && state.highlight.type==='ticket' && state.highlight.key===from){state.highlight.key=key;applyHighlight();}
+    if(!ok)render();
+    var row=list.querySelector('[data-links-ticket="'+cssEscape(ok?key:from)+'"] .links-key');if(row)row.focus();
+    return ok;
   }
   function move(from,to,key,copy){
     var ref=refOf(key);
@@ -149,7 +173,7 @@ function initWorkbenchLinksView(opts){
     else main.appendChild(el('span','links-chip-text',key));
     if(e.imported && e.kind!=='step')main.appendChild(el('span','links-chip-note',inherited?'inherited':'imported · local override'));
     wrap.appendChild(main);
-    rowsLife.listen(main,'click',function(){if(suppressClick){suppressClick=false;return;}setHighlight(state.by==='ticket'?{type:'element',id:linksElementId(e)}:{type:'ticket',key:key},true);});
+    rowsLife.listen(main,'click',function(){if(suppressClick){suppressClick=false;return;}chipHighlight(e,key);});
     rowsLife.listen(main,'keydown',function(ev){if(ev.key==='Enter' || ev.key==='ContextMenu' || ev.key==='F10' && ev.shiftKey){ev.preventDefault();openMenu(main,e,key,!movable);}});
     rowsLife.listen(main,'contextmenu',function(ev){ev.preventDefault();openMenu(main,e,key,!movable);});
     var movable=!inherited && e.editable;
@@ -160,6 +184,8 @@ function initWorkbenchLinksView(opts){
     }
     return wrap;
   }
+  // A chip highlights what it names: the element in By ticket, the ticket in By element.
+  function chipHighlight(e,key){setHighlight(state.by==='ticket'?{type:'element',id:linksElementId(e)}:{type:'ticket',key:key},true);}
   function assignButton(text,label,popover){
     var b=button('links-assign',text,label);b.setAttribute('aria-haspopup','dialog');b.setAttribute('aria-expanded','false');
     b.setAttribute('data-links-opener',popover.opener);
@@ -174,7 +200,7 @@ function initWorkbenchLinksView(opts){
       rowsLife.listen(input,'keydown',function(ev){
         if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();state.adding=false;render();addKey.focus();return;}
         if(ev.key!=='Enter')return;ev.preventDefault();
-        var ticket=trackingTicket(input.value.trim());if(!ticket){fail('Use a Jira key like HW-123 or an absolute http(s) Jira browse URL.');return;}
+        var ticket=trackingTicket(input.value.trim());if(!ticket){fieldError(input,KEY_HELP);return;}
         fail('');state.adding=false;
         if(!ticketRow(ticket.key) && !state.drafts.some(function(d){return d.key===ticket.key;}))state.drafts.push({key:ticket.key,ref:ticket.url || ticket.key});
         render();say(ticket.key+' is ready. Drag it onto an element or use Assign.');
@@ -188,7 +214,7 @@ function initWorkbenchLinksView(opts){
       if(!matches(text))return;shown++;
       var row=el('div','links-row links-ticket-row');row.setAttribute('role','listitem');row.setAttribute('data-links-ticket',t.key);
       var head=el('div','links-row-head');row.appendChild(head);
-      var handle=button('links-handle','⠿','Drag '+t.key+' to a node, connection or step','Drag onto a canvas node or connection, a Steps row, or a By element row to attach '+t.key+'. Or use Assign.');
+      var handle=button('links-handle','⠿','Drag '+t.key+' to a node, connection or step','Drag onto a canvas node or connection, a step coin or a Steps row to attach '+t.key+'. Enter opens Assign.');
       rowsLife.listen(handle,'pointerdown',function(ev){startDrag(ev,handle,t.key,null);});
       rowsLife.listen(handle,'keydown',function(ev){if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();openPopover({type:'assign-ticket',key:t.key,opener:'assign:'+t.key},row.querySelector('.links-assign'));}});
       head.appendChild(handle);
@@ -197,12 +223,14 @@ function initWorkbenchLinksView(opts){
         rowsLife.listen(edit,'keydown',function(ev){
           if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();state.editing=null;render();focusIn('[data-links-ticket="'+t.key+'"] .links-edit');return;}
           if(ev.key!=='Enter')return;ev.preventDefault();
-          var next=trackingTicket(edit.value.trim());
-          if(!next){fail('Use a Jira key like HW-123 or an absolute http(s) Jira browse URL.');return;}
-          if(t.draft){var d=state.drafts.find(function(x){return x.key===t.key;});d.key=next.key;d.ref=next.url || next.key;state.editing=null;render();return;}
-          state.editing=null;
-          if(!commit(function(text,raw,ctx){return planLinksTicketRename(text,raw,t.key,edit.value.trim(),ctx);},{ok:'Renamed '+t.key+' to '+next.key+' everywhere it is attached here. Undo restores it.'}))render();
-          if(state.highlight && state.highlight.type==='ticket' && state.highlight.key===t.key)state.highlight.key=next.key;
+          var value=edit.value.trim(),next=trackingTicket(value);
+          if(!next){fieldError(edit,KEY_HELP);return;}
+          if(t.draft){
+            if(ticketRow(next.key) || state.drafts.some(function(x){return x.key===next.key && x.key!==t.key;})){fieldError(edit,next.key+' already exists.');return;}
+            var d=state.drafts.find(function(x){return x.key===t.key;});d.key=next.key;d.ref=next.url || next.key;state.editing=null;render();return;
+          }
+          if(next.key!==t.key && ticketRow(next.key)){state.merge={from:t.key,to:value,key:next.key};state.editing=null;render();focusIn('[data-links-ticket="'+cssEscape(t.key)+'"] .links-merge-confirm');return;}
+          state.editing=null;rename(t.key,value,next.key,false);
         });
         head.appendChild(edit);
         win.setTimeout(function(){if(edit.isConnected){edit.focus();edit.select();}},0);
@@ -211,6 +239,15 @@ function initWorkbenchLinksView(opts){
         key.setAttribute('aria-pressed',String(!!state.highlight && state.highlight.type==='ticket' && state.highlight.key===t.key));
         rowsLife.listen(key,'click',function(){setHighlight(state.highlight && state.highlight.type==='ticket' && state.highlight.key===t.key?null:{type:'ticket',key:t.key},true);});
         head.appendChild(key);
+      }
+      if(state.merge && state.merge.from===t.key){
+        var ask=el('div','links-merge');ask.setAttribute('role','group');ask.setAttribute('aria-label','Merge '+t.key+' into '+state.merge.key);
+        ask.appendChild(el('span','links-merge-text',state.merge.key+' already exists. Merge '+t.key+' into it? Every element with '+t.key+' gets '+state.merge.key+' instead (one Undo step).'));
+        var yes=button('bbtn links-merge-confirm','Merge into '+state.merge.key),no=button('bbtn links-merge-cancel','Cancel');
+        rowsLife.listen(yes,'click',function(){var m=state.merge;state.merge=null;rename(m.from,m.to,m.key,true);});
+        rowsLife.listen(no,'click',function(){state.merge=null;render();focusIn('[data-links-ticket="'+cssEscape(t.key)+'"] .links-edit');});
+        rowsLife.listen(ask,'keydown',function(ev){if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();no.click();}});
+        ask.appendChild(yes);ask.appendChild(no);row.appendChild(ask);
       }
       head.appendChild(el('span','links-count',t.draft?'not attached yet':t.links.length+(t.links.length===1?' link':' links')));
       var editKey=button('bbtn links-edit','Edit key','Edit key '+t.key,'Rename '+t.key+' on every node and connection that carries it here (one Undo step)');
@@ -271,7 +308,8 @@ function initWorkbenchLinksView(opts){
   function focusSignature(){
     var a=doc.activeElement;if(!a || !root.contains(a) && !(popover && popover.contains(a)))return null;
     var c=a.closest('[data-links-chip]'),r=a.closest('[data-links-ticket],[data-links-element]'),o=a.closest('[data-links-option]');
-    return {cls:a.className,chip:c && c.getAttribute('data-links-chip')+'|'+c.getAttribute('data-links-chip-ticket'),row:r && (r.getAttribute('data-links-ticket') || r.getAttribute('data-links-element')),option:o && o.getAttribute('data-links-option'),inPopover:!!(popover && popover.contains(a))};
+    var rows=Array.prototype.slice.call(list.querySelectorAll('[data-links-ticket],[data-links-element]'));
+    return {at:r?rows.indexOf(r):-1,cls:a.className,chip:c && c.getAttribute('data-links-chip')+'|'+c.getAttribute('data-links-chip-ticket'),row:r && (r.getAttribute('data-links-ticket') || r.getAttribute('data-links-element')),option:o && o.getAttribute('data-links-option'),inPopover:!!(popover && popover.contains(a))};
   }
   function restoreFocus(sig){
     if(!sig)return;var scope=sig.inPopover?popover:list,found=null;if(!scope)return;
@@ -279,6 +317,11 @@ function initWorkbenchLinksView(opts){
     if(sig.option){var opt=scope.querySelector('[data-links-option="'+cssEscape(sig.option)+'"]');found=opt && (opt.matches('button')?opt:opt.querySelector('input'));}
     if(!found && sig.chip && cls){var parts=sig.chip.split('|');found=scope.querySelector('[data-links-chip="'+cssEscape(parts[0])+'"][data-links-chip-ticket="'+cssEscape(parts[1])+'"] .'+cls);}
     if(!found && sig.row){var row=scope.querySelector('[data-links-ticket="'+cssEscape(sig.row)+'"],[data-links-element="'+cssEscape(sig.row)+'"]');found=row && (cls && row.querySelector('.'+cls) || row.querySelector('button'));}
+    // The row went away (its last link was removed): the next row, else the previous one, else the filter.
+    if(!found && !sig.inPopover && sig.at>=0){
+      var rows=list.querySelectorAll('[data-links-ticket],[data-links-element]'),near=rows[sig.at] || rows[sig.at-1];
+      found=near?near.querySelector('.links-key,.links-element-name') || near.querySelector('button'):filter;
+    }
     if(found && found!==doc.activeElement)found.focus({preventScroll:true});
   }
   function cssEscape(value){return String(value).replace(/["\\]/g,'\\$&');}
@@ -324,7 +367,7 @@ function initWorkbenchLinksView(opts){
       if(e.kind!=='step'){
         popLife.listen(search,'keydown',function(ev){
           if(ev.key!=='Enter')return;ev.preventDefault();var ticket=trackingTicket(search.value.trim());
-          if(!ticket){fail('Use a Jira key like HW-123 or an absolute http(s) Jira browse URL.');return;}
+          if(!ticket){fieldError(search,KEY_HELP);return;}
           if(!ticketRow(ticket.key) && !state.drafts.some(function(d){return d.key===ticket.key;}))state.drafts.push({key:ticket.key,ref:ticket.url || ticket.key});
           spec.search='';assign(e,ticket.key,false);
         });
@@ -375,7 +418,7 @@ function initWorkbenchLinksView(opts){
   function paintMenu(spec,opener){
     var e=element(spec.id);
     popover.setAttribute('aria-label',spec.key+' on '+describe(e));
-    var items=[['Highlight',function(){closePopover(false);setHighlight({type:'ticket',key:spec.key},true);}]];
+    var items=[['Highlight',function(){closePopover(false);if(e)chipHighlight(e,spec.key);}]];
     if(!spec.inherited)items.push(['Move to…',function(){openPopover({type:'move',key:spec.key,from:spec.id,copy:false,opener:spec.opener},opener);}]);
     items.push(['Copy to…',function(){openPopover({type:'move',key:spec.key,from:spec.id,copy:true,opener:spec.opener},opener);}]);
     if(!spec.inherited)items.push([e.kind==='step'?'Hide on this step':'Remove',function(){closePopover(false);assign(e,spec.key,true);}]);
@@ -512,10 +555,20 @@ function initWorkbenchLinksView(opts){
     d.ghost.style.left=(ev.clientX+12)+'px';d.ghost.style.top=(ev.clientY+10)+'px';
     d.target=dropTarget(ev.clientX,ev.clientY);paintDrop();
   }
+  /* The Links window must not hide its own drop targets: over the window but not
+     over one of its By element rows, look through it to the Steps list or canvas
+     below, and fade the window so the glowing target shows. */
   function dropTarget(x,y){
-    var hit=doc.elementFromPoint(x,y);if(!hit)return null;
-    var row=hit.closest('[data-links-element]');
-    if(row && root.contains(row))return {element:element(row.getAttribute('data-links-element')),marks:[row]};
+    var hits=doc.elementsFromPoint?doc.elementsFromPoint(x,y):[doc.elementFromPoint(x,y)],host=root.closest('.workspace-window') || root;
+    var top=hits[0];if(!top)return null;
+    var row=top.closest && top.closest('[data-links-element]');
+    if(row && root.contains(row)){seeThrough(false);return {element:element(row.getAttribute('data-links-element')),marks:[row]};}
+    var hit=hits.find(function(n){return n && !host.contains(n) && !(state.drag && state.drag.ghost && state.drag.ghost.contains(n));});
+    var under=!!(host.contains(top) && hit);
+    var found=hit?targetAt(hit):null;seeThrough(under && !!found);return found;
+  }
+  function seeThrough(on){var host=root.closest('.workspace-window');if(host)host.classList.toggle('links-see-through',!!on);}
+  function targetAt(hit){
     var stepRow=hit.closest('#steps-list [data-step-index]'),pick=doc.getElementById('steps-section');
     if(stepRow && pick){var st=element('step:'+Number(pick.value)+':'+stepRow.getAttribute('data-step-index'));return {element:st,marks:[stepRow].concat(st?litTargets([st]).filter(function(n){return n!==stepRow;}):[])};}
     if(!view || !view.contains(hit) || root.contains(hit))return null;
@@ -537,7 +590,7 @@ function initWorkbenchLinksView(opts){
     say(why?'Cannot drop here: '+why:'Drop to '+verb+' '+d.key+(d.from && !d.copy?' from '+describe(d.from):'')+' to '+describe(d.target.element)+(d.from && !d.copy?' · hold ⌥ to copy':'')+'.');
   }
   function endDrag(){
-    var d=state.drag;if(!d)return null;state.drag=null;
+    var d=state.drag;if(!d)return null;state.drag=null;seeThrough(false);
     (d.off || []).forEach(function(off){off();});
     try{if(d.source.hasPointerCapture && d.source.hasPointerCapture(d.id))d.source.releasePointerCapture(d.id);}catch(_){}
     d.marked.forEach(function(n){n.classList.remove('dv-links-drop','dv-links-refused');});
@@ -569,25 +622,29 @@ function initWorkbenchLinksView(opts){
     if(state.popover){ev.preventDefault();closePopover(true);return;}
     if(state.highlight){ev.preventDefault();ev.stopPropagation();setHighlight(null);say('Highlight cleared.');}
   });
-  // Esc on the canvas clears the highlight too, unless something else used the key.
+  // Esc on the canvas clears the highlight too (fields, dialogs and menus keep their own Esc).
   life.listen(doc,'keydown',function(ev){
-    if(ev.key!=='Escape' || ev.defaultPrevented || !state.highlight || root.contains(ev.target))return;
-    if(ev.target.closest && ev.target.closest('input,textarea,select,[role="dialog"],[role="menu"],dialog'))return;
+    if(ev.key!=='Escape' || !state.highlight || root.contains(ev.target) || state.drag)return;
+    if(ev.target.isContentEditable || ev.target.closest && ev.target.closest('input,textarea,select,[role="dialog"],[role="menu"],dialog'))return;
     setHighlight(null);
-  });
+  },true);
 
+  function shown(){var host=root.closest('.workspace-window');return !host || !host.hidden;}
   function refresh(){
+    // Closed, the window keeps no work: the next open rebuilds from the source.
+    if(!shown())return;
     ensureModel();
     if(state.highlight && state.highlight.type==='element' && !element(state.highlight.id))state.highlight=null;
     render();
   }
   life.listen(doc,'workbench-tool-visibility',function(ev){
     if(!ev.detail || ev.detail.name!=='links')return;
-    if(ev.detail.open)refresh();
+    var was=visible;visible=!!ev.detail.open;
+    if(visible){if(!was)refresh();return;}
     // Closing (or hiding) the Links window ends its highlight and any drag or popover.
     else{cancelDrag(null);closePopover(false);if(state.highlight)setHighlight(null);}
   });
-  paintTabs();render();
+  visible=shown();paintTabs();render();
   return {refresh:life.guard(refresh),
     highlight:function(){return state.highlight?JSON.parse(JSON.stringify(state.highlight)):null;},
     destroy:function(){cancelDrag(null);closePopover(false);state.highlight=null;applyHighlight();life.destroy();root.innerHTML='';}};

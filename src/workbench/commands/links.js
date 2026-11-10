@@ -220,11 +220,13 @@ function planLinksTicketMove(text,raw,from,to,key,ref,copy,context){
 }
 /* Replace one ticket key with another on every element that carries it
    locally, in one Undo step. Inherited provider tickets stay. */
-function planLinksTicketRename(text,raw,oldKey,newRef,context){
+function planLinksTicketRename(text,raw,oldKey,newRef,context,merge){
   var ticket=trackingTicket(String(newRef || '').trim());
   if(!ticket)return {error:'Use a Jira key like HW-123 or an absolute http(s) Jira browse URL.'};
   if(ticket.key===oldKey)return {text:text};
   var model=linksTicketModel(text,raw,context);if(model.error)return model;
+  // Renaming onto a key that is already attached merges the two; the caller must ask first.
+  if(!merge && model.tickets.some(function(t){return t.key===ticket.key;}))return {error:ticket.key+' already exists. Merge '+oldKey+' into it?',merge:ticket.key};
   var carriers=model.elements.filter(function(el){return el.kind!=='step' && el.keys.indexOf(oldKey)>=0 && el.inherited.indexOf(oldKey)<0;});
   if(!carriers.length)return {error:oldKey+' is only inherited from a provider; rename it there.'};
   var blocked=carriers.find(function(el){return !el.editable;});if(blocked)return {error:blocked.reason};

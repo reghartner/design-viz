@@ -4867,3 +4867,13 @@ test('#1252 Cancel request during a Load keeps the shown trace and its focus; Cl
  assert.equal(api.snapshot().trace.selected,null,'idle: Clear loaded trace clears');assert.equal(calls.length,2);
  api.destroy();
 });
+/* #1280 light check for fixed-size tiles (Chuck 2026-11-10: the stretching layout is the case that matters; elsewhere the
+   panel body scrolls as a whole): the Spans list's own CSS caps nothing and scrolls nothing, and no rule fills a tile with it. */
+test('#1280 the Spans list has no height cap or scroll of its own in the panel CSS',()=>{
+ const h=harness(fixture()),styles=h.C.PanelRegistry.get('live-status').styles,css=typeof styles==='string'?styles:(Array.isArray(styles)?styles:[]).map(s=>typeof s==='string'?s:s.css || '').join('\n');
+ assert.ok(css.includes('.dv-trace-waterfall{'),'the waterfall rule is in the panel CSS');
+ const own=css.match(/\.dv-trace-waterfall\{[^}]*\}/g) || [],rules=css.match(/[^{}]*\.dv-trace-waterfall[^{]*\{[^}]*\}/g) || [];
+ assert.ok(own.length>=1);for(const rule of rules)assert.doesNotMatch(rule.slice(rule.indexOf('{')),/max-height|overflow|contain:size|flex:1 1 0/,rule.trim());
+ assert.ok(!css.includes('dv-trace-fill'),'no tile fill rule');
+ h.ctl.liveStatus.destroy();
+});

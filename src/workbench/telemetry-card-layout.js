@@ -96,8 +96,20 @@ function createTelemetryCardLayoutEditor(opts){
     opts.commit(plan,c.snapshot,c.target);
     // Re-renders replace cards. Restore keyboard focus to the same authored
     // carrier, preferring the visible local detail copy over its hidden source.
-    var candidates=Array.from(view.querySelectorAll('.dv-metrics-card[data-metrics-section="'+c.target.section+'"][data-dv-edge="'+c.target.index+'"]'));
-    var card=candidates.find(function(el){return el.getBoundingClientRect().width>0;});if(card)card.focus({preventScroll:true});
+    function refocus(){
+      var candidates=Array.from(view.querySelectorAll('.dv-metrics-card[data-metrics-section="'+c.target.section+'"][data-dv-edge="'+c.target.index+'"]'));
+      var card=candidates.find(function(el){return el.getBoundingClientRect().width>0;});if(card)card.focus({preventScroll:true});
+    }
+    refocus();
+    // The status overlay can repaint the cards again after this render, which drops focus to
+    // the body. Restore it then too, but never take focus from anything the author moved to.
+    var doc=view.ownerDocument,tries=3;
+    function again(){
+      if(!life.alive())return;var active=doc.activeElement;
+      if(!active || active===doc.body)refocus();
+      if(--tries>0)(win.requestAnimationFrame || function(fn){return life.delay(fn,16);})(again);
+    }
+    life.delay(again,0);
   }
   life.listen(view,'pointerdown',function(ev){
     var card=cardFrom(ev);if(!card || ev.button!==0 || ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey)return;

@@ -502,9 +502,10 @@
         if(focusedSpan && span.id===focusedSpan.id){spanDetail(item);focusItem=item;}
       });
       // A newly focused span (from the list or the diagram) is scrolled into view after the sweep has removed the previous
-      // span's detail (revealTraceFocus). #1280: the list grows with its spans, so what scrolls is the panel body or the page.
+      // span's detail (revealTraceFocus). #1280: the list grows with its spans and a Live status tile grows with the list, so
+      // what scrolls is the page (or a fixed-height container that holds the panel). An automatic focus never moves the page.
       var focusKey=focusedSpan?focusedSpan.id:'';
-      if(!focusItem){waterfall._traceFocusShown='';host._traceFocusPending=null;}else if(waterfall._traceFocusShown!==focusKey)host._traceFocusPending={list:waterfall,item:focusItem,key:focusKey};
+      if(!focusItem){waterfall._traceFocusShown='';host._traceFocusPending=null;}else if(waterfall._traceFocusShown!==focusKey)host._traceFocusPending={list:waterfall,item:focusItem,key:focusKey,auto:!!focus.auto};
     }
     function stopFocusWatch(){if(host._traceFocusWatch){host._traceFocusWatch.disconnect();host._traceFocusWatch=null;}}
     function revealTraceFocus(){
@@ -516,10 +517,12 @@
         return;
       }
       stopFocusWatch();host._traceFocusPending=null;list._traceFocusShown=pending.key;
-      // The nearest ancestor that scrolls (the panel body in a tile) moves by the least that shows the row; without one, the page does.
+      // A scrolling ancestor below the page (a fixed-height container holding the panel) moves by the least that shows the
+      // row. Without one only a focus the reader asked for scrolls the page, by the least needed; an automatic focus (the
+      // failed span on load) leaves the page where it is.
       var holder=scrollHolder(list),ib=pending.item.getBoundingClientRect();
       if(holder){var hb=holder.getBoundingClientRect();if(ib.top<hb.top || ib.bottom>hb.bottom)holder.scrollTop+=ib.top<hb.top || ib.height>hb.height?ib.top-hb.top-8:ib.bottom-hb.bottom+8;}
-      else if(pending.item.scrollIntoView)pending.item.scrollIntoView({block:'nearest',inline:'nearest'});
+      else if(!pending.auto && pending.item.scrollIntoView)pending.item.scrollIntoView({block:'nearest',inline:'nearest'});
     }
     // The closest element above `node` (crossing a shadow root) whose content scrolls vertically.
     function scrollHolder(node){

@@ -4877,3 +4877,20 @@ test('#1280 the Spans list has no height cap or scroll of its own in the panel C
  assert.ok(!css.includes('dv-trace-fill'),'no tile fill rule');
  h.ctl.liveStatus.destroy();
 });
+/* #1280 review: with no scrolling ancestor below the page, a span focus the reader asked for scrolls the page by the least
+   needed (scrollIntoView nearest); an automatic focus (the failed span on load passes auto) never scrolls the page. */
+test('#1280 an automatic span focus never scrolls the page; a reader\'s focus scrolls it by the least needed',async()=>{
+ const {h,api,m}=await stage2Loaded();
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,calls=[];
+ proto.getClientRects=function(){return [1];};proto.getBoundingClientRect=function(){return {top:900,bottom:930,left:0,right:100,width:100,height:30};};
+ proto.scrollIntoView=function(options){calls.push([this.className,options]);};h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible'})};
+ try{
+  const t=api.snapshot().trace.selected;
+  assert.equal(api.selectTraceSpan({context:t.context,spanId:t.exemplar.spans[41].id,auto:true}),true);h.flush();
+  assert.equal(api.snapshot().trace.selected.focus.auto,true,'the focus says it is automatic');
+  assert.equal(calls.filter(c=>/dv-trace-span-item/.test(c[0])).length,0,'an automatic focus does not scroll the page');
+  const t2=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t2.context,spanId:t2.exemplar.spans[45].id}),true);h.flush();
+  assert.equal(api.snapshot().trace.selected.focus.auto,false);
+  const page=calls.filter(c=>/dv-trace-span-item/.test(c[0]));assert.equal(page.length,1,'a reader\'s focus scrolls the page once');assert.deepEqual(plain(page[0][1]),{block:'nearest',inline:'nearest'});
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;h.doc.defaultView=view;api.destroy();}
+});

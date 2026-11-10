@@ -10,6 +10,7 @@ import {repo} from '../helpers/prepare.mjs';
 | G1 | The same with no section layout (plain panel): the list has no scroll of its own | 60-span trace, board without a section layout | waterfall scrollHeight <= clientHeight + 1; the last row reachable | a capped list (max-height 240px, overflow auto) |
 | G3 | A short trace adds no empty space under its last row, in both layouts | 3-span trace | waterfall bottom - last row bottom <= its 8px padding + 2 | a fill rule or min-height on the list |
 | G4 | A span focused from the diagram far down the list is brought into view by the scroll that now holds it | 60 spans, tile and plain | the focused row is visible by the all-ancestors check | a reveal that still scrolls only the list |
+| G5 | An automatic focus (the failed span on load, #1188) never scrolls the page | 60 spans, the last one failed and mapped to a step | the failed row is focused (aria-pressed) and window.scrollY is unchanged | a page scrollIntoView for every focus |
 Desktop only. Page functions start at host.shadowRoot || host and check the counts they find. */
 const PROFILE=JSON.parse(await readFile(path.join(repo,'tests/fixtures/trace-connection-profile.json'),'utf8'));
 const RECORDED=await readFile(path.join(repo,'tests/fixtures/provider-traces/honeycomb-trace.txt'),'utf8');
@@ -21,6 +22,9 @@ function sixty(){
  const extra=Array.from({length:5},(_,i)=>lines[at].replace('dcce084f04baa9e1','aaaa0000000000'+String(10+i)));
  lines.splice(at+1,0,...extra);return lines.join('\n');
 }
+// The 60-span trace with its last row (redis HGET, row 60) failed; a step maps it, so loading focuses it automatically.
+const FAILED='1c4d74a48ded77bc';
+function failedLast(){const lines=sixty().split('\n'),at=lines.findIndex(l=>l.startsWith('| '+FAILED+' |'));lines[at]=lines[at].replace(' UNSET | false |',' ERROR | true |');return lines.join('\n');}
 // Only the root and its first two descendants: a three-span trace.
 function three(){
  const lines=RECORDED.split('\n'),rows=lines.map((l,i)=>[l,i]).filter(([l])=>/^\| [0-9a-f]{16} \|/.test(l)).slice(3).map(([,i])=>i);
@@ -29,12 +33,12 @@ function three(){
 function spec(tile){
  const d={nodes:{web:{title:'Checkout frontend'},checkout:{title:'Checkout service'},payment:{title:'Payment service'}},rows:[['web','checkout','payment']],
   edges:[{from:'web',to:'checkout',label:'PlaceOrder'},{from:'checkout',to:'payment',label:'Charge'}],
-  steps:[{id:'accept',text:'Accept checkout',nodes:['web'],traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'web'}},{id:'place',text:'Place the order',edge:'web->checkout',traceMatch:{serviceName:'checkout',operation:'msdemo.CheckoutService/PlaceOrder'}}],
+  steps:[{id:'accept',text:'Accept checkout',nodes:['web'],traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'web'}},{id:'place',text:'Place the order',edge:'web->checkout',traceMatch:{serviceName:'checkout',operation:'msdemo.CheckoutService/PlaceOrder'}},{id:'cache',text:'Read the cart cache',nodes:['payment'],traceMatch:{serviceName:'redis',operation:'HGET',nodeId:'payment'}}],
   view:'step',autoplay:false,panels:[{id:'status',type:'live-status',title:'Status'}]};
  if(tile)d.sectionLayout={columns:24,default:[{x:0,y:0,w:15,h:16},{controls:'steps',attachTo:'diagram',x:0,y:16,w:15,h:5},{panel:'status',x:15,y:0,w:9,h:21}]};
  return {page:{title:'Checkout request path',tracking:{telemetry:{environment:'prod',environments:{prod:{},stage:{}},traceConnections:{company:PROFILE}}},sections:[{id:'main',heading:'Checkout',diagram:d}]}};
 }
-async function open(page,server,{tile,payload}){
+async function open(page,server,{tile,payload,load=true}){
  await page.setViewportSize({width:1440,height:900});
  await page.exposeFunction('traceTools',()=>[{server:PROFILE.server,tools:[{name:'get_trace',annotations:{readOnlyHint:true,destructiveHint:false}}]}]);
  await page.exposeFunction('traceDescribe',()=>schema());await page.exposeFunction('tracePermission',keys=>Object.fromEntries(keys.map(k=>[k,'granted'])));
@@ -44,7 +48,7 @@ async function open(page,server,{tile,payload}){
  execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out],{stdio:'pipe'});
  await page.goto(server.origin+'/'+name+'.html');await page.waitForFunction(()=>!!window.ctl);
  const panel=page.locator('.pwidget.pt-live-status').filter({visible:true}).first();await expect(panel.locator('.dv-live-trace')).toBeVisible();
- await panel.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await panel.getByRole('button',{name:'Load trace',exact:true}).click();
+ await panel.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);if(!load)return panel;await panel.getByRole('button',{name:'Load trace',exact:true}).click();
  await expect(panel.locator('.dv-trace-span').first()).toBeVisible();
  return panel;
 }
@@ -94,5 +98,14 @@ for(const tile of [true,false]){
   const far=await page.evaluate(()=>{const t=window.ctl.liveStatus.snapshot().trace.selected,span=t.exemplar.spans[52];window.ctl.liveStatus.selectTraceSpan({context:t.context,spanId:span.id});return span.id;});
   await expect(panel.locator('.dv-trace-span[data-span-id="'+far+'"]')).toHaveAttribute('aria-pressed','true');
   await expect.poll(async()=>{const m2=await measure(panel,far);return m2.rowId===far && m2.rowVisible;},{message:'the focused row is visible by the all-ancestors check'}).toBe(true);
+ });
+ test('#1280 G5 in '+where+' the automatic focus on a failed span far down the list does not scroll the page',async({page,server})=>{
+  const panel=await open(page,server,{tile,payload:failedLast(),load:false});
+  await page.evaluate(()=>window.scrollTo(0,0));const before=await page.evaluate(()=>window.scrollY);
+  await panel.getByRole('button',{name:'Load trace',exact:true}).click();
+  const row=panel.locator('.dv-trace-span[data-span-id="'+FAILED+'"]');await expect(row,'the failed span is focused automatically').toHaveAttribute('aria-pressed','true');
+  const m=await measure(panel,FAILED);expect([m.lists,m.items],'one list of 60 rows').toEqual([1,60]);
+  await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  expect(await page.evaluate(()=>window.scrollY),'the page did not scroll for an automatic focus').toBe(before);
  });
 }

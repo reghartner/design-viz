@@ -8,7 +8,8 @@
    M6 imported | consumer importing provider api with a binding | Provider metrics lists API; unticking Show errors writes the #1266 hide overlay; a template drop onto API is refused with "Templates aren't available on imported nodes yet" | a template replacing provider metrics
    M7 keyboard | same as M1 | Enter on a chip → Move to… → http-service switches it; Enter on a handle opens Assign, a tick binds and opens the editor with the missing parameter flagged | a keyboard path that skips the flag
    M9 template limit | kafka-topic sets lag max 50 | the lag max field shows 50 with "from template kafka-topic" beside it; typing 80 overrides it on the carrier in one Undo step | an in-force limit shown as empty
-   M10 imported, own metrics | consumer importing store with this document's raw binding (no kind) | Metrics kind shows "no kind set"; Signals from offers the templates disabled with the "not available … yet" reason | templates offered and then refused, a kind shown that is not set
+   M10 imported, own metrics | consumer importing store with this document's raw binding (no kind) | Metrics kind shows "no kind set"; Signals from offers the templates disabled with the "not available … yet" reason; Assign refuses Store with that same reason | templates offered and then refused, a kind shown that is not set
+   M11 ratio limit | edge 0 proof lag max 0.5 × rate | the editor shows "lag max 0.5 × rate · ratio limit; edit in Inspect" with no plain lag max field, and Open in Inspect | a ratio shown as a plain maximum
    M8 sync + card kept | edge 0 card pinned at x 120, y 40, width 240 | a parameter edit in Links shows in Inspect's Metrics editor, and an edit there shows in Links, with no reload; switching edge 0 to http-service keeps its card position and width | a stale copy, a lost card pin */
 import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
 import {digest} from '../../canon/drift.mjs';
@@ -205,4 +206,22 @@ test('M10 an imported carrier with this document\'s own metrics: no kind shows a
   const uses=editor.getByRole('combobox',{name:'Signals from',exact:true});
   expect(await uses.locator('option').evaluateAll(list=>list.filter(o=>o.value).map(o=>o.disabled))).toEqual([true,true]);
   await expect(page.locator('#'+await uses.getAttribute('aria-describedby'))).toContainText('Templates aren’t available on imported nodes yet');
+  // Assign gives the same reason for it, not the raw-signals routes that would also refuse.
+  await page.keyboard.press('Escape');
+  await metricRow(panel,'template:kafka-topic').getByRole('button',{name:'Drag kafka-topic to a node or connection',exact:true}).focus();await page.keyboard.press('Enter');
+  const store=page.getByRole('dialog',{name:'Assign kafka-topic',exact:true}).getByRole('checkbox',{name:'Store',exact:true});
+  await expect(store).toHaveAttribute('aria-disabled','true');
+  const why=page.locator('#'+await store.getAttribute('aria-describedby'));
+  await expect(why).toContainText('Templates aren’t available on imported nodes yet');await expect(why).not.toContainText('Move to');
+});
+
+test('M11 a ratio limit shows as "max N × signal", read only, with Inspect named for editing it',async({page,server})=>{
+  const spec=JSON.parse(JSON.stringify(fixture));diagram(spec).edges[0].telemetry.proof={lag:{max:0.5,maxRatioOf:'rate'}};
+  const {panel}=await open(page,server,spec);
+  await metricRow(panel,'template:kafka-topic').getByRole('button',{name:'Edit metrics on '+CTRL_EDGE,exact:true}).click();
+  const editor=panel.getByRole('group',{name:'Metrics on '+CTRL_EDGE,exact:true});
+  await expect(editor.locator('[data-links-ratio="lag"]')).toHaveText('lag max 0.5 × rate · ratio limit; edit in Inspect');
+  await expect(editor.getByRole('textbox',{name:'lag max',exact:true})).toHaveCount(0);
+  await expect(editor.getByRole('button',{name:'Open in Inspect',exact:true})).toBeVisible();
+  await expect(editor.getByRole('textbox',{name:'rate max',exact:true})).toHaveCount(1);
 });

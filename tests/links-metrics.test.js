@@ -130,3 +130,10 @@ test('LM8 limits in force: a template limit shows with its source; a carrier val
   assert.deepEqual(plain(el(model(s.raw),'edge',0).limits.lag.max),{value:80,from:'carrier'});
   assert.deepEqual(plain(el(model(board()),'node','ingest').limits),{},'no limits: nothing in force');
 });
+
+test('LM9 a ratio limit is kept as one: its max and the base signal',()=>{
+  const spec=board();d(spec).edges[0].telemetry.proof={lag:{max:0.5,maxRatioOf:'rate'}};
+  assert.deepEqual(plain(c.validate(c.normalize(spec)).errors),[]);
+  const lag=el(model(spec),'edge',0).limits.lag;
+  assert.deepEqual(plain(lag.max),{value:0.5,from:'carrier'});assert.deepEqual(plain(lag.maxRatioOf),{value:'rate',from:'carrier'});
+});

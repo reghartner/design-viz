@@ -38,6 +38,13 @@ const lookback=from=>{const hours=Math.max(1,Math.ceil((Date.now()-from)/3600000
 // Accessible names of the Load trace controls outside the log lookup section.
 // A Honeycomb get_trace answer for a trace it did not keep.
 const notFound=id=>'---\nMetadata:\n  environment: production\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+id+'\n  view_mode: full\n  visible_spans: 0\n';
+// #1230: positions of what the page function finds (light DOM here; a native viewer host would have a shadow root).
+const layout=root=>root.evaluate(host=>{const r=host.shadowRoot || host,q=s=>Array.from(r.querySelectorAll(s)),box=n=>{const b=n.getBoundingClientRect();return {top:b.top,bottom:b.bottom,height:b.height,left:b.left,right:b.right};};
+ const slot=q('.dv-trace-slot')[0],direct=q('.dv-trace-direct')[0],logs=q('.dv-trace-logs')[0],config=q('details.dv-trace-config')[0];
+ return {slots:q('.dv-trace-slot').length,slot:slot && box(slot),slotText:slot && slot.textContent.trim(),inSlot:slot?slot.querySelectorAll('.dv-trace-selected').length:0,selected:q('.dv-trace-selected').length,
+  search:direct && box(direct),logs:logs && box(logs),configOpen:config && config.open,
+  rows:q('.dv-trace-log-row').map(n=>({...box(n),chosen:n.getAttribute('data-chosen'),shown:n.getClientRects().length>0 && !n.closest('details:not([open])')})),
+  reports:q('.dv-trace-direct-report').map(n=>({...box(n),inLogs:!!n.closest('.dv-trace-logs'),next:n.querySelectorAll('.dv-trace-log-next').length}))};});
 const formControls=root=>root.locator('.dv-trace-config').evaluate(config=>Array.from(config.querySelectorAll('input,select,textarea,button')).filter(n=>!n.closest('.dv-trace-logs')).map(n=>[n.tagName,n.getAttribute('aria-label') || n.textContent.trim(),n.disabled]));
 
 test('desktop authored log lookup lists the newest matching lines and loads the chosen trace focused on its span',async({page,server},info)=>{
@@ -84,10 +91,34 @@ test('desktop a log-line trace the provider did not keep says so and loads the n
  await h.logs.getByRole('button',{name:'Load trace '+MISSING,exact:true}).click();
  const report=h.root.locator('.dv-trace-direct-report');await expect(report).toContainText('Trace not found. The provider may not have kept this trace (sampling). Try the next log line.');
  await expect(report).not.toContainText('longer lookback');await expect(h.root.locator('.dv-trace-time')).toHaveJSProperty('open',false);
+ // #1230 (test plan 1; Chuck: stacked, not beside): the report sits directly under the clicked row inside the search, before
+ // the next row and not after the last result; the row stays marked.
+ const at=await layout(h.root),rep=at.reports[0],row=at.rows[0];expect([at.reports.length,at.rows.length],'one report, three rows').toEqual([1,3]);
+ expect(rep.inLogs,'the report is inside the search section').toBe(true);expect(at.rows.map(r=>r.chosen)).toEqual(['true','false','false']);
+ expect(rep.top,'below the clicked row').toBeGreaterThanOrEqual(row.bottom-1);expect(rep.top-row.bottom,'directly below it').toBeLessThanOrEqual(8);
+ expect(rep.bottom,'above the next row').toBeLessThanOrEqual(at.rows[1].top+1);expect(rep.bottom,'not after the last result').toBeLessThanOrEqual(at.rows[2].top+1);
+ expect(Math.abs(rep.left-row.left),'stacked under the row, not beside it').toBeLessThanOrEqual(2);expect(rep.right-rep.left,'as wide as the row').toBeGreaterThanOrEqual((row.right-row.left)*0.9);
+ expect(rep.next,'Try the next log line is in it').toBe(1);
+ expect([at.inSlot,at.slotText],'the reserved space stays empty').toEqual([0,'Load a trace to show it here']);
  await info.attach('log-line-not-kept',{body:await h.root.screenshot(),contentType:'image/png'});
  await report.getByRole('button',{name:'Try the next log line',exact:true}).click();
  await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);await expect(h.root.locator('.dv-trace-span[data-span-id="'+SPAN+'"]')).toHaveAttribute('aria-pressed','true');
  expect(h.calls.filter(c=>c.tool==='get_trace').map(c=>c.args.trace_id)).toEqual([MISSING,ID]);
+});
+
+/* #1230 (test plan 2 and 3): a reserved space above the search holds the loaded trace. Before a load it is a short
+   placeholder; a loaded log line's trace appears in it while the search and its results stay open below. */
+test('desktop the loaded trace goes in the reserved space above the search; the search and its results stay open',async({page,server},info)=>{
+ const h=await open(page,server);let at=await layout(h.root);
+ expect([at.slots,at.inSlot,at.selected,at.slotText],'before a load: one empty placeholder').toEqual([1,0,0,'Load a trace to show it here']);
+ expect(at.slot.height,'the placeholder is short').toBeGreaterThan(0);expect(at.slot.height).toBeLessThan(80);expect(at.slot.bottom,'it sits above the search').toBeLessThanOrEqual(at.search.top+1);
+ await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');await h.logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(h.logs.locator('.dv-trace-log-row')).toHaveCount(1);
+ await h.logs.getByRole('button',{name:'Load trace '+ID,exact:true}).click();await expect(h.root.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);
+ at=await layout(h.root);
+ expect([at.slots,at.inSlot,at.selected],'the trace is in the reserved space').toEqual([1,1,1]);expect(at.slotText).not.toContain('Load a trace to show it here');
+ expect(at.configOpen,'the search stays open').toBe(true);expect(at.rows.map(r=>r.shown),'its result list is still visible').toEqual([true]);
+ expect(at.slot.top,'the reserved space is above the search').toBeLessThan(at.search.top);expect(at.slot.top).toBeLessThan(at.logs.top);expect(at.slot.bottom).toBeLessThanOrEqual(at.search.top+1);
+ await info.attach('trace-slot-loaded',{body:await h.root.screenshot(),contentType:'image/png'});
 });
 
 /* #1158: "Only lines with a trace ID" is checked by default; Find then appends the trace ID label filter. */

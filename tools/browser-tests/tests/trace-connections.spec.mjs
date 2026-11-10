@@ -12,11 +12,13 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 async function onTrace(root){await expect(root.getByRole('button',{name:/^(Jira|Trace)( · \d+)?$/})).toHaveCount(0);await expect(root.locator('.dv-live-trace')).toBeVisible();}
 async function observeTraceReveals(page){await page.evaluate(()=>{window.traceReveals=[];const original=Element.prototype.scrollIntoView;Element.prototype.scrollIntoView=function(...args){if(this.matches('.dv-trace-selected'))window.traceReveals.push(this);return original.apply(this,args);};});}
 async function openTraceConfiguration(root){const config=root.locator('.dv-trace-config');if(!await config.evaluate(node=>node.open))await config.locator(':scope > summary').click();await expect(config).toHaveJSProperty('open',true);}
+// #1230: a loaded trace sits in the reserved space above the search, which stays open below it.
 async function expectCompactTrace(root){
- await expect(root.locator('.dv-trace-config')).toHaveJSProperty('open',false);await expect(root.locator('.dv-trace-diagnostics')).toHaveJSProperty('open',false);await expect(root.locator('.dv-trace-arguments')).toBeHidden();
+ await expect(root.locator('.dv-trace-config')).toHaveJSProperty('open',true);await expect(root.locator('.dv-trace-diagnostics')).toHaveJSProperty('open',false);await expect(root.locator('.dv-trace-arguments')).toBeHidden();
  await expect(root.locator('.dv-trace-config > summary')).toContainText('Production');await expect(root.locator('.dv-trace-span').first()).toBeInViewport();
+ await expect(root.locator('.dv-trace-slot > .dv-trace-selected')).toHaveCount(1);
  const body=await root.locator('.dv-live-trace').boundingBox(),config=await root.locator('.dv-trace-direct').boundingBox(),selected=await root.locator('.dv-trace-selected').boundingBox(),waterfall=await root.locator('.dv-trace-waterfall').boundingBox();
- expect(config.height,'loaded connection summary stays compact').toBeLessThan(240);expect(selected.y-body.y,'selected request stays beside the diagram').toBeLessThan(470);expect(waterfall.y-body.y,'waterfall is not pushed below expanded configuration').toBeLessThan(720);
+ expect(selected.y,'the selected request is above the search').toBeLessThan(config.y);expect(selected.y-body.y,'selected request stays beside the diagram').toBeLessThan(470);expect(waterfall.y-body.y,'waterfall is not pushed below the search').toBeLessThan(720);
 }
 function detailSpec(){const detail=nestedSpec(),d=detail.page.sections[0].diagram;detail.page.title='Loaded detail';detail.page.sections[0].heading='Imported detail';delete d.edges[0].telemetry;d.edges[0].curvePoints=[{t:.5,dx:0,dy:70}];
  d.nodes.local={title:'Local frontend'};d.rows.push(['local']);d.steps=[{id:'local',nodes:['local'],text:'Local checkout',traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'local'}},{id:'imported',edge:'outer::inner::a->outer::inner::b',text:'Imported currency',traceMatch:{serviceName:'currency',operation:'grpc.msdemo.CurrencyService/GetSupportedCurrencies',nodeId:'outer::inner::b'}}];return detail;}
@@ -63,7 +65,12 @@ test('desktop Load trace shows the active lookback, and a no-spans load names it
  h.respond('---\nMetadata:\n  environment: ms-demo\n  navigation_hints: no spans found\n  total_spans: 0\n  trace_id: '+ID+'\n  view_mode: full\n  visible_spans: 0\n');
  await input.fill('https://ui.honeycomb.io/example-team/environments/production/trace?trace_id='+ID+'&trace_start_ts=1791779586.602194688&trace_end_ts=1791779592.123456789');await expect(note).toHaveText("This link's time range cannot be used with this connection; paste the trace ID alone.");
  await input.fill(ID);await expect(note).toHaveText('Looks back 2h; change under Lookback.');await h.root.getByRole('button',{name:'Load trace',exact:true}).click();
- await expect(status).toHaveText('Trace not found in the last 2h. Try a longer lookback under Lookback.');await expect(time).toHaveJSProperty('open',true);await expect(h.root.locator('.dv-trace-selected')).toHaveCount(0);expect(h.calls).toHaveLength(1);expect(h.calls[0].args.from).toBe('-2h');
+ await expect(status).toHaveText('Trace not found in the last 2h. Try a longer lookback under Lookback.');await expect(time).toHaveJSProperty('open',true);
+ // #1230 (Chuck: stacked, not beside): the error sits directly under the Load trace controls, inside the search.
+ const placed=await h.root.locator('.dv-trace-direct-report').evaluate(r=>{const p=r.previousElementSibling,a=r.getBoundingClientRect(),b=p && p.getBoundingClientRect();
+  return {inSearch:!!r.closest('details.dv-trace-config'),afterLoad:!!(p && p.querySelector('.dv-trace-load')),gap:b?a.top-b.bottom:null,overlap:b?Math.min(a.right,b.right)-Math.max(a.left,b.left):null,width:a.width};});
+ expect([placed.inSearch,placed.afterLoad],'after the Load trace controls').toEqual([true,true]);expect(placed.gap,'directly below them').toBeGreaterThanOrEqual(-1);expect(placed.gap).toBeLessThanOrEqual(16);
+ expect(placed.overlap,'stacked under them, not beside').toBeGreaterThan(placed.width*0.5);await expect(h.root.locator('.dv-trace-selected')).toHaveCount(0);expect(h.calls).toHaveLength(1);expect(h.calls[0].args.from).toBe('-2h');
  await time.locator('summary').click();await expect(time).toHaveJSProperty('open',false);await page.evaluate(()=>window.ctl.liveStatus.setStatusMode('jira'));await h.root.getByRole('button',{name:'Trace',exact:true}).click();
  await expect(status).toHaveText('Trace not found in the last 2h. Try a longer lookback under Lookback.');await expect(h.root.locator('.dv-trace-time')).toHaveJSProperty('open',false);await h.root.locator('.dv-trace-time > summary').click();
  await h.root.getByRole('textbox',{name:'Trace start',exact:true}).fill('-7d');await expect(note).toHaveText('Looks back 7d; change under Lookback.');

@@ -20,11 +20,11 @@ function spec(){
  return {page:{title:'Checkout request path',tracking:{telemetry:{grafana:{loki:'loki-$env'},environment:'prod',environments:{prod:{},stage:{}},traceConnections:{company:PROFILE},
   lookups:{order:{label:'Order ID',query:'{env="$env"} |= "order placed" | order_id="$value"'}}}},sections:[{id:'main',heading:'Checkout',diagram:d}]}};
 }
-async function open(page,server,payload=RECORDED){
+async function open(page,server,payload=RECORDED,lines={data:[]}){
  await page.setViewportSize({width:1440,height:900});
  await page.exposeFunction('traceTools',()=>[{server:PROFILE.server,tools:[{name:'get_trace',annotations:{readOnlyHint:true,destructiveHint:false}}]},{server:'Grafana',tools:[{name:'query_loki_logs',annotations:{readOnlyHint:true}}]}]);
  await page.exposeFunction('traceDescribe',()=>schema());await page.exposeFunction('tracePermission',keys=>Object.fromEntries(keys.map(k=>[k,'granted'])));
- await page.exposeFunction('traceCall',(server,tool,args)=>tool==='query_loki_logs'?{content:[{type:'text',text:JSON.stringify({data:[]})}]}:{payload});
+ await page.exposeFunction('traceCall',(server,tool,args)=>tool==='query_loki_logs'?{content:[{type:'text',text:JSON.stringify(lines)}]}:{payload});
  await page.addInitScript(()=>{localStorage.setItem('dv_tour_v1','done');window.claude={use:async name=>name==='permissions'?{request:keys=>window.tracePermission(keys)}:{listTools:()=>window.traceTools(),describeTool:()=>window.traceDescribe(),callTool:(s,n,a)=>window.traceCall(s,n,a)}};window.flowviewBooted=ctl=>{window.ctl=ctl;};});
  const file=path.join(server.root,'trace-compact.json'),out=path.join(server.root,'trace-compact.html');await writeFile(file,JSON.stringify(spec()));
  execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out],{stdio:'pipe'});
@@ -39,8 +39,8 @@ test('#1173 at 1440x900 a loaded trace\'s span list starts beside the diagram, a
  const frame=await section.locator('.section-layout-tile[data-layout-key="diagram"]').boundingBox(),row=await first.boundingBox(),body=await panel.locator('.dv-live-trace').boundingBox();
  await page.screenshot({path:info.outputPath('trace-compact-1440x900.png')});
  expect(row.y,'the first span row starts above the diagram frame\'s bottom edge ('+Math.round(frame.y+frame.height)+')').toBeLessThan(frame.y+frame.height);
- // Only the controls row, the two collapsed lines and the focus box come before the span list (about 200 px; the expanded
- // search report, request details and Clear rows took over 300).
+ // Only the controls row and the collapsed request line come before the span list; the open search follows it (#1230).
+ // Expanded request details before the list took over 300 px.
  expect(row.y-body.y,'the span list follows the collapsed lines directly').toBeLessThan(260);
 });
 /* #1186 stage 2 (Chuck approved the mockup 2026-11-09): the span list fills the rest of the panel and scrolls inside it,
@@ -57,7 +57,9 @@ test('#1186 at 1440x900 the span list fills the panel and scrolls itself; a focu
  expect(Math.abs(icons.y-line.y),'the icons sit at the top of the request line').toBeLessThan(8);expect(icons.x+icons.width,'at its right end').toBeGreaterThan(line.x+line.width-4);
  const g=await geometry();
  expect(g.box.y+g.box.height,'the list ends inside the panel').toBeLessThanOrEqual(g.card.y+g.card.height+1);
- expect(g.card.y+g.card.height-(g.box.y+g.box.height),'the list fills the rest of the panel').toBeLessThan(48);
+ // #1230: the trace sits above the search, which stays open; the list fills what the search leaves.
+ const search=await panel.locator('.dv-trace-direct').boundingBox();expect(g.box.y+g.box.height,'the list ends above the search').toBeLessThanOrEqual(search.y+1);
+ expect(search.y+search.height,'the search ends inside the panel').toBeLessThanOrEqual(g.card.y+g.card.height+1);expect(g.card.y+g.card.height-(search.y+search.height),'the list and the search below it fill the panel').toBeLessThan(48);
  expect(['auto','scroll'],'the list scrolls itself').toContain(g.overflow);expect(g.scroll,'55 spans overflow the list').toBeGreaterThan(g.client+40);
  // A span from the middle of the list: its detail opens directly under its row, inside the list.
  const row=list.locator('.dv-trace-span').nth(5);await row.scrollIntoViewIfNeeded();await row.click();
@@ -76,6 +78,23 @@ test('#1186 a span focused from the diagram far down the list is scrolled into t
  const far=await page.evaluate(()=>{const t=window.ctl.liveStatus.snapshot().trace.selected,span=t.exemplar.spans[41];window.ctl.liveStatus.selectTraceSpan({context:t.context,spanId:span.id});return span.id;});
  const row=list.locator('.dv-trace-span[data-span-id="'+far+'"]');await expect(row).toHaveAttribute('aria-pressed','true');
  await expect.poll(async()=>{const l=await list.boundingBox(),r=await row.boundingBox();return r.y>=l.y-1 && r.y+r.height<=l.y+l.height+1;},{message:'the focused row is inside the list\'s box'}).toBe(true);
+});
+/* #1230 review: in the tile the trace above never paints over an open search that is taller than the space left; the panel
+   body scrolls instead. Regression guard for the reserved-space layout (unchanged product code has no slot and passes). */
+test('#1230 at 1440x900 a loaded trace above an open search with eight log rows does not cover the search',async({page,server},info)=>{
+ const ns=ago=>(BigInt(Date.now()-ago)*1000000n).toString(),lines={data:Array.from({length:8},(_,i)=>({timestamp:ns(60000*(i+1)),line:'order placed',labels:{env:'prod'},structuredMetadata:{order_id:'o-1',trace_id:ID}}))};
+ const {panel}=await open(page,server,RECORDED,lines),logs=panel.locator('.dv-trace-logs');
+ await logs.getByLabel('Order ID',{exact:true}).fill('o-1');await logs.getByRole('button',{name:'Find log lines',exact:true}).click();await expect(logs.locator('.dv-trace-log-row')).toHaveCount(8);
+ await logs.getByRole('button',{name:'Load trace '+ID,exact:true}).first().click();await expect(panel.locator('.dv-trace-slot .dv-trace-span').first()).toBeVisible();
+ const at=await panel.evaluate(p=>{const r=p.shadowRoot || p,q=s=>Array.from(r.querySelectorAll(s)),b=n=>n.getBoundingClientRect();
+  const waterfall=q('.dv-trace-waterfall'),selected=q('.dv-trace-slot > .dv-trace-selected'),search=q('.dv-trace-direct'),rows=q('.dv-trace-log-row');
+  if(waterfall.length!==1 || selected.length!==1 || search.length!==1)return {counts:[waterfall.length,selected.length,search.length,rows.length]};
+  const last=rows[rows.length-1];last.scrollIntoView({block:'center'});const lb=b(last),hit=document.elementFromPoint(lb.left+lb.width/2,lb.top+lb.height/2);
+  return {counts:[1,1,1,rows.length],selectedBottom:b(selected[0]).bottom,waterfallBottom:b(waterfall[0]).bottom,searchTop:b(search[0]).top,lastRowHit:!!(hit && hit.closest('.dv-trace-log-row')===last)};});
+ expect(at.counts,'one waterfall, one trace in the slot, one search, eight rows').toEqual([1,1,1,8]);
+ expect(at.waterfallBottom,'the waterfall ends above the search').toBeLessThanOrEqual(at.searchTop+1);expect(at.selectedBottom,'so does the trace').toBeLessThanOrEqual(at.searchTop+1);
+ expect(at.lastRowHit,'the last log row is not painted over').toBe(true);
+ await page.screenshot({path:info.outputPath('trace-slot-tall-search-1440x900.png')});
 });
 // #1188 + #1186: a failed span no step maps adds an error note to the request line, after the flags and before the date.
 const CURRENCY='011114cbd1fd62de',FAILED=RECORDED.replace(new RegExp('^(\\| '+CURRENCY+' \\|(?:[^|]*\\|){4}) UNSET \\| false \\|','m'),'$1 ERROR | true |');

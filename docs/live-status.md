@@ -449,6 +449,23 @@ hierarchy metadata below to preview an initiative without contacting Jira.
 Live colors require a viewer with the live-status overlay and a status provider.
 PRs stay icons; the demo timeline supplies their GitHub detail.
 
+### Step trace match
+
+Select a step and open **Inspect → Code and trace evidence → Trace match** (desktop)
+to edit its `traceMatch` without JSON (#1238). A step without one shows **Service
+name** and **Operation**; **Add trace match** (or Enter) writes both. The form then
+edits **Service name**, **Operation**, **Node** (local and imported nodes, by id),
+**Namespace**, **Occurrence**, **Retry attempts** (`repeat: "attempts"`; it cannot
+be combined with an occurrence) and **Attributes** (one row per key with a text,
+number or true/false type; **Add attribute** or Enter adds one). **Add alternative**
+copies the last selector into the alternatives array; **Remove alternative N** back
+to one returns the single object; **Remove trace match** removes it. Other keys
+(`maxDurationMs`, `maxQueueDepth`, `parentStepId`, `optional`, `role`, `panelId`)
+stay in each selector's **Advanced (JSON)** box and survive form edits unchanged;
+step `conditions` stay in **Runtime conditions JSON**. Each edit is one Undo step.
+Validator messages for the step's `traceMatch` show beside the field they name.
+A value that is not selector objects keeps the **Trace match JSON** box.
+
 ### Query progress
 
 A dispatched numeric query shows **Loading…** until its first result. Refreshes
@@ -1820,7 +1837,7 @@ mode:
   written even when it draws on an imported node or edge. The board re-renders
   with the loaded trace and the focused span kept, and the span then maps to the
   step. A step that already has a `traceMatch` is not offered; edit it in the
-  Workbench.
+  Workbench ([Step trace match](#step-trace-match)).
 - Imported nodes and edges write the consumer overlay
   (`topologyImports[].nodeTracking` / `edgeTracking`, as the Workbench does); the
   provider spec never changes.

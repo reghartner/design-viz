@@ -134,7 +134,7 @@ the required leaves instead of the builder initializer or DOM renderer.
 | `commands/common.js` | Shared ID/row helpers, registry-backed panel-authoring views, cloning/subtree rewrite, field/list edits and bulk dispatch |
 | `commands/graph.js` | Node/edge/group/panel creation, identity changes, deletion cascades, node duplication and insert templates |
 | `commands/document.js` | Document title/default-skin/provenance edits and explicit bare-diagram wrapping; page/section/tab insertion, deletion, duplication and movement, with raw-list addresses and rendered landing ordinals |
-| `commands/narrative.js` | Step insertion, duplication, reordering and global deletion; path edits; hop/outcome, node/tone and panel-patch commands; shared narrative finalization |
+| `commands/narrative.js` | Step insertion, duplication, reordering and global deletion; path edits; hop/outcome, node/tone and panel-patch commands; the step trace match form edits (`planStepTraceMatch`, #1238); shared narrative finalization |
 | `commands/layout.js` | Row/group/node movement, floats, swaps and stacks; host layouts, named views and pure tile transformations |
 | `commands/reuse.js` | Authored step copy/share planning, occurrence removal/independence, occurrence lookup and destination state previews |
 | `commands/clipboard.js` | Clipboard envelope parsing, declaration copying, validation, ID/reference remapping and paste planning |

@@ -501,7 +501,7 @@
         var duration=el(row,'span','duration','dv-trace-duration',telemetryTraceDuration(span.ms)+(span.error?' · error':''));duration.setAttribute('role','img');duration.setAttribute('aria-label',span.ms+' milliseconds'+(span.error?' · error':''));duration.title=span.ms+' ms';
         if(focusedSpan && span.id===focusedSpan.id){spanDetail(item);focusItem=item;}
       });
-      // A newly focused span (from the list or the diagram) is scrolled into view after the sweep has removed the previous
+      // A newly focused span (a row, a step choice or a log line) is scrolled into view after the sweep has removed the previous
       // span's detail (revealTraceFocus). #1280: the list grows with its spans and a Live status tile grows with the list, so
       // what scrolls is the page (or a fixed-height container that holds the panel). An automatic focus never moves the page.
       // The key notes an automatic focus, so a reader's later focus of the same span still reveals it.

@@ -4922,6 +4922,9 @@ test('#1280 a span focus restored after an edit re-render never scrolls the page
    const restored=b.api.snapshot().trace.selected;assert.ok(restored && restored.focus && restored.focus.spanId===MAP_SPAN,(auto?'auto':'reader')+': the focus is restored');
    assert.equal(restored.focus.auto,true,'a restored focus is marked as nobody\'s new request');
    assert.equal(scroller.scrollTop,0,(auto?'auto':'reader')+': the page did not scroll');assert.equal(calls.filter(c=>/dv-trace-span-item/.test(c)).length,0,'no scrollIntoView');
+   // Review c2: the reader then focusing the same span is a request, so the page scrolls by the least needed.
+   assert.equal(b.api.selectTraceSpan({context:restored.context,spanId:MAP_SPAN}),true);b.h.flush();
+   assert.equal(b.api.snapshot().trace.selected.focus.auto,false);assert.equal(scroller.scrollTop,1038,(auto?'auto':'reader')+': a reader focus of the same span after a restore scrolls (1930 - 900 + 8)');
   }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;b.api.destroy();}
  }
 });

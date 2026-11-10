@@ -66,8 +66,11 @@ test('desktop Load trace shows the active lookback, and a no-spans load names it
  await input.fill('https://ui.honeycomb.io/example-team/environments/production/trace?trace_id='+ID+'&trace_start_ts=1791779586.602194688&trace_end_ts=1791779592.123456789');await expect(note).toHaveText("This link's time range cannot be used with this connection; paste the trace ID alone.");
  await input.fill(ID);await expect(note).toHaveText('Looks back 2h; change under Lookback.');await h.root.getByRole('button',{name:'Load trace',exact:true}).click();
  await expect(status).toHaveText('Trace not found in the last 2h. Try a longer lookback under Lookback.');await expect(time).toHaveJSProperty('open',true);
- // #1230: the error sits right after the Load trace controls, inside the search.
- expect(await h.root.locator('.dv-trace-direct-report').evaluate(r=>{const p=r.previousElementSibling;return [!!r.closest('details.dv-trace-config'),!!(p && p.querySelector('.dv-trace-load'))];}),'by the Load trace controls').toEqual([true,true]);await expect(h.root.locator('.dv-trace-selected')).toHaveCount(0);expect(h.calls).toHaveLength(1);expect(h.calls[0].args.from).toBe('-2h');
+ // #1230 (Chuck: stacked, not beside): the error sits directly under the Load trace controls, inside the search.
+ const placed=await h.root.locator('.dv-trace-direct-report').evaluate(r=>{const p=r.previousElementSibling,a=r.getBoundingClientRect(),b=p && p.getBoundingClientRect();
+  return {inSearch:!!r.closest('details.dv-trace-config'),afterLoad:!!(p && p.querySelector('.dv-trace-load')),gap:b?a.top-b.bottom:null,overlap:b?Math.min(a.right,b.right)-Math.max(a.left,b.left):null,width:a.width};});
+ expect([placed.inSearch,placed.afterLoad],'after the Load trace controls').toEqual([true,true]);expect(placed.gap,'directly below them').toBeGreaterThanOrEqual(-1);expect(placed.gap).toBeLessThanOrEqual(16);
+ expect(placed.overlap,'stacked under them, not beside').toBeGreaterThan(placed.width*0.5);await expect(h.root.locator('.dv-trace-selected')).toHaveCount(0);expect(h.calls).toHaveLength(1);expect(h.calls[0].args.from).toBe('-2h');
  await time.locator('summary').click();await expect(time).toHaveJSProperty('open',false);await page.evaluate(()=>window.ctl.liveStatus.setStatusMode('jira'));await h.root.getByRole('button',{name:'Trace',exact:true}).click();
  await expect(status).toHaveText('Trace not found in the last 2h. Try a longer lookback under Lookback.');await expect(h.root.locator('.dv-trace-time')).toHaveJSProperty('open',false);await h.root.locator('.dv-trace-time > summary').click();
  await h.root.getByRole('textbox',{name:'Trace start',exact:true}).fill('-7d');await expect(note).toHaveText('Looks back 7d; change under Lookback.');

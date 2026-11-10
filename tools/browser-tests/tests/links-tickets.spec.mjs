@@ -2,6 +2,8 @@
    row | fixture | assertion | rejects
    B1 by ticket + highlight | board below | FW-45 row lists chips for node ctrl, edge ctrl->ingest and step 2; Highlight FW-45 marks those on the canvas and the Steps row, dims the rest; Esc clears | a list that misses step links, or a highlight that only selects one element
    B2 drag + Assign | same | dragging FW-45's handle onto the ingest->notify label adds FW-45 to edges[2].tickets; one Undo restores the source; + Assign ticks node notify (one Undo step each) | a drop that writes nothing, a drop that takes two Undo steps
+   B4 canvas pill | same | the canvas pill names FW-45 and its Clear ends the highlight; closing Links ends it too | a dimmed canvas with no explanation after Links closes
+   B5 refused step move | ctrl with FW-45, FW-46 plus a step lighting ctrl with ticketFilter [FW-46] | dragging the FW-45 chip from ctrl onto that step marks it refused, not amber, and the drop changes nothing | a move that deletes the ticket
    B3 by element move | same | By element: step 2 row shows FW-45; dragging the FW-45 chip from the ctrl row onto the notify row moves it in one Undo step; ⌥-drag copies; Enter on a chip offers Move to… and moving by keyboard writes the same | a move that leaves the source, a copy that removes it */
 import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
 
@@ -13,12 +15,12 @@ const fixture={page:{title:'Doorbell',sections:[{heading:'Flow',diagram:{autopla
 const source=async page=>JSON.parse(await page.locator('#src').inputValue());
 const diagram=raw=>raw.page.sections[0].diagram;
 
-async function open(page,server){
+async function open(page,server,spec=fixture){
   await page.setViewportSize({width:1440,height:1000});
   // Open Links at the left so the right-hand canvas drop targets are not under it.
   await page.addInitScript(()=>{try{localStorage.setItem('dv-workbench-floating-v1',JSON.stringify({tool:'inspect',windows:{links:{open:false,x:84,y:120,w:380,h:760}}}));}catch(_){}});
   await page.goto(server.origin+'/workbench.html');
-  const text=JSON.stringify(fixture,null,2);await paste(page,text);
+  const text=JSON.stringify(spec,null,2);await paste(page,text);
   await expect(page.locator('#docview g.node[data-dv-node="ctrl"]')).toBeVisible();await closeTools(page);
   await page.locator('#editor-tab-links').click();
   const links=page.locator('#workspace-window-links');await expect(links).toBeVisible();
@@ -108,4 +110,33 @@ test('B3 By element: the step row shows FW-45; a chip drag moves it in one Undo 
   await expect.poll(async()=>diagram(await source(page)).nodes.notify.tickets).toEqual(['FW-45']);
   expect(diagram(await source(page)).nodes.ctrl.tickets).toBeUndefined();
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
+});
+
+test('B4 the canvas pill explains and clears the highlight, and closing Links clears it',async({page,server})=>{
+  const {links}=await open(page,server);
+  const pill=page.locator('.links-canvas-pill'),litCount=()=>page.locator('#docview .dv-links-lit').count();
+  await expect(pill).toBeHidden();
+  await links.locator('[data-links-ticket="FW-45"]').getByRole('button',{name:'Highlight FW-45',exact:true}).click();
+  await expect(pill).toBeVisible();await expect(pill).toContainText('FW-45');
+  await pill.getByRole('button',{name:'Clear link highlight'}).click();
+  await expect(pill).toBeHidden();await expect.poll(litCount).toBe(0);
+  await links.locator('[data-links-ticket="FW-45"]').getByRole('button',{name:'Highlight FW-45',exact:true}).click();
+  await expect.poll(litCount).toBeGreaterThan(0);
+  await links.locator('.workspace-window-close').click();
+  await expect(links).toBeHidden();await expect(pill).toBeHidden();await expect.poll(litCount).toBe(0);
+  await expect(page.locator('#docview .dv-links-dimming')).toHaveCount(0);
+});
+
+test('B5 dragging a ticket from a node onto a step it would vanish from is refused before the drop',async({page,server})=>{
+  const spec=JSON.parse(JSON.stringify(fixture)),d=diagram(spec);
+  d.nodes.ctrl.tickets=['FW-45','FW-46'];d.steps.push({id:'chime',text:'The controller rings the chime',nodes:['ctrl'],ticketFilter:['FW-46']});
+  const second=await open(page,server,spec);
+  await second.links.getByRole('button',{name:'By element',exact:true}).click();
+  const step=second.links.locator('[data-links-element="step:0:3"]');
+  await pointerTo(page,second.links.locator('[data-links-element="node:0:ctrl"] [data-links-chip-ticket="FW-45"] .links-chip-main'),step,{release:false});
+  await expect(step).toHaveClass(/dv-links-refused/);await expect(step).not.toHaveClass(/dv-links-drop/);
+  await expect(second.links.locator('.links-status')).toContainText('Hold ⌥');
+  await page.mouse.up();
+  await expect(page.locator('#src')).toHaveValue(second.text);
+  await expect(second.links.locator('.links-error')).toContainText('would take it off the node');
 });

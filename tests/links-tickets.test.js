@@ -131,3 +131,43 @@ test('L8 a snapshot without its providers lists imported elements with their tic
   const s=apply(snapshot,(t,r)=>c.planLinksTicket(t,r,{kind:'node',section:0,id:'canon::api'},'LOC-9','LOC-9',false,null));
   assert.deepEqual(d(s.raw).nodes['canon::api'].tickets.slice(-1),['LOC-9']);
 });
+
+test('L9 a move from a node onto a step is refused (it would delete the ticket); a copy shows it on the step',()=>{
+  const spec=board();d(spec).steps[1].ticketFilter=['FW-46'];
+  const text=JSON.stringify(spec,null,2),raw=JSON.parse(text),m=c.linksTicketModel(text,raw,null);
+  const ctrl=m.elements.find(e=>e.kind==='node' && e.id==='ctrl'),step=m.elements.find(e=>e.kind==='step' && e.index===1);
+  assert.match(c.planLinksTicketMove(text,raw,ctrl,step,'FW-45','FW-45',false,null).error,/would take it off the node/);
+  assert.match(c.linksDropRefusal(ctrl,step,'FW-45',false),/Hold ⌥/);
+  assert.equal(c.linksDropRefusal(ctrl,step,'FW-45',true),null,'a copy is offered');
+  const s=apply(spec,(t,r)=>c.planLinksTicketMove(t,r,ctrl,step,'FW-45','FW-45',true,null));
+  assert.equal(d(s.raw).steps[1].ticketFilter,undefined,'the step shows every lit ticket again');
+  assert.deepEqual(d(s.raw).nodes.ctrl.tickets,d(spec).nodes.ctrl.tickets,'the node keeps its tickets');
+});
+
+test('L10 drop checks cover the source: inherited, read-only and last-shown-on-a-step sources only copy',()=>{
+  const f=imported(),text=JSON.stringify(f.source,null,2),m=c.linksTicketModel(text,JSON.parse(text),f.context);
+  const api=m.elements.find(e=>e.kind==='node' && e.id==='canon::api'),local=m.elements.find(e=>e.kind==='node' && e.id==='local');
+  assert.match(c.linksDropRefusal(api,local,'CAN-1',false),/inherited/);
+  assert.equal(c.linksDropRefusal(api,local,'CAN-1',true),null);
+  const fixed=Object.assign({},local,{editable:false,reason:'Read only.'});
+  assert.match(c.linksDropRefusal(fixed,api,'LOC-1',false),/Read only\. Hold ⌥/);
+  const only=board();d(only).nodes.ctrl.tickets=['FW-45'];const t2=JSON.stringify(only),r2=JSON.parse(t2),m2=c.linksTicketModel(t2,r2,null);
+  const step=m2.elements.find(e=>e.kind==='step' && e.index===1),notify=m2.elements.find(e=>e.kind==='node' && e.id==='notify');
+  assert.match(c.planLinksTicketMove(t2,r2,step,notify,'FW-45','FW-45',false,null).error,/Keep at least one ticket/);
+});
+
+test('L11 showing or hiding on a step keeps filter keys it no longer lights, as Inspect does',()=>{
+  const spec=board();d(spec).steps[1].ticketFilter=['FW-45','FW-46','OLD-1'];
+  const s=apply(spec,(t,r)=>c.planLinksTicket(t,r,{kind:'step',section:0,index:1},'FW-46',null,true,null));
+  assert.deepEqual(d(s.raw).steps[1].ticketFilter,['FW-45','OLD-1']);
+  const back=apply(s.raw,(t,r)=>c.planLinksTicket(t,r,{kind:'step',section:0,index:1},'FW-46',null,false,null));
+  assert.equal(d(back.raw).steps[1].ticketFilter,undefined,'every lit ticket shown again means no filter, as the Inspector checklist writes');
+});
+
+test('L12 entries Tracking cannot read are named; a non-list value makes the element read only',()=>{
+  const spec=board();d(spec).nodes.ingest.tickets=['BE-67','not a key'];d(spec).nodes.notify.tickets='FW-1';
+  const text=JSON.stringify(spec),m=c.linksTicketModel(text,JSON.parse(text),null);
+  const ingest=m.elements.find(e=>e.kind==='node' && e.id==='ingest'),notify=m.elements.find(e=>e.kind==='node' && e.id==='notify');
+  assert.deepEqual(plain(ingest.unreadable),['not a key']);assert.equal(ingest.editable,true);
+  assert.equal(notify.notList,true);assert.equal(notify.editable,false);assert.match(notify.reason,/not a list/);
+});

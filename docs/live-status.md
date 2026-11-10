@@ -1445,9 +1445,10 @@ recorded message is scrubbed of the credential values.
 Provider responses never reach the agent: the script prints exactly one line, for example
 `snapshot examples/live-status/live-status.snapshot.json at 2026-11-10T11:02:00.000Z: 7 tickets (0 missing) ·
 6 carriers, 11 of 14 signals · no errors`. It exits 1 without writing a file when neither
-provider could run, and when every Jira call failed: the tickets are then unknown, and a snapshot
-showing them all as missing would be wrong. A rate-limited call (HTTP 429) is recorded with its
-Retry-After; a datasource uid that is not one path segment is refused.
+provider could run, and when Jira answered no search for the board's tickets (the Flagged search
+and the epic lookup do not count): the tickets are then unknown, and a snapshot showing them all as
+missing would be wrong. A rate-limited call (HTTP 429) is retried once after its Retry-After (at most
+10 s) and recorded only if it still fails; a datasource uid that is not one path segment is refused.
 
 The snapshot is written next to the board as `<board>.snapshot.json` (`--out` chooses another
 path). `*.snapshot.json` is ignored by git, so real ticket titles, assignees and metric values

@@ -44,7 +44,8 @@ test('S1 the snapshot is one demo story day with exactly the mock day\'s state p
 
 /* A local Jira REST and Grafana HTTP server, reached through https names (the script refuses http):
    `fetch` maps https://jira.test and https://grafana.test to it and records each URL asked for. */
-function providers({failQuery=null,pages=false,failJira=null}={}){
+function providers({failQuery=null,pages=false,failJira=null,failTickets=false,rateOnce=false}={}){
+ let limited=false;
  const seen=[],asked=[];
  const issue=(key,status,category)=>({key,fields:{summary:'Work '+key,status:{name:status,statusCategory:{key:category}},assignee:{displayName:'Pat'},updated:'2026-10-24T10:00:00.000+0000'}});
  const server=http.createServer((req,res)=>{let body='';req.on('data',c=>body+=c);req.on('end',()=>{
@@ -53,6 +54,8 @@ function providers({failQuery=null,pages=false,failJira=null}={}){
   if(url.pathname==='/rest/api/3/search/jql'){
    if(failJira){res.writeHead(failJira,{'Content-Type':'application/json','Retry-After':'30'});return res.end('{}');}
    const ask=JSON.parse(body),jql=ask.jql;
+   if(rateOnce && !limited){limited=true;res.writeHead(429,{'Content-Type':'application/json','Retry-After':'1'});return res.end('{}');}
+   if(failTickets && !/Flagged/.test(jql))return send(500,{});
    // FW-46 is flagged as an impediment: blocked whatever its status.
    if(/Flagged/.test(jql))return send(200,{issues:/FW-46/.test(jql)?[issue('FW-46','Done','done')]:[],isLast:true});
    if(/^parent = /.test(jql))return send(200,{issues:[],isLast:true});
@@ -227,7 +230,7 @@ test('S10 Jira pages are followed; a Jira that never answers leaves the tickets 
  p=await providers({failJira:429});
  try{
   const dir=tmp(),r=await cli(env,dir,{fetchImpl:p.fetch});
-  assert.equal(r.code,1);assert.equal(r.lines.length,1);assert.match(r.lines[0],/^snapshot not written: every Jira call failed, so the board's 7 tickets are unknown \(first: Jira search is rate limited \(HTTP 429, retry after 30\)\)/);
+  assert.equal(r.code,1);assert.equal(r.lines.length,1);assert.match(r.lines[0],/^snapshot not written: Jira answered no search for the board's tickets, so its 7 tickets are unknown \(first: Jira search is rate limited \(HTTP 429, retry after 30\)\)/);
   assert.doesNotMatch(r.lines[0],/missing/);assert.equal(fs.existsSync(r.out),false);
  }finally{await p.close();}
 });
@@ -274,4 +277,23 @@ test('S14 at the deadline every provider still busy is named',async()=>{
  const {summary}=await snap.takeSnapshot({specText:fs.readFileSync(BOARD,'utf8'),transport,timeoutMs:1000});
  const late=summary.errors.filter(e=>/no answer within 1 s/.test(e.message)).map(e=>e.source).sort();
  assert.deepEqual(late,['grafana','jira']);
+});
+test('S15 a Flagged search alone does not count as Jira answering: the tickets stay unknown and no file is written',async()=>{
+ const p=await providers({failTickets:true});
+ try{
+  const r=await cli({JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET},tmp(),{fetchImpl:p.fetch});
+  assert.ok(p.seen.some(s=>s.path==='/rest/api/3/search/jql' && /Flagged/.test(JSON.parse(s.body).jql)),'precondition: the Flagged search answered');
+  assert.equal(r.code,1);assert.match(r.lines[0],/^snapshot not written: Jira answered no search for the board's tickets, so its 7 tickets are unknown/);assert.equal(fs.existsSync(r.out),false);
+ }finally{await p.close();}
+});
+test('S16 a rate-limited call that the retry recovers is not recorded as an error',async()=>{
+ const p=await providers({rateOnce:true});
+ try{
+  const r=await cli({JIRA_SITE:'https://jira.test',GRAFANA_URL:'https://grafana.test',...SECRET},tmp(),{fetchImpl:p.fetch});
+  const bodies=p.seen.filter(s=>s.path==='/rest/api/3/search/jql').map(s=>s.body);
+  assert.ok(bodies.some((b,i)=>bodies.indexOf(b)!==i),'precondition: the rate-limited search was sent again');
+  const snapshot=JSON.parse(fs.readFileSync(r.out,'utf8'));
+  assert.equal(snapshot.errors.filter(e=>/rate limited/.test(e.message)).length,0,'the recovered 429 is not an error');assert.doesNotMatch(r.lines[0],/rate limited/);
+  assert.equal(snapshot.days[0].issues['FW-46'].state,'blocked','the retried search still delivered');assert.equal(Object.keys(snapshot.days[0].issues).filter(k=>/^(HW|FW|BE)-/.test(k)).length,6);
+ }finally{await p.close();}
 });

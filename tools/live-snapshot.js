@@ -68,7 +68,11 @@ function parseTime(value,now){
 function failure(message){return {code:'tool_error',message:String(message)};}
 async function readJson(response,what){
   const text=await response.text();
-  if(response.status===429){const wait=response.headers && response.headers.get && response.headers.get('retry-after');throw {code:'rate_limited',message:what+' is rate limited (HTTP 429'+(wait?', retry after '+String(wait).slice(0,40):'')+')'};}
+  if(response.status===429){
+    // The viewer's adapter retries a rate-limited call once after retryAfterMs (capped here at 10 s).
+    const wait=response.headers && response.headers.get && response.headers.get('retry-after'),seconds=Number(wait);
+    throw {code:'rate_limited',retryAfterMs:isFinite(seconds) && seconds>=0?Math.min(10000,seconds*1000):5000,message:what+' is rate limited (HTTP 429'+(wait?', retry after '+String(wait).slice(0,40):'')+')'};
+  }
   if(!response.ok)throw failure(what+' answered HTTP '+response.status);
   try{return JSON.parse(text);}catch(ex){throw failure(what+' did not answer JSON');}
 }
@@ -168,9 +172,17 @@ function mcpHandlerTransport(handlers,env){
 }
 
 /* The connector namespace the adapters expect, over a transport. A watch answers once: a snapshot never polls. */
+// A failed call is recorded under its call key; the same call answering later (the adapter's retry) removes it.
 function connectorNamespace(transport,errors,signal,answered){
-  const call=(server,tool,input)=>Promise.resolve().then(()=>transport.call(server,tool,input,signal)).then(payload=>{if(answered)answered[/grafana/i.test(server)?'grafana':'jira']++;return {payload};},error=>{
-    if(!(error && error.unsupported) && !(signal && signal.aborted))errors.push({source:/grafana/i.test(server)?'grafana':'jira',tool,message:String(error && error.message || error)});throw error;});
+  const call=(server,tool,input)=>{
+    const key=server+'\u0000'+tool+'\u0000'+JSON.stringify(input || {});
+    return Promise.resolve().then(()=>transport.call(server,tool,input,signal)).then(payload=>{
+      for(let i=errors.length-1;i>=0;i--)if(errors[i].key===key)errors.splice(i,1);
+      if(answered){answered[/grafana/i.test(server)?'grafana':'jira']++;if(tool==='searchJiraIssuesUsingJql' && input && typeof input.jql==='string')answered.searches.push(input.jql);}
+      return {payload};
+    },error=>{
+      if(!(error && error.unsupported) && !(signal && signal.aborted))errors.push({source:/grafana/i.test(server)?'grafana':'jira',tool,message:String(error && error.message || error),key});throw error;});
+  };
   return {
     listTools:()=>Promise.resolve(transport.servers()),
     callTool:(server,tool,input)=>call(server,tool,input),
@@ -195,7 +207,7 @@ function scrub(text,secrets){
   return out.replace(/(Basic|Bearer)\s+[A-Za-z0-9+/=._%-]{8,}/g,'$1 ***');
 }
 async function takeSnapshot({specText,board='board',transport,now=()=>Date.now(),timeoutMs=60000}){
-  const run=new AbortController(),errors=[],answered={jira:0,grafana:0},doc=headlessDocument(),namespace=connectorNamespace(transport,errors,run.signal,answered);
+  const run=new AbortController(),errors=[],answered={jira:0,grafana:0,searches:[]},doc=headlessDocument(),namespace=connectorNamespace(transport,errors,run.signal,answered);
   try{return await snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,namespace,answered});}
   finally{run.abort();}
 }
@@ -243,8 +255,10 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
     errors:dedupe(errors.map(e=>({source:e.source,tool:e.tool==null?null:scrub(e.tool,transport.secrets),message:scrub(e.message,transport.secrets)})))};
   const requested=refs.tickets,missingTickets=requested.filter(key=>!day.issues[key]).length;
   const signals=hasMetrics?bindings.reduce((n,b)=>n+Object.keys(b.signals).length,0):0,observed=Object.keys(day.telemetry.carriers).reduce((n,id)=>n+Object.keys(day.telemetry.carriers[id]).length,0);
-  // A Jira that never answered says nothing about the tickets: they are unknown, not missing.
-  const jiraFailed=hasJira && answered.jira<=1;
+  /* A Jira that answered no search for the board's tickets says nothing about them: they are unknown, not
+     missing. The Flagged search and the epic metadata lookup do not count. */
+  const ticketSearch=jql=>{if(/Flagged\s*=\s*Impediment/i.test(jql))return false;if(/^parent\s*=/i.test(jql))return true;const keys=(/key in \(([^)]*)\)/i.exec(jql) || [,''])[1].split(',').map(k=>k.trim());return keys.some(k=>requestedTickets.indexOf(k)>=0);};
+  const requestedTickets=refs.tickets,jiraFailed=hasJira && requestedTickets.length>0 && !answered.searches.some(ticketSearch);
   return {snapshot,summary:{tickets:requested.length,missing:hasJira && !jiraFailed?missingTickets:null,jiraFailed,carriers:Object.keys(day.telemetry.carriers).length,signals,observed,errors:snapshot.errors,at,jira:hasJira,metrics:hasMetrics}};
 }
 function dedupe(list){const seen=new Set();return list.filter(e=>{const key=JSON.stringify(e);if(seen.has(key))return false;seen.add(key);return true;});}
@@ -324,7 +338,7 @@ async function main(argv,env,{fetchImpl,stdout=process.stdout,transport}={}){
   if(result.refused){stdout.write('snapshot not written: '+result.refused+'\n');return 1;}
   const {snapshot,summary}=result;
   // Every ticket would read missing: no snapshot at all is better than a wrong one.
-  if(summary.jiraFailed){stdout.write(scrub('snapshot not written: every Jira call failed, so the board\'s '+summary.tickets+' tickets are unknown'+(summary.errors.filter(e=>e.source==='jira')[0]?' (first: '+summary.errors.filter(e=>e.source==='jira')[0].message+')':''),source.secrets)+'\n');return 1;}
+  if(summary.jiraFailed){stdout.write(scrub('snapshot not written: Jira answered no search for the board\'s tickets, so its '+summary.tickets+' tickets are unknown'+(summary.errors.filter(e=>e.source==='jira')[0]?' (first: '+summary.errors.filter(e=>e.source==='jira')[0].message+')':''),source.secrets)+'\n');return 1;}
   if(!summary.jira && !summary.metrics){stdout.write(scrub('snapshot not written: '+(summary.errors.filter(e=>e.tool==null && (e.source==='jira' || e.source==='grafana')).map(e=>e.source+': '+e.message).join('; ') || 'the board has no tickets and no bound signals'),source.secrets)+'\n');return 1;}
   fs.writeFileSync(file,JSON.stringify(snapshot,null,2)+'\n');
   stdout.write(scrub(summaryLine(file,summary),source.secrets)+'\n');

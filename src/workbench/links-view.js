@@ -433,7 +433,7 @@ function initWorkbenchLinksView(opts){
             var reason=!x.editable?x.reason:x.kind==='step' && x.lit.indexOf(key)<0?'Lights no node or connection with '+key:x.kind!=='step' && x.inherited.indexOf(key)>=0?'Inherited from the provider (read only)':null;
             body.appendChild(option(id,sectionPrefix(x)+x.label,on,reason,function(checked){assign(x,key,!checked);},note));
           }else{
-            body.appendChild(pickTarget(sectionPrefix(x)+x.label,id,why_[id],function(){var source=from,copy=spec.copy;closePopover(false);if(move(copy?null:source,x,key,false))focusChip(x,key);},note));
+            body.appendChild(pickTarget(sectionPrefix(x)+x.label,id,why_[id],function(){var source=from,copy=spec.copy;closePopover(false);if(move(copy?null:source,x,key,false))focusChip(x,key);},note,spec.copy));
           }
         });
       });
@@ -466,11 +466,11 @@ function initWorkbenchLinksView(opts){
     return line;
   }
   // A Move to… / Copy to… target that the static checks refuse.
-  function pickTarget(label,id,why,onPick,note){
+  function pickTarget(label,id,why,onPick,note,copy){
     var line=el('div','links-pop-row'),pick=button('links-pop-target',label);pick.setAttribute('data-links-option',id);line.appendChild(pick);
     if(note)line.appendChild(el('span','links-chip-note',note));
     if(why)refusedReason(pick,why,line);
-    popLife.listen(pick,'click',function(){if(refused(pick)){say('Cannot drop here: '+why);return;}onPick();});
+    popLife.listen(pick,'click',function(){if(refused(pick)){say((copy?'Cannot copy here: ':'Cannot move here: ')+why);return;}onPick();});
     return line;
   }
   function paintMenu(spec,opener){
@@ -838,12 +838,14 @@ function initWorkbenchLinksView(opts){
       var to=element(spec.to);if(!to){state.popover=null;popover=null;return;}
       popover.setAttribute('aria-label',to.label+' already has a trace match. '+(spec.copy?'Copy':'Move')+' '+spec.key+' as:');
       var head=el('p','links-pop-hint',to.label+' already has '+to.matches.map(function(u){return u.key;}).join(', ')+'. Esc cancels; nothing is written until you choose.');popover.appendChild(head);
+      var dup=linksTraceAlternativeRefusal(to,spec.key);
       menuItems([
         ['Replace',function(){var f=spec.from,c=spec.copy;closePopover(false);traceMove(f,to,spec.key,'replace',c);}],
-        ['Add as alternative',function(){var f=spec.from,c=spec.copy;closePopover(false);traceMove(f,to,spec.key,'alternative',c);}],
+        ['Add as alternative',function(){if(dup){say('Cannot add as an alternative: '+dup);return;}var f=spec.from,c=spec.copy;closePopover(false);traceMove(f,to,spec.key,'alternative',c);}],
         ['Cancel',function(){closePopover(true);say('Nothing changed.');}]]);
-      var dup=linksTraceAlternativeRefusal(to,spec.key),alt=popover.querySelectorAll('[role="menuitem"]')[1];
-      if(dup && alt){alt.disabled=true;alt.setAttribute('aria-disabled','true');alt.title=dup;popover.insertBefore(el('p','links-pop-reason',dup),alt.nextSibling);}
+      // A refused choice stays reachable by the arrow keys and says why (aria-disabled + its described reason).
+      var alt=popover.querySelectorAll('[role="menuitem"]')[1];
+      if(dup && alt){var why=refusedReason(alt,dup,popover);popover.insertBefore(why,alt.nextSibling);}
       return;
     }
     var title=spec.type==='trace-assign'?'Assign '+spec.key+' to steps':(spec.copy?'Copy ':'Move ')+spec.key+' from '+from.label;
@@ -869,7 +871,7 @@ function initWorkbenchLinksView(opts){
           var f=spec.from,c=spec.copy,src=spec.opener;
           if(x.matches.length){traceChoose(f,x,spec.key,c,src);return;}
           closePopover(false);traceMove(f,x,spec.key,null,c);
-        },note));
+        },note,spec.copy));
       }
     });
     popover.appendChild(el('p','links-pop-hint',spec.type==='trace-move'?'↑↓ move · Enter picks · a step with a match asks Replace or Add as alternative · Esc closes':'↑↓ move · Space ticks or unticks · Esc closes · each tick is one Undo step'));

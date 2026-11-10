@@ -9,7 +9,7 @@ function initDiagramAddMenu(opts){
   var title=doc.getElementById('diagram-add-title'),back=doc.getElementById('diagram-add-back');
   var error=doc.getElementById('diagram-add-error'),help=doc.getElementById('diagram-add-help');
   var choices=Array.from(dialog.querySelectorAll('[data-add-kind]')),presetButtons=[];
-  var structure=[doc.getElementById('add-section'),doc.getElementById('add-tabs'),doc.getElementById('add-contract')];
+  var structure=[doc.getElementById('add-section'),doc.getElementById('add-tabs'),doc.getElementById('add-contract'),doc.getElementById('add-grid-table')].filter(Boolean);
   var choosingNode=false,snapshot=null,invalid=false,optionsKey='',destination=null,inline=null,inlineLife=null,inlineOpener=null;
   NODE_PRESETS.forEach(function(item,index){
     var choice=doc.createElement('button');choice.type='button';choice.setAttribute('data-add-preset',String(index));

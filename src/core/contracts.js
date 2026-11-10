@@ -91,7 +91,9 @@ function contractGridColumnWarnings(value,path,warnings){
   });
 }
 /* o: {tableClass, caption, captionClass, firstWidth, fieldLabel, columns, rows:[{attrs, head, cells}],
-   headAttrs?, cellAttrs?(column), missing, empty?}. Strings in head/attrs/missing/empty are HTML. */
+   rowHead?, cellAttrs?(column), missing, empty?}. Strings in head/attrs/missing/empty are HTML. rowHead
+   opens each row header: default '<th scope="row">'; a host whose row styles target td can pass
+   '<td … role="rowheader">'. */
 function contractGridTableHTML(o){
   var total=o.columns.reduce(function(sum,col){return sum+contractGridWidth(col.width,160);},o.firstWidth);
   var h='<table class="'+o.tableClass+'" style="width:'+total+'px"><caption class="'+o.captionClass+'">'+esc(o.caption)+
@@ -101,7 +103,8 @@ function contractGridTableHTML(o){
   o.columns.forEach(function(col){h+='<th scope="col">'+esc(col.label || col.id)+'</th>';});
   h+='</tr></thead><tbody>';
   o.rows.forEach(function(row){
-    h+='<tr'+row.attrs+'><th scope="row"'+(o.headAttrs || '')+'>'+row.head+'</th>';
+    var open=o.rowHead || '<th scope="row">',tag=open.slice(1,3);
+    h+='<tr'+row.attrs+'>'+open+row.head+'</'+tag+'>';
     o.columns.forEach(function(col){
       h+='<td'+(o.cellAttrs?o.cellAttrs(col):'')+'>'+(panelOwn(row.cells,col.id)?esc(contractGridCellText(row.cells[col.id])):o.missing)+'</td>';
     });
@@ -144,4 +147,22 @@ function contractGridCollectCells(baseCells,columns,item,keepNumbers){
     else cells[col.id]=keepNumbers && had && typeof baseCells[col.id]==='number' && value.trim()!=='' && isFinite(Number(value))?Number(value):value;
   });
   return cells;
+}
+/* Rows editor collect for a grid contract block: rows keep everything else they had (hot, link, delta,
+   reveal); k and cells come from the editor. Numbers stay numbers only where the cell was a number. */
+function contractGridRowItems(fields,columns){
+  return fields.map(function(f,index){
+    var row={_sourceIndex:index,k:f.k};
+    columns.forEach(function(col,i){row['cell'+i]=panelOwn(f.cells,col.id)?contractGridCellText(f.cells[col.id]):'';});
+    return row;
+  });
+}
+function contractGridCollectRows(fields,columns,items){
+  return {value:items.map(function(item){
+    var base=fields[item._sourceIndex],next=base?JSON.parse(JSON.stringify(base)):{};
+    next.k=item.k;
+    var cells=contractGridCollectCells(base && base.cells,columns,item,true);
+    if(Object.keys(cells).length)next.cells=Object.assign({},cells);else delete next.cells;
+    return next;
+  })};
 }

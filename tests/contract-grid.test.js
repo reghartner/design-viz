@@ -6,7 +6,7 @@
 | R3 | Guard: the data-contract panel renders byte-identical HTML after its column/cell code moves to shared helpers. | three panels: full (bad widths, duplicate ids, non-object cells, highlights), empty, bare | sha256 of render HTML equals main 18c39baa | a refactor that changes panel output |
 | R0 | Guard: a classic block (no `columns`) renders byte-identical HTML. | legacy + block with hot, link, delta, reveal, skipped rows | sha256 equals main 18c39baa | grid code leaking into classic blocks |
 | V1 | Grid validation: duplicate column ids, more than 12 columns, column width under 40, undeclared cell key, non-scalar cell, cells without columns, v/g beside columns and a non-text fieldLabel warn with their paths; a valid grid has no warnings. | grid blocks | warnings by path; valid grid warnings deepEqual [] | grids that fail silently or warn on valid input |
-| R1 | A grid renders a real table named by the block title: caption, column headers (fieldLabel + labels), row headers (k), a dash for a missing cell, widths, inside a keyboard-focusable scroll region. | grid with 3 columns, 3 rows | caption text; th scope=col list; th scope=row list; dash count; colgroup widths; table width; region role/label/tabindex | v/g columns for a grid; an unnamed table; page-wide overflow |
+| R1 | A grid renders a real table named by the block title: caption, column headers (fieldLabel + labels), row headers (k, role=rowheader on the classic .ctk cell so skins apply), a dash for a missing cell, widths, inside a keyboard-focusable scroll region. | grid with 3 columns, 3 rows | caption text; th scope=col list; th scope=row list; dash count; colgroup widths; table width; region role/label/tabindex | v/g columns for a grid; an unnamed table; page-wide overflow |
 | R2 | Grid rows keep hot, delta badge, link, revealAt/hideAt and the row identity used by the Workbench. | grid rows with each flag | class, badge, link, data-dv-reveal-at/hide-at, data-dv-crow | grid rows that drop row behaviour |
 | C1 | Compatibility reports content.contract-grids only when a block has columns. | grid page; classic page | feature lists | grids invisible to older-viewer checks |
 | W1 | Planners: Add grid table; columns add/rename/reorder/remove (remove prunes cells and says how many); rows add/edit (numbers stay numbers only when they were); single cell edit; fieldLabel; classic → grid conversion (v → Value, g → Notes, only used columns) is lossless. | section with a classic block | resulting JSON; removal message; conversion result | lossy conversion; orphan cells; silent removal |
@@ -49,21 +49,21 @@ test('V1 grid blocks validate columns, cells and their neighbours',()=>{
   bad.columns.push({id:'yoda',label:'Again'},{id:'thin',width:12});
   for(let i=0;i<10;i++)bad.columns.push({id:'c'+i});
   bad.fields[0].cells.ghost=1;bad.fields[1].cells.jyn={n:1};bad.fields[2].v='old value';bad.fields[2].g='old meaning';
-  const warnings=warningsOf({heading:'Calls',contracts:[bad]}),at='page.sections[0].contracts[0]';
+  const warnings=warningsOf({heading:'Calls',contracts:[bad]}),at='sections[0].contracts[0]';
   for(const [needle,why] of [[at+'.fieldLabel','fieldLabel text'],[at+'.columns[3].id','duplicate column id'],[at+'.columns[4].width','width under 40'],[at+'.columns:','more than 12 columns'],
     [at+'.fields[0].cells.ghost','undeclared cell key'],[at+'.fields[1].cells.jyn','non-scalar cell'],[at+'.fields[2].v','v beside columns'],[at+'.fields[2].g','g beside columns']])
     assert.ok(warnings.some(w=>w.startsWith(needle)),why+': '+warnings.join(' | '));
   const orphan=warningsOf({heading:'Calls',contracts:[{title:'Classic',fields:[{k:'a',v:'1',cells:{x:1}}]}]});
-  assert.ok(orphan.some(w=>w.startsWith('page.sections[0].contracts[0].fields[0].cells')),'cells without columns: '+orphan.join(' | '));
+  assert.ok(orphan.some(w=>w.startsWith('sections[0].contracts[0].fields[0].cells')),'cells without columns: '+orphan.join(' | '));
 });
 
 test('R1 a grid block renders a real table named by its title, with a dash for a missing cell, in a scroll region',()=>{
   const html=C.contractBlocksHTML({contracts:[grid()]},'s');
-  assert.doesNotMatch(html,/class="ctv"|class="ctg"/,'no classic value/meaning columns');
+  assert.doesNotMatch(html,/class="ctv"|class="ctg"/,'no classic value/meaning columns (grid cells are ctv ctcell)');
   assert.match(html,/<caption[^>]*>Calls per location load<\/caption>/,'the table is named by the block title');
   const cols=[...html.matchAll(/<th scope="col"[^>]*>([^<]*)<\/th>/g)].map(m=>m[1]);
   assert.deepEqual(cols,['Scenario','Yoda','Jyn','Han']);
-  const rows=[...html.matchAll(/<th scope="row"[^>]*><span class="ctkey">([^<]*)<\/span>/g)].map(m=>m[1]);
+  const rows=[...html.matchAll(/<td class="ctk" role="rowheader"><span class="ctkey">([^<]*)<\/span>/g)].map(m=>m[1]);
   assert.deepEqual(rows,['SS3 location','SS2 location','Camera only']);
   assert.equal((html.match(/—/g)||[]).length,3,'three missing cells show a dash');
   assert.match(html,/<td[^>]*data-contract-cell="han"[^>]*>0<\/td>/,'zero is a value, not a missing cell');
@@ -78,7 +78,7 @@ test('R2 grid rows keep hot, delta, link, reveal and row identity',()=>{
   const g=grid();Object.assign(g.fields[1],{delta:'changed',link:'https://x.test/l',revealAt:2,hideAt:4});
   const html=C.contractBlocksHTML({contracts:[g]},'s');
   const row=i=>html.match(new RegExp('<tr[^>]*data-dv-crow="'+i+'"[^>]*>[\\s\\S]*?</tr>'))[0];
-  for(const i of [0,1,2])assert.match(row(i),/<th scope="row" class="ctk">/,'grid row '+i+' has a row header and cells');
+  for(const i of [0,1,2])assert.match(row(i),/<td class="ctk" role="rowheader">[\s\S]*<td class="ctv ctcell" data-contract-cell=/,'grid row '+i+' has a row header and cells');
   assert.match(row(0),/class="ctrow hot"/);
   assert.match(row(1),/class="ctrow delta-changed"/);assert.match(row(1),/class="ctdelta"[^>]*>changed</);
   assert.match(row(1),/class="ctlink" href="https:\/\/x.test\/l"/);

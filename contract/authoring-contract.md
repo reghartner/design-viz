@@ -366,8 +366,8 @@ flow moves:
 
 ### Multiple contract blocks and widths
 
-Use `section.contracts` for multiple independent field tables. Each block has
-all the fields described above, plus optional `id` and `span`:
+Use `section.contracts` for independent field tables. Each block has the fields
+above plus optional `id` and `span`; with `columns` it is a grid table (recipe):
 
 ```json
 "contracts": [
@@ -382,8 +382,8 @@ all the fields described above, plus optional `id` and `span`:
 
 `span` is the width in a 12-column grid: **4 = third, 6 = half, 8 = two-thirds,
 12 = full**. Omitted or invalid widths use 12. Two `span:6` blocks share a row;
-full-width blocks stack. Blocks fill left-to-right in source order and wrap
-when they no longer fit. A block's height follows its content. At content widths
+full-width blocks stack. Blocks fill in source order and wrap when they no
+longer fit. Heights follow content. At content widths
 of 720px or less, all blocks stack, including in ShadowRoot/Forge hosts.
 The legacy `contract` object can also use `span`.
 

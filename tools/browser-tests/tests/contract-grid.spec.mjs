@@ -3,7 +3,7 @@
 |---|---|---|---|---|
 | B1 | Reader: a grid block is a real table named by its title, with column and row headers and a dash for a missing cell. | section (no diagram) with a 3-column grid | getByRole('table', name = title); column headers; row headers; dash cell | k/v/g rows; an unnamed table |
 | B2 | Reader: a wide grid (12 columns × 160px) scrolls inside its block, not the page; the scroll region is keyboard-focusable; the same at 390px wide (reading only). | 12-column grid | region scrollWidth > clientWidth; scrollLeft moves; page has no horizontal overflow; region focusable | page-wide overflow; a grid that clips columns |
-| B3 | Reader: a grid row with revealAt:2 is hidden at step 1 and shown at step 2. | section with a diagram and two steps, grid row revealAt:2 | row hidden at s=send, visible at s=reply | grid rows that ignore step reveals |
+| B3 | Reader: a grid row with revealAt:1 (zero-based step index) is hidden at the first step and shown at the second. | section with a diagram and two steps, grid row revealAt:1 | row hidden at s=send, visible at s=reply | grid rows that ignore step reveals |
 | B4 | Workbench (desktop): Add grid table from the Add menu; Add column, reorder a column and edit a cell are each one Undo step; Use columns (grid) converts a classic block in one Undo step. | page with one classic block and a heading-only section | source after each edit and after its Undo | edits that need several Undo steps; no Add grid table entry |
 */
 import {writeFile} from 'node:fs/promises';
@@ -51,7 +51,7 @@ test('B2 reader wide grid scrolls inside its block, not the page, also at 390px'
 
 test('B3 reader step reveal shows a grid row at its step',async({page,server})=>{
   await page.setViewportSize({width:1280,height:900});
-  const g=grid();g.fields[2].revealAt=2;
+  const g=grid();g.fields[2].revealAt=1;
   const raw={page:{title:'Grid',sections:[{heading:'Calls',diagram:{nodes:{a:{title:'Doorbell'},b:{title:'Cloud'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],
     steps:[{id:'send',edge:'a->b',text:'Send.'},{id:'reply',edge:'a->b',text:'Reply.'}]},contracts:[g]}]}};
   let root=await reader(page,server,'grid-b3',raw,'#d=calls&m=step&s=send');

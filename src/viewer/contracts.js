@@ -15,6 +15,8 @@ function contractCardHTML(contract, sectionReference, record){
     h += '</div>';
   }
   var rows = Array.isArray(contract.fields) ? contract.fields : [];
+  // #1304: a block with a `columns` array is a grid; k is the row header, then one cell per column.
+  var grid = Array.isArray(contract.columns), gridRows = [];
   var body = '', renderedRow = 0;
   rows.forEach(function(f, fi){
     if (!f || typeof f !== 'object' || !f.k) return;
@@ -24,17 +26,28 @@ function contractCardHTML(contract, sectionReference, record){
       esc(f.k) + '">&#8599;</a>' : '';
     var delta = ['added','removed','changed'].indexOf(f.delta) >= 0 ? f.delta : null;
     var badge = delta ? ' <span class="ctdelta" aria-label="' + delta + ' field">' + delta + '</span>' : '';
-    body += '<tr class="ctrow' + (f.hot === true ? ' hot' : '') +
+    var attrs = ' class="ctrow' + (f.hot === true ? ' hot' : '') +
             (delta ? ' delta-' + delta : '') + '"' +
             ' data-dv-crow="' + fi + '"' + /* spec index — malformed rows are skipped, so the rendered position can lag it */
             (addressed ? ' id="contract-' + sectionAddress + '-row-' + renderedRow +
              '" tabindex="-1" aria-label="Contract field ' + esc(f.k) + '"' : '') +
-            fragmentAttrs(f) + '>' +
+            fragmentAttrs(f);
+    if (grid){ gridRows.push({attrs:attrs, head:'<span class="ctkey">' + esc(f.k) + link + '</span>' + badge, cells:f.cells}); return; }
+    body += '<tr' + attrs + '>' +
             '<td class="ctk"><span class="ctkey">' + esc(f.k) + link + '</span>' + badge + '</td>' +
             '<td class="ctv">' + (f.v != null ? esc(f.v) : '') + '</td>' +
             '<td class="ctg">' + (f.g != null ? proseMarkup(f.g) : '') + '</td></tr>';
   });
-  if (body) h += '<table class="cttable">' + body + '</table>';
+  if (grid){
+    var gridTitle = contract.title || 'On the wire';
+    h += '<div class="ctgrid-scroll" tabindex="0" role="region" aria-label="' + esc(gridTitle) + '">' +
+      contractGridTableHTML({tableClass:'cttable ctgrid', caption:gridTitle, captionClass:'ctgrid-caption', firstWidth:180,
+        fieldLabel:contractGridFieldLabel(contract.fieldLabel, 'Field'), columns:contractGridColumns(contract), rows:gridRows,
+        // Row headers and cells reuse the classic row classes, so every skin's row, hot and focus styles apply.
+        rowHead:'<td class="ctk" role="rowheader">', cellAttrs:function(col){ return ' class="ctv ctcell" data-contract-cell="' + esc(col.id) + '"'; },
+        missing:'<span class="ctmissing" aria-label="No value">—</span>'}) + '</div>';
+  }
+  else if (body) h += '<table class="cttable">' + body + '</table>';
   if (contract.note) h += '<div class="ctnote">' + proseMarkup(contract.note) + '</div>';
   h += '</div>';
   return h;

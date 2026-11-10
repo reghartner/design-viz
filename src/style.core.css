@@ -591,6 +591,17 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .ctnote{font:400 11px 'IBM Plex Sans',sans-serif; margin-top:7px;}
 .sk-aurora .ctnote{color:#5E7396;}
 .sk-daylight .ctnote{color:#8A8474;}
+/* #1304 grid contract blocks: the shared column/cell table scrolls sideways inside its block. Rows reuse
+   the classic .ctrow/.ctk/.ctv styles, so skins apply unchanged. */
+.ctgrid-scroll{max-width:100%; overflow-x:auto; scrollbar-width:thin;}
+.ctgrid-scroll:focus-visible{outline:2px solid currentColor; outline-offset:2px;}
+.cttable.ctgrid{table-layout:fixed; min-width:100%;}
+.ctgrid-caption{position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap;}
+.ctgrid thead th{padding:2px 10px 6px 6px; text-align:left; vertical-align:bottom; font:600 10px 'IBM Plex Mono',monospace;
+  letter-spacing:.06em; text-transform:uppercase; opacity:.7; overflow-wrap:anywhere;}
+.ctgrid td{white-space:normal; overflow-wrap:anywhere;}
+.contract-grid .ctgrid .ctk,.contract-grid .ctgrid .ctv{width:auto;}
+.ctmissing{opacity:.45;}
 /* lane pill on the caption line */
 .lanepill{font:700 9.5px 'IBM Plex Mono',monospace; letter-spacing:.08em; padding:2px 7px;
   border-radius:999px; border:1px solid currentColor; margin-right:8px;}

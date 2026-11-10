@@ -1,7 +1,7 @@
 /* #1265 part B: an agent's snapshot (tools/live-snapshot.js) shown in the desktop Workbench preview.
 | row | fixture | assertion (scoped) | rejects |
 |---|---|---|---|
-| W1 Load snapshot | the doorbell example board pasted; File → Load snapshot… with a snapshot file | the "Snapshot from <time>" checkbox appears checked beside Demo live status; carriers wear the snapshot states; the Epic status connection line reads "Snapshot from …" with data-state snapshot; the Metrics line reads "Metrics: snapshot from …"; the ingest carrier has a metrics card; Demo turns Snapshot off and Snapshot turns Demo off | snapshot data shown as Demo or as live; a control that only appears in the source |
+| W1 Load snapshot | the doorbell example board pasted; File → Load snapshot… with a snapshot file | the "Snapshot from <time>" checkbox appears checked beside Demo live status; carriers wear the snapshot states; the Epic status connection line reads "Snapshot from …" with data-state snapshot; the Metrics line reads "Metrics: snapshot from …"; the bound edge mcu → ingest has a metrics card showing the snapshot's rate (cards are drawn on edges; nodes get cues); Demo turns Snapshot off and Snapshot turns Demo off | snapshot data shown as Demo or as live; a control that only appears in the source |
 | W2 never exported | W1, then Export project | the editor source is unchanged and no exported file holds a snapshot title, assignee or the snapshot kind | snapshot data leaking into a saved, exported or published board |
 | W3 offered next to the board | a working folder holding doorbell.spec.json and doorbell.snapshot.json | after Choose working folder… the "Snapshot from <time>" checkbox is offered unchecked and the carriers are not painted; checking it paints them | a snapshot that turns itself on |
 All three fail at the baseline: there is no Load snapshot… control and no Snapshot choice. */
@@ -20,7 +20,7 @@ function snapshotFile(){
  return {version:1,kind:'flowview-live-snapshot',snapshotAt:AT,board:'doorbell.spec.json',intervalSeconds:6,epics:{'DOOR-100':{summary:'Doorbell epic from the snapshot'}},
   days:[{label:'Snapshot from '+AT,issues:{'HW-123':issue('done','Snapshot title HW-123'),'FW-45':issue('blocked','Snapshot title FW-45'),'FW-46':issue('active','Snapshot title FW-46'),
    'HW-124':issue('done','Snapshot title HW-124'),'BE-67':issue('active','Snapshot title BE-67'),'BE-68':issue('todo','Snapshot title BE-68'),'UX-89':issue('todo','Snapshot title UX-89')},
-   telemetry:{start:'2026-11-10T10:44:00.000Z',stepSeconds:360,carriers:{ingest:{rate:{values,unit:'req/h'},errors:{values:[0,0,1],unit:'req/h'}}}}}],errors:[]};
+   telemetry:{start:'2026-11-10T10:44:00.000Z',stepSeconds:360,carriers:{ingest:{rate:{values,unit:'req/h'},errors:{values:[0,0,1],unit:'req/h'}},'mcu->ingest':{rate:{values:[1200,1350,1462],unit:'req/h'},errors:{values:[0,0,0],unit:'req/h'}}}}}],errors:[]};
 }
 const node=(view,id)=>view.locator('g.node[data-dv-node="'+id+'"]').first();
 const snapshotToggle=page=>page.getByRole('checkbox',{name:/^Snapshot from /});
@@ -44,7 +44,7 @@ test('W1 W2 File → Load snapshot shows the snapshot as Snapshot from <time>, a
  await expect(node(view,'mcu')).toHaveClass(/dv-live-blocked/);await expect(node(view,'button')).toHaveClass(/dv-live-done/);
  const connection=panel.locator('.dv-live-connection');await expect(connection).toHaveAttribute('data-state','snapshot');await expect(connection).toHaveText(/^Snapshot from /);
  await expect(panel.locator('.dv-live-metrics-connection')).toHaveText(/^Metrics: snapshot from /);
- await expect(view.locator('g.dv-metrics-card[data-metrics-card="ingest"]')).toHaveCount(1);
+ const card=view.locator('g.dv-metrics-card[data-metrics-card="mcu->ingest"]');await expect(card).toHaveCount(1);await expect(card).toContainText(/1[,.]?462/);
  await expect(panel.locator('tr[data-live-ticket="FW-45"] .dv-live-ticket-title')).toHaveText('Snapshot title FW-45');
  await page.screenshot({path:info.outputPath('snapshot-workbench.png')});
  // One choice at a time.

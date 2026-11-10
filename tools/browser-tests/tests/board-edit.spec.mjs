@@ -473,7 +473,7 @@ test('E20 outside Edit mode and for read-only viewers a marked carrier popover h
 | row | fixture | assertion (scoped) | rejects |
 |---|---|---|---|
 | E21 edit controls hand focus on | boardSpec | Enter on Edit focuses Done; Enter on Done focuses Edit; after a drop, Enter on Save focuses Edit once the save re-renders the board; after another drop, Enter on Discard focuses Edit | focus left on <body> after the pressed control hides |
-| E22 popover edits return focus to the carrier | boardSpec with A holding AA-1 and EX-1 | Enter on Remove AA-1 in A's popover focuses A's card in the re-rendered board; Remove EX-1 (A's last ticket) focuses "Save 2 changes" | focus left on <body> after the re-render |
+| E22 popover edits return focus to the carrier | boardSpec with edge A → B holding EX-1 | Enter on Remove AA-1 in A's popover focuses A's card in the re-rendered board (A keeps its work-status button); Remove EX-1 from the edge (no button without tickets) focuses "Save 2 changes" | focus left on <body> after the re-render |
 Both fail at the baseline on the focus assertion: no code moves focus. */
 // The focused element, through any shadow roots.
 const focusedControl=page=>page.evaluate(()=>{
@@ -503,16 +503,16 @@ test('E21 #1253 Edit, Done, Save and Discard hand keyboard focus to the control 
  await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Edit'});
 });
 test('E22 #1253 Remove in a carrier popover returns keyboard focus to the carrier after the board re-renders',async({page,server})=>{
- const spec=boardSpec();diagramAt(spec).nodes.a.tickets=['AA-1','EX-1'];
+ const spec=boardSpec();diagramAt(spec).edges[0].tickets=['EX-1'];
  const board=await buildBoard(server,'focus-remove',spec);await mockRuntime(page);
  const {root,panel}=await openBoard(page,board);await startEditing(panel);
  await nodeCard(root,'a').press('Enter');let pop=popover(page);await expect(pop).toBeVisible();
  await pop.getByRole('button',{name:'Remove AA-1 from Alpha service',exact:true}).press('Enter');
  await expect(saveButton(panel)).toHaveText('Save 1 change');
  await expect.poll(()=>focusedControl(page)).toMatchObject({node:'a',card:true});
- // Removing A's last ticket leaves no ticket button on A: focus goes to Save, which shows the count.
- await page.keyboard.press('Enter');pop=popover(page);await expect(pop).toBeVisible();
- await pop.getByRole('button',{name:'Remove EX-1 from Alpha service',exact:true}).press('Enter');
+ // An edge without tickets is no button: focus goes to Save, which shows the count.
+ await edgeLabel(root,0).press('Enter');pop=popover(page);await expect(pop).toBeVisible();
+ await pop.getByRole('button',{name:'Remove EX-1 from calls',exact:true}).press('Enter');
  await expect(saveButton(panel)).toHaveText('Save 2 changes');
  await expect.poll(()=>focusedControl(page)).toMatchObject({tag:'button',text:'Save 2 changes'});
 });

@@ -453,13 +453,13 @@ test('R1 edge lines halos and live break glyphs open their own tickets through o
  }
  assert.equal(line.getAttribute('tabindex'),null);assert.equal(halo.getAttribute('tabindex'),null);assert.equal(label.getAttribute('tabindex'),'0');
  api.setEnabled(false);assert.ok(h.view.querySelectorAll('.dv-live-pointer').length>0);click(line);assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
- api.setEnabled(true);click(line);assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);
+ api.setEnabled(true);click(line);assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
  api.clear();assert.equal(h.view.querySelectorAll('.dv-live-comm-failure').length,0);click(line);assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);assert.equal(h.view.querySelector('.dv-live-ticket-state').textContent,'No status');h.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
  api.apply({'EE-1':{state:'done'}});h.ctl.sections[0].sectionEl.dispatchEvent({type:'dv:pathrender'});h.flush();click(line);assert.equal(h.view.querySelector('.dv-live-popover').hidden,false);
  api.destroy();assert.equal(h.view.querySelectorAll('.dv-live-pointer,.dv-live-target').length,0);
  const u=harness(data);u.view.querySelector('text.lbl').remove();u.ctl.liveStatus.apply({'EE-1':{state:'done'}});
  const path=u.view.querySelector('path.edge');assert.equal(path.getAttribute('tabindex'),'0');assert.equal(u.view.querySelector('path.halo').getAttribute('tabindex'),null);
- u.view.dispatchEvent({type:'click',target:path,button:0,preventDefault(){},stopPropagation(){}});assert.equal(u.view.querySelector('.dv-live-popover').hidden,false);
+ u.view.dispatchEvent({type:'click',target:path,button:0,preventDefault(){},stopPropagation(){}});assert.equal(u.view.querySelector('.dv-live-popover').hidden,false);u.doc.dispatchEvent({type:'keydown',key:'Escape',preventDefault(){},stopPropagation(){}});
  u.ctl.liveStatus.apply(fixed);const breakTarget=u.view.querySelector('.dv-live-comm-failure');assert.equal(path.getAttribute('tabindex'),null);assert.equal(breakTarget.getAttribute('tabindex'),'0');assert.equal(breakTarget.getAttribute('role'),'button');
  u.view.dispatchEvent({type:'keydown',target:breakTarget,key:'Enter',preventDefault(){},stopPropagation(){}});assert.equal(u.view.querySelector('.dv-live-popover').hidden,false);
  u.ctl.liveStatus.clear();assert.equal(u.view.querySelectorAll('.dv-live-comm-failure').length,0);assert.equal(path.getAttribute('tabindex'),'0');
@@ -4711,11 +4711,15 @@ test('#1253 item 15 Remove and Clear Missing work return focus to the edited car
   pop=b.h.view.querySelector('.dv-live-popover');press(pop.querySelector('button.dv-live-clear-missing'));b.runTimers();
   assert.equal(b.editor.state().pending,2,'the marker was cleared');
   assert.ok(focus.el===cardOf(b.h,'c'),'focus is on the cleared node');
-  // Removing the last ticket leaves no popover button on the carrier: focus goes to Save, which shows the new count.
+  // A node without tickets keeps its work-status button, so it takes focus too.
   carrierClick(b.h,cardOf(b.h,'a'));
   pop=b.h.view.querySelector('.dv-live-popover');press(pop.querySelector('button.dv-live-remove'));b.runTimers();
-  assert.equal(b.editor.state().pending,3);assert.equal(cardOf(b.h,'a').classList.contains('dv-live-target'),false,'precondition: node a is no longer a ticket button');
-  assert.ok(focus.el===b.control('save'),'focus falls back to Save');assert.equal(b.control('save').textContent,'Save 3 changes');
+  assert.equal(b.editor.state().pending,3);assert.ok(focus.el===cardOf(b.h,'a'),'focus is on the node that lost its last ticket');
+  // An edge without tickets is no button at all: focus goes to Save, which shows the new count.
+  carrierClick(b.h,b.h.view.querySelector('text.lbl'));
+  pop=b.h.view.querySelector('.dv-live-popover');assert.ok(pop.getAttribute('aria-label').startsWith('Live tickets for '),'the edge popover is open');press(pop.querySelector('button.dv-live-remove'));b.runTimers();
+  assert.equal(b.editor.state().pending,4);assert.equal(b.h.view.querySelectorAll('.dv-live-target').some(el=>el.getAttribute('data-dv-edge')!=null),false,'precondition: the edge is no longer a button');
+  assert.ok(focus.el===b.control('save'),'focus falls back to Save');assert.equal(b.control('save').textContent,'Save 4 changes');
   b.h.ctl.liveStatus.destroy();
  }finally{focus.restore();}
 });

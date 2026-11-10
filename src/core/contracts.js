@@ -76,3 +76,72 @@ function edgeJsonContracts(diagram,step){
   });
   return out;
 }
+
+/* #1304: the column and cell shape shared by the data-contract panel and grid
+   contract blocks (`columns` plus per-row `cells`). Each host supplies its own
+   classes and row headers; the table structure, widths and cell text are here. */
+var CONTRACT_GRID_MAX_COLUMNS=12;
+function contractGridWidth(value,fallback){return typeof value==='number' && isFinite(value) && value>=40?value:fallback;}
+function contractGridColumns(value){return panelCollectionItems(value,'columns',CONTRACT_GRID_MAX_COLUMNS);}
+function contractGridCellText(value){return value===undefined?'':value===null?'null':typeof value==='object'?JSON.stringify(value):String(value);}
+function contractGridFieldLabel(value,fallback){return typeof value==='string' && value.trim()?value:fallback;}
+function contractGridColumnWarnings(value,path,warnings){
+  panelCollectionWarnings(value,path,warnings,'columns',CONTRACT_GRID_MAX_COLUMNS,function(col,at,warnings){
+    if(col.width!=null && contractGridWidth(col.width,null)===null)warnings.push(at+'.width: use a width of at least 40 pixels — using 160');
+  });
+}
+/* o: {tableClass, caption, captionClass, firstWidth, fieldLabel, columns, rows:[{attrs, head, cells}],
+   headAttrs?, cellAttrs?(column), missing, empty?}. Strings in head/attrs/missing/empty are HTML. */
+function contractGridTableHTML(o){
+  var total=o.columns.reduce(function(sum,col){return sum+contractGridWidth(col.width,160);},o.firstWidth);
+  var h='<table class="'+o.tableClass+'" style="width:'+total+'px"><caption class="'+o.captionClass+'">'+esc(o.caption)+
+    '</caption><colgroup><col style="width:'+o.firstWidth+'px">';
+  o.columns.forEach(function(col){h+='<col style="width:'+contractGridWidth(col.width,160)+'px">';});
+  h+='</colgroup><thead><tr><th scope="col">'+esc(o.fieldLabel)+'</th>';
+  o.columns.forEach(function(col){h+='<th scope="col">'+esc(col.label || col.id)+'</th>';});
+  h+='</tr></thead><tbody>';
+  o.rows.forEach(function(row){
+    h+='<tr'+row.attrs+'><th scope="row"'+(o.headAttrs || '')+'>'+row.head+'</th>';
+    o.columns.forEach(function(col){
+      h+='<td'+(o.cellAttrs?o.cellAttrs(col):'')+'>'+(panelOwn(row.cells,col.id)?esc(contractGridCellText(row.cells[col.id])):o.missing)+'</td>';
+    });
+    h+='</tr>';
+  });
+  if(!o.rows.length && o.empty)h+=o.empty;
+  return h+'</tbody></table>';
+}
+/* Editor projection and collect for a Columns rows editor: renames keep ids, new columns get an id
+   from their name, widths of at least 40 px. */
+function contractGridMintId(used,label,fallback){
+  var stem=String(label).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || fallback,id=stem,suffix=2;
+  while(used[id])id=stem+'-'+suffix++;
+  used[id]=true;return id;
+}
+function contractGridColumnRows(columns){
+  return columns.map(function(item,index){return {_sourceIndex:index,label:item.label || item.id,width:item.width};});
+}
+function contractGridCollectColumns(original,items){
+  var used=Object.create(null),error;
+  original.forEach(function(item){used[item.id]=true;});
+  var out=items.map(function(item){
+    var base=original[item._sourceIndex],next=Object.assign(Object.create(null),base);
+    if(!base)next.id=contractGridMintId(used,item.label,'column');
+    if(!base || item.label!==(base.label || base.id))next.label=item.label;
+    if(item.width!==undefined && contractGridWidth(item.width,null)===null)error='Column widths must be at least 40 pixels.';
+    if(item.width===undefined)delete next.width;else next.width=item.width;
+    return next;
+  });
+  return error?{error:error}:{value:out};
+}
+/* One row's cells from editor inputs cell0..cellN; an emptied input removes the cell. keepNumbers keeps
+   a number when the cell was a number and the new text is numeric; otherwise cells are text. */
+function contractGridCollectCells(baseCells,columns,item,keepNumbers){
+  var cells=Object.assign(Object.create(null),baseCells);
+  columns.forEach(function(col,i){
+    var value=item['cell'+i] || '',had=panelOwn(baseCells,col.id),prior=had?contractGridCellText(baseCells[col.id]):'';
+    if(value===prior.trim())return;
+    if(value==='')delete cells[col.id];
+    else cells[col.id]=keepNumbers && had && typeof baseCells[col.id]==='number' && value.trim()!=='' && isFinite(Number(value))?Number(value):value;
+  });
+  return cells;
+}

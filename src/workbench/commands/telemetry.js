@@ -35,6 +35,18 @@ function telemetryRenameKey(object,from,to){
   var out={};Object.keys(object).forEach(function(key){out[key===from?to:key]=object[key];});return out;
 }
 function telemetryDropEmpty(object,key){if(telemetryObject(object[key]) && !Object.keys(object[key]).length)delete object[key];}
+/* #1255: a renamed signal (next) or a removed one (next null) carries its proof limit and
+   every maxRatioOf reference with it; limits and a proof left empty are dropped. */
+function telemetryProofSignal(binding,name,next){
+  if(!telemetryObject(binding) || !telemetryObject(binding.proof))return binding;
+  if(telemetryOwn(binding.proof,name)){if(next==null)delete binding.proof[name];else binding.proof=telemetryRenameKey(binding.proof,name,next);}
+  Object.keys(binding.proof).forEach(function(key){
+    var limit=binding.proof[key];if(!telemetryObject(limit) || limit.maxRatioOf!==name)return;
+    if(next!=null){limit.maxRatioOf=next;return;}
+    delete limit.maxRatioOf;if(!Object.keys(limit).length)delete binding.proof[key];
+  });
+  telemetryDropEmpty(binding,'proof');return binding;
+}
 function telemetryParams(value){
   var list=Array.isArray(value)?value.slice():typeof value==='string'?value.split(/[\s,]+/).filter(Boolean):value==null?[]:null;
   if(!list)return {error:'List parameter names separated by commas.'};
@@ -116,8 +128,7 @@ function telemetryEditBinding(binding,edit,options){
     if(!telemetryOwn(signals,name))return {error:'Signal "'+name+'" not found. Render and select it again.'};
     if(op==='removeSignal'){
       if(asTemplate && Object.keys(signals).length===1)return {error:'A template needs at least one signal; remove the template instead.'};
-      delete signals[name];
-      if(telemetryObject(b.proof)){delete b.proof[name];telemetryDropEmpty(b,'proof');}
+      delete signals[name];telemetryProofSignal(b,name,null);
       if(!asTemplate && !Object.keys(signals).length)return {value:null};
       return {value:b};
     }
@@ -125,11 +136,7 @@ function telemetryEditBinding(binding,edit,options){
     if(edit.field==='name'){
       var renamed=telemetrySignalName(edit.value,signals,name);if(renamed.error)return renamed;
       if(renamed.value===name)return {value:b};
-      b.signals=telemetryRenameKey(signals,name,renamed.value);
-      if(telemetryObject(b.proof)){
-        if(telemetryOwn(b.proof,name))b.proof=telemetryRenameKey(b.proof,name,renamed.value);
-        Object.keys(b.proof).forEach(function(key){var limit=b.proof[key];if(telemetryObject(limit) && limit.maxRatioOf===name)limit.maxRatioOf=renamed.value;});
-      }
+      b.signals=telemetryRenameKey(signals,name,renamed.value);telemetryProofSignal(b,name,renamed.value);
       return {value:b};
     }
     if(edit.field==='source'){
@@ -327,18 +334,20 @@ function telemetryEditPage(telemetry,edit){
 }
 function telemetryPageTemplates(raw){var doc=builderDocumentPage(raw);return trackingTelemetry(doc && doc.page).templates;}
 /* Every authored carrier (and consumer overlay entry) that names a template. */
-function telemetryTemplateUses(raw,name){
-  var count=0;
-  function check(value){if(telemetryObject(value) && telemetryObject(value.telemetry) && value.telemetry.use===name)count++;}
+function telemetryTemplateUses(raw,name){return telemetryTemplateCarriers(raw,name).length;}
+/* The authored homes (local nodes and edges, import overlay entries) whose telemetry uses a template. */
+function telemetryTemplateCarriers(raw,name){
+  var found=[];
   specSectionPaths(raw).forEach(function(rec){
     var d=specValueAt(raw,rec.diagram);if(!telemetryObject(d))return;
-    if(telemetryObject(d.nodes))Object.keys(d.nodes).forEach(function(id){check(d.nodes[id]);});
-    (Array.isArray(d.edges)?d.edges:[]).forEach(check);
-    (Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp){
-      ['nodeTracking','edgeTracking'].forEach(function(field){if(telemetryObject(imp && imp[field]))Object.keys(imp[field]).forEach(function(key){check(imp[field][key]);});});
+    function check(value,path){if(telemetryObject(value) && telemetryObject(value.telemetry) && value.telemetry.use===name)found.push({path:rec.diagram.concat(path),telemetry:value.telemetry});}
+    if(telemetryObject(d.nodes))Object.keys(d.nodes).forEach(function(id){check(d.nodes[id],['nodes',id]);});
+    (Array.isArray(d.edges)?d.edges:[]).forEach(function(edge,i){check(edge,['edges',i]);});
+    (Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp,i){
+      ['nodeTracking','edgeTracking'].forEach(function(field){if(telemetryObject(imp && imp[field]))Object.keys(imp[field]).forEach(function(key){check(imp[field][key],['topologyImports',i,field,key]);});});
     });
   });
-  return count;
+  return found;
 }
 /* Resolve the selected node or connection to its authored home: the local
    carrier, or the consumer overlay entry of an authored topology import. A
@@ -401,9 +410,30 @@ function planPageTelemetry(text,raw,edit){
   if(edit && edit.op==='enabled' && doc.page.tracking!=null && !tracking)return {error:'Tracking is not an object; repair it in JSON first.'};
   var result=telemetryEditPage(current,edit);if(result.error)return result;
   if(JSON.stringify(result.value)===JSON.stringify(telemetryObject(current)?current:null) && (result.value!=null || current===undefined))return {text:text};
-  if(!tracking)return result.value==null?{text:text}:planSetField(text,raw,doc.path,'tracking',JSON.stringify({telemetry:result.value},null,2));
-  if(result.value==null && Object.keys(tracking).every(function(key){return key==='telemetry';}))return planSetField(text,raw,doc.path,'tracking',null);
-  return planSetField(text,raw,doc.path.concat(['tracking']),'telemetry',result.value==null?null:JSON.stringify(result.value,null,2));
+  var plan;
+  if(!tracking)plan=result.value==null?{text:text}:planSetField(text,raw,doc.path,'tracking',JSON.stringify({telemetry:result.value},null,2));
+  else if(result.value==null && Object.keys(tracking).every(function(key){return key==='telemetry';}))plan=planSetField(text,raw,doc.path,'tracking',null);
+  else plan=planSetField(text,raw,doc.path.concat(['tracking']),'telemetry',result.value==null?null:JSON.stringify(result.value,null,2));
+  return plan.error?plan:telemetryTemplateSignalCarriers(plan,raw,current,result.value,edit);
+}
+/* #1255: renaming or removing a template signal moves or drops the limits that carriers
+   using the template set on it (proof keys and maxRatioOf), in the same plan and Undo step. */
+function telemetryTemplateSignalCarriers(plan,raw,before,after,edit){
+  var inner=edit && edit.op==='template' && edit.edit;
+  if(!inner || !(inner.op==='removeSignal' || inner.op==='signal' && inner.field==='name'))return plan;
+  function signals(page){var t=telemetryObject(page) && telemetryObject(page.templates) && page.templates[edit.template];return t && telemetryObject(t.signals)?Object.keys(t.signals):null;}
+  var was=signals(before),now=signals(after);if(!was || !now || now.indexOf(inner.name)>=0)return plan;
+  var next=inner.op==='removeSignal'?null:now.filter(function(key){return was.indexOf(key)<0;})[0];
+  if(inner.op!=='removeSignal' && !next)return plan;
+  var text=plan.text;
+  telemetryTemplateCarriers(raw,edit.template).forEach(function(carrier){
+    if(plan.error || !telemetryObject(carrier.telemetry.proof))return;
+    var updated=telemetryProofSignal(telemetryClone(carrier.telemetry),inner.name,next);
+    if(JSON.stringify(updated)===JSON.stringify(carrier.telemetry))return;
+    var step=planSetField(text,JSON.parse(text),carrier.path,'telemetry',JSON.stringify(updated,null,2));
+    if(step.error){plan=step;return;}text=step.text;
+  });
+  return plan.error?plan:{text:text};
 }
 /* Read model for the carrier editor. warnings are the validator's #937
    messages for this carrier, relative to it ('telemetry.signals.rate: …'). */

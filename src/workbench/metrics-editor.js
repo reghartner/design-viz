@@ -5,7 +5,7 @@
    o.commit(edit) and one accepted edit is one Undo step. Nothing here runs a
    query or draws on the canvas; preview rendering has its own owner. */
 function flowMetricsDom(o){
-  var doc=o.document,c=o.controls;
+  var doc=o.document,c=o.controls,drafts=o.drafts || new Map();
   function el(tag,cls,text){var node=doc.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node;}
   function note(parent,text,cls){var p=el('p','fnote'+(cls?' '+cls:''),text);parent.appendChild(p);return p;}
   // Each control carries its row label as its accessible name; a <label> around a <select> would include the option text.
@@ -19,8 +19,16 @@ function flowMetricsDom(o){
     if(kind==='text')input.type='text';
     (options || []).forEach(function(option){var item=el('option',null,option[1]);item.value=option[0];input.appendChild(item);});
     if(value!=null)input.value=value;
-    return row(parent,label,input);
+    return kept(row(parent,label,input),label);
   }
+  /* #1255: unsaved New … fields survive a same-selection re-render (o.drafts is inspector-owned
+     and cleared when the selection changes); a successful add forgets them. */
+  function kept(input,key){
+    var k='metrics:'+key;if(drafts.has(k))input.value=drafts.get(k);
+    function keep(){drafts.set(k,input.value);}
+    o.listen(input,'input',keep);o.listen(input,'change',keep);return input;
+  }
+  function forget(keys){keys.forEach(function(key){drafts.delete('metrics:'+key);});}
   function warnings(parent,list,label){
     if(!list.length)return;
     var ul=el('ul','metrics-warnings');ul.setAttribute('aria-label',label);
@@ -58,7 +66,9 @@ function flowMetricsDom(o){
     nameInput.placeholder='rate, errors, lag';unit.placeholder='req/h, msgs, ms';
     function submit(){
       var edit={op:'addSignal',name:nameInput.value.trim(),source:source.value,query:query.value,unit:unit.value.trim() || null};
-      if(extra)extra(edit);return commit(edit);
+      if(extra)extra(edit);var ok=commit(edit);
+      if(ok)forget(['name','source','query','unit'].map(function(field){return label+' '+field;}).concat(extra?['Metrics kind']:[]));
+      return ok;
     }
     [nameInput,unit].forEach(function(input){o.listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();submit();}});});
     add.appendChild(c.action(prefix?'Add '+prefix+'signal':'Add signal',submit));
@@ -78,7 +88,7 @@ function flowMetricsDom(o){
       row(parent,label,c.text(telemetryObject(links)?links[link[0]]:null,function(v){return commit({op:'link',key:link[0],value:v});},{placeholder:placeholders && placeholders[link[0]]?'Template: '+placeholders[link[0]]:'https://…'}));
     });
   }
-  return {el:el,note:note,row:row,relabel:relabel,group:group,fold:fold,draft:draft,warnings:warnings,signalEditors:signalEditors,proofEditors:proofEditors,linkEditors:linkEditors,sourceOptions:sourceOptions};
+  return {el:el,note:note,row:row,relabel:relabel,group:group,fold:fold,draft:draft,kept:kept,forget:forget,drafts:drafts,warnings:warnings,signalEditors:signalEditors,proofEditors:proofEditors,linkEditors:linkEditors,sourceOptions:sourceOptions};
 }
 
 /* o: {document, state: telemetryCarrierState(...), controls:{row,text,select,number,action}, listen, commit(edit)} */
@@ -100,14 +110,18 @@ function createFlowMetricsEditor(o){
   // An imported carrier that inherits a provider binding is bound; only a carrier with neither is unbound.
   if(!b && !s.inherited)d.note(box,'Unbound: no metrics overlay and no proof verdict. Choose a kind, then add a signal'+(templateNames.length?' or pick a template':'')+'.','metrics-status');
   // An unbound carrier's kind is a draft: it is written with the first signal or template.
-  var draftKind='call',template=s.mode==='template';
+  // #1255: a carrier that inherits a provider binding starts from the inherited kind.
+  var inheritedKind=!b && telemetryObject(s.inherited) && TELEMETRY_KINDS.indexOf(s.inherited.kind)>=0?s.inherited.kind:null;
+  var savedKind=d.drafts.get('metrics:Metrics kind'),draftKind=!b && TELEMETRY_KINDS.indexOf(savedKind)>=0?savedKind:inheritedKind || 'call',template=s.mode==='template';
   var kind=c.select(TELEMETRY_KINDS,b?(typeof b.kind==='string'?b.kind:''):draftKind,function(v){
-    if(!b){draftKind=v || 'call';return true;}
+    if(!b){draftKind=v || 'call';d.drafts.set('metrics:Metrics kind',draftKind);return true;}
     return commit({op:'kind',value:v});
   },!!b && template);
-  d.row(box,'Metrics kind',d.relabel(kind,{'':'(template kind'+(s.templateBase && typeof s.templateBase.kind==='string'?': '+s.templateBase.kind:'')+')'}));
+  var kindLabels={'':'(template kind'+(s.templateBase && typeof s.templateBase.kind==='string'?': '+s.templateBase.kind:'')+')'};
+  if(inheritedKind)kindLabels[inheritedKind]=inheritedKind+' (inherited)';
+  d.row(box,'Metrics kind',d.relabel(kind,kindLabels));
   if(templateNames.length || template){
-    d.row(box,'Signals from',d.relabel(c.select(templateNames,template?s.template:'',function(v){return commit({op:'use',name:v,kind:draftKind});},true),{'':'Raw signals'}));
+    d.row(box,'Signals from',d.relabel(c.select(templateNames,template?s.template:'',function(v){var ok=commit({op:'use',name:v,kind:draftKind});if(ok && v)d.forget(['Metrics kind']);return ok;},true),{'':'Raw signals'}));
   }
   if(template){
     var chosen=s.templates[s.template],effective=s.effective;
@@ -166,7 +180,7 @@ function createFlowMetricsSettings(o){
     set.appendChild(c.action('Remove environment '+id,function(){return commit({op:'removeEnvironment',name:id});}));
   });
   var environmentName=d.draft(environments,'New environment id','text',null,'');environmentName.placeholder='qa, stg or prd';
-  function addEnvironment(){return commit({op:'addEnvironment',name:environmentName.value.trim()});}
+  function addEnvironment(){var ok=commit({op:'addEnvironment',name:environmentName.value.trim()});if(ok)d.forget(['New environment id']);return ok;}
   o.listen(environmentName,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addEnvironment();}});
   environments.appendChild(c.action('Add environment',addEnvironment));
   d.row(box,'Metrics window',c.text(typeof t.window==='string'?t.window:t.window==null?null:JSON.stringify(t.window),function(v){return commit({op:'window',value:v});},{placeholder:'24h'}));
@@ -193,8 +207,10 @@ function createFlowMetricsSettings(o){
   var source=d.draft(add,'New template signal source','select',d.sourceOptions,'grafana'),query=d.draft(add,'New template signal query','textarea',null,''),unit=d.draft(add,'New template signal unit','text',null,'');
   name.placeholder='kafka-topic';params.placeholder='topic, group';signal.placeholder='lag';
   function submit(){
-    return commit({op:'addTemplate',name:name.value.trim(),kind:kind.value || null,params:params.value,
+    var ok=commit({op:'addTemplate',name:name.value.trim(),kind:kind.value || null,params:params.value,
       signal:{name:signal.value.trim(),source:source.value,query:query.value,unit:unit.value.trim() || null}});
+    if(ok)d.forget(['name','kind','parameters','signal name','signal source','signal query','signal unit'].map(function(field){return 'New template '+field;}));
+    return ok;
   }
   [name,params,signal,unit].forEach(function(input){o.listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();submit();}});});
   add.appendChild(c.action('Add template',submit));

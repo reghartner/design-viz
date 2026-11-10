@@ -933,7 +933,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
         carrierTarget(card,edge.from+'->'+edge.to,edge,appearance,binding.page.tracking,edge.label || edge.from+' → '+edge.to,c && c.waiting,c && c.availability,binding.ordinal!=null?{section:binding.ordinal,kind:'edge',index:index}:null,null,!workPaint);
         carrierPointer(path,card);carrierPointer(path.closest('svg').querySelector('path.halo[data-dv-edge="'+index+'"]'),card);
       },telemetry.config());
-      scope.querySelectorAll('svg').forEach(function(svg){if(svg._layoutStatusCoins)svg._layoutStatusCoins();});
+      scope.querySelectorAll('svg').forEach(function(svg){
+        if(svg._layoutStatusCoins)svg._layoutStatusCoins();
+        // #1255: Workbench Preview metrics layout grows the diagram frame to fit its cards, as the
+        // live overlay does after painting its cues, so a card below its edge is not clipped.
+        if(cardsView && cardsView.preview && svg._refreshStatusFrame)svg._refreshStatusFrame();
+      });
     });
   }
   // A named connector (#943: 'Grafana') reads "<source> connected · <window> window · refreshed <time>".

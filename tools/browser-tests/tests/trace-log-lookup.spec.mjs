@@ -126,6 +126,7 @@ test('desktop three authored log searches are three labeled boxes; Find on the s
  await expect(h.logs.locator('[data-log-search="device"] .dv-trace-log-row')).toHaveCount(1);
  expect(h.calls.map(c=>[c.tool,c.args.logql])).toEqual([['query_loki_logs','{env="stg"} |= "Handling camera stats message" | deviceId="cam-7"\n| trace_id =~ "[0-9a-fA-F]{16,32}"']]);
  at=await seen();expect(at.map(b=>b.rows),'results under the box that ran only').toEqual([0,1,0,0]);
+ expect(await h.root.evaluate(host=>{const a=host.shadowRoot && host.shadowRoot.activeElement || document.activeElement;return a && a.matches('button.dv-trace-log-find') && a.closest('[data-log-search]').getAttribute('data-log-search');}),'focus stays on the Find that ran').toBe('device');
  const device=at[1];expect(device.rowTops[0],'directly under its controls, inside the box').toBeGreaterThan(device.top);expect(device.bottom,'above the next box').toBeLessThanOrEqual(at[2].top+1);
  await info.attach('log-search-boxes',{body:await h.root.screenshot(),contentType:'image/png'});
  // Enter in the first box runs its Find; the list moves under it.

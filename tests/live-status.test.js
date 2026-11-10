@@ -4194,12 +4194,13 @@ test('#1173 #1230 a picked example trace keeps the search open and collapses the
    without a $value slot shows only its button; the typed LogQL query is its own collapsible box. Enter runs a value box's
    Find, Ctrl/Cmd+Enter the typed box's; results sit under the box that ran. */
 test('#1173 #1233 each authored lookup is its own box with its own Find; the typed LogQL query is a separate collapsed box',async()=>{
- const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),calls=[];
- const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"',values:['arch']},errors:{label:'Recent errors',query:'{app="cams"} |= "error"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
- const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async args=>{calls.push(plain(args));return {data:[]};}}}}),api=h.ctl.liveStatus;
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),calls=[];let hold=null;
+ const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"',values:['arch']},errors:{label:'Recent errors',query:'{app="cams"} |= "error"'},constructor:{label:'Constructor ID',query:'{app="cams"} | id="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async args=>{calls.push(plain(args));if(hold)await hold.promise;return {data:[]};}}}}),api=h.ctl.liveStatus;
  api.setStatusMode('trace');for(let i=0;i<6;i++)await settle();const m=mountStatus(h);h.flush();
  const typedId=api.snapshot().trace.direct.logs.typed,box=id=>m.body.querySelector('.dv-trace-log-search[data-log-search="'+id+'"]'),find=id=>box(id).querySelector('button.dv-trace-log-find'),first=()=>calls.map(c=>c.logql.split('\n')[0]);
- assert.deepEqual(m.body.querySelectorAll('.dv-trace-logs [data-log-search]').map(n=>n.getAttribute('data-log-search')),['camera','errors',typedId],'authored order, then the typed box');
+ assert.deepEqual(m.body.querySelectorAll('.dv-trace-logs [data-log-search]').map(n=>n.getAttribute('data-log-search')),['camera','errors','constructor',typedId],'authored order, then the typed box');
+ assert.equal(box('constructor').querySelector('input').value,'','an id that is an Object.prototype key starts empty');
  assert.equal(find('camera').getAttribute('aria-label'),'Find log lines for Camera model');assert.equal(find('errors').getAttribute('aria-label'),'Find log lines for Recent errors');assert.equal(find('camera').textContent,'Find log lines');
  const value=box('camera').querySelector('input');assert.equal(value.getAttribute('aria-label'),'Camera model');assert.ok(value.getAttribute('list'),'suggested values stay a pick list');
  assert.equal(box('errors').querySelector('input'),null,'no $value slot: only its button');assert.equal(box('errors').querySelector('.dv-trace-log-name').textContent,'Recent errors');
@@ -4207,7 +4208,12 @@ test('#1173 #1233 each authored lookup is its own box with its own Find; the typ
  assert.equal(m.body.querySelector('button.dv-trace-log-mode'),null,'no mode switch');assert.ok(!m.body.querySelectorAll('select').some(el=>el.getAttribute('aria-label')==='Log lookup'),'no lookup select');
  value.value='arch';value.dispatchEvent({type:'input'});value.dispatchEvent({type:'keydown',key:'Enter',preventDefault(){}});for(let i=0;i<6;i++)await settle();h.flush();
  assert.deepEqual(first(),['{app="cams"} | cameraModel="arch"'],'Enter in a value box runs its Find');
- find('errors').dispatchEvent({type:'click'});for(let i=0;i<6;i++)await settle();h.flush();
+ // While it runs, the pressed Find keeps focus (aria-disabled, not disabled), names what it does, and ignores a repeat press.
+ const running=find('errors');hold={};hold.promise=new Promise(resolve=>{hold.release=resolve;});running.dispatchEvent({type:'click'});for(let i=0;i<6;i++)await settle();h.flush();
+ assert.equal(find('errors'),running,'the same button');assert.deepEqual([running.disabled,running.getAttribute('aria-disabled'),running.getAttribute('aria-busy'),running.textContent,running.getAttribute('aria-label')],[false,'true','true','Finding…','Finding log lines for Recent errors']);
+ assert.equal(find('camera').disabled,true,'the other Finds wait');running.dispatchEvent({type:'click'});await settle();assert.equal(calls.length,2,'a repeat press is ignored');
+ const release=hold.release;hold=null;release();for(let i=0;i<6;i++)await settle();h.flush();
+ assert.equal(find('errors'),running);assert.deepEqual([running.disabled,running.getAttribute('aria-disabled'),running.textContent,running.getAttribute('aria-label')],[false,null,'Find log lines','Find log lines for Recent errors'],'done: back to Find');
  assert.deepEqual(first(),['{app="cams"} | cameraModel="arch"','{app="cams"} |= "error"'],'the second box runs its own query');
  assert.ok(box('errors').querySelector('.dv-trace-logs-status'),'its result note is under the box that ran');assert.equal(box('camera').querySelector('.dv-trace-logs-status'),null,'and nowhere else');
  const area=typed.querySelector('textarea');assert.equal(area.getAttribute('aria-label'),'LogQL log query');area.value='{app="cams"}';area.dispatchEvent({type:'input'});
@@ -4216,6 +4222,11 @@ test('#1173 #1233 each authored lookup is its own box with its own Find; the typ
  assert.equal(typed.querySelector('button.dv-trace-log-find').getAttribute('aria-label'),'Find log lines for LogQL query');
  assert.equal(api.snapshot().trace.direct.logs.form.values.camera,'arch','each box keeps its value');
  api.destroy();
+ // lookups: {} shows only the typed box, open.
+ const none=harness({...raw,tracking:{telemetry:{...raw.tracking.telemetry,lookups:{}}}},{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async()=>({data:[]})}}});
+ none.ctl.liveStatus.setStatusMode('trace');for(let i=0;i<6;i++)await settle();const nm=mountStatus(none);none.flush();
+ assert.equal(nm.body.querySelectorAll('.dv-trace-log-search').length,0,'no authored boxes');const only=nm.body.querySelector('details.dv-trace-log-typed');assert.ok(only,'the typed box');assert.equal(only.open,true,'open');
+ none.ctl.liveStatus.destroy();
 });
 // #1182 c2: one open-state slot. Another trace resets it (pick A, open, pick B, back to A: collapsed); a re-poll with the
 // same entry key keeps it; focus inside a card removed by a Load moves to the new card's line once.

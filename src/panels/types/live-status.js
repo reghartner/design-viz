@@ -55,7 +55,7 @@
     // Header buttons wear `tbtn`, the reader's per-theme button look shared with the section's Play and Present buttons (#863).
     function button(parent,key,cls,text,method){
       var node=el(parent,'button',key,cls+' tbtn',text);node.type='button';node._liveMethod=method;
-      if(!node._liveClick){node._liveClick=function(){var owner=host._livePanelApi;if(owner && !node.disabled)owner[node._liveMethod](node._liveArgument);};node.addEventListener('click',node._liveClick);}
+      if(!node._liveClick){node._liveClick=function(){var owner=host._livePanelApi;if(owner && !node.disabled && node.getAttribute('aria-disabled')!=='true')owner[node._liveMethod](node._liveArgument);};node.addEventListener('click',node._liveClick);}
       return node;
     }
     // One keyed icon per URL: GitHub evidence (#756) and a plain authored link share the node, so a URL that gains evidence keeps its identity.
@@ -186,10 +186,11 @@
           var owner=host._livePanelApi;if(ev.preventDefault)ev.preventDefault();if(owner && node._logFindable)owner.findLogLines(node._logSearch);
         };node.addEventListener('keydown',node._logEnter);}
       }
+      // The running Find stays enabled (aria-disabled, presses ignored) so it keeps keyboard focus; the others are disabled.
       function find(parent,search,name){
-        var running=logs.busy && r && r.lookup===search,go=button(parent,'find','reader-button dv-trace-log-find',running?'Finding…':'Find log lines','findLogLines');
-        go._liveArgument=search;go.setAttribute('aria-label','Find log lines for '+name);go.disabled=!findable;
-        if(running)go.setAttribute('aria-busy','true');else go.removeAttribute('aria-busy');
+        var running=!!(logs.busy && r && r.lookup===search),go=button(parent,'find','reader-button dv-trace-log-find',running?'Finding…':'Find log lines','findLogLines');
+        go._liveArgument=search;go.setAttribute('aria-label',(running?'Finding log lines for ':'Find log lines for ')+name);go.disabled=!findable && !running;
+        if(running){go.setAttribute('aria-busy','true');go.setAttribute('aria-disabled','true');}else{go.removeAttribute('aria-busy');go.removeAttribute('aria-disabled');}
         return go;
       }
       // #1158: checked by default; Find then lists only lines with a trace ID. It applies to every box.
@@ -200,7 +201,7 @@
         var group=el(section,'div','search-'+lookup.id,'dv-trace-log-search');group.setAttribute('role','group');group.setAttribute('aria-label',lookup.label+' log search');group.setAttribute('data-log-search',lookup.id);
         var line=el(group,'div','controls','dv-trace-log-search-controls');
         if(lookup.slot){
-          var value=control(line,'value',lookup.label,'input',lookup.id),typedValue=logs.form.values[lookup.id] || '';value.type='text';value.maxLength=200;value.autocomplete='off';value.spellcheck=false;value.placeholder=lookup.values.length?'Type or pick a value':'Type a value';
+          var value=control(line,'value',lookup.label,'input',lookup.id),typedValue=Object.prototype.hasOwnProperty.call(logs.form.values,lookup.id)?logs.form.values[lookup.id]:'';value.type='text';value.maxLength=200;value.autocomplete='off';value.spellcheck=false;value.placeholder=lookup.values.length?'Type or pick a value':'Type a value';
           if(lookup.values.length){var ids=host._logValuesIds || (host._logValuesIds=Object.create(null)),list=el(line,'datalist','values','');list.id=ids[lookup.id] || (ids[lookup.id]='dv-trace-log-values-'+(++logValueLists));lookup.values.forEach(function(v,i){el(list,'option',String(i),'').value=v;});value.setAttribute('list',list.id);}
           else value.removeAttribute('list');
           if(value.value!==typedValue)value.value=typedValue;onEnter(value,lookup.id,false);

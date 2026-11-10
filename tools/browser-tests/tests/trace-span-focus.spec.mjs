@@ -36,7 +36,8 @@ async function setup(page,server,{ambiguous=false,baseline=false,textTarget=fals
  await writeFile(path.join(server.root,'trace-focus.html'),'<div id="host"></div><div id="peer"></div><script type="module">import {mountNativeViewer} from "./trace-focus-native.js";window.mount=mountNativeViewer;</script>');
  await page.goto(server.origin+'/trace-focus.html');await page.waitForFunction(()=>!!window.mount);
  await page.evaluate(({spec,schema,text})=>{
-  window.traceScrolls=0;const scroll=Element.prototype.scrollIntoView;Element.prototype.scrollIntoView=function(...args){if(this.matches('.dv-trace-selected'))window.traceScrolls++;return scroll.apply(this,args);};
+  // #1280: the Load reveal targets the request line and fires flowview-trace-reveal (it no longer calls scrollIntoView).
+  window.traceScrolls=0;document.addEventListener('flowview-trace-reveal',ev=>{const line=ev.composedPath()[0];if(line.matches && line.matches('.dv-trace-selected .dv-trace-request-line'))window.traceScrolls++;},true);
   window.focusSpec=spec;window.focusOptions={telemetry:{directTrace:{describe:async()=>schema,call:async()=>({payload:text})}}};
   window.viewer=window.mount(document.querySelector('#host'),spec,window.focusOptions);window.peer=window.mount(document.querySelector('#peer'),spec,window.focusOptions);
   window.api=window.viewer.controller.liveStatus;window.sp=window.viewer.controller.sections[0].stepper;window.api.apply({'EDGE-1':{state:'active'},'EDGE-2':{state:'done'}});
@@ -88,8 +89,10 @@ test('desktop native trace focus selects source steps, preserves imported/local 
  await page.evaluate(()=>window.sp.jumpSource(1,'imported'));await expect(root.locator('.dv-trace-focus-overlay[data-trace-level="current"]')).toHaveCount(1);
  await expect(page.locator('#peer [data-trace-focus]')).toHaveCount(0);expect(await page.evaluate(()=>window.peer.controller.sections[0].stepper.current().id)).toBe('local');
  await captureFocus(root,info,'trace-focus-nested-import-hidden-alternate');
- const scrolls=await page.evaluate(()=>window.traceScrolls);await page.evaluate(()=>{for(let i=0;i<4;i++)window.api.setTraceShow(true);});
- await expect(root.locator('.dv-trace-focus-overlay[data-trace-level="current"]')).toHaveCount(1);expect(await page.evaluate(()=>window.traceScrolls)).toBe(scrolls);
+ const scrolls=await page.evaluate(()=>window.traceScrolls),y=await page.evaluate(()=>window.scrollY);expect(scrolls,'the Load revealed its trace once').toBe(1);
+ await page.evaluate(()=>{for(let i=0;i<4;i++)window.api.setTraceShow(true);});
+ await expect(root.locator('.dv-trace-focus-overlay[data-trace-level="current"]')).toHaveCount(1);expect(await page.evaluate(()=>window.traceScrolls),'four repaints do not reveal again').toBe(scrolls);
+ expect(await page.evaluate(()=>window.scrollY),'and do not move the page').toBe(y);
  await root.getByRole('button',{name:'Clear trace focus',exact:true}).click();await expect(root.locator('[data-trace-focus]')).toHaveCount(0);await expect(root.locator('.dv-trace-span[aria-pressed="true"]')).toHaveCount(0);expect(await state(page)).toMatchObject({step:'currency',playing:false});
  await page.evaluate(()=>window.sp.enterAmbient());await row(root,local).click();expect(await state(page)).toMatchObject({step:'local',playing:false});await expect(node(root,'local')).toHaveAttribute('data-trace-focus','true');
 });

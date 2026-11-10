@@ -10,8 +10,10 @@ const schema=()=>({name:'get_trace',annotations:{readOnlyHint:true,destructiveHi
 const clone=x=>JSON.parse(JSON.stringify(x));
 // #1136: a board without ticket references opens on the Trace view and shows no Jira | Trace switch.
 async function onTrace(root){await expect(root.getByRole('button',{name:/^(Jira|Trace)( · \d+)?$/})).toHaveCount(0);await expect(root.locator('.dv-live-trace')).toBeVisible();}
-// #1280: the successful Load reveals the selected trace's request line (its top), not the whole, now taller, trace.
-async function observeTraceReveals(page){await page.evaluate(()=>{window.traceReveals=[];const original=Element.prototype.scrollIntoView;Element.prototype.scrollIntoView=function(...args){if(this.matches('.dv-trace-request-line') && this.closest('.dv-trace-selected'))window.traceReveals.push(this);return original.apply(this,args);};});}
+// #1280: the successful Load reveals the selected trace's request line (its top), not the whole, now taller, trace. It
+// scrolls only this document (or a scrolling container) by the least needed, so the reveal is observed through the
+// flowview-trace-reveal event it fires on that line, also when nothing had to move.
+async function observeTraceReveals(page){await page.evaluate(()=>{window.traceReveals=[];document.addEventListener('flowview-trace-reveal',ev=>{const line=ev.composedPath()[0];if(line.matches && line.matches('.dv-trace-request-line') && line.closest('.dv-trace-selected'))window.traceReveals.push(line);},true);});}
 async function openTraceConfiguration(root){const config=root.locator('.dv-trace-config');if(!await config.evaluate(node=>node.open))await config.locator(':scope > summary').click();await expect(config).toHaveJSProperty('open',true);}
 // #1230: a loaded trace sits in the reserved space above the search, which stays open below it.
 async function expectCompactTrace(root){

@@ -265,7 +265,7 @@
             var owner=host._livePanelApi;if(!owner || load.disabled)return;var request=host._directRevealRequest=(host._directRevealRequest || 0)+1;
             Promise.resolve(owner.loadLogTrace(load._logIndex)).then(function(result){
               if(!live || !result || host._livePanelApi!==owner || host._directRevealRequest!==request)return;
-              var target=traceRevealTarget();if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
+              revealLoadedTrace();
             });
           };load.addEventListener('click',load._logClick);}
         });
@@ -333,7 +333,7 @@
           if(!live || !result || host._livePanelApi!==owner || host._directRevealRequest!==request)return;
           var value=owner.snapshot(),selected=value.trace && value.trace.selected;
           if(value.mode!=='trace' || !selected || !selected.manual || selected.exemplar.selectionToken!==result.selectionToken)return;
-          var target=traceRevealTarget();if(target && target.getClientRects().length && target.scrollIntoView)target.scrollIntoView({block:'nearest',inline:'nearest'});
+          revealLoadedTrace();
         });
       };
       if(!load._directLoadClick){load._directLoadClick=function(){load._directLoadAction();};load.addEventListener('click',load._directLoadClick);}
@@ -493,7 +493,8 @@
       var dragSpans=!!(value.edit && value.edit.active && model.mapSteps);
       // #1280 (Chuck, option A): only while Edit-mode span dragging is on, the list is capped at about one screen and scrolls
       // itself, so any row and the diagram it is dropped on are on screen together. Reading view has no inner scroll.
-      waterfall.classList.toggle('dv-trace-waterfall-edit',dragSpans);
+      var capped=waterfall.classList.contains('dv-trace-waterfall-edit');waterfall.classList.toggle('dv-trace-waterfall-edit',dragSpans);
+      if(dragSpans && !capped)measureListCap(waterfall);watchListCap(dragSpans?waterfall:null);
       e.spans.forEach(function(span){
         var item=el(waterfall,'div',span.id,'dv-trace-span-item'),row=el(item,'button','row','dv-trace-span'+(dragSpans && span.service && span.name?' dv-live-draggable':''));row.type='button';
         if(dragSpans && span.service && span.name)row.setAttribute('draggable','true');else row.removeAttribute('draggable');
@@ -521,14 +522,39 @@
         return;
       }
       stopFocusWatch();host._traceFocusPending=null;list._traceFocusShown=pending.key;
-      // A scrolling ancestor below the page (a fixed-height container holding the panel) moves by the least that shows the
-      // row. Without one only a focus the reader asked for scrolls the page, by the least needed, and only this document
-      // (never a frame around it); an automatic or restored focus leaves the page where it is.
-      var holder=scrollHolder(pending.item),ib=pending.item.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement;
-      if(holder){var hb=holder.getBoundingClientRect();if(ib.top<hb.top || ib.bottom>hb.bottom)holder.scrollTop+=ib.top<hb.top || ib.height>hb.height?ib.top-hb.top-8:ib.bottom-hb.bottom+8;}
-      else if(pending.auto)return;
-      else if(page && view && view.innerHeight){if(ib.top<0 || ib.height>view.innerHeight)page.scrollTop+=ib.top-8;else if(ib.bottom>view.innerHeight)page.scrollTop+=ib.bottom-view.innerHeight+8;}
-      else if(pending.item.scrollIntoView)pending.item.scrollIntoView({block:'nearest',inline:'nearest'});
+      revealInView(pending.item,pending.auto);
+    }
+    /* #1280: bring `node` into view by the least scroll. A scrolling ancestor below the page (the capped Edit-mode list, a
+       fixed-height container holding the panel) moves first. Without one, only a reveal the reader asked for (pageOff false)
+       scrolls the page, and only this document's scrolling element, never a frame around the board. */
+    function revealInView(node,pageOff){
+      var holder=scrollHolder(node),ib=node.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement;
+      if(holder){var hb=holder.getBoundingClientRect();if(ib.top<hb.top || ib.bottom>hb.bottom)holder.scrollTop+=ib.top<hb.top || ib.height>hb.height?ib.top-hb.top-8:ib.bottom-hb.bottom+8;return;}
+      if(pageOff)return;
+      if(page && view && view.innerHeight){if(ib.top<0 || ib.height>view.innerHeight)page.scrollTop+=ib.top-8;else if(ib.bottom>view.innerHeight)page.scrollTop+=ib.bottom-view.innerHeight+8;}
+      else if(node.scrollIntoView)node.scrollIntoView({block:'nearest',inline:'nearest'});
+    }
+    // A successful Load's reveal of its own trace (#1230), then a flowview-trace-reveal event on the request line, so a host
+    // (or a test) can see that the gesture revealed its trace even when nothing had to move.
+    function revealLoadedTrace(){
+      var target=traceRevealTarget();if(!target || !target.getClientRects || !target.getClientRects().length)return;
+      revealInView(target,false);
+      var view=doc.defaultView || (typeof window!=='undefined'?window:null),Make=view && view.CustomEvent;
+      if(Make && target.dispatchEvent)target.dispatchEvent(new Make('flowview-trace-reveal',{bubbles:true,composed:true}));
+    }
+    // #1280: the Edit-mode cap runs from the list's top to the window's bottom (CSS --dv-trace-list-top), measured when the
+    // cap turns on and again on a window resize while it is on, so every row reaches the screen by scrolling the list alone.
+    function measureListCap(list){
+      if(!list.getBoundingClientRect || !list.style || !list.style.setProperty)return;
+      list.style.setProperty('--dv-trace-list-top',Math.max(0,Math.round(list.getBoundingClientRect().top))+'px');
+    }
+    function watchListCap(list){
+      var view=doc.defaultView;if(!view || !view.addEventListener)return;
+      host._traceCapList=list;
+      if(list && !host._traceCapResize){
+        host._traceCapResize=function(){var l=host._traceCapList;if(!live || !l || !l.isConnected){view.removeEventListener('resize',host._traceCapResize);host._traceCapResize=null;return;}measureListCap(l);};
+        view.addEventListener('resize',host._traceCapResize);
+      }else if(!list && host._traceCapResize){view.removeEventListener('resize',host._traceCapResize);host._traceCapResize=null;}
     }
     // #1280: a successful Load reveals the loaded trace's top line (its request line). The trace itself can be taller than the
     // window now that the Spans list grows, and revealing all of it would align its top to the window's and move the page.
@@ -813,7 +839,7 @@
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}.dv-trace-log-report>.dv-trace-direct-report{margin-top:0}.dv-trace-log-row:has(+.dv-trace-log-report){border-bottom:0}
 .dv-trace-selected{min-width:0}.dv-trace-slot{margin:10px 0;min-width:0}.dv-trace-slot-hint{margin:0;padding:10px;border:1px dashed var(--explore-border);border-radius:6px;color:var(--dfaint);font-size:11px}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
-.dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall.dv-trace-waterfall-edit{max-height:calc(100vh - 200px);overflow:auto}.dv-trace-waterfall{margin:0 0 12px;border:1px solid var(--explore-border);border-top:0;border-radius:0 0 6px 6px;padding:0 8px 8px}
+.dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall.dv-trace-waterfall-edit{max-height:max(240px,calc(100vh - var(--dv-trace-list-top,200px) - 16px));overflow:auto}.dv-trace-waterfall{margin:0 0 12px;border:1px solid var(--explore-border);border-top:0;border-radius:0 0 6px 6px;padding:0 8px 8px}
 .dv-trace-span{width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;align-items:center;padding:5px 0;font-size:10px}.dv-trace-span[aria-pressed="true"]{background:color-mix(in srgb,var(--dv-live-active) 10%,transparent)}.dv-trace-span:focus-visible{outline:2px solid var(--dv-live-active)}.dv-trace-operation-detail{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;gap:6px;margin-top:12px;padding:8px;border:1px solid var(--explore-border);border-radius:6px}.dv-trace-operation-detail>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}.dv-trace-operation-detail small{grid-column:1/-1}.dv-trace-duration{font:700 13px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}.dv-trace-span .dv-trace-duration{grid-column:2;grid-row:1;white-space:nowrap}.dv-trace-operation-detail .dv-trace-duration{font-size:20px;line-height:1.4}.dv-trace-span-name{grid-column:1;grid-row:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-track{grid-column:1/-1;grid-row:2;height:10px;background:color-mix(in srgb,var(--dink) 7%,transparent)}.dv-trace-bar{display:block;box-sizing:border-box;max-width:100%;height:10px;background:var(--dv-live-active)}.dv-trace-span[data-error="true"] .dv-trace-bar{background:var(--dv-live-blocked)}
 .dv-trace-mappings{display:grid;gap:5px}.dv-trace-mapping{display:grid;grid-template-columns:1fr auto;gap:2px 8px;border-left:3px solid var(--dfaint);padding:5px 8px}.dv-trace-mapping small{grid-column:1/-1;color:var(--dfaint)}.dv-trace-mapping[data-tone="error"]{border-color:var(--dv-live-blocked)}.dv-trace-mapping[data-tone="warning"]{border-color:#d49620}
 [data-trace-tone="error"]{--dv-trace-color:#d64b68}[data-trace-tone="warning"]{--dv-trace-color:#c88b14}[data-trace-tone="observed"]{--dv-trace-color:#368cc9}[data-trace-tone="unknown"]{--dv-trace-color:#87929e}

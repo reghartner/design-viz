@@ -185,11 +185,14 @@ test('M3 desktop Edit mode drags spans onto a step and onto nodes; two candidate
 test('M4 desktop the Spans list scrolls itself only while Edit-mode span dragging is on; after Done it has no inner scroll',async({page,server})=>{
  const {panel}=await open(page,server,'span-mapping-cap',{},{drag:true});
  const measure=()=>panel.evaluate(p=>{const r=p.shadowRoot || p,lists=r.querySelectorAll('.dv-trace-waterfall'),l=lists[0];if(lists.length!==1)return {lists:lists.length};
-  const s=getComputedStyle(l);return {lists:1,rows:l.querySelectorAll('.dv-trace-span').length,capped:l.classList.contains('dv-trace-waterfall-edit'),overflow:s.overflowY,scroll:l.scrollHeight,client:l.clientHeight,height:l.getBoundingClientRect().height,view:innerHeight};});
+  const s=getComputedStyle(l),b=l.getBoundingClientRect();return {lists:1,rows:l.querySelectorAll('.dv-trace-span').length,capped:l.classList.contains('dv-trace-waterfall-edit'),overflow:s.overflowY,scroll:l.scrollHeight,client:l.clientHeight,top:b.top,bottom:b.bottom,height:b.height,view:innerHeight};});
  let m=await measure();expect([m.lists,m.capped,m.overflow],'reading view before Edit: no cap').toEqual([1,false,'visible']);expect(m.scroll).toBeLessThanOrEqual(m.client+1);
  await panel.getByRole('button',{name:'Edit',exact:true}).click();await expect(span(panel,CURRENCY)).toHaveAttribute('draggable','true');
  m=await measure();expect([m.lists,m.capped,m.overflow],'Edit mode: capped and scrolling').toEqual([1,true,'auto']);
- expect(m.height,'about one screen').toBeLessThanOrEqual(m.view-200+1);expect(m.scroll,m.rows+' rows scroll inside the list').toBeGreaterThan(m.client+40);
+ // Review c4: the cap runs from the list's top to the window's bottom (at least 240 px), so the list ends on screen.
+ expect(m.bottom,'the capped list ends on screen').toBeLessThanOrEqual(m.view+1);expect(m.height).toBeGreaterThanOrEqual(239);expect(m.scroll,m.rows+' rows scroll inside the list').toBeGreaterThan(m.client+40);
+ // A window resize while the cap is on re-measures it.
+ await page.setViewportSize({width:1440,height:800});await expect.poll(async()=>{const r=await measure();return r.capped && r.bottom<=r.view+1;},{message:'after a resize the list still ends on screen'}).toBe(true);
  await panel.getByRole('button',{name:'Done',exact:true}).click();await expect(panel.getByRole('button',{name:'Edit',exact:true})).toBeVisible();
  m=await measure();expect([m.lists,m.capped,m.overflow],'after Done: the cap is gone').toEqual([1,false,'visible']);expect(m.scroll,'no inner scroll in the reading view').toBeLessThanOrEqual(m.client+1);
 });

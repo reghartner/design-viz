@@ -4883,7 +4883,7 @@ test('#1280 the Spans list has no height cap or scroll of its own in the panel C
  const own=css.match(/\.dv-trace-waterfall\{[^}]*\}/g) || [],rules=css.match(/[^{}]*\.dv-trace-waterfall[^{]*\{[^}]*\}/g) || [];
  // The one exception is Chuck's option A: the Edit-mode span-dragging class caps and scrolls the list.
  assert.ok(own.length>=1);for(const rule of rules.filter(r=>!r.includes('dv-trace-waterfall-edit')))assert.doesNotMatch(rule.slice(rule.indexOf('{')),/max-height|overflow|contain:size|flex:1 1 0/,rule.trim());
- assert.ok(/\.dv-trace-waterfall\.dv-trace-waterfall-edit\{max-height:calc\(100vh - 200px\);overflow:auto\}/.test(css),'the Edit-mode cap rule');
+ assert.ok(css.includes('.dv-trace-waterfall.dv-trace-waterfall-edit{max-height:max(240px,calc(100vh - var(--dv-trace-list-top,200px) - 16px));overflow:auto}'),'the Edit-mode cap runs from the list top to the window bottom');
  assert.ok(!css.includes('dv-trace-fill'),'no tile fill rule');
  h.ctl.liveStatus.destroy();
 });

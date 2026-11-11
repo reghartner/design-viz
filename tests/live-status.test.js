@@ -2055,8 +2055,9 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
  assert.ok(!metrics.classList.contains('tbtn'),'#1131 a switch, not a button that looks like a third view');
  assert.equal(metrics.getAttribute('aria-checked'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
  const top=header.querySelector('.dv-status-top'),controls=head.querySelector('.dv-live-controls');
- const style=top.querySelector('.dv-live-metrics-style');
- assert.ok(top.children.at(-2)===metrics && top.children.at(-1)===style,'#1131 the switch ends the top row, followed only by its #1294 Metrics style choice');assert.ok(style.hidden===true,'#1294 the style choice is hidden while the overlay is off');assert.ok(header.children.indexOf(top)<header.children.indexOf(live.parentElement),'#1131 Live | Over time is the row below');
+ const style=top.querySelector('.dv-live-metrics-style'),refresh=top.querySelector('.dv-live-metrics-refresh');
+ assert.ok(top.children.at(-3)===metrics && top.children.at(-2)===refresh && top.children.at(-1)===style,'#1131 the switch ends the top row, followed only by its #1293 Refresh now and its #1294 Metrics style choice');
+ assert.ok(top.children.filter(c=>!c.hidden).at(-1)===metrics,'#1131 the switch ends the visible top row while the overlay is off');assert.ok(refresh.hidden===true,'#1293 Refresh now is hidden while Metrics is off');assert.ok(style.hidden===true,'#1294 the style choice is hidden while the overlay is off');assert.ok(header.children.indexOf(top)<header.children.indexOf(live.parentElement),'#1131 Live | Over time is the row below');
  assert.ok(head.children.indexOf(controls)<head.children.indexOf(head.querySelector('.dv-live-status')),'M6 controls precede status text');
  assert.ok(conn,'M6 metrics connector text');assert.ok(!conn.classList.contains('dv-live-connection'),'M6 distinct connector');
  assert.equal(head.querySelectorAll('.dv-live-connection').length,1);
@@ -5165,6 +5166,41 @@ test('#1280 the reveal ends the opened detail itself at the window edge less 8px
   itemBottom=1000;scroller.scrollTop=0;const t2=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t2.context,spanId:t2.exemplar.spans[54].id}),true);h.flush();
   assert.equal(scroller.scrollTop,108,'last item: the detail still ends at the edge less 8 px');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
+});
+
+/* #1293: the Metrics line says "· Refreshing…" while a refresh runs over a shown answer, and while Refresh now cools
+   down it says when it is available again (visible text, not only the button's tooltip). */
+test('M14 the Metrics line shows Refreshing… over a shown answer and the Refresh now cooldown as text',async()=>{
+ let release=null,calls=0;const sample={a:{signals:{lag:{value:3}}}};
+ const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:()=>{calls++;return new Promise(r=>{release=()=>r(sample);});}}});
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const text=()=>textOf(h.view.querySelector('.dv-live-metrics-connection')),refresh=()=>h.view.querySelector('.dv-live-metrics-refresh');
+ h.ctl.liveStatus.setMetricsEnabled(true);await settle();release();await settle();h.flush();
+ assert.ok(refresh() && !refresh().hidden,'Refresh now shows while Metrics is on');assert.doesNotMatch(text(),/Refreshing…/);
+ const tick=[...h.timers].find(([,x])=>x.ms===300000);assert.ok(tick,'the refresh is armed');h.timers.delete(tick[0]);tick[1].fn();await settle();h.flush();
+ assert.match(text(),/ · Refreshing…/,'a refresh over the shown answer says so: '+text());assert.equal(refresh().getAttribute('aria-busy'),'true');
+ release();await settle();h.flush();assert.doesNotMatch(text(),/Refreshing…/);
+ assert.equal(h.ctl.liveStatus.refreshMetricsNow(),false,'within 60 s of that refresh');await settle();h.flush();assert.equal(calls,2);
+ assert.match(text(),/ · Refresh now available at .+/,'the cooldown is visible text: '+text());assert.equal(refresh().getAttribute('aria-disabled'),'true');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});
+
+/* #1313 review c2: after an answer that names a failed query, off/on waits up to 60 s. Meanwhile the answered signals
+   stay on screen and the Metrics line says what is true: the last refresh failed, and when the next try is. */
+test('M15 during the wait after a failed answer, the answered values stay and the line names the failure and the next try',async()=>{
+ let calls=0;const sample={a:{signals:{lag:{value:3}}}};
+ const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:(b,s,report)=>{calls++;report.note('a->b rate: boom');return Promise.resolve(sample);}}});
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const text=()=>textOf(h.view.querySelector('.dv-live-metrics-connection'));
+ h.ctl.liveStatus.setMetricsEnabled(true);await settle();h.flush();assert.equal(calls,1);assert.match(text(),/a->b rate: boom/);
+ h.ctl.liveStatus.setMetricsEnabled(false);h.ctl.liveStatus.setMetricsEnabled(true);await settle();h.flush();
+ assert.equal(calls,1,'no call during the wait');
+ assert.equal(plain(h.ctl.telemetry.snapshot().map).a?.signals?.lag?.value,3,'the signal that answered stays');
+ assert.equal(h.ctl.telemetry.status().busy,false,'no call is running');assert.notEqual(h.ctl.telemetry.status().state,'loading','never loading while nothing runs');
+ assert.doesNotMatch(text(),/connecting/,'never "connecting" while no call runs: '+text());
+ assert.match(text(),/last refresh failed at .+ · next try at .+/,'the line names the failure and the next try: '+text());
+ assert.match(text(),/a->b rate: boom/,'and the failed query');
+ panel.destroy();h.ctl.liveStatus.destroy();
 });
 /* Follow-up to #1280 (review c9 minor 1): the page's top edge is the reader's bar where it is now (sticky in a native mount,
    fixed in the published reader), read live from the view's .explore-navigation. --flowview-navigation-bottom is measured

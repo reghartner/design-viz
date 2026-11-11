@@ -1290,7 +1290,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var evidence=telemetry.snapshot(),status=evidence.status;
     return {environment:evidence.environment,environments:evidence.environments,proof:liveStatusProofPresentation(evidence,telemetryWindow),logDetails:liveStatusLogDetails(evidence,telemetryWindow),available:status.state!=='absent',enabled:telemetry.enabled(),demo:telemetryDemo,state:status.state,busy:status.busy,
       refreshedAt:status.refreshedAt,note:status.note,checkedText:status.refreshedAt?'refreshed '+clockTime(status.refreshedAt):'',
-      source:telemetrySource(),window:telemetryWindow,style:metricsStyleShown(),styleChoice:!authoring && !metricsPreview,snapshot:telemetryOptions && typeof telemetryOptions.snapshot==='string'?telemetryOptions.snapshot:''};
+      source:telemetrySource(),window:telemetryWindow,style:metricsStyleShown(),styleChoice:!authoring && !metricsPreview,snapshot:telemetryOptions && typeof telemetryOptions.snapshot==='string'?telemetryOptions.snapshot:'',refreshNow:refreshNowView()};
+  }
+  // #1293: the Refresh now button's state and tooltip.
+  function refreshNowView(){
+    var state=typeof telemetry.refreshNowState==='function'?telemetry.refreshNowState():{state:'off'};
+    var title=state.state==='busy'?'Refreshing…':state.state==='cooldown'?'Refresh now is available again at '+clockTime(state.until)+' · Honeycomb allows 10 query results a minute':
+      state.refreshedAt?'Refresh now (last updated '+clockTime(state.refreshedAt)+')':'Refresh now';
+    return {state:state.state,until:state.until || null,untilText:state.until?clockTime(state.until):'',title:title,
+      waiting:!!state.waiting,failedAtText:state.waiting && state.failedAt?clockTime(state.failedAt):'',nextTryText:state.waiting && state.nextTry?clockTime(state.nextTry):''};
   }
   function snapshot(){
     refreshDependencies();
@@ -2380,6 +2388,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // The panel's Metrics button (#939); Jira Live above is independent of it.
     setMetricsEnvironment:function(value){if(!retired)telemetry.setEnvironment(value);},
     setMetricsEnabled:function(value){if(!retired)telemetry.setEnabled(value);},
+    refreshMetricsNow:function(){return !retired && typeof telemetry.refreshNow==='function' && telemetry.refreshNow();},
     // #1294: Cards or Outline, remembered per viewer and board; storage may be unavailable.
     setMetricsStyle:function(value){
       if(retired || authoring || ['cards','outline'].indexOf(value)<0 || value===metricsStyle)return;

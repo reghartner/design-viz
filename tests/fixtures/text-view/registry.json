@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "diagrams": [
+    {"id": "tv-platform", "path": "platform.json"},
+    {"id": "tv-board", "path": "board.json"}
+  ]
+}

@@ -37,17 +37,21 @@ async function setup(kind,{refreshMs,hostRefreshMs,environments,fail,throwAll}={
  const C={URL,AbortController,TextDecoder,TextEncoder,console,document:doc,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id)};
  C.Date=class extends Date{constructor(...args){super(...(args.length?args:[clock.now]));}static now(){return clock.now;}};
  vm.runInNewContext(entrypoint('standalone').body,C);
- const calls=[];
+ const calls=[],value={n:42},holds=[];
+ // hold: the next data call waits until release() (a refresh in flight).
  const win={claude:{use:async()=>({listTools:async()=>plain(SERVERS),callTool:async(server,tool,input)=>{calls.push({tool,at:clock.now,input:plain(input)});if(fail && fail() && DATA.includes(tool))throw {code:'tool_error',message:'boom'};
-  if(tool==='run_query')return {payload:METADATA};if(tool==='query_prometheus')return {payload:{data:[{values:[[START/1000-60,'40'],[START/1000,'42']]}]}};return {payload:[]};}})},
-  fetch:async()=>new Response(JSON.stringify(RAW))};
+  if(DATA.includes(tool) && value.hold)await new Promise(resolve=>holds.push(resolve));
+  if(tool==='run_query')return {payload:METADATA};if(tool==='query_prometheus')return {payload:{data:[{values:[[START/1000-60,'40'],[START/1000,String(value.n)]]}]}};return {payload:[]};}})},
+  fetch:async()=>new Response(JSON.stringify({results:[{data:{COUNT:value.n}}],series:[{data:{time:'2026-11-10T11:00:00Z',COUNT:3}},{data:{time:'2026-11-10T11:30:00Z',COUNT:value.n}}]}))};
  const p=C.normalize(board(kind,refreshMs,environments)),adapter=C.createTelemetryProviders(p,win);
  assert.ok(adapter,'the board has automatic metrics providers');
  let options=hostRefreshMs===undefined?adapter.options:Object.assign({},adapter.options,{refreshMs:hostRefreshMs});
  if(throwAll){const base=options.provider;options=Object.assign({},options,{provider:(...args)=>throwAll()?Promise.reject(new Error('connector down')):base(...args)});}
  const api=C.createTelemetry(p,options,{carriers:fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram || {};Object.keys(d.nodes || {}).forEach(id=>fn(d.nodes[id],id,p));})});
  const handle=adapter.attach({telemetry:api,liveStatus:{snapshot:()=>({actionLabel:''}),action(){},onChange:()=>()=>{},onDestroy:()=>()=>{}}},p);await settle();
- return {C,api,timers,clock,calls,
+ return {C,api,timers,clock,calls,value,release:async()=>{value.hold=false;holds.splice(0).forEach(r=>r());await settle();},
+  sample:()=>{const m=plain(api.snapshot().map).a;return m && (m.signals.rate || m.signals.spans) && (m.signals.rate || m.signals.spans).value;},
+  async fireMs(ms){const entry=[...timers].find(([,x])=>x.ms===ms);assert.ok(entry,'a timer of '+ms+' ms is armed: '+JSON.stringify([...timers.values()].map(x=>x.ms)));timers.delete(entry[0]);entry[1].fn();await settle();},
   data:()=>calls.filter(c=>DATA.includes(c.tool)).length,
   armed:()=>[...timers.values()].map(x=>x.ms),
   advance(ms){clock.now+=ms;},
@@ -193,3 +197,57 @@ for(const kind of ['grafana','honeycomb'])test('R11 '+kind+': after a refresh th
   assert.equal(h.data(),2,'the answer before the failure is not reused (the failed Retry made no data call)');assert.equal(h.api.status().state,'ok');
  }finally{h.close();}
 });
+
+/* #1293: cached through off/on, and Refresh now.
+| row | fixture | assertion | rejects |
+|---|---|---|---|
+| R12 | Grafana and Honeycomb boards, an answer older than 5 minutes | Metrics off then on shows the cached map and its own refreshed time at once (never empty or loading), busy while exactly one background call runs, then the new map; the timer restarts from that answer | a blank or loading state on a stale off/on, or a second call |
+| R13 | the same boards | Refresh now calls once at once and re-arms the refresh timer at 5 minutes from its answer; a second Refresh now while it runs makes no call; after the answer a Refresh now within 60 s makes no call and reports the cooldown until 60 s after the first; once the cooldown ends it calls again | a Refresh now that is ignored, queues, or can exceed one call a minute |
+| R14 | the same boards | a Refresh now within 60 s of an automatic call makes no call; the click shows the cooldown until 60 s after that call, and its end repaints | two refreshes inside a minute |
+| R15 | the same boards | with Metrics off, or Over time open, Refresh now is off and makes no call | a hidden way to call |
+*/
+for(const kind of ['grafana','honeycomb']){
+ test('R12 '+kind+': off/on after 5 minutes shows the cached answer at once, then refreshes it with exactly one background call',async()=>{
+  const h=await setup(kind);
+  try{
+   h.api.setEnabled(true);await settle();assert.equal(h.data(),1);const first=plain(h.api.status()),old=h.sample();assert.equal(old,42);
+   h.api.setEnabled(false);h.advance(FIVE+1000);h.value.n=77;h.value.hold=true;h.api.setEnabled(true);await settle();
+   const during=plain(h.api.status());
+   assert.equal(h.sample(),42,'the cached value shows at once');assert.equal(during.state,'ok','never loading');assert.equal(during.refreshedAt,first.refreshedAt,'with its own refreshed time');assert.equal(during.busy,true,'refreshing in the background');
+   assert.equal(h.data(),2,'exactly one background call');
+   await h.release();assert.equal(h.sample(),77,'then the new answer');assert.notEqual(h.api.status().refreshedAt,first.refreshedAt);assert.equal(h.api.status().busy,false);
+   assert.equal(h.data(),2);assert.deepEqual(h.armed(),[FIVE],'the timer restarts from that answer');
+  }finally{h.close();}
+ });
+ test('R13 '+kind+': Refresh now calls once at once, re-arms the timer, ignores clicks while running and keeps a 60 s cooldown',async()=>{
+  const h=await setup(kind);
+  try{
+   h.api.setEnabled(true);await settle();assert.equal(h.data(),1);
+   h.advance(120000);assert.equal(h.api.refreshNowState().state,'ready');assert.equal(h.api.refreshNowState().refreshedAt,h.api.status().refreshedAt,'it names the last update');
+   h.value.hold=true;h.value.n=55;assert.equal(h.api.refreshNow(),true,'Refresh now calls');await settle();assert.equal(h.data(),2,'at once');
+   assert.equal(h.api.refreshNowState().state,'busy');assert.equal(h.api.refreshNow(),false,'a second click while it runs');await settle();assert.equal(h.data(),2,'queues nothing');
+   await h.release();assert.equal(h.sample(),55);assert.ok(h.armed().includes(FIVE),'the refresh timer restarts 5 minutes from that answer: '+JSON.stringify(h.armed()));
+   h.advance(10000);const state=h.api.refreshNowState();assert.equal(state.state,'cooldown');assert.equal(state.until,new Date(START+120000+60000).toISOString(),'60 s after that Refresh now started');
+   assert.equal(h.api.refreshNow(),false);await settle();assert.equal(h.data(),2,'no call during the cooldown');
+   h.advance(50000);await h.fireMs(60000);assert.equal(h.api.refreshNowState().state,'ready','the cooldown ends with a repaint');
+   assert.equal(h.api.refreshNow(),true);await settle();assert.equal(h.data(),3);
+  }finally{h.close();}
+ });
+ test('R14 '+kind+': Refresh now within 60 s of an automatic refresh makes no call',async()=>{
+  const h=await setup(kind);
+  try{
+   h.api.setEnabled(true);await settle();h.advance(FIVE);await h.fireMs(FIVE);assert.equal(h.data(),2,'the automatic refresh');
+   h.advance(20000);assert.equal(h.api.refreshNow(),false,'within 60 s of that call');await settle();assert.equal(h.data(),2,'no call');
+   const state=h.api.refreshNowState();assert.equal(state.state,'cooldown','the click shows the cooldown');assert.equal(state.until,new Date(START+FIVE+60000).toISOString(),'until 60 s after the automatic call');
+   assert.ok(h.armed().includes(40000),'its end repaints: '+JSON.stringify(h.armed()));
+  }finally{h.close();}
+ });
+ test('R15 '+kind+': Refresh now is off while Metrics is off or Over time is open',async()=>{
+  const h=await setup(kind);
+  try{
+   assert.equal(h.api.refreshNowState().state,'off');assert.equal(h.api.refreshNow(),false);await settle();assert.equal(h.data(),0);
+   h.api.setEnabled(true);await settle();h.advance(120000);h.api.openHistory([{at:new Date(START).toISOString(),key:'2026-11-10'}],0);await settle();const before=h.data();
+   assert.equal(h.api.refreshNowState().state,'off');assert.equal(h.api.refreshNow(),false);await settle();assert.equal(h.data(),before);
+  }finally{h.close();}
+ });
+}

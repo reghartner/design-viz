@@ -267,6 +267,30 @@ var FlowCanon = (function(){
     if(TRACE_SPAN_ROLES[kind].indexOf(s.role)<0)e.push('role must be one of '+TRACE_SPAN_ROLES[kind].join(', '));
     return e;
   }
+  /* #1290 (D19): the text for a declared exact operation or prefix that no span of its service in
+     an approved reference trace matches, or null (also for attribute-only declarations). A span can
+     be real and still absent from one run, so the text does not call the declaration wrong. */
+  function traceReferenceMiss(m,spans){
+    if(!object(m) || typeof m.serviceName!=='string' || !Array.isArray(spans))return null;
+    var exact=typeof m.operation==='string',prefix=!exact && typeof m.operationPrefix==='string';if(!exact && !prefix)return null;
+    if(spans.some(function(s){return object(s) && s.serviceName===m.serviceName && (exact?s.operation===m.operation:typeof s.operation==='string' && s.operation.indexOf(m.operationPrefix)===0);}))return null;
+    return m.serviceName+' '+(exact?m.operation:'operations starting "'+m.operationPrefix+'"')+' was not seen in the approved reference trace. If it only appears in some runs, such as retries, nothing is wrong; otherwise check the declaration or approve a new reference';
+  }
+  // The approved reference trace spans of a diagram, or null.
+  function referenceSpans(d){var r=object(d) && object(d.referenceTrace)?d.referenceTrace:null;return r && object(r.approval) && object(r.trace) && Array.isArray(r.trace.spans)?r.trace.spans:null;}
+  // The node ids and delivered edge keys the steps of a diagram's reference flow (its first path, else every step) light.
+  function referenceLit(d){
+    var steps=Array.isArray(d.steps)?d.steps:[],path=Array.isArray(d.paths) && d.paths.length && object(d.paths[0]) && Array.isArray(d.paths[0].steps)?d.paths[0].steps:null;
+    if(path)steps=path.map(function(id){return steps.find(function(s){return object(s) && s.id===id;});});
+    var out={nodes:[],edges:[]};
+    steps.forEach(function(st){
+      if(!object(st))return;var failures=object(st.failures)?st.failures:{},keys=[];
+      if(typeof st.edge==='string')keys.push(st.edge);(Array.isArray(st.edges)?st.edges:[]).forEach(function(k){if(typeof k==='string')keys.push(k);});
+      keys.forEach(function(k){if(failures[k]!=='dropped' && failures[k]!=='blocked' && out.edges.indexOf(k)<0)out.edges.push(k);});
+      (Array.isArray(st.nodes)?st.nodes:[]).forEach(function(n){if(typeof n==='string' && out.nodes.indexOf(n)<0)out.nodes.push(n);});
+    });
+    return out;
+  }
   function traceDeclarationErrors(trace,kind,raw,listed){
     if(!listed)listed=profileAttributes(raw);
     if(!object(trace) || Object.keys(trace).some(function(k){return k!=='spans';}) || !object(trace.spans))return [{key:null,message:'expected {"spans": {<name>: <span declaration>}}'}];
@@ -399,6 +423,6 @@ var FlowCanon = (function(){
   }
   /* #1238: the attribute names traceMatch.attributes accepts on this page, for the Workbench form. */
   function traceAttributeNames(raw){return traceAttributes.concat(Object.keys(profileAttributes(raw)).filter(function(k){return traceAttributes.indexOf(k)<0;}));}
-  return {version:1,traceWarnings:traceWarnings,traceDeclarationErrors:traceDeclarationErrors,traceCarrierErrors:traceCarrierErrors,traceAttributeNames:traceAttributeNames,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
+  return {version:1,traceWarnings:traceWarnings,traceDeclarationErrors:traceDeclarationErrors,traceReferenceMiss:traceReferenceMiss,referenceSpans:referenceSpans,referenceLit:referenceLit,traceCarrierErrors:traceCarrierErrors,traceAttributeNames:traceAttributeNames,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
     referenceErrors:referenceErrors,locate:locate,codeUrl:codeUrl,references:references,validate:validate,links:links};
 })();

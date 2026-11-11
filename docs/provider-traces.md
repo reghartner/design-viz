@@ -482,7 +482,8 @@ both. `traceScope` (all fields optional; `{}` inherits from shared carriers too)
 A span that two steps both claim (inherited or explicit) makes both **ambiguous**, naming the
 span and the other step; the earlier step never wins. Imported carriers use the consumer's
 merged declarations, so its overlay additions, hides and overrides change what steps inherit.
-Pages using `traceScope` need the `flow.trace-scope` capability.
+Pages using `traceScope` need the `flow.trace-scope` capability. Reference approvals cover
+inherited declarations too; see `docs/canon.md` (reference traces).
 
 ## Honeycomb lookback
 

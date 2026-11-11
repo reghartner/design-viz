@@ -24,6 +24,8 @@ try{
     const approved=approveReference(spec,trace,{section,reason:flag('reason'),actor:'CLI reviewer'}),target=C.sections(output=C.clone(authored))[section]?.diagram;
     if(!target)throw new Error('Diagram section not found.');
     target.referenceTrace=C.sections(approved)[section].diagram.referenceTrace;
-  }else{const options={section,label:flag('label') || 'Incident trace'},result=compareTrace(spec,trace,options);output=spec===authored?result.spec:compareTrace(authored,trace,options).spec;console.error(JSON.stringify({firstDivergence:result.firstDivergence,pathId:result.pathId,warnings:result.warnings,unmatched:result.mapping.unmatched}));}
+  }else{
+    // #1290: compare the resolved board once (inherited declarations exist only there) and write the incident into the authored one.
+    const options={section,label:flag('label') || 'Incident trace',into:spec===authored?null:authored},result=compareTrace(spec,trace,options);output=result.spec;console.error(JSON.stringify({firstDivergence:result.firstDivergence,pathId:result.pathId,warnings:result.warnings,unmatched:result.mapping.unmatched}));}
   const json=JSON.stringify(output,null,2)+'\n';if(flag('out'))await writeFile(flag('out'),json);else process.stdout.write(json);
 }catch(e){console.error(e.message);process.exitCode=1;}

@@ -747,6 +747,22 @@ function editHistoryEntries(page, warn){
   return kept.map(function(item){return item.entry;});
 }
 
+/* #1290 (D19): on a diagram with an approved reference trace, each declaration the board owns on a
+   carrier its reference flow lights is checked against that trace. Local carriers are checked here;
+   spans the board's own import overlay adds or overrides are checked when it resolves (at the overlay
+   path, src/canon-topology.js). Spans a provider declares are left to the provider's own check. */
+function referenceTraceDeclarationWarnings(d,DP,warnings){
+  if(typeof FlowCanon==='undefined' || !FlowCanon.referenceSpans)return;
+  var spans=FlowCanon.referenceSpans(d);if(!spans)return;
+  var lit=FlowCanon.referenceLit(d),imports=specObject(d.topologyProvenance) && Array.isArray(d.topologyProvenance.imports)?d.topologyProvenance.imports:[];
+  function imported(kind,id){return imports.some(function(imp){return specObject(imp) && Array.isArray(imp[kind]) && imp[kind].indexOf(id)>=0;});}
+  function check(value,at){
+    var declared=specObject(value) && specObject(value.trace) && specObject(value.trace.spans)?value.trace.spans:{};
+    Object.keys(declared).forEach(function(key){var miss=FlowCanon.traceReferenceMiss(declared[key],spans);if(miss)warnings.push(at+'.trace.spans.'+key+': '+miss);});
+  }
+  if(specObject(d.nodes))lit.nodes.forEach(function(id){if(specObject(d.nodes[id]) && !imported('nodes',id))check(d.nodes[id],DP+'.nodes.'+id);});
+  (Array.isArray(d.edges)?d.edges:[]).forEach(function(e,i){if(specObject(e) && lit.edges.indexOf(e.from+'->'+e.to)>=0 && !imported('edges',e.from+'->'+e.to))check(e,DP+'.edges['+i+']');});
+}
 /* #1290: steps inherit the trace spans declared on the carriers they light. Warn, in plain words,
    when a traceScope skip names a span the carrier does not declare or a carrier the step does
    not light (both ignored, so a provider change never fails the board), and when a step
@@ -845,6 +861,7 @@ function validate(page){
     // #1290: provider spans dropped for this board warn at the carrier; overlay findings sit at the overlay.
     if(typeof FlowTopology!=='undefined' && FlowTopology.traceFindings){var spanFindings=FlowTopology.traceFindings(d,DP);errors.push.apply(errors,spanFindings.errors);warnings.push.apply(warnings,spanFindings.warnings);}
     traceScopeWarnings(d,DP,warnings);
+    referenceTraceDeclarationWarnings(d,DP,warnings);
     // A resolved snapshot already carries overlay bindings on its imported carriers.
     if(!d.topologyProvenance)(Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp,i){
       if(!specObject(imp))return;

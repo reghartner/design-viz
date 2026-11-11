@@ -14,6 +14,7 @@
 | E10 | A name the provider declares is taken even while hidden here: rename and Add span are refused beside the name (provider title, else id); the note is a role=status region; the hide is kept. |
 | E11 | A refused attribute type change is explained beside that type select. |
 | E12 | Note slots stay in the page as status regions; a refusal clears then sets its note, so a repeated identical refusal is announced. |
+| E13 | Hide or revert of a span the provider does not declare names the provider by its title. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -271,4 +272,12 @@ test('E12 note slots stay in the page; each refusal clears its note and sets it 
   value.value='y';value.fire('change');
   assert.equal(note().textContent,'','a repeated refusal clears it again');
   ui.h.flush();assert.match(note().textContent,/A prefix needs at least 2 characters/,'and sets it again');
+});
+
+test('E13 a hide or revert of a span the provider does not declare names the provider by its title',()=>{
+  const f=imported();f.provider.page.title='Order platform';const ui=harness(f.consumer,f.context),INODE={kind:'node',section:0,id:'shared::worker'};
+  ['hide','revert'].forEach(op=>{
+    const plan=ui.e.C.planCarrierTraceSpans(ui.text,ui.raw,INODE,{op,name:'nope',value:true},f.context);
+    assert.equal(plan.error,'Span nope is not inherited from Order platform.');
+  });
 });

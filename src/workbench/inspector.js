@@ -780,14 +780,17 @@ function traceSpansControls(){
     var keys=Object.keys(state.spans),summary=document.createElement('summary');summary.textContent='Trace spans'+(keys.length?' · '+keys.length:'');fold.appendChild(summary);
     var serial=0,where=state.kind==='edge'?'connection':'node';
     function el(tag,cls,text,parent){var x=document.createElement(tag);if(cls)x.className=cls;if(text!=null)x.textContent=text;(parent || fold).appendChild(x);return x;}
-    el('p','fnote',state.imported?'This '+where+' is imported from '+state.provider+'. Changes here are stored in this document; everything else keeps following '+state.provider+'.':
+    el('p','fnote',state.imported?'This '+where+' is imported from '+state.providerTitle+'. Changes here are stored in this document; everything else keeps following '+state.providerTitle+'.':
       'The spans that belong to this '+where+' in a loaded trace. Steps that light it inherit them.');
     // A note slot right after a control: validator messages and refusals, read by its aria-describedby.
     function slot(parent,control){
       // role=status: a refusal is announced when its text appears. Text is set only by a refusal or a
       // validator message, never cleared and rewritten on a plain re-render.
-      var p=el('p','fnote trace-span-note','',parent);p.id=prefix+'-trace-span-'+(serial++);p.hidden=true;p.setAttribute('role','status');
-      control._spanNote=function(text){p.textContent=text || '';p.hidden=!text;if(text){control.setAttribute('aria-describedby',p.id);if(/^(INPUT|SELECT|TEXTAREA)$/i.test(control.tagName))control.setAttribute('aria-invalid','true');}};
+      // The slot stays in the page, empty and collapsed by CSS, so assistive tech tracks it.
+      var p=el('p','fnote trace-span-note','',parent);p.id=prefix+'-trace-span-'+(serial++);p.setAttribute('role','status');
+      control._spanNote=function(text){p.textContent=text || '';if(text){control.setAttribute('aria-describedby',p.id);if(/^(INPUT|SELECT|TEXTAREA)$/i.test(control.tagName))control.setAttribute('aria-invalid','true');}};
+      // A refusal clears the note, then sets it a moment later: a repeated identical refusal is a change too.
+      control._spanRefuse=function(text){p.textContent='';control.setAttribute('aria-describedby',p.id);opts.schedule(function(){control._spanNote(text);},0);};
       return p;
     }
     function named(control,name,title){control.setAttribute('aria-label',name);if(title)control.title=title;return control;}
@@ -795,7 +798,7 @@ function traceSpansControls(){
     function commit(edit,controls){
       var parsed=parseEditor();if(parsed.error){formError(parsed.error);return false;}
       var plan=planCarrierTraceSpans(parsed.text,parsed.raw,target,edit,context);
-      if(plan.error){var c=controls && (controls[plan.field] || controls.value || controls.any);if(c && c._spanNote)c._spanNote(plan.error);else formError(plan.error);return false;}
+      if(plan.error){var c=controls && (controls[plan.field] || controls.value || controls.any);if(c && c._spanRefuse)c._spanRefuse(plan.error);else formError(plan.error);return false;}
       if(plan.text===parsed.text)return true;
       formError('');return applyPlan(plan,{after:refreshFormSoon},parsed);
     }
@@ -807,10 +810,10 @@ function traceSpansControls(){
     keys.forEach(function(key){
       var span=state.spans[key],group=el('fieldset','trace-span');el('legend','','Span '+key,group);
       var inherited=state.imported && Object.prototype.hasOwnProperty.call(state.inherited,key),changed=inherited && state.overlay && state.overlay.spans && state.overlay.spans[key]!=null;
-      el('p','fnote trace-span-origin',!state.imported?'Declared here':inherited?'Inherited from '+state.provider+(changed?', changed here':''):'Added here',group);
+      el('p','fnote trace-span-origin',!state.imported?'Declared here':inherited?'Inherited from '+state.providerTitle+(changed?', changed here':''):'Added here',group);
       var nameInput;
       if(inherited){
-        nameInput=named(document.createElement('input'),key+' name','Inherited span names come from '+state.provider+'. To rename one, hide it and add a new span.');
+        nameInput=named(document.createElement('input'),key+' name','Inherited span names come from '+state.providerTitle+'. To rename one, hide it and add a new span.');
         nameInput.type='text';nameInput.className='fctl';nameInput.value=key;nameInput.readOnly=true;
       }else nameInput=named(textControl(key,function(v){return commit({op:'rename',name:key,to:v==null?'':v},{name:nameInput});},{placeholder:key}),key+' name','Rename this span. Its fields are kept, and trace scope skips on this board that name it follow.');
       if(!inherited)nameInput.readOnly=false;
@@ -822,7 +825,7 @@ function traceSpansControls(){
       value.disabled=mode==='attributes';
       listen(match,'change',function(){
         // From attributes only to an operation or prefix: there is no value yet, so ask for it first.
-        if(match.value!=='attributes' && !String(value.value || '').trim()){value.disabled=false;value._spanNote('Enter the '+(match.value==='operationPrefix'?'prefix':'operation')+', then press Enter.');value.focus();return;}
+        if(match.value!=='attributes' && !String(value.value || '').trim()){value.disabled=false;value._spanRefuse('Enter the '+(match.value==='operationPrefix'?'prefix':'operation')+', then press Enter.');value.focus();return;}
         if(commit({op:'set',name:key,field:'match',mode:match.value,value:match.value==='attributes'?null:value.value},{match:match,value:value})===false)match.value=mode;
       });
       row(group,'Namespace',named(textControl(span.namespace,function(v){return commit({op:'set',name:key,field:'namespace',value:v},{any:null});},{placeholder:'any'}),key+' namespace','Matches the span service.namespace attribute. Empty matches any namespace.'));
@@ -856,16 +859,16 @@ function traceSpansControls(){
       });
       var acts=actionGroup('Span '+key+' actions','trace-span-actions');
       if(inherited){
-        var hide=checkboxControl(false,function(on){return commit({op:'hide',name:key,value:on},{any:null});});named(hide.firstChild,key+' hidden for this document','Hide this inherited span in this document only. '+state.provider+' keeps it.');
+        var hide=checkboxControl(false,function(on){return commit({op:'hide',name:key,value:on},{any:null});});named(hide.firstChild,key+' hidden for this document','Hide this inherited span in this document only. '+state.providerTitle+' keeps it.');
         var cap=document.createElement('span');cap.className='fnote';cap.textContent=' Hidden for this document';hide.appendChild(cap);acts.appendChild(hide);
-        if(changed)acts.appendChild(named(actionButton('Revert '+key+' to inherited',function(){return commit({op:'revert',name:key},{any:null});}),'Revert '+key+' to inherited','Remove your changes to this span; it follows '+state.provider+' again.'));
+        if(changed)acts.appendChild(named(actionButton('Revert '+key+' to inherited',function(){return commit({op:'revert',name:key},{any:null});}),'Revert '+key+' to inherited','Remove your changes to this span; it follows '+state.providerTitle+' again.'));
       }else acts.appendChild(named(actionButton('Remove span '+key,function(){return commit({op:'remove',name:key},{any:null});}),'Remove span '+key));
       group.appendChild(acts);
     });
     if(state.imported && state.hidden && state.hidden.length){
       var hiddenBox=el('fieldset','trace-span-hidden');el('legend','','Hidden inherited spans',hiddenBox);
       state.hidden.forEach(function(key){
-        var c=checkboxControl(true,function(on){return commit({op:'hide',name:key,value:on},{any:null});});named(c.firstChild,key+' hidden for this document','Clear to show '+key+' from '+state.provider+' again.');
+        var c=checkboxControl(true,function(on){return commit({op:'hide',name:key,value:on},{any:null});});named(c.firstChild,key+' hidden for this document','Clear to show '+key+' from '+state.providerTitle+' again.');
         var cap=document.createElement('span');cap.className='fnote';cap.textContent=' '+key;c.appendChild(cap);hiddenBox.appendChild(frow(key,c));
       });
     }

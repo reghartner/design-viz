@@ -781,6 +781,7 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .trace-span legend,.trace-span-add legend,.trace-span-hidden legend{padding:0 5px;font-size:11px;font-weight:700;}
 .trace-spans-editor .fnote{margin:0;line-height:1.45;overflow-wrap:anywhere;}
 .trace-spans-editor .trace-span-note{margin:0 0 2px 96px;padding-left:6px;border-left:3px solid #D99A1E;color:var(--ink);}
+.trace-spans-editor .trace-span-note:empty{margin:0;padding:0;border:0;height:0;overflow:hidden;}
 .trace-spans-editor .fctl[aria-invalid="true"]{border-color:#D99A1E;}
 .trace-spans-editor .bbtn{min-height:24px;}
 .trace-spans-editor .rowx{min-width:24px;}

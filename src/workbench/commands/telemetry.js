@@ -767,7 +767,10 @@ function traceSpansOverlayEdit(inherited,before,after,previous){
 function traceSpansState(raw,target,context){
   var text=JSON.stringify(raw),t=telemetryCarrierTarget(text,raw,target,context);if(t.error)return t;
   var kind=target.kind==='edge'?'edge':'node',merged=telemetryObject(t.resolved.trace) && telemetryObject(t.resolved.trace.spans)?telemetryClone(t.resolved.trace.spans):{};
-  var out={id:t.id,kind:kind,imported:!!t.owner,provider:t.owner?t.owner.spec:null,spans:merged,inherited:{},overlay:null,messages:{},roles:TRACE_SPAN_ROLE_LIST[kind]};
+  // The provider is named by its page title in every message, its spec id when it has none.
+  var providerSpec=t.owner && context && Array.isArray(context.specs)?context.specs.find(function(x){return x && x.page && x.page.canon && x.page.canon.id===t.owner.spec;}):null;
+  var providerTitle=providerSpec && typeof providerSpec.page.title==='string' && providerSpec.page.title.trim()?providerSpec.page.title.trim():t.owner?t.owner.spec:null;
+  var out={id:t.id,kind:kind,imported:!!t.owner,provider:t.owner?t.owner.spec:null,providerTitle:providerTitle,spans:merged,inherited:{},overlay:null,messages:{},roles:TRACE_SPAN_ROLE_LIST[kind]};
   if(t.owner){
     var imp=t.got.d.topologyImports.find(function(i){return i && i.as===t.owner.as;}),rel=t.id.split('->').map(function(part){return part.slice(t.owner.as.length+2);}).join('->');
     var entry=telemetryObject(imp[t.field])?imp[t.field][rel]:null;out.overlay=telemetryObject(entry) && telemetryObject(entry.trace)?telemetryClone(entry.trace):null;
@@ -818,12 +821,11 @@ function planCarrierTraceSpans(text,raw,target,edit,context){
   var t=telemetryCarrierTarget(text,raw,target,context);if(t.error)return t;
   var state=traceSpansState(raw,target,context);if(state.error)return state;
   var op=edit && edit.op;
-  if(op==='rename' && t.owner && telemetryOwn(state.inherited,edit.name))return {error:'Inherited span names come from '+state.provider+'. To rename one, hide it and add a new span.',field:'name'};
+  if(op==='rename' && t.owner && telemetryOwn(state.inherited,edit.name))return {error:'Inherited span names come from '+state.providerTitle+'. To rename one, hide it and add a new span.',field:'name'};
   // A provider name hidden here is still taken: reusing it would drop the hide and patch the provider's span.
   var claimed=op==='rename'?edit.to:op==='add'?edit.name:null;claimed=typeof claimed==='string'?claimed.trim():claimed;
   if(t.owner && claimed && telemetryOwn(state.inherited,claimed) && !telemetryOwn(state.spans,claimed)){
-    var spec=(context && Array.isArray(context.specs)?context.specs:[]).find(function(x){return x && x.page && x.page.canon && x.page.canon.id===state.provider;}),title=spec && typeof spec.page.title==='string' && spec.page.title.trim()?spec.page.title.trim():state.provider;
-    return {error:'The provider '+title+' declares a span named '+claimed+', hidden in this document; pick another name, or show '+claimed+' and change it instead.',field:'name'};
+    return {error:'The provider '+state.providerTitle+' declares a span named '+claimed+', hidden in this document; pick another name, or show '+claimed+' and change it instead.',field:'name'};
   }
   var plan;
   if(!t.owner){

@@ -9,7 +9,8 @@
         "nodes": {},
         "rows": [["orders::api", "orders::worker"]],
         "steps": [
-          {"id":"receive", "text":"The worker takes the order", "nodes":["orders::worker"]},
+          {"id":"receive", "nodes":["orders::worker"],
+           "text":"The worker takes the order (no traceScope on purpose: it warns because step work also lights the worker; a scope here would inherit the worker too, and spans both steps claim would read ambiguous)"},
           {"id":"work", "text":"The worker processes it", "nodes":["orders::worker"],
            "traceScope":{"skip":{"orders::worker":["role:cache"]}, "maxDurationMs":250}}
         ]

@@ -320,7 +320,7 @@ test('S9 the scoped example: a shared worker is inherited only by the step with 
   const read=id=>JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/canon/topology/'+id+'.json'),'utf8'));
   const board=read('orders-scoped'),platform=read('orders-platform');
   assert.deepEqual(plain(diagramOf(board).steps),[
-    {id:'receive',text:'The worker takes the order',nodes:['orders::worker']},
+    {id:'receive',nodes:['orders::worker'],text:'The worker takes the order (no traceScope on purpose: it warns because step work also lights the worker; a scope here would inherit the worker too, and spans both steps claim would read ambiguous)'},
     {id:'work',text:'The worker processes it',nodes:['orders::worker'],traceScope:{skip:{'orders::worker':['role:cache']},maxDurationMs:250}}]);
   const page=C.FlowTopology.resolveSource(board,{version:1,id:'orders-scoped',specs:[platform,board]});
   assert.deepEqual(plain(C.validate(C.normalize(page)).errors),[]);

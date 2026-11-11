@@ -5100,6 +5100,7 @@ test('#1280 follow-up: in the capped Edit list a row never lands under the bar, 
 | DC3 | Where the chooser opens (several steps, or none), "Declare on <title>" is one of its choices, with the role select; it calls declareSpan. |
 | DC4 | The latest declaration shows "Declared <key> (<service> · <operation>) on <title>." with Undo (undoDeclare). |
 | DC5 | A span the carrier already declares is refused before the write: the board editor's reason ("Already declared as <key> on <title>.") shows beside the button, in the note and in the chooser. |
+| DC6 | (#1337 CI M5) the mapping re-renders the board: the offer of "Declare on <title> instead" survives the controller hand-over (rememberTrace / takeTrace), as the real board editor does it. |
 */
 const click=(el,h)=>{el.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});if(h)runTimers(h);};
 const SPAN={serviceName:MAP_MATCH.serviceName,operation:MAP_MATCH.operation};
@@ -5177,5 +5178,19 @@ test('DC5 a span the carrier already declares is refused beside the button, in t
  click(b.m.body.querySelector('.dv-trace-map-chooser button.dv-trace-map-declare'),b.h);
  assert.deepEqual(b.editor.declares,[]);
  assert.equal((b.m.body.querySelector('.dv-trace-map-chooser .dv-trace-declare-error') || {}).textContent,'Already declared as charge on Beta.','the chooser stays open and says why');
+ b.api.destroy();
+});
+test('DC6 Declare on <title> instead survives the re-render the mapping causes',async()=>{
+ const editor=mapEditor();let b=mapBoard({editor});const s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ assert.deepEqual(editor.calls.at(-1).ref,{section:0,kind:'step',id:'beta'});
+ // The real board editor re-renders the board after the mapping: the controller retires and a new one takes the trace.
+ editor.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});b.api.destroy();
+ b=mapBoard({editor});b.h.flush();b.api.setTraceShow(true);
+ const note=b.m.body.querySelector('.dv-trace-map-note');assert.ok(note,'the note');
+ assert.ok(note.querySelector('select.dv-trace-declare-role'),'the role select is still offered after the re-render');
+ const instead=note.querySelector('button.dv-trace-declare-instead');assert.ok(instead,'Declare on Beta instead is still offered');
+ click(instead,b.h);
+ assert.deepEqual(editor.swaps,[{ref:{section:0,kind:'node',id:'b'},span:{...SPAN,role:'process'}}]);
  b.api.destroy();
 });

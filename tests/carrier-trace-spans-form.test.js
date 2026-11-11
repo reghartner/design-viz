@@ -152,3 +152,65 @@ test('E4 E5 validator messages beside their span; the receive side of a connecti
   assert.deepEqual(plain(diagramOf(ui.raw).edges[0].trace),{spans:{receive:{serviceName:'order-worker',operation:'process orders',role:'receive'}}});
   assert.deepEqual(plain(ui.e.C.FlowCanon.validate(ui.raw)).filter(e=>/^edges\./.test(e)),[],'the declared receive span is valid');
 });
+
+test('E6 a broken override is shown with its error, never turned into a hide; unsupported attributes are refused',()=>{
+  const f=imported(),ui=harness(f.consumer,f.context),INODE={kind:'node',section:0,id:'shared::worker'};
+  const overlay=()=>plain(diagramOf(ui.raw).topologyImports[0].nodeTracking.worker);
+  ui.select(INODE);
+  // Chain 1: the editor refuses an attribute the board cannot match, beside the field.
+  let held=ui.text;ui.control('process new attribute name').value='not.allowed';ui.control('process new attribute value').value='1';ui.click('Add attribute to process');
+  assert.equal(ui.text,held,'nothing written');
+  assert.match(ui.beside('process new attribute name'),/^Attribute not\.allowed is not one this board can match\. Use a supported attribute such as db\.system, or list it in a trace connection's allowedAttributes\.$/);
+  ui.select(INODE);held=ui.text;addSpan(ui,{name:'weird',service:'s',mode:'attributes',value:'weird.attr=1',role:'cache'});
+  assert.equal(ui.text,held);assert.match(ui.beside('New span value'),/Attribute weird\.attr is not one this board can match/);
+  // Chain 2: a hand-written broken override and a typo'd added entry are shown with their errors.
+  const broken=JSON.parse(ui.text);diagramOf(broken).topologyImports[0].nodeTracking.worker.trace={spans:{process:{role:'send'},procss:{operation:'x'}}};
+  ui.h.session.replaceProject(JSON.stringify(broken,null,2),null,{topologyContext:{version:1,id:'consumer',specs:[f.provider,broken]}});ui.select(INODE);
+  assert.ok(ui.has('process service'),'the broken inherited span is shown, not hidden');
+  assert.ok(!ui.h.guide.querySelector('fieldset.trace-span-hidden'),'nothing is listed as hidden');
+  assert.match(ui.beside('process role'),/role must be one of process, database, cache, call, work/,'its error sits beside the field');
+  assert.ok(ui.has('procss service'),'a typo\'d added entry is shown');
+  assert.match(ui.beside('procss service')+ui.beside('procss value'),/the provider declares no span procss/);
+  // An unrelated edit keeps both entries byte for byte and adds no hide.
+  ui.set('find namespace','eu');
+  assert.deepEqual(overlay().trace,{spans:{process:{role:'send'},procss:{operation:'x'},find:{namespace:'eu'}}},'the broken entries are kept as written; no hide');
+  // Fixing the role mends the override.
+  ui.select(INODE);ui.set('process role','process');
+  assert.equal(Object.hasOwn(overlay().trace.spans,'process'),false,'back to the inherited role: no override left');
+  // Locally the same attribute is refused before it reaches node.trace.
+  const local=harness(board()).select(NODE);addSpan(local,{name:'process',service:'s',value:'v',role:'process'});local.select(NODE);
+  held=local.text;local.control('process new attribute name').value='not.allowed';local.control('process new attribute value').value='1';local.click('Add attribute to process');
+  assert.equal(local.text,held);assert.match(local.beside('process new attribute name'),/is not one this board can match/);
+});
+
+test('E7 rename a local or added span, keeping its fields and the trace scope skips that name it, in one Undo step',()=>{
+  const d=board();diagramOf(d).nodes.worker.trace={spans:{find:{serviceName:'order-worker',operationPrefix:'find ',namespace:'eu',attributes:{'db.system':'mongodb'},role:'database'}}};
+  diagramOf(d).steps.push({id:'work',text:'Work',nodes:['worker'],traceScope:{skip:{worker:['find','role:cache']}}});
+  const ui=harness(d).select(NODE);
+  assert.equal(ui.control('find name').readOnly,false,'local span names can be renamed');
+  oneStep(ui,()=>ui.set('find name','lookup'),NODE);
+  const raw=ui.raw;
+  assert.deepEqual(plain(diagramOf(raw).nodes.worker.trace),{spans:{lookup:{serviceName:'order-worker',operationPrefix:'find ',namespace:'eu',attributes:{'db.system':'mongodb'},role:'database'}}},'every field is kept');
+  assert.deepEqual(plain(diagramOf(raw).steps[1].traceScope.skip),{worker:['lookup','role:cache']},'the skip follows the new name');
+  const before=ui.text;ui.set('lookup name','1bad');assert.equal(ui.text,before);assert.match(ui.beside('lookup name'),/A span name starts with a letter/);
+  // An imported carrier: a span added here can be renamed; an inherited one cannot.
+  const f=imported(),im=harness(f.consumer,f.context),INODE={kind:'node',section:0,id:'shared::worker'};im.select(INODE);
+  addSpan(im,{name:'audit',service:'order-worker',value:'audit write',role:'database'});im.select(INODE);
+  oneStep(im,()=>im.set('audit name','auditing'),INODE);
+  assert.deepEqual(plain(diagramOf(im.raw).topologyImports[0].nodeTracking.worker.trace.spans),{auditing:{serviceName:'order-worker',operation:'audit write',role:'database'}});
+  assert.equal(im.control('process name').readOnly,true);
+});
+
+test('E8 E9 a receiver without process spans says so and still offers a receive span; attribute values have a type',()=>{
+  const ui=harness(board()).select(EDGE);
+  assert.match(ui.texts('.trace-span-receiver').join(' '),/^The receiving node Worker declares no process span, so this connection reads send only\. Declare a receive span here to time the hand-off\.$/);
+  ui.click('Declare receive span here');
+  assert.equal(ui.control('New span name').value,'receive');assert.equal(ui.control('New span role').value,'receive');
+  // Attribute types: a number value is stored as a number.
+  ui.select(NODE);addSpan(ui,{name:'process',service:'s',value:'v',role:'process'});ui.select(NODE);
+  ui.control('process new attribute name').value='http.response.status_code';ui.control('process new attribute value').value='200';ui.control('process new attribute type').value='number';
+  oneStep(ui,()=>ui.click('Add attribute to process'),NODE);
+  assert.equal(diagramOf(ui.raw).nodes.worker.trace.spans.process.attributes['http.response.status_code'],200);
+  oneStep(ui,()=>ui.set('process attribute http.response.status_code type','string'),NODE);
+  assert.equal(diagramOf(ui.raw).nodes.worker.trace.spans.process.attributes['http.response.status_code'],'200');
+});

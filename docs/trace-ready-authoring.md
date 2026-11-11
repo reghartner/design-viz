@@ -39,7 +39,10 @@ existing step that represents the observed operation, add `traceMatch`,
 preserving the step's ID, narrative and delivered `edge` or
 `edges`. `nodeId` names an existing stable node in this source section, normally
 the receiving node for that operation. It is not a provider service-name guess.
-`traceMatch` on a node or edge is ignored, with a validator warning.
+`traceMatch` on a node or edge is ignored (warns). To time a node or
+connection in every story, declare its spans under `trace.spans`; steps without
+`traceMatch` inherit them and `traceScope` narrows ([declared spans](provider-traces.md#trace-spans-declared-on-nodes-and-connections-1290),
+[example](../examples/trace-ready/declared.spec.json)).
 
 The Trace view shows a span's exact service and operation ([details](live-status.md#direct-trace-loading)).
 
@@ -70,20 +73,16 @@ the [normalizer](canon.md) can disambiguate: `service.namespace`,
 `flow.backpressure`, `flow.delivery_failed`, `retry.attempt`, and `flow.step.id`.
 Other tags, payload fields and request IDs are dropped (profiles may keep
 [`allowedAttributes`](provider-traces.md#allowed-match-attributes)); do not write
-selectors against them. Prefer stable instrumentation meaning over incidental
-timings.
+selectors against them. Prefer stable instrumentation meaning to timings.
 
-For duplicate calls, first use a verified parent/link or retained attribute.
-`occurrence:1` is only valid for fully timed, non-overlapping serial calls;
-concurrent calls remain ambiguous. `repeat:"attempts"` requires distinct numeric
-`retry.attempt` values and a common parent; do not combine it with `occurrence`.
-One span matching two steps is ambiguous. Do not silence ambiguity by renaming
-nodes, taking the first span or inventing attributes. Leave the unresolved
-mapping visible and report what instrumentation/context is missing. Per-transport
-root spans of one step: [alternatives](provider-traces.md#tracematch-alternatives).
+`occurrence:1` is only for serial, fully timed calls; `repeat:"attempts"` needs
+distinct whole-number `retry.attempt` values and one parent; never combine them. One span
+matching two steps is ambiguous. Do not silence ambiguity by renaming nodes,
+taking the first span or inventing attributes; report what instrumentation is
+missing ([more](provider-traces.md#duplicate-calls-and-retries)).
 
 Only uniquely matched delivered edges receive operation-duration annotations.
-Multiple steps claiming the same edge cannot supply one exact edge duration.
+Several steps claiming one edge cannot give one exact duration.
 These durations are not network latency. Add `maxDurationMs` or `maxQueueDepth`
 only from an explicit existing requirement or user-approved budget, with its
 source in the ledger. Missing spans mean **not observed / outcome unknown**;
@@ -133,9 +132,8 @@ approval. The `reference` and `compare` CLI commands are a separate optional
 them merely to align an existing diagram.
 
 CLI `preview --section N` selects a zero-based diagram section and checks its
-first path (or all steps if no paths). For each additional path, use the same
-production matcher read-only, supplying its exact ID. Give each path report a
-unique name:
+first path (or all steps if no paths). For each additional path, run the same
+production matcher read-only with its exact ID, one uniquely named report each:
 
 ```sh
 node --input-type=module - "$TRACE_CHECK_DIR/trace-resolved.spec.json" /path/to/request.json 0 PATH_ID > "$TRACE_CHECK_DIR/path-mapping.json" <<'JS'

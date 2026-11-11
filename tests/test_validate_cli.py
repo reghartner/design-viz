@@ -236,6 +236,41 @@ class ValidateCliTest(unittest.TestCase):
                 with self.subTest(remedy=remedy):
                     self.assertIn(remedy, error_line)
 
+    def test_trace_scope_example(self):
+        # #1290 PR 10: orders-scoped lights the imported worker from two steps; the one with a
+        # traceScope inherits it. It validates with the provider; the step without a scope gets the
+        # documented shared-carrier warning.
+        scoped, platform = TOPOLOGY / "orders-scoped.json", TOPOLOGY / "orders-platform.json"
+        r = run_cli(str(scoped), str(platform))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(f"{scoped}: 0 errors, 1 warnings", r.stdout)
+        self.assertIn("step receive inherits no trace spans because orders::worker is also lit by step work", r.stdout)
+
+    def test_trace_span_example_pair_and_invalid_provider_declaration(self):
+        # #1290: examples/canon/topology orders-platform (declares trace spans) and
+        # orders-board (changes one, adds one, hides one) validate cleanly together.
+        board, platform = TOPOLOGY / "orders-board.json", TOPOLOGY / "orders-platform.json"
+        clean = run_cli(str(board), str(platform))
+        self.assertEqual(clean.returncode, 0, clean.stdout + clean.stderr)
+        self.assertIn(f"{board}: 0 errors, 0 warnings", clean.stdout)
+        self.assertIn(f"{platform}: 0 errors, 0 warnings", clean.stdout)
+        # An invalid provider declaration fails the provider's own build and is
+        # dropped for the consumer with a warning that names the provider path.
+        with tempfile.TemporaryDirectory() as temp:
+            temp = pathlib.Path(temp)
+            raw = json.loads(platform.read_text())
+            raw["page"]["sections"][0]["diagram"]["nodes"]["worker"]["trace"]["spans"]["find"]["operation"] = "find orders"
+            provider, consumer = temp / "orders-platform.json", temp / "orders-board.json"
+            provider.write_text(json.dumps(raw))
+            shutil.copyfile(board, consumer)
+            r = run_cli(str(consumer), str(provider))
+            self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+            self.assertIn(f"{provider}: ERROR nodes.worker.trace.spans.find: operation and operationPrefix cannot be combined", r.stdout)
+            self.assertIn(f"{provider}: 1 errors, 0 warnings", r.stdout)
+            self.assertIn(f'{consumer}: warn  sections[0].diagram.nodes.orders::worker.trace.spans.find: provider "orders-platform" '
+                          "sections[0].diagram.nodes.worker.trace.spans.find: operation and operationPrefix cannot be combined; not used on this board", r.stdout)
+            self.assertIn(f"{consumer}: 0 errors, 1 warnings", r.stdout)
+
     def test_resolve_imports_unlisted_provider_keeps_registry_message(self):
         with tempfile.TemporaryDirectory() as temp:
             temp = pathlib.Path(temp)

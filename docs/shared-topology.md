@@ -496,10 +496,11 @@ The delivery board imports that structure without copying nodes or edges:
 Open the authored consumer with its approved providers. In the desktop Inspector,
 select an imported node or connection and use **Add ticket** or **Add PR**.
 Inherited references are displayed read-only. Removal applies only to consumer
-additions; each edit has one Undo/Redo. Duplicate additions do nothing.
+additions; each edit is one Undo/Redo. Duplicate additions do nothing.
 
-`nodeTracking` and `edgeTracking` values accept `tickets` and `prs` arrays and
-optional `existsWhen: "tickets-done"`. Existence requires all resolved tickets to
+`nodeTracking` and `edgeTracking` values accept `tickets` and `prs` arrays,
+optional `existsWhen: "tickets-done"`, and `trace` (change, add or hide one provider
+[span declaration](provider-traces.md#trace-spans-declared-on-nodes-and-connections-1290)). Existence requires all resolved tickets to
 be Done, including inherited and local tickets. Provider-authored rules survive
 imports and remain read-only in the consumer. A consumer may add or remove its
 own rule using desktop Inspect → Tracking; reference edits and layout resets
@@ -508,11 +509,9 @@ preserve it. No valid resolved tickets warns and ignores the rule. See
 Jira keys or browse URLs, and PR URLs, follow the [tracking parser](live-status.md#fields); invalid
 entries, unknown fields, and missing/deselected identities fail validation.
 Nested imports use complete provider-relative keys such as `inner::api` and
-`inner::api->inner::store`. The resolver appends local references after inherited
-ones and deduplicates tickets by Jira key in order, retaining the first authored
-reference and its browse URL when present. Provider refreshes preserve
-local additions, including when a provider later adopts the same reference;
-removing the local copy still leaves that inherited reference.
+`inner::api->inner::store`. Local references follow inherited ones, deduplicated
+by Jira key (the first wins). Provider refreshes keep local
+additions; removing a local copy of an inherited reference keeps the provider's.
 
 Tracking is independent of `nodeOverrides`, `nodePositions`, `nodeCodeRefs` and
 `edgeOverrides`, so presentation and layout resets preserve it. Saved authoring

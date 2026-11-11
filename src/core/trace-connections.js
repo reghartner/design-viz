@@ -59,11 +59,12 @@ var FlowTraceConnections=(function(){
   }
   function profiles(raw){if(!object(raw) || Object.keys(raw).length>16)fail('configuration','traceConnections must be an object of at most 16 profiles.');var out={};Object.keys(raw).forEach(function(id){if(!name(id))fail('configuration','Invalid connection id.');out[id]=profile(raw[id]);});return out;}
   /* #1095: company profiles are inherited only by a board that uses traces: a
-     step with traceMatch, or a live-status panel (Status -> Trace) on a page
-     with tracking.telemetry, a node, edge or import-overlay telemetry binding,
-     or a node detail reference (a loaded detail can hold traceMatch steps).
-     Callers pass the page the viewer renders, after topology resolution. The
-     section walk mirrors FlowCanon sections() (src/canon.js). */
+     step with traceMatch, a node or edge trace span declaration (#1290), or a
+     live-status panel (Status -> Trace) on a page with tracking.telemetry, a
+     node, edge or import-overlay telemetry binding, or a node detail reference
+     (a loaded detail can hold traceMatch steps). Callers pass the page the
+     viewer renders, after topology resolution. The section walk mirrors
+     FlowCanon sections() (src/canon.js). */
   function usesTraces(page){
     var diagrams=[];if(!object(page))return false;
     function list(v){return Array.isArray(v)?v:[];}
@@ -72,6 +73,9 @@ var FlowTraceConnections=(function(){
     function values(v){return object(v)?Object.keys(v).map(function(k){return v[k];}):[];}
     function bound(v){return object(v) && own(v,'telemetry');}
     if(diagrams.some(function(d){return list(d.steps).some(function(s){var m=object(s) && s.traceMatch;return Array.isArray(m)?m.length>0:!!m;});}))return true;
+    // #1290: spans declared on a node or edge, or an import overlay's trace, map a trace too.
+    function declares(v){return object(v) && own(v,'trace');}
+    if(diagrams.some(function(d){return values(d.nodes).some(declares) || list(d.edges).some(declares) || list(d.topologyImports).some(function(imp){return object(imp) && (values(imp.nodeTracking).some(declares) || values(imp.edgeTracking).some(declares));});}))return true;
     if(!diagrams.some(function(d){return list(d.panels).some(function(p){return object(p) && p.type==='live-status';});}))return false;
     if(object(page.tracking) && own(page.tracking,'telemetry'))return true;
     return diagrams.some(function(d){return values(d.nodes).some(function(n){return bound(n) || object(n) && !!n.detail;}) || list(d.edges).some(bound) || list(d.topologyImports).some(function(imp){return object(imp) && (values(imp.nodeTracking).some(bound) || values(imp.edgeTracking).some(bound));});});

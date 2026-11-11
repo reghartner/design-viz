@@ -16,7 +16,15 @@ try{
     if(flag('out') && await physical(flag('out'))===await physical(flag('spec')))throw new Error('--out names the authored spec; write the output to another file.');
     // The resolved copy is used for mapping and validation only; outputs keep the authored form.
     spec=(await resolveLocalImports(flag('spec'),imports).catch(e=>{throw new Error('--resolve-imports '+imports+': '+e.message);})).resolved;
-  }else if(command!=='compare' && (declares(spec) || C.sections(spec).some(s=>declares(s?.diagram))))throw new Error(flag('spec')+': unresolved topology declarations. To resolve them, pass '+IMPORTS+'.');
+  }else if(declares(spec) || C.sections(spec).some(s=>declares(s?.diagram))){
+    // compare may run on an import board unresolved when no reference step can inherit an imported
+    // carrier's declarations, which exist only resolved (#1290). Incident steps an earlier compare wrote
+    // are not reference steps, and a local node or connection declares its spans in this file.
+    const d=C.sections(spec)[Number(flag('section') || 0)]?.diagram,aliases=(Array.isArray(d?.topologyImports)?d.topologyImports:[]).map(i=>i && i.as).filter(a=>typeof a==='string');
+    const imported=id=>typeof id==='string' && id.split('->').some(part=>aliases.some(a=>part.startsWith(a+'::')));
+    const inherits=!!d && C.traceMatch.baseSteps(d).some(st=>st && !st.traceMatch && [st.edge].concat(st.edges || [],st.nodes || []).some(imported));
+    if(command!=='compare' || inherits)throw new Error(flag('spec')+': unresolved topology declarations. To resolve them, pass '+IMPORTS+'.');
+  }
   const trace=JSON.parse(await readFile(flag('trace'),'utf8')),section=Number(flag('section') || 0);
   let output;
   if(command==='preview')output=referencePreview(spec,trace,section);
@@ -24,6 +32,8 @@ try{
     const approved=approveReference(spec,trace,{section,reason:flag('reason'),actor:'CLI reviewer'}),target=C.sections(output=C.clone(authored))[section]?.diagram;
     if(!target)throw new Error('Diagram section not found.');
     target.referenceTrace=C.sections(approved)[section].diagram.referenceTrace;
-  }else{const options={section,label:flag('label') || 'Incident trace'},result=compareTrace(spec,trace,options);output=spec===authored?result.spec:compareTrace(authored,trace,options).spec;console.error(JSON.stringify({firstDivergence:result.firstDivergence,pathId:result.pathId,warnings:result.warnings,unmatched:result.mapping.unmatched}));}
+  }else{
+    // #1290: compare the resolved board once (inherited declarations exist only there) and write the incident into the authored one.
+    const options={section,label:flag('label') || 'Incident trace',into:spec===authored?null:authored},result=compareTrace(spec,trace,options);output=result.spec;console.error(JSON.stringify({firstDivergence:result.firstDivergence,pathId:result.pathId,warnings:result.warnings,unmatched:result.mapping.unmatched}));}
   const json=JSON.stringify(output,null,2)+'\n';if(flag('out'))await writeFile(flag('out'),json);else process.stdout.write(json);
 }catch(e){console.error(e.message);process.exitCode=1;}

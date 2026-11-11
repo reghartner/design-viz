@@ -417,11 +417,30 @@ function planDeleteGroup(text, raw, sectionIdx, key){
   });
 }
 
+function builderRetargetTraceSkip(st, oldKey, newKey){
+  /* #1290: traceScope.skip is keyed by node id or "from->to" edge key. A renamed
+     carrier carries its skip list (merged when the new key already has one); a
+     removed carrier takes its skip list with it. */
+  var scope=st && st.traceScope;
+  if(!scope || typeof scope!=='object' || !scope.skip || typeof scope.skip!=='object' || Array.isArray(scope.skip) || !Object.prototype.hasOwnProperty.call(scope.skip,oldKey))return;
+  var skip=Object.create(null);
+  Object.keys(scope.skip).forEach(function(key){
+    var next=key===oldKey?newKey:key;
+    if(!next)return;
+    var list=scope.skip[key];
+    if(Object.prototype.hasOwnProperty.call(skip,next) && Array.isArray(skip[next]) && Array.isArray(list))
+      list=skip[next].concat(list.filter(function(item){return skip[next].indexOf(item)<0;}));
+    skip[next]=list;
+  });
+  if(Object.keys(skip).length)scope.skip=skip;else delete scope.skip;
+}
+
 function builderRetargetStepKeys(steps, oldKey, newKey){
   /* Point every step reference at newKey; null newKey removes the
      reference (a step may legally end up edgeless). */
   (steps || []).forEach(function(st){
     if (!st) return;
+    builderRetargetTraceSkip(st, oldKey, newKey);
     if (st.edge === oldKey){
       if (newKey) st.edge = newKey; else delete st.edge;
     }
@@ -524,6 +543,7 @@ function planRenameNode(text, raw, sectionIdx, oldId, newId){
     (d.steps || []).forEach(function(st){
       if (st && Array.isArray(st.nodes))
         st.nodes = st.nodes.map(function(n){ return n === oldId ? newId : n; });
+      builderRetargetTraceSkip(st, oldId, newId);
     });
     renamedKeys.forEach(function(pair){ builderRetargetStepKeys(d.steps, pair[0], pair[1]); });
   });
@@ -614,6 +634,7 @@ function planDeleteNode(text, raw, sectionIdx, id, resolve){
         st.nodes = st.nodes.filter(function(n){ return n !== id; });
         if (!st.nodes.length) delete st.nodes;
       }
+      builderRetargetTraceSkip(st, id, null);
     });
   });
   plan = builderPruneTicketFilters(plan, sectionIdx, removedTickets, resolve);

@@ -236,8 +236,114 @@ var FlowCanon = (function(){
           if(typeof m.attributes[k]!=='string')warnings.push(at+'Honeycomb table cells are text; a '+typeof m.attributes[k]+' value never matches');
         });
       });
-    });});
+      // #1290: and for a step's traceScope.attributes.
+      var scoped=st && object(st.traceScope) && object(st.traceScope.attributes)?st.traceScope.attributes:{};
+      Object.keys(scoped).forEach(function(k){
+        if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}) || typeof scoped[k]==='string')return;
+        warnings.push('steps.'+(st.id || '?')+'.traceScope.attributes.'+k+': Honeycomb table cells are text; a '+typeof scoped[k]+' value never matches');
+      });
+    });
+    // #1290: the same rule for span declarations on nodes and edges.
+    function declared(value,at){
+      var spans=object(value) && object(value.trace) && object(value.trace.spans)?value.trace.spans:{};
+      Object.keys(spans).forEach(function(key){
+        var attrs=object(spans[key]) && object(spans[key].attributes)?spans[key].attributes:{};
+        Object.keys(attrs).forEach(function(k){
+          if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}) || typeof attrs[k]==='string')return;
+          warnings.push(at+'.trace.spans.'+key+'.attributes.'+k+': Honeycomb table cells are text; a '+typeof attrs[k]+' value never matches');
+        });
+      });
+    }
+    if(object(sec.diagram.nodes))Object.keys(sec.diagram.nodes).forEach(function(id){declared(sec.diagram.nodes[id],'nodes.'+id);});
+    (Array.isArray(sec.diagram.edges)?sec.diagram.edges:[]).forEach(function(e){if(object(e))declared(e,'edges.'+e.from+'->'+e.to);});
+    });
     return warnings;
+  }
+  /* #1290: trace span declarations on a node or edge: trace.spans, keyed by a short name.
+     A declaration names spans by serviceName and either an exact operation, an
+     operationPrefix, or (with neither) its attributes; role says what the span is.
+     Returns [{key, message}]; key is null when the trace object itself is malformed. */
+  var TRACE_SPAN_ROLES={node:['process','database','cache','call','work'],edge:['send','receive']};
+  var TRACE_SPAN_FIELDS=['serviceName','operation','operationPrefix','namespace','attributes','role'];
+  function traceSpanErrors(s,kind,listed){
+    if(!object(s))return ['expected a span declaration object'];
+    var e=[],has=function(k){return Object.prototype.hasOwnProperty.call(s,k);};
+    Object.keys(s).forEach(function(k){if(TRACE_SPAN_FIELDS.indexOf(k)<0)e.push('unknown field '+k);});
+    if(typeof s.serviceName!=='string' || !s.serviceName.trim())e.push('serviceName required');
+    if(has('operation') && (typeof s.operation!=='string' || !s.operation.trim()))e.push('operation must be a nonempty string');
+    if(has('operationPrefix') && (typeof s.operationPrefix!=='string' || s.operationPrefix.trim().length<2))e.push('operationPrefix must be at least two characters');
+    if(has('operation') && has('operationPrefix'))e.push('operation and operationPrefix cannot be combined');
+    if(!has('operation') && !has('operationPrefix') && !(object(s.attributes) && Object.keys(s.attributes).length))e.push('needs operation, operationPrefix or attributes');
+    if(has('namespace') && (typeof s.namespace!=='string' || !s.namespace.trim()))e.push('namespace must be a nonempty string');
+    if(has('attributes') && (!object(s.attributes) || Object.keys(s.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !['string','number','boolean'].includes(typeof s.attributes[k]);})))e.push('attributes: use supported operational attributes only');
+    if(TRACE_SPAN_ROLES[kind].indexOf(s.role)<0)e.push('role must be one of '+TRACE_SPAN_ROLES[kind].join(', '));
+    return e;
+  }
+  /* #1290 (D19): the text for a declared exact operation or prefix that no span of its service in
+     an approved reference trace matches, or null (also for attribute-only declarations). A span can
+     be real and still absent from one run, so the text does not call the declaration wrong. */
+  function traceReferenceMiss(m,spans){
+    if(!object(m) || typeof m.serviceName!=='string' || !Array.isArray(spans))return null;
+    var exact=typeof m.operation==='string',prefix=!exact && typeof m.operationPrefix==='string';if(!exact && !prefix)return null;
+    if(spans.some(function(s){return object(s) && s.serviceName===m.serviceName && (exact?s.operation===m.operation:typeof s.operation==='string' && s.operation.indexOf(m.operationPrefix)===0);}))return null;
+    return m.serviceName+' '+(exact?m.operation:'operations starting "'+m.operationPrefix+'"')+' was not seen in the approved reference trace. If it only appears in some runs, such as retries, nothing is wrong; otherwise check the declaration or approve a new reference';
+  }
+  // The approved reference trace spans of a diagram, or null.
+  function referenceSpans(d){var r=object(d) && object(d.referenceTrace)?d.referenceTrace:null;return r && object(r.approval) && object(r.trace) && Array.isArray(r.trace.spans)?r.trace.spans:null;}
+  // The node ids and delivered edge keys the steps of a diagram's reference flow (its first path, else every step) light.
+  function referenceLit(d){
+    var steps=Array.isArray(d.steps)?d.steps:[],path=Array.isArray(d.paths) && d.paths.length && object(d.paths[0]) && Array.isArray(d.paths[0].steps)?d.paths[0].steps:null;
+    if(path)steps=path.map(function(id){return steps.find(function(s){return object(s) && s.id===id;});});
+    var out={nodes:[],edges:[]};
+    steps.forEach(function(st){
+      if(!object(st))return;var failures=object(st.failures)?st.failures:{},keys=[];
+      if(typeof st.edge==='string')keys.push(st.edge);(Array.isArray(st.edges)?st.edges:[]).forEach(function(k){if(typeof k==='string')keys.push(k);});
+      keys.forEach(function(k){if(failures[k]!=='dropped' && failures[k]!=='blocked' && out.edges.indexOf(k)<0)out.edges.push(k);});
+      (Array.isArray(st.nodes)?st.nodes:[]).forEach(function(n){if(typeof n==='string' && out.nodes.indexOf(n)<0)out.nodes.push(n);});
+    });
+    return out;
+  }
+  function traceDeclarationErrors(trace,kind,raw,listed){
+    if(!listed)listed=profileAttributes(raw);
+    if(!object(trace) || Object.keys(trace).some(function(k){return k!=='spans';}) || !object(trace.spans))return [{key:null,message:'expected {"spans": {<name>: <span declaration>}}'}];
+    var out=[];
+    Object.keys(trace.spans).forEach(function(key){
+      if(!/^[A-Za-z][A-Za-z0-9_-]*$/.test(key))out.push({key:key,message:'span names start with a letter and use letters, digits, - and _'});
+      traceSpanErrors(trace.spans[key],kind,listed).forEach(function(message){out.push({key:key,message:message});});
+    });
+    return out;
+  }
+  // The validate() messages for every carrier declaration of a page, e.g. 'nodes.worker.trace.spans.find: …'.
+  function traceCarrierErrors(raw,listed){
+    if(!listed)listed=profileAttributes(raw);
+    var errors=[];
+    sections(raw).forEach(function(sec){
+      var d=sec.diagram;
+      function spans(value,kind,at){
+        if(!object(value) || !Object.prototype.hasOwnProperty.call(value,'trace'))return;
+        traceDeclarationErrors(value.trace,kind,raw,listed).forEach(function(x){errors.push(at+'.trace'+(x.key==null?'':'.spans.'+x.key)+': '+x.message);});
+      }
+      if(object(d.nodes))Object.keys(d.nodes).forEach(function(id){spans(d.nodes[id],'node','nodes.'+id);});
+      (Array.isArray(d.edges)?d.edges:[]).forEach(function(e){if(object(e))spans(e,'edge','edges.'+e.from+'->'+e.to);});
+    });
+    return errors;
+  }
+  /* #1290: a step's traceScope narrows the spans it inherits from the carriers it lights. */
+  var TRACE_SCOPE_FIELDS=['root','parentStepId','attributes','skip','optional','maxDurationMs','maxQueueDepth'];
+  function traceScopeErrors(st,ids,listed){
+    if(!Object.prototype.hasOwnProperty.call(st,'traceScope'))return [];
+    var sc=st.traceScope,e=[];
+    if(!object(sc))return ['traceScope: expected an object'];
+    if(st.traceMatch!=null)e.push('traceScope: use traceMatch or traceScope on a step, not both');
+    if(!st.id)e.push('traceScope: stable step ID required');
+    Object.keys(sc).forEach(function(k){if(TRACE_SCOPE_FIELDS.indexOf(k)<0)e.push('traceScope: unknown field '+k);});
+    if(sc.root!=null && (!object(sc.root) || Object.keys(sc.root).some(function(k){return k!=='serviceName' && k!=='operation';}) || typeof sc.root.serviceName!=='string' || !sc.root.serviceName.trim() || typeof sc.root.operation!=='string' || !sc.root.operation.trim()))e.push('traceScope.root: expected {serviceName, operation}');
+    if(sc.parentStepId!=null && (typeof sc.parentStepId!=='string' || !ids.has(sc.parentStepId) || sc.parentStepId===st.id))e.push('traceScope: unknown or self parentStepId');
+    if(sc.attributes!=null && (!object(sc.attributes) || Object.keys(sc.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !['string','number','boolean'].includes(typeof sc.attributes[k]);})))e.push('traceScope.attributes: use supported operational attributes only');
+    if(sc.skip!=null && (!object(sc.skip) || Object.keys(sc.skip).some(function(k){return !Array.isArray(sc.skip[k]) || sc.skip[k].some(function(x){return typeof x!=='string' || !x.trim();});})))e.push('traceScope.skip: expected {<node or connection id>: [<span name or role:<role>>, …]}');
+    if(sc.optional!==undefined && typeof sc.optional!=='boolean')e.push('traceScope.optional: expected true or false');
+    ['maxDurationMs','maxQueueDepth'].forEach(function(k){if(sc[k]!=null && (typeof sc[k]!=='number' || !Number.isFinite(sc[k]) || sc[k]<0))e.push('traceScope.'+k+': nonnegative number required');});
+    return e;
   }
   function validate(raw){
     var errors=[], p=pageOf(raw);
@@ -266,14 +372,24 @@ var FlowCanon = (function(){
       });
     });
     var listed=profileAttributes(raw);
+    traceCarrierErrors(raw,listed).forEach(function(e){errors.push(e);});
     sections(raw).forEach(function(sec){
       var d=sec.diagram, steps=Array.isArray(d.steps)?d.steps:[], ids=new Set(steps.map(function(s){return s && s.id;}));
       if(d.referenceTrace!=null){var r=d.referenceTrace;if(!object(r) || r.version!==1 || !object(r.trace) || !object(r.trace.context) || !Array.isArray(r.trace.spans) || typeof r.trace.traceId!=='string' || !object(r.approval) || typeof r.approval.reason!=='string' || typeof r.contract!=='string')errors.push('referenceTrace: expected an approved version-1 trace mapping');}
       if(d.incidents!=null && (!Array.isArray(d.incidents) || d.incidents.some(function(i){return !object(i) || typeof i.pathId!=='string' || typeof i.traceId!=='string' || typeof i.firstDivergence!=='string';})))errors.push('incidents: expected comparison provenance objects');
       // Every alternative's parentStepId is an edge; a cycle through any of them fails.
-      var parents=new Map(steps.filter(function(s){return s && s.traceMatch;}).map(function(s){return [s.id,[].concat(s.traceMatch).map(function(m){return m && m.parentStepId;}).filter(Boolean)];})),acyclic=new Set();
-      var cyclic=function(id,path){if(acyclic.has(id))return false;if(path.has(id))return true;path.add(id);var hit=(parents.get(id) || []).some(function(p){return cyclic(p,path);});path.delete(id);if(!hit)acyclic.add(id);return hit;};
-      parents.forEach(function(_,id){if(cyclic(id,new Set()))errors.push('traceMatch: cyclic parentStepId');});
+      // #1290: traceScope.parentStepId joins the same cycle check.
+      // A cycle that needs a traceScope parent is reported under traceScope, where the step form shows it
+      // (a step naming itself is already reported as a self parentStepId).
+      var cycles=function(withScope){
+        var parents=new Map(steps.filter(function(s){return s && (s.traceMatch || withScope && object(s.traceScope));}).map(function(s){return [s.id,[].concat(s.traceMatch || []).map(function(m){return m && m.parentStepId;}).concat(withScope && object(s.traceScope) && s.traceScope.parentStepId && s.traceScope.parentStepId!==s.id?[s.traceScope.parentStepId]:[]).filter(Boolean)];})),acyclic=new Set(),hits=[];
+        var cyclic=function(id,path){if(acyclic.has(id))return false;if(path.has(id))return true;path.add(id);var hit=(parents.get(id) || []).some(function(p){return cyclic(p,path);});path.delete(id);if(!hit)acyclic.add(id);return hit;};
+        parents.forEach(function(_,id){if(cyclic(id,new Set()))hits.push(id);});
+        return hits;
+      };
+      var matchCycles=cycles(false);
+      matchCycles.forEach(function(){errors.push('traceMatch: cyclic parentStepId');});
+      cycles(true).filter(function(id){return matchCycles.indexOf(id)<0;}).forEach(function(){errors.push('traceScope: cyclic parentStepId');});
       steps.forEach(function(st){
         if(!st)return;
         // An array lists alternatives; each entry is validated as one selector and
@@ -300,6 +416,7 @@ var FlowCanon = (function(){
         });
         // #1175: a step with alternatives is optional only when every alternative says so.
         if(many && list.some(function(m){return object(m) && m.optional===true;}) && list.some(function(m){return !object(m) || m.optional!==true;}))errors.push('traceMatch: set optional on every alternative or on none');
+        traceScopeErrors(st,ids,listed).forEach(function(e){errors.push(e);});
         if(st.conditions!=null){
           if(!Array.isArray(st.conditions))errors.push('conditions: expected an array');
           else st.conditions.forEach(function(c){
@@ -326,6 +443,6 @@ var FlowCanon = (function(){
   }
   /* #1238: the attribute names traceMatch.attributes accepts on this page, for the Workbench form. */
   function traceAttributeNames(raw){return traceAttributes.concat(Object.keys(profileAttributes(raw)).filter(function(k){return traceAttributes.indexOf(k)<0;}));}
-  return {version:1,traceWarnings:traceWarnings,traceAttributeNames:traceAttributeNames,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
+  return {version:1,traceWarnings:traceWarnings,traceDeclarationErrors:traceDeclarationErrors,traceReferenceMiss:traceReferenceMiss,referenceSpans:referenceSpans,referenceLit:referenceLit,traceCarrierErrors:traceCarrierErrors,traceAttributeNames:traceAttributeNames,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
     referenceErrors:referenceErrors,locate:locate,codeUrl:codeUrl,references:references,validate:validate,links:links};
 })();

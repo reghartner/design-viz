@@ -122,7 +122,7 @@ function carrierTraceMatchWarning(value, d, kind, id, path, warnings){
   if(!value || typeof value!=='object' || !Object.prototype.hasOwnProperty.call(value,'traceMatch'))return;
   var imports=(d.topologyProvenance && Array.isArray(d.topologyProvenance.imports))?d.topologyProvenance.imports:[];
   if(imports.some(function(imp){return imp && Array.isArray(imp[kind+'s']) && imp[kind+'s'].indexOf(id)>=0;}))return;
-  warnings.push(path+'.traceMatch: traceMatch is read only from steps; this value on '+kind+' '+id+' is ignored. Put it on the step that lights this '+kind+'.');
+  warnings.push(path+'.traceMatch: traceMatch is read only from steps; this value on '+kind+' '+id+' is ignored. Put it on the step that lights this '+kind+', or declare it under trace.spans.');
 }
 function trackingWarnings(value, path, warnings){
   if(value && Object.prototype.hasOwnProperty.call(value,'missingWork') && typeof value.missingWork!=='boolean')
@@ -720,7 +720,14 @@ function editHistoryEntryProblem(entry){
   for(var i=0;i<entry.changes.length;i++){
     var change=entry.changes[i],at='changes['+i+']';
     if(!specObject(change))return at+': must be an object';
-    if(change.op!=='add' && change.op!=='remove' && change.op!=='clear-missing-work' && change.op!=='trace-match')return at+'.op: must be "add", "remove", "clear-missing-work" or "trace-match"';
+    if(change.op!=='add' && change.op!=='remove' && change.op!=='clear-missing-work' && change.op!=='trace-match' && change.op!=='trace-span')return at+'.op: must be "add", "remove", "clear-missing-work", "trace-match" or "trace-span"';
+    // #1290 PR 9: a span declared on a node or connection in Edit mode names its carrier and the declaration.
+    if(change.op==='trace-span'){
+      if(Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "trace-span" change has no ticket';
+      if(Object.prototype.hasOwnProperty.call(change,'step'))return at+': a "trace-span" change names a node or edge, not a step';
+      var sp=change.span;
+      if(!specObject(sp) || ['key','serviceName','operation','role'].some(function(k){return typeof sp[k]!=='string' || !sp[k];}))return at+'.span: needs "key", "serviceName", "operation" and "role" strings';
+    }
     // #1078: a span mapped to a step in Edit mode names the step and the traceMatch written there.
     if(change.op==='trace-match'){
       if(Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "trace-match" change has no ticket';
@@ -735,10 +742,12 @@ function editHistoryEntryProblem(entry){
       var was=change.replaces;
       if(Object.prototype.hasOwnProperty.call(change,'replaces') && (!specObject(was) || typeof was.serviceName!=='string' || !was.serviceName || typeof was.operation!=='string' || !was.operation))return at+'.replaces: needs "serviceName" and "operation" strings';
       if(specObject(was) && Object.prototype.hasOwnProperty.call(was,'nodeId') && (typeof was.nodeId!=='string' || !was.nodeId))return at+'.replaces.nodeId: must be a node id';
+      // #1290: the traceScope a mapping replaced (board Edit removes it).
+      if(Object.prototype.hasOwnProperty.call(change,'replacesScope') && !specObject(change.replacesScope))return at+'.replacesScope: must be the traceScope object the mapping replaced';
       continue;
     }
     // #855: clearing a Missing work marker names only its carrier.
-    if(change.op==='clear-missing-work'){if(Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "clear-missing-work" change has no ticket';}
+    if(change.op==='clear-missing-work' || change.op==='trace-span'){if(change.op==='clear-missing-work' && Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "clear-missing-work" change has no ticket';}
     else if(typeof change.ticket!=='string' || !trackingKeyPattern.test(change.ticket))return at+'.ticket: must be a Jira key';
     var node=Object.prototype.hasOwnProperty.call(change,'node'),edge=Object.prototype.hasOwnProperty.call(change,'edge');
     var nodeOk=typeof change.node==='string' && change.node.length>0;
@@ -765,6 +774,87 @@ function editHistoryEntries(page, warn){
   return kept.map(function(item){return item.entry;});
 }
 
+/* #1290 (D19): on a diagram with an approved reference trace, each declaration the board owns on a
+   carrier its reference flow lights is checked against that trace. Local carriers are checked here;
+   spans the board's own import overlay adds or overrides are checked when it resolves (at the overlay
+   path, src/canon-topology.js). Spans a provider declares are left to the provider's own check. */
+function referenceTraceDeclarationWarnings(d,DP,warnings){
+  if(typeof FlowCanon==='undefined' || !FlowCanon.referenceSpans)return;
+  var spans=FlowCanon.referenceSpans(d);if(!spans)return;
+  var lit=FlowCanon.referenceLit(d),imports=specObject(d.topologyProvenance) && Array.isArray(d.topologyProvenance.imports)?d.topologyProvenance.imports:[];
+  function imported(kind,id){return imports.some(function(imp){return specObject(imp) && Array.isArray(imp[kind]) && imp[kind].indexOf(id)>=0;});}
+  function check(value,at){
+    var declared=specObject(value) && specObject(value.trace) && specObject(value.trace.spans)?value.trace.spans:{};
+    Object.keys(declared).forEach(function(key){var miss=FlowCanon.traceReferenceMiss(declared[key],spans);if(miss)warnings.push(at+'.trace.spans.'+key+': '+miss);});
+  }
+  if(specObject(d.nodes))lit.nodes.forEach(function(id){if(specObject(d.nodes[id]) && !imported('nodes',id))check(d.nodes[id],DP+'.nodes.'+id);});
+  (Array.isArray(d.edges)?d.edges:[]).forEach(function(e,i){if(specObject(e) && lit.edges.indexOf(e.from+'->'+e.to)>=0 && !imported('edges',e.from+'->'+e.to))check(e,DP+'.edges['+i+']');});
+}
+/* #1290: steps inherit the trace spans declared on the carriers they light. Warn, in plain words,
+   when a traceScope skip names a span the carrier does not declare or a carrier the step does
+   not light (both ignored, so a provider change never fails the board), and when a step
+   inherits nothing because every declared carrier it lights is shared with another step on a
+   path and it has no traceScope. */
+function traceScopeWarnings(d,DP,warnings){
+  var steps=Array.isArray(d.steps)?d.steps:[];
+  function declared(kind,id){
+    var value=kind==='node'?(specObject(d.nodes) && d.nodes[id]):(Array.isArray(d.edges)?d.edges:[]).find(function(e){return specObject(e) && e.from+'->'+e.to===id;});
+    var spans=specObject(value) && specObject(value.trace) && specObject(value.trace.spans)?value.trace.spans:null;
+    return spans && Object.keys(spans).filter(function(k){return specObject(spans[k]);}).map(function(k){return {key:k,role:spans[k].role};});
+  }
+  function lit(st){
+    var keys=[],failures=specObject(st.failures)?st.failures:{};
+    if(typeof st.edge==='string')keys.push(st.edge);
+    if(Array.isArray(st.edges))st.edges.forEach(function(k){if(typeof k==='string' && keys.indexOf(k)<0)keys.push(k);});
+    return keys.filter(function(k){return failures[k]!=='dropped' && failures[k]!=='blocked';}).map(function(k){return {kind:'edge',id:k};})
+      .concat((Array.isArray(st.nodes)?st.nodes:[]).filter(function(n){return typeof n==='string';}).map(function(n){return {kind:'node',id:n};}));
+  }
+  var paths=typeof diagramPathList==='function'?diagramPathList(d):[{indices:steps.map(function(s,i){return i;})}],warned=Object.create(null);
+  steps.forEach(function(st,i){
+    if(!specObject(st) || st.traceMatch!=null)return;
+    var at=DP+'.steps['+i+']',carriers=lit(st).filter(function(c){return declared(c.kind,c.id);});
+    if(specObject(st.traceScope) && specObject(st.traceScope.skip))Object.keys(st.traceScope.skip).forEach(function(id){
+      var list=Array.isArray(st.traceScope.skip[id])?st.traceScope.skip[id]:[],where=at+'.traceScope.skip.'+id;
+      var hit=lit(st).find(function(c){return c.id===id;});
+      if(!hit){warnings.push(where+': step '+(st.id || i)+' does not light '+id+'; that skip is ignored');return;}
+      var spans=declared(hit.kind,id) || [];
+      list.forEach(function(entry){
+        if(typeof entry!=='string')return;
+        if(entry.indexOf('role:')===0){var role=entry.slice(5);if(!spans.some(function(x){return x.role===role;}))warnings.push(where+': '+id+' declares no trace span with role '+role+'; that skip is ignored');
+          // #1290: a step on a connection only ever takes its send spans, so skipping anything else does nothing.
+          else if(hit.kind==='edge' && role!=='send')warnings.push(where+': a step on a connection takes only its send spans, so skipping role:'+role+' does nothing');}
+        else if(!spans.some(function(x){return x.key===entry;}))warnings.push(where+': '+id+' declares no trace span named '+entry+'; that skip is ignored');
+        else if(hit.kind==='edge' && !spans.some(function(x){return x.key===entry && x.role==='send';}))warnings.push(where+': a step on a connection takes only its send spans, so skipping '+entry+' does nothing');
+      });
+    });
+    // #1290: a parent step on no path with this step is never found, so the step always reads missing.
+    if(specObject(st.traceScope) && typeof st.traceScope.parentStepId==='string' && st.traceScope.parentStepId!==st.id){
+      var pj=steps.findIndex(function(x){return specObject(x) && x.id===st.traceScope.parentStepId;});
+      if(pj>=0 && !paths.some(function(path){return path.indices.indexOf(i)>=0 && path.indices.indexOf(pj)>=0;}))
+        warnings.push(at+'.traceScope.parentStepId: parent step '+st.traceScope.parentStepId+' is on no path with step '+(st.id || i)+', so this step always reads missing');
+    }
+    // #1290: a budget on a step that lights nothing with declared spans is never checked.
+    if(specObject(st.traceScope) && !carriers.length && (st.traceScope.maxDurationMs!=null || st.traceScope.maxQueueDepth!=null))
+      warnings.push(at+'.traceScope: step '+(st.id || i)+' lights no node or connection that declares trace spans, so its budget is never checked');
+    if(st.traceScope!=null || !carriers.length || warned[i])return;
+    // The first path that holds this step where every declared carrier it lights is shared; the
+    // warning names that path when the diagram has authored paths.
+    var named=Array.isArray(d.paths) && d.paths.length;
+    paths.some(function(path){
+      if(path.indices.indexOf(i)<0)return false;
+      var shared=null,others=null;
+      var free=carriers.filter(function(c){
+        var with_=path.indices.filter(function(j){return j!==i && specObject(steps[j]) && lit(steps[j]).some(function(o){return o.kind===c.kind && o.id===c.id;});});
+        if(with_.length && !shared){shared=c;others=with_.map(function(j){return steps[j].id || String(j);});}
+        return !with_.length;
+      });
+      if(free.length || !shared)return false;
+      warned[i]=true;
+      warnings.push(at+': '+(named?'on path '+path.label+', ':'')+'step '+(st.id || i)+' inherits no trace spans because '+shared.id+' is also lit by '+(others.length>1?'steps ':'step ')+others.join(', ')+'; add a traceScope to this step to choose its spans (skip the ones another step owns, or both steps claim them)');
+      return true;
+    });
+  });
+}
 function validate(page){
   var errors = [], warnings = [], notes = [];
   if (!specObject(page)){ errors.push('top level: expected {page:{blocks:[...]}} (or sections), or a bare diagram with nodes+rows'); return {errors:errors, warnings:warnings}; }
@@ -807,6 +897,10 @@ function validate(page){
       if(drop.kind==='edges')(Array.isArray(d.edges)?d.edges:[]).some(function(e,i){if(e && e.from+'->'+e.to===drop.id){at=DP+'.edges['+i+']';return true;}return false;});
       warnings.push(at+'.telemetry: provider "'+drop.spec+'" '+drop.path+': '+drop.message);
     });
+    // #1290: provider spans dropped for this board warn at the carrier; overlay findings sit at the overlay.
+    if(typeof FlowTopology!=='undefined' && FlowTopology.traceFindings){var spanFindings=FlowTopology.traceFindings(d,DP);errors.push.apply(errors,spanFindings.errors);warnings.push.apply(warnings,spanFindings.warnings);}
+    traceScopeWarnings(d,DP,warnings);
+    referenceTraceDeclarationWarnings(d,DP,warnings);
     // A resolved snapshot already carries overlay bindings on its imported carriers.
     if(!d.topologyProvenance)(Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp,i){
       if(!specObject(imp))return;

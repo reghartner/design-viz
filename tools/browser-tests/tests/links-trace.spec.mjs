@@ -11,7 +11,8 @@
    T10 refused menu choice | same | Move to… step 4 (it already has the same match) marks Add as alternative aria-disabled with its described reason; ArrowDown reaches it, Enter on it writes nothing and keeps the menu, ArrowDown reaches Cancel, Enter writes nothing | arrow keys stuck, a refused choice that writes or hides its reason
    T11 create draft follows its step | same | a + Add trace match draft on step 3 is dropped when a JSON edit removes step 1 and moves another step into its place | a draft that jumps to another step
    T12 id-less step | step 3 without an id | + Add trace match is focusable, aria-disabled and described by the visible reason; clicking it writes nothing and says the reason in the status line | a disabled control that hides its reason from keyboard users
-   T6 imported node | consumer importing provider api | the Node select lists API (imported) and writes nodeId canon::api in one Undo step | imported nodes missing from the select */
+   T6 imported node | consumer importing provider api | the Node select lists API (imported) and writes nodeId canon::api in one Undo step | imported nodes missing from the select
+   T13 declarations (#1290 PR 8) | notify and ctrl->ingest declare spans; Path A shares notify, Path B does not | the route row lists "declared on Notification service (route)" and "Step 3 · push (inherited on Path B)"; Assign marks a scoped step "replaces this step's trace scope"; the rename notice says it changes the steps' trace matches, not the declarations; Edit in Inspect opens the Trace spans fold; By element lists the node's own declarations; Move onto the scoped step says its trace scope was removed | a declaration row that can be dragged or renamed, a rename that hides what it leaves alone */
 import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
 import {digest} from '../../canon/drift.mjs';
 
@@ -301,4 +302,41 @@ test('T12 + Add trace match on a step without an id is focusable, explains why, 
   await expect(panel.locator('.links-trace-editor')).toHaveCount(0);
   await expect(links.locator('.links-status')).toContainText('Give this step an id in Inspect first');
   await expect(page.locator('#src')).toHaveValue(text);
+});
+
+test('T13 declared spans: read-only rows with inheriting steps per path, a plain rename notice, Edit in Inspect, By element',async({page,server})=>{
+  const spec=JSON.parse(JSON.stringify(fixture)),dd=spec.page.sections[0].diagram;
+  dd.nodes.notify.trace={spans:{route:{serviceName:'notify-svc',operation:'route.event',role:'process'},lookup:{serviceName:'notify-svc',operationPrefix:'GET ',role:'database'}}};
+  dd.edges[0].trace={spans:{send:{serviceName:'ingest-api',operation:'POST /v1/events',role:'send'}}};
+  delete dd.steps[0].traceMatch;dd.steps[0].traceScope={};
+  dd.paths=[{id:'a',label:'Path A',steps:['publish','route','push','retry']},{id:'b',label:'Path B',steps:['publish','push']}];
+  const {panel}=await open(page,server,spec);
+  const row=panel.locator('[data-links-trace="'+KEY+'"]');
+  await expect(row.locator('.links-declaration')).toHaveText(['declared on Notification service (route)']);
+  await expect(row.locator('.links-inherited')).toHaveText(['Step 3 · push (inherited on Path B)']);
+  const prefix=panel.locator('[data-links-trace="notify-svc · GET … (prefix)"]');
+  await expect(prefix.getByRole('button',{name:/^Rename/})).toHaveCount(0);await expect(prefix.locator('.links-handle')).toHaveCount(0);
+  // A step with a trace scope says, before the action, that assigning replaces it.
+  await row.getByRole('button',{name:'Assign '+KEY+' to steps',exact:true}).click();
+  await expect(page.locator('[data-links-option="step:0:0"] .links-chip-note')).toHaveText('replaces this step\'s trace scope');
+  await page.keyboard.press('Escape');
+  await row.getByRole('button',{name:'Rename '+KEY,exact:true}).click();
+  await expect(row.locator('.links-trace-rename')).toContainText('This changes the steps\' trace matches only, not the spans declared on nodes and connections.');
+  await row.getByRole('button',{name:'Cancel',exact:true}).click();
+  const edit=row.getByRole('button',{name:'Edit route on Notification service in Inspect',exact:true});
+  const box=await edit.boundingBox();expect(box.height,'the button is at least 24px tall').toBeGreaterThanOrEqual(24);
+  await edit.click();
+  const fold=page.locator('#guide details.trace-spans-editor');
+  await expect(fold).toBeVisible();expect(await fold.evaluate(el=>el.open)).toBe(true);
+  await expect(fold.getByLabel('route service',{exact:true})).toHaveValue('notify-svc');
+  if(!await page.locator('#workspace-window-links').isVisible())await page.locator('#editor-tab-links').click();
+  await panel.getByRole('button',{name:'By element',exact:true}).click();
+  await expect(panel.locator('[data-links-element="node:0:notify"] .links-declaration')).toHaveText(['route · notify-svc route.event','lookup · notify-svc GET … (prefix)']);
+  // #1290 PR 9 (review c2 minor): Move onto a step with a trace scope says, after the write too, that the scope went.
+  await panel.locator('[data-links-element="step:0:1"] [data-links-trace-chip="'+KEY+'"] .links-chip-main').focus();await page.keyboard.press('Enter');
+  await page.getByRole('menu',{name:new RegExp(KEY)}).getByRole('menuitem',{name:'Move to…'}).click();
+  const picker=page.getByRole('dialog',{name:new RegExp('Move '+KEY)});await expect(picker).toBeVisible();
+  await picker.getByRole('button',{name:'Step 1 · publish (has a trace scope)',exact:true}).click();
+  await expect(page.locator('#workspace-window-links .links-status')).toContainText('; its trace scope was removed.');
+  await expect.poll(async()=>steps(await source(page))[0]).toEqual({id:'publish',text:'The controller publishes',edge:'ctrl->ingest',traceMatch:{serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'deployment.environment.name':'prod'}}});
 });

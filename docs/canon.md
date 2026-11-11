@@ -287,7 +287,20 @@ environment and service version changes are reported. Changed selectors or budge
 require reference reapproval. Unmatched spans are reported and never assigned
 invented nodes, outcomes or root causes.
 
-`diagram.referenceTrace` holds the approved mapping and reference.
+`diagram.referenceTrace` holds the approved mapping and reference. For steps that inherit
+declared trace spans (#1290, `docs/provider-traces.md`) the approval also covers the step's
+`traceScope` and the declarations of every carrier it lights (and, for a connection, the
+receiving node's `process` spans), so a provider or overlay change to those spans asks for a
+new approval, as does another step starting or stopping to light a carrier a step inherits
+from; boards without declarations keep their approvals unchanged. Inheriting steps count as
+measured; ambiguous ones block approval, and steps of another flow are left out. `trace-cli
+compare --resolve-imports` checks the approval once, on the resolved board. With an approved
+reference trace, each declaration the board owns on a carrier its reference flow lights is
+checked: a declared operation or prefix that no span matches reads "… was not seen in the
+approved reference trace. If it only appears in some runs, such as retries, nothing is wrong".
+Local declarations are reported at the carrier, spans the board's import overlay adds or
+overrides at the overlay; spans a provider declares are left to the provider's own reference
+check, and attribute-only declarations are not checked.
 `diagram.incidents` holds portable comparison provenance. Generated divergent
 steps have unique IDs, `evidence`, and `conditions`. Conditions accept
 `service-error`, `delivery-failed`, `slow`, `database-slow`, `queue-buildup`,
@@ -309,7 +322,9 @@ For a spec with `topologyImports`, add
 `tools/validate.js` uses). Imports resolve in memory for mapping and validation
 only. `reference` and `compare` output the authored spec, imports kept, with the
 approved reference or the incident overlay; `--out` may not name the authored
-spec. Without the option, `preview` and `reference` stop with an error naming it.
+spec. Without the option, `preview` and `reference` stop with an error naming it, and so
+does `compare` when a reference step without a `traceMatch` lights an imported node or
+connection (it can inherit the provider's declared spans). Incident steps don't count.
 
 These commands write proposed files; committing a reference or incident into the
 central repository remains a reviewed change. See the

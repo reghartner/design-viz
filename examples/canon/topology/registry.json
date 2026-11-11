@@ -24,6 +24,18 @@
     {
       "id": "checkout-nested",
       "path": "checkout-nested.json"
+    },
+    {
+      "id": "orders-platform",
+      "path": "orders-platform.json"
+    },
+    {
+      "id": "orders-board",
+      "path": "orders-board.json"
+    },
+    {
+      "id": "orders-scoped",
+      "path": "orders-scoped.json"
     }
   ]
 }

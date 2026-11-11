@@ -3,7 +3,7 @@
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null,invalidateAlignment=null,invalidateEdgeEndpoints=null;
-  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),TRACE_MATCH_DRAFTS=new Map(),TRACE_MATCH_REVEALED=new Set(),traceMatchCache=null,OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false,BOARD_READY_TEXT=null,FORM_NOTICE=null;
+  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),TRACE_MATCH_DRAFTS=new Map(),TRACE_SPAN_DRAFTS=new Map(),TRACE_SCOPE_VIEW=new Map(),REVEAL_TRACE_SPANS=null,TRACE_MATCH_REVEALED=new Set(),traceMatchCache=null,OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false,BOARD_READY_TEXT=null,FORM_NOTICE=null;
   // #1255: unsaved Metrics editor New … fields for the current selection.
   var METRICS_DRAFTS=new Map();
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
@@ -44,8 +44,11 @@ function createBuilderInspector(opts){
   function beginForm(identity){
     var same=identity===inspectorScrollKey;
     var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0,sizes:same?captureTextareaSizes():null,disclosures:same?captureDisclosures():null};
+    // A Links "Edit in Inspect" request is for the very next render of that carrier (#1290 PR 8):
+    // rendering anything else first drops it, so a later ordinary click opens nothing.
+    if(REVEAL_TRACE_SPANS && REVEAL_TRACE_SPANS!==revealKey(session.target))REVEAL_TRACE_SPANS=null;
     if(!same){
-      OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_MATCH_REVEALED.clear();
+      OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_SPAN_DRAFTS.clear();TRACE_SCOPE_VIEW.clear();TRACE_MATCH_REVEALED.clear();
       OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;FORM_NOTICE=null;
       LOG_SEARCH_DRAFTS.clear();
     }
@@ -65,7 +68,10 @@ function createBuilderInspector(opts){
       else if(!previous.disclosures)fold.open=fold.hasAttribute('data-inspector-open');
     });
     assignControlKeys();restoreTextareaSizes(previous.sizes);restoreFocus(previous.focus);guide.scrollTop=previous.scroll;
+    if(REVEAL_TRACE_SPANS && REVEAL_TRACE_SPANS===revealKey(session.target))REVEAL_TRACE_SPANS=null;
   }
+  // The carrier a Links "Edit in Inspect" asked for (#1290 PR 8); another selection's render leaves the request.
+  function revealKey(t){return t?JSON.stringify([t.kind,t.section,t.kind==='node'?t.id:t.index]):'';}
   function disclosureNodes(){
     /* Omit changing patch summaries and collection counts from the identity. */
     var counts=Object.create(null),folds=Array.from(guide.querySelectorAll('details'));
@@ -737,6 +743,7 @@ function trackingControls(val,overlay){
     });
     if(session.target && (session.target.kind==='node' || session.target.kind==='edge') && !textBox){
       var metrics=metricsControls();if(metrics)box.appendChild(metrics);
+      var spans=traceSpansControls();if(spans)box.appendChild(spans);
     }
     return box;
   }
@@ -764,6 +771,159 @@ function metricsControls(){
     return createFlowMetricsEditor({document:document,state:state,controls:metricsControlKit(),listen:listen,drafts:METRICS_DRAFTS,commit:function(edit){
       return commitTelemetry(function(text,raw){return planCarrierTelemetry(text,raw,target,edit,session.topologyContext());});
     }});
+  }
+/* #1290 PR 6: Inspect → Tracking → Trace spans on a node or connection, local or imported (desktop
+   only). Each accepted edit is one planCarrierTraceSpans source change, so one Undo step; a refused
+   edit changes nothing and its plain message sits beside the field. Imported carriers store only
+   their changes in the consumer overlay; each inherited span names its provider. */
+function traceSpansControls(){
+    var snapshot=parseEditor();if(snapshot.error)return null;
+    var target=Object.assign({},session.target),context=session.topologyContext(),state;
+    try{state=traceSpansState(snapshot.raw,target,context);}catch(ex){state={error:ex.message};}
+    if(state.error)return null;
+    if(target.kind==='edge')target.key=state.id;
+    var fold=document.createElement('details');fold.className='trace-spans-editor';
+    // Links "Edit in Inspect" (#1290 PR 8): open this fold, and any fold around it, for this selection only.
+    if(REVEAL_TRACE_SPANS && REVEAL_TRACE_SPANS===revealKey(session.target)){fold.setAttribute('data-inspector-reveal','');
+      opts.schedule(function(){if(!fold.isConnected && fold.isConnected!==undefined)return;for(var f=fold;f;f=f.parentNode && f.parentNode.closest?f.parentNode.closest('details'):null)f.open=true;var s=fold.querySelector('summary');if(s && s.focus)s.focus();if(fold.scrollIntoView)fold.scrollIntoView({block:'nearest'});},0);}
+    var keys=Object.keys(state.spans),summary=document.createElement('summary');summary.textContent='Trace spans'+(keys.length?' · '+keys.length:'');fold.appendChild(summary);
+    var serial=0,where=state.kind==='edge'?'connection':'node';
+    function el(tag,cls,text,parent){var x=document.createElement(tag);if(cls)x.className=cls;if(text!=null)x.textContent=text;(parent || fold).appendChild(x);return x;}
+    el('p','fnote',state.imported?'This '+where+' is imported from '+state.providerTitle+'. Changes here are stored in this document; everything else keeps following '+state.providerTitle+'.':
+      'The spans that belong to this '+where+' in a loaded trace. Steps that light it inherit them.');
+    // A note slot right after a control: validator messages and refusals, read by its aria-describedby.
+    function slot(parent,control){
+      // role=status: a refusal is announced when its text appears. Text is set only by a refusal or a
+      // validator message, never cleared and rewritten on a plain re-render.
+      // The slot stays in the page, empty and collapsed by CSS, so assistive tech tracks it.
+      var p=el('p','fnote trace-span-note','',parent);p.id=prefix+'-trace-span-'+(serial++);p.setAttribute('role','status');
+      control._spanNote=function(text){p.textContent=text || '';if(text){control.setAttribute('aria-describedby',p.id);if(/^(INPUT|SELECT|TEXTAREA)$/i.test(control.tagName))control.setAttribute('aria-invalid','true');}};
+      // A refusal clears the note, then sets it a moment later: a repeated identical refusal is a change too.
+      control._spanRefuse=function(text){p.textContent='';control.setAttribute('aria-describedby',p.id);opts.schedule(function(){control._spanNote(text);},0);};
+      return p;
+    }
+    function named(control,name,title){control.setAttribute('aria-label',name);if(title)control.title=title;return control;}
+    function row(parent,label,control){var r=frow(label,control);parent.appendChild(r);slot(parent,control);return control;}
+    function commit(edit,controls){
+      var parsed=parseEditor();if(parsed.error){formError(parsed.error);return false;}
+      var plan=planCarrierTraceSpans(parsed.text,parsed.raw,target,edit,context);
+      if(plan.error){var c=controls && (controls[plan.field] || controls.value || controls.any);if(c && c._spanRefuse)c._spanRefuse(plan.error);else formError(plan.error);return false;}
+      if(plan.text===parsed.text)return true;
+      formError('');return applyPlan(plan,{after:refreshFormSoon},parsed);
+    }
+    function select(options,value,label){
+      var sel=document.createElement('select');sel.className='fctl';
+      options.forEach(function(o){var x=document.createElement('option');x.value=o[0];x.textContent=o[1];sel.appendChild(x);});sel.value=value;return named(sel,label);
+    }
+    var modes=Object.keys(TRACE_SPAN_MODES).map(function(k){return [k,TRACE_SPAN_MODES[k]];}),roleOptions=state.roles.map(function(r){return [r,r];});
+    keys.forEach(function(key){
+      var span=state.spans[key],group=el('fieldset','trace-span');el('legend','','Span '+key,group);
+      var inherited=state.imported && Object.prototype.hasOwnProperty.call(state.inherited,key),changed=inherited && state.overlay && state.overlay.spans && state.overlay.spans[key]!=null;
+      el('p','fnote trace-span-origin',!state.imported?'Declared here':inherited?'Inherited from '+state.providerTitle+(changed?', changed here':''):'Added here',group);
+      var nameInput;
+      if(inherited){
+        nameInput=named(document.createElement('input'),key+' name','Inherited span names come from '+state.providerTitle+'. To rename one, hide it and add a new span.');
+        nameInput.type='text';nameInput.className='fctl';nameInput.value=key;nameInput.readOnly=true;
+      }else nameInput=named(textControl(key,function(v){return commit({op:'rename',name:key,to:v==null?'':v},{name:nameInput});},{placeholder:key}),key+' name','Rename this span. Its fields are kept, and trace scope skips on this board that name it follow.');
+      if(!inherited)nameInput.readOnly=false;
+      row(group,'Name',nameInput);
+      var service=row(group,'Service',named(textControl(span.serviceName,function(v){return commit({op:'set',name:key,field:'serviceName',value:v},{serviceName:service});},{placeholder:'order-worker'}),key+' service','The span service.name, exactly as the trace shows it.'));
+      var mode=traceSpanMode(span),match=row(group,'Match',select(modes,mode,key+' match'));
+      var value=row(group,'Value',named(textControl(span.operation!=null?span.operation:span.operationPrefix,function(v){return commit({op:'set',name:key,field:'match',mode:match.value,value:v},{value:value});},{placeholder:mode==='operationPrefix'?'find ':'process orders'}),key+' value',
+        'The exact operation, or the start of it for Prefix. Attributes only matches every span of the service with the attributes below.'));
+      value.disabled=mode==='attributes';
+      listen(match,'change',function(){
+        // From attributes only to an operation or prefix: there is no value yet, so ask for it first.
+        if(match.value!=='attributes' && !String(value.value || '').trim()){value.disabled=false;value._spanRefuse('Enter the '+(match.value==='operationPrefix'?'prefix':'operation')+', then press Enter.');value.focus();return;}
+        if(commit({op:'set',name:key,field:'match',mode:match.value,value:match.value==='attributes'?null:value.value},{match:match,value:value})===false)match.value=mode;
+      });
+      row(group,'Namespace',named(textControl(span.namespace,function(v){return commit({op:'set',name:key,field:'namespace',value:v},{any:null});},{placeholder:'any'}),key+' namespace','Matches the span service.namespace attribute. Empty matches any namespace.'));
+      var role=row(group,'Role',select(roleOptions,span.role,key+' role'));role.title='What the span is. It is a label, not a matcher: process and send time the node or connection.';
+      listen(role,'change',function(){if(commit({op:'set',name:key,field:'role',value:role.value},{role:role})===false)role.value=span.role;});
+      // Attributes: one row per key and an add row.
+      var attrs=span.attributes && typeof span.attributes==='object'?span.attributes:{},box=document.createElement('div');box.className='rowsedit trace-span-attributes';
+      box.setAttribute('role','group');box.setAttribute('aria-label',key+' attributes');
+      var TYPES=[['string','Text'],['number','Number'],['boolean','True/false']];
+      Object.keys(attrs).forEach(function(a){
+        var line=el('div','rowline','',box),label=el('span','fnote',a+' = '+String(attrs[a]),line);label.setAttribute('aria-hidden','true');
+        var type=typeof attrs[a],types=select(TYPES,type,key+' attribute '+a+' type');types.title='Value type. Honeycomb table cells are text; Tempo keeps numbers and true/false.';line.appendChild(types);
+        listen(types,'change',function(){if(commit({op:'attribute',name:key,key:a,attrName:a,value:String(attrs[a]),type:types.value},{any:types})===false)types.value=type;});
+        var x=named(actionButton('\u00d7',function(){return commit({op:'attribute',name:key,key:a,attrName:null},{any:addName});},'rowx'),'Remove attribute '+a+' from '+key,'Remove attribute '+a);line.appendChild(x);
+        slot(box,types);
+      });
+      var addLine=el('div','rowline','',box),draftKey='attr:'+key+':';
+      var addName=named(document.createElement('input'),key+' new attribute name','A supported span attribute, such as db.system.');addName.type='text';addName.className='fctl';addName.placeholder='attribute';
+      var addValue=named(document.createElement('input'),key+' new attribute value');addValue.type='text';addValue.className='fctl';addValue.placeholder='value';
+      [addName,addValue].forEach(function(input,i){var k=draftKey+i;if(TRACE_SPAN_DRAFTS.has(k))input.value=TRACE_SPAN_DRAFTS.get(k);listen(input,'input',function(){TRACE_SPAN_DRAFTS.set(k,input.value);});input._flowviewHasDraft=function(){return input.value!=='';};addLine.appendChild(input);});
+      if(state.allowed && state.allowed.length){var listId=prefix+'-span-attrs';if(!guide.querySelector('#'+listId) && !fold.querySelector('#'+listId)){var dl=el('datalist','',null);dl.id=listId;state.allowed.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});}addName.setAttribute('list',listId);}
+      var addType=select(TYPES,'string',key+' new attribute type');addType.title='Value type. Honeycomb table cells are text; Tempo keeps numbers and true/false.';addLine.appendChild(addType);
+      function addAttribute(){if(commit({op:'attribute',name:key,key:null,attrName:addName.value,value:addValue.value,type:addType.value},{any:addName,attribute:addName})!==false){TRACE_SPAN_DRAFTS.delete(draftKey+0);TRACE_SPAN_DRAFTS.delete(draftKey+1);}}
+      [addName,addValue].forEach(function(input){listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addAttribute();}});});
+      addLine.appendChild(named(actionButton('Add attribute',addAttribute,'rowadd'),'Add attribute to '+key,'Add the attribute typed to the left (Enter also adds it).'));
+      group.appendChild(frowBlock('Attributes',box));slot(group,addName);
+      // Validator messages for this span, beside the field they concern.
+      (state.messages[key] || []).forEach(function(text){
+        var target=/declares no span/.test(text)?service:/role/.test(text)?role:/operation|prefix|needs operation/i.test(text)?value:/attribute/.test(text)?addName:service;
+        if(target._spanNote)target._spanNote(text);
+      });
+      var acts=actionGroup('Span '+key+' actions','trace-span-actions');
+      if(inherited){
+        var hide=checkboxControl(false,function(on){return commit({op:'hide',name:key,value:on},{any:null});});named(hide.firstChild,key+' hidden for this document','Hide this inherited span in this document only. '+state.providerTitle+' keeps it.'+(changed?' Hiding drops your changes to this span; Undo brings them back.':''));
+        var cap=document.createElement('span');cap.className='fnote';cap.textContent=' Hidden for this document';hide.appendChild(cap);acts.appendChild(hide);
+        if(changed)acts.appendChild(named(actionButton('Revert '+key+' to inherited',function(){return commit({op:'revert',name:key},{any:null});}),'Revert '+key+' to inherited','Remove your changes to this span; it follows '+state.providerTitle+' again.'));
+      }else acts.appendChild(named(actionButton('Remove span '+key,function(){return commit({op:'remove',name:key},{any:null});}),'Remove span '+key));
+      group.appendChild(acts);
+    });
+    if(state.imported && state.hidden && state.hidden.length){
+      var hiddenBox=el('fieldset','trace-span-hidden');el('legend','','Hidden inherited spans',hiddenBox);
+      state.hidden.forEach(function(key){
+        var c=checkboxControl(true,function(on){return commit({op:'hide',name:key,value:on},{any:null});});named(c.firstChild,key+' hidden for this document','Clear to show '+key+' from '+state.providerTitle+' again.');
+        var cap=document.createElement('span');cap.className='fnote';cap.textContent=' '+key;c.appendChild(cap);hiddenBox.appendChild(frow(key,c));
+      });
+    }
+    var askReceive=null;
+    if(state.kind==='edge' && state.receiver && !state.receiver.declared && !state.receiver.process.length){
+      // No process span on the receiver: the hand-off cannot end anywhere until a receive span is declared.
+      el('p','fnote trace-span-receiver','The receiving node '+state.receiver.title+' declares no process span, so this connection reads send only. Declare a receive span here to time the hand-off.');
+      askReceive=actionButton('Declare receive span here',function(){newName.value='receive';newRole.value='receive';TRACE_SPAN_DRAFTS.set('add:name','receive');TRACE_SPAN_DRAFTS.set('add:role','receive');newService.focus();return true;});
+      askReceive.title='Starts a receive span in Add span below: enter its service and operation.';el('div','iacts').appendChild(askReceive);
+    }
+    if(state.kind==='edge' && state.receiver && !state.receiver.declared && state.receiver.process.length){
+      var procs=state.receiver.process;
+      el('p','fnote trace-span-receiver','Receive side: '+state.receiver.title+'\'s process span'+(procs.length>1?'s':'')+' ('+procs.map(function(p){return p.key+': '+p.span.serviceName+' '+(p.span.operation || p.span.operationPrefix || '');}).join(', ')+'). Declare a receive span here only when the receiving span is a different one.');
+      var first=procs[0].span,receiveMode=first.operation!=null?'operation':first.operationPrefix!=null?'operationPrefix':'attributes';
+      var declare=actionButton('Declare receive span here',function(){
+        var value=receiveMode==='attributes'?Object.keys(first.attributes || {}).map(function(k){return k+'='+first.attributes[k];})[0]:first[receiveMode];
+        return commit({op:'add',name:keys.indexOf('receive')<0?'receive':'receive2',serviceName:first.serviceName,mode:receiveMode,value:value,role:'receive'},{any:null});
+      });declare.title='Adds a receive span on this connection, starting from the receiving node\'s process span; edit it after.';el('div','iacts').appendChild(declare);
+    }
+    // Add span.
+    var add=el('fieldset','trace-span-add');el('legend','','Add span',add);
+    function draftInput(label,placeholder,key,title){
+      var input=named(document.createElement('input'),label,title);input.type='text';input.className='fctl';input.placeholder=placeholder;
+      if(TRACE_SPAN_DRAFTS.has('add:'+key))input.value=TRACE_SPAN_DRAFTS.get('add:'+key);
+      listen(input,'input',function(){TRACE_SPAN_DRAFTS.set('add:'+key,input.value);});input._flowviewHasDraft=function(){return input.value!=='';};return input;
+    }
+    var newName=row(add,'Name',draftInput('New span name','process','name','A short name, such as process, find or send. Letters, digits, - and _.'));
+    var newService=row(add,'Service',draftInput('New span service','order-worker','service','The span service.name, exactly as the trace shows it.'));
+    var newMatch=row(add,'Match',select(modes,'operation','New span match'));
+    var newValue=row(add,'Value',draftInput('New span value','process orders','value','The operation, its start for Prefix, or name=value for Attributes only.'));
+    // The chosen role is a draft too, so a re-render before Add span keeps it.
+    var roleDraft=TRACE_SPAN_DRAFTS.get('add:role'),newRole=row(add,'Role',select(roleOptions,state.roles.indexOf(roleDraft)>=0?roleDraft:state.roles[0],'New span role'));
+    listen(newRole,'change',function(){TRACE_SPAN_DRAFTS.set('add:role',newRole.value);});
+    function addSpan(){
+      var ok=commit({op:'add',name:newName.value,serviceName:newService.value,mode:newMatch.value,value:newValue.value,role:newRole.value},{name:newName,serviceName:newService,value:newValue,role:newRole});
+      if(ok!==false)['name','service','value','role'].forEach(function(k){TRACE_SPAN_DRAFTS.delete('add:'+k);});
+      return ok;
+    }
+    [newName,newService,newValue].forEach(function(input){listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addSpan();}});});
+    var addActs=actionGroup('Add span actions','trace-span-actions');addActs.appendChild(actionButton('Add span',addSpan));add.appendChild(addActs);
+    if(state.imported && state.overlay){
+      var all=actionGroup('Trace spans actions','trace-span-actions');
+      all.appendChild(named(actionButton('Revert all trace spans',function(){return commit({op:'revertAll'},{any:null});}),'Revert all trace spans','Remove every change this document makes to these spans in one step.'));
+      fold.appendChild(all);
+    }
+    return fold;
   }
 /* #1233: Status board settings → Log searches (tracking.telemetry.lookups). */
 function logSearchesControls(warnings){
@@ -1229,6 +1389,253 @@ function traceMatchPlaced(messages,many){
     });
     return placed;
   }
+/* #1290 PR 7: how a loaded trace maps this step. Own span (traceMatch, the #1238 form) or the
+   spans declared on the nodes and connections it lights (traceScope). The radios change only the
+   view; a write is a labelled button or a field, one Undo step each. */
+function traceScopeMessages(val){
+    if(val.traceScope===undefined || !session.validate)return [];
+    var parsed=parseEditor();if(parsed.error)return [];
+    var path=builderTargetPath(parsed.raw,session.target);if(!path)return [];
+    var without=JSON.parse(JSON.stringify(parsed.raw)),st=specValueAt(without,path);if(!st || typeof st!=='object')return [];
+    delete st.traceScope;
+    // A document that imports reports its materialized spec's faults in one message: split it.
+    function parts(r){return [].concat.apply([],r.errors.concat(r.warnings).map(function(m){var at=m.indexOf('invalid materialized spec: ');return at>=0?m.slice(at+27).split('; '):[m];}));}
+    var withIt=parts(session.validate(parsed.raw)),base=parts(session.validate(without)),rest=Object.create(null);
+    base.forEach(function(m){rest[m]=(rest[m] || 0)+1;});
+    return withIt.filter(function(m){if(rest[m]){rest[m]--;return false;}return /traceScope/.test(m);}).map(function(m){return m.slice(m.indexOf('traceScope'));})
+      .filter(function(m,i,all){return all.indexOf(m)===i;});
+  }
+function traceMappingEditor(val,ctx,t,stepIdInput){
+    var d=ctx.diagram || {},resolvedStep=(d.steps || [])[t.index] || val,carriers=traceScopeCarriers(d,resolvedStep);
+    var declared=carriers.filter(function(c){return c.spans.length;});
+    var hasMatch=val.traceMatch!==undefined && val.traceMatch!==null,hasScope=val.traceScope!==undefined;
+    // Keyed by step ID (position for a step without one), so a reorder never carries it to another step.
+    var viewKey=JSON.stringify([session.snapshot().project,t.section,typeof val.id==='string' && val.id?'id:'+val.id:'index:'+t.index]);
+    var view=TRACE_SCOPE_VIEW.get(viewKey) || (hasMatch?'own':hasScope?'scope':declared.length?'scope':'own');
+    var box=document.createElement('div');box.className='trace-mapping';
+    var modes=document.createElement('div');modes.className='trace-mapping-modes';modes.setAttribute('role','radiogroup');modes.setAttribute('aria-label','How a loaded trace maps this step');
+    [['own','Own span (trace match)'],['scope','From its nodes and connections (trace scope)']].forEach(function(m){
+      var lab=document.createElement('label');lab.className='trace-mapping-mode';
+      var r=document.createElement('input');r.type='radio';r.name=prefix+'-trace-mapping';r.value=m[0];r.checked=view===m[0];r.setAttribute('aria-label',m[1]);
+      listen(r,'change',function(){if(!r.checked)return;TRACE_SCOPE_VIEW.set(viewKey,m[0]);refreshFormSoon();});
+      var txt=document.createElement('span');txt.textContent=m[1];lab.appendChild(r);lab.appendChild(txt);modes.appendChild(lab);
+    });
+    box.appendChild(modes);
+    var inner=view==='own'?traceMatchEditor(val,ctx,t):traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput);
+    box.appendChild(inner);box.setAttribute('data-warning-count',inner.getAttribute('data-warning-count') || '0');
+    return box;
+  }
+function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
+    var box=document.createElement('fieldset');box.className='trace-scope-editor';
+    var legend=document.createElement('legend');legend.textContent='Trace scope';box.appendChild(legend);
+    var serial=0,scope=val.traceScope && typeof val.traceScope==='object' && !Array.isArray(val.traceScope)?val.traceScope:null;
+    var allowed=typeof FlowCanon!=='undefined' && FlowCanon.traceAttributeNames?FlowCanon.traceAttributeNames(ctx.resolvedPage):[];
+    function el(tag,cls,text,parent){var x=document.createElement(tag);if(cls)x.className=cls;if(text!=null)x.textContent=text;(parent || box).appendChild(x);return x;}
+    function named(control,name,title){control.setAttribute('aria-label',name);if(title)control.title=title;return control;}
+    // A note after a control: validator messages and refusals (role=status, kept in the page).
+    function slot(parent,control){
+      var p=el('p','fnote trace-scope-note','',parent);p.id=prefix+'-trace-scope-'+(serial++);p.setAttribute('role','status');
+      control._scopeNote=function(text){p.textContent=text || '';if(text){control.setAttribute('aria-describedby',p.id);if(/^(INPUT|SELECT|TEXTAREA)$/i.test(control.tagName))control.setAttribute('aria-invalid','true');}};
+      control._scopeRefuse=function(text){p.textContent='';control.setAttribute('aria-describedby',p.id);opts.schedule(function(){control._scopeNote(text);},0);};
+      return p;
+    }
+    function commit(edit,controls){
+      var parsed=parseEditor();if(parsed.error){formError(parsed.error);return false;}
+      var plan=planStepTraceScope(parsed.text,parsed.raw,t.section,t.index,edit,{allowed:allowed});
+      if(plan.noop){refreshFormSoon();return true;}
+      if(plan.error){var c=controls && (controls[plan.field] || controls.any);if(c && c._scopeRefuse)c._scopeRefuse(plan.error);else formError(plan.error);return false;}
+      formError('');return applyPlan(plan,{after:refreshFormSoon},parsed);
+    }
+    var draftKey=function(k){return 'scope:'+k;};
+    function draft(input,k){
+      if(TRACE_MATCH_DRAFTS.has(draftKey(k)))input.value=TRACE_MATCH_DRAFTS.get(draftKey(k));
+      listen(input,'input',function(){if(input.value)TRACE_MATCH_DRAFTS.set(draftKey(k),input.value);else TRACE_MATCH_DRAFTS.delete(draftKey(k));});
+      input._flowviewHasDraft=function(){return input.value!=='';};return input;
+    }
+    function textInput(name,value,title,placeholder){var i=named(document.createElement('input'),name,title);i.type='text';i.className='fctl';i.value=value==null?'':String(value);if(placeholder)i.placeholder=placeholder;return i;}
+    var acts;
+    if(hasMatch){
+      el('p','fnote','This step has its own trace match. Using its nodes and connections removes it; Undo brings it back.');
+      acts=actionGroup('Trace scope actions','trace-scope-actions');
+      var use=actionButton('Use its nodes and connections (removes this step’s trace match)'.replace('’','\''),function(){return commit({op:'create'},{create:use});});
+      acts.appendChild(use);box.appendChild(acts);slot(box,use);
+      box.setAttribute('data-warning-count','0');return box;
+    }
+    // What the step inherits: by title, naming a shared node or connection and the other step.
+    // Sharing is per path, as the core D9 rule counts it (FlowTraceMatch.effectiveSelector over
+    // that path's steps); the form names a path only when paths disagree.
+    var d=ctx.diagram || {},steps=Array.isArray(d.steps)?d.steps:[],routes=typeof diagramPathList==='function'?diagramPathList(d).filter(function(r){return r.indices.indexOf(t.index)>=0;}):[];
+    if(!routes.length)routes=[{label:'',indices:steps.map(function(s,i){return i;})}];
+    var self=steps[t.index] || val;
+    function others(c,route){return route.indices.filter(function(i){if(i===t.index || !steps[i])return false;return traceScopeCarriers(d,steps[i]).some(function(x){return x.kind===c.kind && x.id===c.id;});}).map(function(i){return steps[i];});}
+    function inheritsOn(route){
+      var pathSteps=route.indices.map(function(i){return steps[i];}).filter(Boolean);
+      var eff=typeof FlowTraceMatch!=='undefined' && FlowTraceMatch.effectiveSelector?FlowTraceMatch.effectiveSelector(d,self,pathSteps):null;
+      return eff && Array.isArray(eff.inherits)?eff.inherits:null;
+    }
+    function stepTitle(s){return '“'+String(s && s.text || s && s.id || '').replace(/\s+/g,' ').trim()+'”';}
+    function stepList(list){return (list.length>1?'steps ':'step ')+list.map(stepTitle).join(', ');}
+    var skip=scope && scope.skip && typeof scope.skip==='object' && !Array.isArray(scope.skip)?scope.skip:{};
+    function skipped(c,x){var list=Array.isArray(skip[c.id])?skip[c.id]:[];return list.indexOf(x.key)>=0 || list.indexOf('role:'+x.role)>=0;}
+    function plural(n){return n+(n===1?' span':' spans');}
+    var lit=carriers,owning=carriers.filter(function(c){return c.owned.length;}),status;
+    if(!lit.length)status='This step lights no nodes or connections, so it inherits no spans.';
+    else if(!carriers.some(function(c){return c.spans.length;}))status='Its nodes and connections declare no trace spans, so a loaded trace leaves this step unmapped. Declare spans in Inspect on a node or connection, or use a trace match.';
+    else if(!scope){
+      var per=routes.map(function(route){
+        var inherits=inheritsOn(route);
+        var used=owning.filter(function(c){return inherits?inherits.indexOf(c.id)>=0:!others(c,route).length;}),shared=owning.filter(function(c){return used.indexOf(c)<0;});
+        var clauses=shared.map(function(c){return c.title+' is also lit by '+stepList(others(c,route));}).join('; ');
+        var whole,brief;
+        if(!used.length){
+          whole=shared.length?'Inherits nothing: '+clauses+'; add a trace scope to choose '+(shared.length>1?'their':'its')+' spans.':'Inherits nothing: its nodes and connections declare no spans this step can own.';
+          brief=shared.length?'inherits nothing ('+clauses+')':'inherits nothing';
+        }else{
+          var from=used.map(function(c){return c.title+' ('+plural(c.owned.length)+')';}).join(' and ');
+          whole='Inherits from '+from+'.'+(shared.length?' '+clauses+'; add a trace scope to inherit '+(shared.length>1?'their':'its')+' spans.':'');
+          brief='inherits from '+from+(shared.length?' ('+clauses+')':'');
+        }
+        return {label:route.label,whole:whole,brief:brief,shared:shared};
+      });
+      if(per.every(function(x){return x.whole===per[0].whole;}))status=per[0].whole;
+      else{
+        // Paths that agree are named together; the advice comes once, at the end.
+        var groups=[];per.forEach(function(x){var g=groups.find(function(y){return y.brief===x.brief;});if(g)g.labels.push(x.label);else groups.push({brief:x.brief,labels:[x.label]});});
+        var names=function(list){return list.length>1?list.slice(0,-1).join(', ')+' and '+list[list.length-1]:list[0];};
+        var sharedAll=[];per.forEach(function(x){x.shared.forEach(function(c){if(sharedAll.indexOf(c)<0)sharedAll.push(c);});});
+        status=groups.map(function(g){return 'On '+names(g.labels)+': '+g.brief+'.';}).join(' ')+(sharedAll.length?' Add a trace scope to choose '+(sharedAll.length>1?'their':'its')+' spans.':'');
+      }
+    }else{
+      var counted=owning.map(function(c){return {c:c,n:c.owned.filter(function(x){return !skipped(c,x);}).length};}).filter(function(x){return x.n;});
+      status=counted.length?'Inherits from '+counted.map(function(x){return x.c.title+' ('+x.n+' of '+plural(x.c.owned.length)+')';}).join(' and ')+'.':owning.length?'Inherits nothing: every declared span is skipped.':'Inherits nothing: its nodes and connections declare no spans this step can own.';
+    }
+    el('p','fnote trace-scope-status',status);
+    // Each carrier's spans: checkboxes with a scope (checked counts), a read-only list without.
+    carriers.forEach(function(c){
+      var group=el('fieldset','trace-scope-carrier');el('legend','',c.title+(c.kind==='edge'?' (connection)':''),group);
+      if(!c.spans.length){el('p','fnote',c.title+' declares no trace spans.',group);return;}
+      var roles=[];
+      c.owned.forEach(function(x){
+        var row=el('div','trace-scope-span-row',null,group);
+        if(scope){
+          var role=typeof x.role==='string' && Array.isArray(skip[c.id]) && skip[c.id].indexOf('role:'+x.role)>=0;
+          var box_=checkboxControl(!skipped(c,x),function(on){return commit({op:'skip',carrier:c.id,entry:x.key,counts:on},{any:box_.firstChild});});
+          named(box_.firstChild,x.key+' on '+c.title+' counts for this step','Checked: this span counts for this step. Clear to skip it.');
+          if(role){box_.firstChild.checked=false;box_.firstChild.disabled=true;}
+          row.appendChild(box_);el('span','trace-scope-span',traceScopeSpanText(x),row);slot(group,box_.firstChild);
+          if(role)box_.firstChild._scopeNote('Not counted: every '+x.role+' span on '+c.title+' is skipped.');
+        }else el('span','trace-scope-span',traceScopeSpanText(x),row);
+        if(typeof x.role==='string' && roles.indexOf(x.role)<0)roles.push(x.role);
+      });
+      c.handoff.forEach(function(x){el('p','fnote trace-scope-handoff',traceScopeSpanText(x)+' times the hand-off; it is not this step\'s span.',group);});
+      if(scope && c.kind==='node')roles.forEach(function(r){
+        var row=el('div','trace-scope-span-row trace-scope-role-row',null,group),on=!(Array.isArray(skip[c.id]) && skip[c.id].indexOf('role:'+r)>=0);
+        var rb=checkboxControl(on,function(v){return commit({op:'skip',carrier:c.id,entry:'role:'+r,counts:v},{any:rb.firstChild});});
+        named(rb.firstChild,r+' spans on '+c.title+' count for this step','Clear to skip every '+r+' span on '+c.title+'.');
+        row.appendChild(rb);el('span','trace-scope-role','All '+r+' spans',row);slot(group,rb.firstChild);
+      });
+      if(c.kind==='edge' && !c.owned.length && c.handoff.length)el('p','fnote trace-scope-hint','This connection declares only a receive span; declare a send span on it for this step to have spans of its own.',group);
+      if(!scope && c.owned.length){
+        // Who else lights it, per path; a path is named only when not every path agrees.
+        var by=[];routes.forEach(function(route){others(c,route).forEach(function(s){var hit=by.find(function(x){return x.s===s;});if(!hit)by.push(hit={s:s,routes:[]});hit.routes.push(route.label);});});
+        if(by.length){
+          var everywhere=by.every(function(x){return x.routes.length===routes.length;});
+          el('p','fnote trace-scope-also','Also lit by '+(everywhere?stepList(by.map(function(x){return x.s;})):by.map(function(x){return 'step '+stepTitle(x.s)+(x.routes.length===routes.length?'':' on '+(x.routes.length>1?x.routes.slice(0,-1).join(', ')+' and '+x.routes[x.routes.length-1]:x.routes[0]));}).join(', '))+'.',group);
+        }
+      }
+    });
+    var placed={root:[],parent:[],attributes:[],optional:[],maxDurationMs:[],maxQueueDepth:[],general:[]},messages=traceScopeMessages(val);
+    messages.forEach(function(m){
+      var key=/^traceScope\.root/.test(m)?'root':/parentStepId/.test(m)?'parent':/^traceScope\.attributes/.test(m)?'attributes':/^traceScope\.optional/.test(m)?'optional':
+        /^traceScope\.maxDurationMs/.test(m)?'maxDurationMs':/^traceScope\.maxQueueDepth/.test(m)?'maxQueueDepth':/^traceScope\.skip/.test(m)?null:'general';
+      if(key)placed[key].push(m);
+    });
+    box.setAttribute('data-warning-count',String(messages.length));
+    if(!scope){
+      acts=actionGroup('Trace scope actions','trace-scope-actions');
+      var add=actionButton('Add trace scope',function(){return commit({op:'create'},{create:add});});
+      add.title='Inherit from every node and connection this step lights, even shared ones, and choose spans, a root, a parent step and budgets.';
+      acts.appendChild(add);
+      if(typeof val.id!=='string' || !val.id.trim()){
+        var go=actionButton('Go to Step ID',function(){if(stepIdInput && stepIdInput.focus)stepIdInput.focus();return true;});
+        go.title='A trace scope needs a stable step ID.';acts.appendChild(go);
+      }
+      box.appendChild(acts);slot(box,add);
+      return box;
+    }
+    // Skips that no longer apply: their reason and Remove.
+    Object.keys(skip).forEach(function(id){
+      var c=carriers.find(function(x){return x.id===id;}),name=c?c.title:id;
+      (Array.isArray(skip[id])?skip[id]:[]).forEach(function(entry){
+        if(typeof entry!=='string')return;
+        var why=!c?'this step does not light '+id+'.':entry.indexOf('role:')===0?(c.spans.some(function(x){return 'role:'+x.role===entry;})?null:name+' declares no span with role '+entry.slice(5)+'.'):(c.spans.some(function(x){return x.key===entry;})?null:name+' declares no span '+entry+'.');
+        if(!why)return;
+        var line=el('div','trace-scope-stale-row');el('p','fnote trace-scope-stale','Skip '+entry+' on '+name+': '+why,line);
+        line.appendChild(actionButton('Remove skip '+entry+' from '+name,function(){return commit({op:'skip',carrier:id,entry:entry,counts:true},{any:null});},'rowx'));
+      });
+    });
+    // Trace root: a service and an operation, written together.
+    var root=scope.root && typeof scope.root==='object'?scope.root:null;
+    var rootService=draft(textInput('Trace root service',root?root.serviceName:'','The service of the trace’s first span. In a trace that starts elsewhere this step reads “not this flow”.','web'),'root-service');
+    var rootOperation=draft(textInput('Trace root operation',root?root.operation:'','The operation of the trace’s first span.','POST /checkout'),'root-operation');
+    var rootControls={serviceName:rootService,operation:rootOperation};
+    function setRoot(field){var ok=commit({op:'root',serviceName:rootService.value,operation:rootOperation.value,field:field},rootControls);if(ok!==false){TRACE_MATCH_DRAFTS.delete(draftKey('root-service'));TRACE_MATCH_DRAFTS.delete(draftKey('root-operation'));}return ok;}
+    if(root){commitOnChange(rootService,null,function(){return setRoot('serviceName');});commitOnChange(rootOperation,null,function(){return setRoot('operation');});}
+    else [rootService,rootOperation].forEach(function(i){listen(i,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();setRoot(null);}});});
+    box.appendChild(frow('Trace root service',rootService));slot(box,rootService);
+    box.appendChild(frow('Trace root operation',rootOperation));slot(box,rootOperation);
+    var rootActs=actionGroup('Trace root actions','trace-scope-actions');
+    if(!root){var setB=actionButton('Set trace root',function(){return setRoot(null);});setB.title='Write the trace root from both fields (Enter in either also sets it).';rootActs.appendChild(setB);}
+    else rootActs.appendChild(actionButton('Clear trace root',function(){return commit({op:'root',clear:true},{any:null});}));
+    box.appendChild(rootActs);
+    placed.root.forEach(function(m){rootService._scopeNote(m);});
+    // Parent step.
+    var parent=document.createElement('select');parent.className='fctl';named(parent,'Parent step','Spans this step inherits must descend from that step’s spans. Spans whose ancestry is not in the trace are kept and marked.');
+    var none=document.createElement('option');none.value='';none.textContent='None';parent.appendChild(none);
+    // Only a step on a path with this one can be its parent: elsewhere it always reads missing.
+    function sharesPath(i){return routes.some(function(route){return route.indices.indexOf(i)>=0;});}
+    steps.forEach(function(s,i){if(i===t.index || !s || typeof s.id!=='string' || !s.id || !sharesPath(i))return;var o=document.createElement('option');o.value=s.id;o.textContent=stepTitle(s)+' ('+s.id+')';parent.appendChild(o);});
+    var current=typeof scope.parentStepId==='string'?scope.parentStepId:'';
+    if(current && !steps.some(function(s,i){return i!==t.index && s && s.id===current && sharesPath(i);})){var known=steps.some(function(s,i){return i!==t.index && s && s.id===current;}),u=document.createElement('option');u.value=current;u.textContent=current+(known?' (not on this step’s path)':' (unknown)');parent.appendChild(u);}
+    parent.value=current;
+    listen(parent,'change',function(){if(commit({op:'parent',value:parent.value},{parent:parent,any:parent})===false)parent.value=current;});
+    box.appendChild(frow('Parent step',parent));slot(box,parent);placed.parent.forEach(function(m){parent._scopeNote(m);});
+    // Attributes every inherited span must have.
+    var attrs=scope.attributes && typeof scope.attributes==='object' && !Array.isArray(scope.attributes)?scope.attributes:{};
+    var TYPES=[['string','Text'],['number','Number'],['boolean','True/false']];
+    function typeSelect(value,label){var s=document.createElement('select');s.className='fctl';TYPES.forEach(function(x){var o=document.createElement('option');o.value=x[0];o.textContent=x[1];s.appendChild(o);});s.value=value;return named(s,label,'Value type. Honeycomb table cells are text; Tempo keeps numbers and true/false.');}
+    var attrBox=el('div','trace-scope-attributes');
+    Object.keys(attrs).forEach(function(a){
+      var line=el('div','rowline','',attrBox),label=el('span','fnote',a+' = '+String(attrs[a]),line);label.setAttribute('aria-hidden','true');
+      var type=typeof attrs[a],types=typeSelect(type,'scope attribute '+a+' type');line.appendChild(types);
+      listen(types,'change',function(){if(commit({op:'attribute',key:a,attrName:a,value:String(attrs[a]),type:types.value},{any:types})===false)types.value=type;});
+      line.appendChild(named(actionButton('×',function(){return commit({op:'attribute',key:a,attrName:null},{any:null});},'rowx'),'Remove scope attribute '+a));
+      slot(attrBox,types);
+    });
+    var addLine=el('div','rowline','',attrBox);
+    var addName=draft(textInput('new scope attribute name','','A supported trace attribute, such as deployment.environment.name.','attribute'),'attr-name'),addValue=draft(textInput('new scope attribute value','','The exact value every inherited span must have.','value'),'attr-value');
+    if(allowed.length){var listId=prefix+'-scope-attrs',dl=el('datalist','',null,attrBox);dl.id=listId;allowed.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});addName.setAttribute('list',listId);}
+    var addType=typeSelect('string','new scope attribute type');
+    addLine.appendChild(addName);addLine.appendChild(addValue);addLine.appendChild(addType);
+    function addAttribute(){var ok=commit({op:'attribute',key:null,attrName:addName.value,value:addValue.value,type:addType.value},{attribute:addName,any:addName});if(ok!==false){TRACE_MATCH_DRAFTS.delete(draftKey('attr-name'));TRACE_MATCH_DRAFTS.delete(draftKey('attr-value'));}return ok;}
+    [addName,addValue].forEach(function(i){listen(i,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addAttribute();}});});
+    var addB=actionButton('Add scope attribute',addAttribute,'rowadd');addB.title='Add the attribute typed to the left (Enter also adds it).';addLine.appendChild(addB);
+    box.appendChild(frowBlock('Attributes',attrBox));slot(attrBox,addName);placed.attributes.forEach(function(m){addName._scopeNote(m);});
+    // Optional, Time budget, Max queue depth.
+    var optional=checkboxControl(scope.optional===true,function(on){return commit({op:'optional',value:on},{any:optional.firstChild});});
+    named(optional.firstChild,'Optional','A trace without these spans reads neutral instead of missing.');
+    box.appendChild(frow('Optional',optional));slot(box,optional.firstChild);placed.optional.forEach(function(m){optional.firstChild._scopeNote(m);});
+    [['maxDurationMs','Time budget (ms)','The step is slow above this many milliseconds (its spans’ time, or the hand-off on a connection).'],['maxQueueDepth','Max queue depth','The step is backed up above this queue depth.']].forEach(function(f){
+      var input=textInput(f[1],scope[f[0]],f[2],'');input.className='fctl fnum';
+      commitOnChange(input,null,function(v){return commit({op:'number',field:f[0],value:v},{maxDurationMs:input,maxQueueDepth:input,any:input});});
+      box.appendChild(frow(f[1],input));slot(box,input);placed[f[0]].forEach(function(m){input._scopeNote(m);});
+    });
+    if(placed.general.length){var gen=el('ul','metrics-warnings trace-scope-warnings');gen.setAttribute('aria-label','Trace scope warnings');placed.general.forEach(function(m){var li=document.createElement('li');li.textContent=m;gen.appendChild(li);});}
+    acts=actionGroup('Trace scope actions','trace-scope-actions');
+    var removeB=actionButton('Remove trace scope',function(){return commit({op:'remove'},{any:null});});removeB.title='Back to the default: inherit only from nodes and connections no other step lights.';
+    acts.appendChild(removeB);box.appendChild(acts);
+    return box;
+  }
 function traceMatchEditor(val,ctx,t){
     var box=document.createElement('fieldset');box.className='trace-match-editor';
     var legend=document.createElement('legend');legend.textContent='Trace match';box.appendChild(legend);
@@ -1293,7 +1700,8 @@ function traceMatchEditor(val,ctx,t){
       });
       function create(){var ok=commit({op:'create',serviceName:drafts.serviceName.value,operation:drafts.operation.value});if(ok!==false)dropDrafts('create:');return ok;}
       Object.keys(drafts).forEach(function(k){listen(drafts[k],'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();create();}});});
-      var createActs=actionGroup('Trace match actions','trace-match-actions'),createButton=actionButton('Add trace match',create);
+      var scoped=val.traceScope && typeof val.traceScope==='object' && !Array.isArray(val.traceScope);
+      var createActs=actionGroup('Trace match actions','trace-match-actions'),createButton=actionButton(scoped?'Add trace match (replaces this step\'s trace scope)':'Add trace match',create);
       createButton.title='Write this step’s trace match from the service name and operation (Enter in either field also adds it).';
       createActs.appendChild(createButton);box.appendChild(createActs);general();
       return box;
@@ -1422,8 +1830,9 @@ function stepForm(val, ctx){
           {after: function(){ renderInspector(); }});
       };
     }
+    var stepIdInput;
     var rows = [
-      frow('Step ID',textControl(val.id,function(v){
+      frow('Step ID',stepIdInput=textControl(val.id,function(v){
         if(v==null){formError('Use a stable step ID to support paths and detail mappings.');return false;}
         return commitCascade(function(raw){return planRenameStep(session.text(),raw,t.section,t.index,v);});
       },{placeholder:'optional stable-step-id'})),
@@ -1461,9 +1870,10 @@ function stepForm(val, ctx){
     var evidenceTitle=document.createElement('summary'),matchCount=(traceMatchFormAlternatives(val.traceMatch) || [val.traceMatch]).length;
     evidence.appendChild(evidenceTitle);
     evidence.appendChild(frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr')));
-    var matchEditor=traceMatchEditor(val,ctx,t),matchWarnings=Number(matchEditor.getAttribute('data-warning-count')) || 0;
+    var matchEditor=traceMappingEditor(val,ctx,t,stepIdInput),matchWarnings=Number(matchEditor.getAttribute('data-warning-count')) || 0;
+    var scopeSet=val.traceMatch==null && val.traceScope!==undefined;
     // The summary says whether a trace match is set and flags its warnings; the disclosure identity ignores text after ' · '.
-    evidenceTitle.textContent='Code and trace evidence'+(matchCount>1?' · trace match, '+matchCount+' alternatives':matchCount?' · trace match set':'')+
+    evidenceTitle.textContent='Code and trace evidence'+(scopeSet?' · trace scope set':matchCount>1?' · trace match, '+matchCount+' alternatives':matchCount?' · trace match set':'')+
       (matchWarnings?' · '+matchWarnings+(matchWarnings===1?' warning':' warnings'):'');
     evidence.appendChild(matchEditor);
     evidence.appendChild(frow('Runtime conditions JSON',jsonFieldControl('conditions',val.conditions,'jsonArr')));
@@ -3719,6 +4129,7 @@ function renderInspector(){
     render:renderInspector,renderMulti:renderMultiInspector,refresh:refreshFormSoon,refreshCatalog:refreshCatalog,retire:function(){if(!disposed)retire();},
     sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();if(invalidateExtraction)invalidateExtraction();if(invalidateTopologyExport)invalidateTopologyExport();if(invalidateAlignment)invalidateAlignment();if(invalidateEdgeEndpoints)invalidateEdgeEndpoints();},
     message:inspectorMessage,error:formError,commit:commitSimple,transact:commitCascade,focusProse:focusProse,
+    revealTraceSpans:function(t){REVEAL_TRACE_SPANS=revealKey(t || session.target);},
     panel:panelEditor,panelForTarget:panelEditorForTarget,panelForCard:panelEditorForCard,
     busy:function(view){return !disposed && Object.keys(panelEditors).some(function(type){var editor=panelEditors[type].value;return editor.busy && editor.busy(view,guide);});},
     destroy:function(){if(disposed)return;disposed=true;try{retire();}finally{formLife.destroy();panelEditors=Object.create(null);if(guide)guide.innerHTML='';}}

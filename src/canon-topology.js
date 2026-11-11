@@ -91,10 +91,31 @@ var FlowTopology = (function(){
 
   function validateTracking(value,at){
     // telemetry content is warning-only (validator); the resolver only carries it.
-    shape(value,['tickets','prs','existsWhen','missingWork','telemetry'],at);
+    shape(value,['tickets','prs','existsWhen','missingWork','telemetry','trace'],at);
+    if(own(value,'trace'))validateTraceOverlay(value.trace,at+' trace');
     if(Object.prototype.hasOwnProperty.call(value,'missingWork') && typeof value.missingWork!=='boolean')fail(at,'missingWork must be true or false');
     if(Object.prototype.hasOwnProperty.call(value,'existsWhen') && value.existsWhen!=='tickets-done')fail(at,'existsWhen must be tickets-done');
     trackingRefs(value,function(field,index){fail(at,'invalid '+field+(index===null?' array':' entry '+index));});
+  }
+  /* #1290: a consumer trace overlay patches the inherited trace.spans: an entry is a field
+     patch (null deletes a field), a null entry or a name in `hide` hides that span. The shape
+     is checked here; the merged declaration is validated on the resolved carrier. */
+  var TRACE_SPAN_PATCH_FIELDS=['serviceName','operation','operationPrefix','namespace','attributes','role'];
+  function validateTraceOverlay(value,at){
+    shape(value,['spans','hide'],at);
+    if(own(value,'hide') && (!Array.isArray(value.hide) || value.hide.some(function(key){return typeof key!=='string' || !key;})))fail(at,'hide must be an array of span names');
+    if(!own(value,'spans'))return;
+    if(!object(value.spans))fail(at,'spans must be an object keyed by span name');
+    Object.keys(value.spans).forEach(function(key){
+      var entry=value.spans[key],where=at+' span '+key;
+      if(entry===null)return;
+      if(!object(entry))fail(where,'must be a field patch object or null');
+      shape(entry,TRACE_SPAN_PATCH_FIELDS,where);
+      Object.keys(entry).forEach(function(field){
+        var v=entry[field];if(v===null)return;
+        if(field==='attributes'?!object(v):typeof v!=='string')fail(where,field+(field==='attributes'?' must be an object or null':' must be a string or null'));
+      });
+    });
   }
   /* #1266: a consumer overlay on an imported value: the import carries the provider's value,
      and an importer may add, change or hide parts of it. Reusable for other imported kinds:
@@ -142,6 +163,14 @@ var FlowTopology = (function(){
       TELEMETRY_SOURCES.forEach(function(source){if(!own(patch,source))delete current[source];});
     }};
   function mergeTelemetry(inherited,overlay){return mergeOverlay(inherited,overlay,TELEMETRY_OVERLAY_RULES);}
+  // #1290: trace spans always merge. A span names spans one way, so a patch that sets
+  // operation removes an inherited operationPrefix and the reverse.
+  var TRACE_OVERLAY_RULES={hide:'spans',fields:{spans:'entries'},
+    entry:function(field,current,patch){
+      if(patch.operation!=null)delete current.operationPrefix;
+      if(patch.operationPrefix!=null)delete current.operation;
+    }};
+  function mergeTrace(inherited,overlay){return mergeOverlay(inherited,overlay,TRACE_OVERLAY_RULES);}
   function applyTracking(value,addition){
     if(!addition)return;
     if(addition.missingWork===true)value.missingWork=true;
@@ -159,6 +188,74 @@ var FlowTopology = (function(){
         if(object(merged.signals) && Object.keys(merged.signals).length)value.telemetry=merged;else delete value.telemetry;
       }
     }
+  }
+  /* #1290: an imported carrier's trace spans are the provider's declarations plus the
+     consumer overlay. A provider span this board's validation rejects, and the overlay does
+     not fix, is not used here: `drop(key, message)` records it with its provider path (the
+     provider's own build reports it). A span the overlay breaks or adds incomplete is left
+     out too and recorded as the overlay's error; a hide or a null entry for a span the
+     provider lacks, and a span both hidden and patched (the hide wins), are overlay
+     warnings: `note(type, at, message)`, at relative to the overlay's trace. */
+  var traceDrops=new WeakMap();
+  function inheritTrace(value,overlay,kind,page,providerPage,drop,note,reference){
+    var addition=object(overlay) && own(overlay,'trace')?clone(overlay.trace):null;
+    if(!own(value,'trace') && !addition)return;
+    var errors=own(value,'trace')?FlowCanon.traceDeclarationErrors(value.trace,kind,page):[];
+    var malformed=errors.some(function(x){return x.key==null;});
+    if(malformed){drop(null,errors[0].message);delete value.trace;errors=[];}
+    var provided=object(value.trace)?clone(value.trace.spans):{};
+    if(addition){
+      var spans=object(addition.spans)?addition.spans:{},hidden=(Array.isArray(addition.hide)?addition.hide:[]).slice();
+      Object.keys(spans).forEach(function(key){if(spans[key]===null && hidden.indexOf(key)<0)hidden.push(key);});
+      hidden.forEach(function(key){
+        // A malformed provider trace already warns; its span names are unknown, not missing.
+        if(!own(provided,key) && !malformed)note('warning',own(spans,key) && spans[key]===null?'.spans.'+key:'.hide','the provider declares no span '+key+' on this carrier; the hide is kept in case it returns');
+        if(object(spans[key])){note('warning','.spans.'+key,'span '+key+' is both hidden and patched; the hide wins');delete spans[key];}
+      });
+      var merged=mergeTrace(value.trace,addition);
+      if(object(merged.spans))value.trace=merged;else delete value.trace;
+    }
+    if(!object(value.trace))return;
+    var after=FlowCanon.traceDeclarationErrors(value.trace,kind,page);
+    Object.keys(value.trace.spans).forEach(function(key){
+      var still=after.filter(function(x){return x.key===key;}).map(function(x){return x.message;});
+      if(!still.length)return;
+      var entry=value.trace.spans[key];delete value.trace.spans[key];
+      if(own(provided,key) && errors.some(function(x){return x.key===key;})){
+        // Valid in the provider's own build: this board's attribute allowlist is the reason.
+        var own_=FlowCanon.traceDeclarationErrors({spans:{x:provided[key]}},kind,providerPage),allowed=FlowCanon.traceAttributeNames(page);
+        var missing=Object.keys(object(provided[key].attributes)?provided[key].attributes:{}).filter(function(k){return allowed.indexOf(k)<0;});
+        drop(key,!own_.length && missing.length?'attribute '+missing.join(', ')+' is not allowed on this board; list it in this board\'s trace connection allowedAttributes':still.join('; '));
+      }
+      else{
+        // Name the new-span rule only when that is what is missing.
+        var incomplete=!object(entry) || typeof entry.serviceName!=='string' || !entry.serviceName.trim() || entry.role==null ||
+          !own(entry,'operation') && !own(entry,'operationPrefix') && !(object(entry.attributes) && Object.keys(entry.attributes).length);
+        note('error','.spans.'+key,(own(provided,key) || !incomplete?'':'the provider declares no span '+key+' on this carrier, so this entry is a new span and needs a full declaration: ')+still.join('; '));
+      }
+    });
+    // #1290 (D19): the spans this board's overlay adds or overrides are its own declarations; on a
+    // carrier its reference flow lights they are checked against its approved reference trace.
+    // A patch that only narrows (namespace, attributes) or relabels an inherited span leaves the
+    // provider's strings, which are the provider's to check.
+    if(reference && addition && object(addition.spans))Object.keys(addition.spans).forEach(function(key){
+      var patch=addition.spans[key],owns=object(patch) && (!own(provided,key) || ['serviceName','operation','operationPrefix'].some(function(f){return own(patch,f);}));
+      var miss=owns && object(value.trace.spans[key])?FlowCanon.traceReferenceMiss(value.trace.spans[key],reference):null;
+      if(miss)note('warning','.spans.'+key,miss);
+    });
+    if(!Object.keys(value.trace.spans).length)delete value.trace;
+  }
+  /* Validator text for one resolved diagram's span findings: dropped provider spans warn at
+     the carrier; overlay findings are errors or warnings at the overlay. DP is the diagram path. */
+  function traceFindings(d,DP){
+    var out={errors:[],warnings:[]};
+    (traceDrops.get(d) || []).forEach(function(f){
+      if(f.type!=='drop'){out[f.type==='error'?'errors':'warnings'].push(DP+'.'+f.at+': '+f.message);return;}
+      var at=DP+'.nodes.'+f.id;
+      if(f.kind==='edges')(Array.isArray(d.edges)?d.edges:[]).some(function(e,i){if(e && edgeKey(e)===f.id){at=DP+'.edges['+i+']';return true;}return false;});
+      out.warnings.push(at+'.trace'+(f.key==null?'':'.spans.'+f.key)+': provider "'+f.spec+'" '+f.path+': '+f.message+'; not used on this board');
+    });
+    return out;
   }
   // Provider `use` bindings name the provider page's templates and expand only
   // with them, while that page is known. A binding the provider cannot expand
@@ -278,8 +375,9 @@ var FlowTopology = (function(){
       states.set(id,'visiting');
       var spec=byId.get(id);
       sections(spec).forEach(function(sec,si){
-        var d=sec.diagram,at=id+' section '+(sec.id || si),imports=d.topologyImports || [],provenance=[],defaultPlacements=Object.create(null),drops=[];
-        imports.forEach(function(imp){
+        var d=sec.diagram,at=id+' section '+(sec.id || si),imports=d.topologyImports || [],provenance=[],defaultPlacements=Object.create(null),drops=[],spanDrops=[];
+        var referenceSpans=FlowCanon.referenceSpans(d),referenceLit=referenceSpans?FlowCanon.referenceLit(d):{nodes:[],edges:[]};
+        imports.forEach(function(imp,importIndex){
           var where=at+' import '+imp.as+' ('+imp.spec+' export '+imp.export+')',prefix=imp.as+'::';
           if(!byId.has(imp.spec))fail(where,'missing spec '+imp.spec);
           visit(imp.spec,chain.concat(where));
@@ -298,6 +396,8 @@ var FlowTopology = (function(){
           var providerRecord=typeof sectionRecords==='function'?sectionRecords(byId.get(imp.spec).page).find(function(record){return record.section.diagram===provider;}):null;
           var providerAt=(providerRecord?providerRecord.path:'section')+'.diagram';
           function dropped(kind,id,path){return function(problem){drops.push({kind:kind,id:id,spec:imp.spec,path:path+'.telemetry'+problem.path,message:problem.message});};}
+          function traceDropped(kind,id,path){return function(key,message){spanDrops.push({type:'drop',kind:kind,id:id,key:key,spec:imp.spec,path:path+'.trace'+(key==null?'':'.spans.'+key),message:message});};}
+          function traceNoted(field,key){return function(type,sub,message){spanDrops.push({type:type,at:'topologyImports['+importIndex+'].'+field+'.'+key+'.trace'+sub,message:message});};}
           function importedEdge(key){var parts=key.split('->');return prefix+parts[0]+'->'+prefix+parts[1];}
           ['nodes','edges'].forEach(function(key){
             if(!own(imp,key))return;
@@ -335,6 +435,7 @@ var FlowTopology = (function(){
             }
             if(own(imp.nodeCodeRefs || {},key))value.codeRefs=(value.codeRefs || []).concat(clone(imp.nodeCodeRefs[key]));
             inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));applyTracking(value,(imp.nodeTracking || {})[key]);
+            inheritTrace(value,(imp.nodeTracking || {})[key],'node',spec,byId.get(imp.spec),traceDropped('nodes',prefix+key,providerAt+'.nodes.'+key),traceNoted('nodeTracking',key),referenceLit.nodes.indexOf(prefix+key)>=0?referenceSpans:null);
             if(imp.presentation)value.presentation=imp.presentation;
             Object.keys((imp.nodeOverrides || {})[key] || {}).forEach(function(field){var override=imp.nodeOverrides[key][field];if(override===null)delete value[field];else value[field]=clone(override);});
             // Reveal indices belong to the provider's story, not the consumer.
@@ -362,7 +463,9 @@ var FlowTopology = (function(){
           exp.edges.forEach(function(key){
             var matches=(provider.edges || []).filter(function(e){return e && edgeKey(e)===key;});
             if(matches.length!==1)fail(where,'missing or ambiguous exported edge '+key);
-            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));applyTracking(edge,(imp.edgeTracking || {})[key]);if(imp.presentation)edge.presentation=imp.presentation;
+            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));applyTracking(edge,(imp.edgeTracking || {})[key]);
+            inheritTrace(edge,(imp.edgeTracking || {})[key],'edge',spec,byId.get(imp.spec),traceDropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'),traceNoted('edgeTracking',key),referenceLit.edges.indexOf(importedEdge(key))>=0?referenceSpans:null);
+            if(imp.presentation)edge.presentation=imp.presentation;
             if(!selected.has(edge.from) || !selected.has(edge.to))fail(where,'exported edge '+key+' must include both endpoints in exported nodes');
             Object.keys((imp.edgeOverrides || {})[key] || {}).forEach(function(field){var value=imp.edgeOverrides[key][field];if(value===null)delete edge[field];else edge[field]=clone(value);});
             edge.from=prefix+edge.from;edge.to=prefix+edge.to;delete edge.revealAt;delete edge.hideAt;
@@ -401,6 +504,16 @@ var FlowTopology = (function(){
             if(!(drop.kind==='nodes'?nodeIds:edgeIds).includes(id) || object(overlay) && own(overlay,'telemetry') && !telemetryMergeOverlay(overlay.telemetry))return;
             drops.push({kind:drop.kind,id:id,spec:drop.spec,path:drop.path,message:drop.message});
           });
+          // Spans dropped while the provider resolved its own imports follow the carriers this
+          // import selects, unless the carrier here ends with a valid span of that name.
+          (traceDrops.get(provider) || []).forEach(function(drop){
+            if(drop.type!=='drop')return;
+            var id=drop.kind==='nodes'?prefix+drop.id:importedEdge(drop.id);
+            if(!(drop.kind==='nodes'?nodeIds:edgeIds).includes(id))return;
+            var carrier=drop.kind==='nodes'?d.nodes[id]:d.edges.find(function(e){return e && edgeKey(e)===id;});
+            if(drop.key!=null && carrier && object(carrier.trace) && object(carrier.trace.spans) && own(carrier.trace.spans,drop.key))return;
+            spanDrops.push({type:'drop',kind:drop.kind,id:id,key:drop.key,spec:drop.spec,path:drop.path,message:drop.message});
+          });
           ((provider.topologyProvenance || {}).imports || []).forEach(function(nested){
             var nestedNodes=(nested.nodes || []).map(function(key){return prefix+key;}).filter(function(key){return nodeIds.includes(key);});
             var nestedEdges=(nested.edges || []).map(function(key){var parts=key.split('->');return prefix+parts[0]+'->'+prefix+parts[1];}).filter(function(key){return edgeIds.includes(key);});
@@ -410,6 +523,7 @@ var FlowTopology = (function(){
         });
         if(provenance.length)d.topologyProvenance={version:1,imports:provenance};
         if(drops.length)telemetryDrops.set(d,drops);
+        if(spanDrops.length)traceDrops.set(d,spanDrops);
         if(provenance.length || d.topologyProvenance)checkReferences(d,at);
       });
       // Validate exports even when nobody imports them, so broken declarations
@@ -426,7 +540,12 @@ var FlowTopology = (function(){
     copies.forEach(function(spec){visit(spec.page.canon.id,[]);});
     copies.forEach(function(spec){
       sections(spec).forEach(function(sec){delete sec.diagram.topologyImports;delete sec.diagram.topologyExports;});
-      var errors=FlowCanon.validate(spec).concat(validate(normalize(spec)).errors);
+      // #1290: span declarations do not block resolution: each document's own validation
+      // reports its declarations and overlay findings, and invalid provider spans were
+      // dropped above. Only those exact messages are set aside.
+      var spanErrors=new Set(FlowCanon.traceCarrierErrors(spec));
+      if(typeof sectionRecords==='function')sectionRecords(spec.page).forEach(function(record){traceFindings(record.section.diagram,record.path+'.diagram').errors.forEach(function(e){spanErrors.add(e);});});
+      var errors=Array.from(new Set(FlowCanon.validate(spec).concat(validate(normalize(spec)).errors))).filter(function(e){return !spanErrors.has(e);});
       if(errors.length)fail(spec.page.canon.id,'invalid materialized spec: '+errors.join('; '));
     });
     return copies;
@@ -459,18 +578,24 @@ var FlowTopology = (function(){
   function snapshotTracking(value,node){
     var tracking={};if(!object(value))return tracking;
     var fields=['tickets','prs'];
-    if(!node || !isTextBoxNode(value))fields.push('existsWhen','missingWork','telemetry');
+    if(!node || !isTextBoxNode(value))fields.push('existsWhen','missingWork','telemetry','trace');
     fields.forEach(function(field){if(own(value,field))tracking[field]=value[field];});return tracking;
   }
   function protectedValue(value,node){
     if(!object(value))return value;
     var copy=clone(value);Object.keys(snapshotTracking(value,node)).forEach(function(field){delete copy[field];});return copy;
   }
-  function snapshotTrackingError(before,after){
+  function snapshotTrackingError(before,after,page){
     var error=null;
     function check(previous,next,node,id){
       if(error || sameDefinition(snapshotTracking(previous,node),snapshotTracking(next,node)))return;
-      try{validateTracking(snapshotTracking(next,node),'snapshot '+(node?'node ':'connection ')+id+' tracking');}catch(ex){error=ex.message;}
+      var at='snapshot '+(node?'node ':'connection ')+id+' tracking';
+      try{validateTracking(snapshotTracking(next,node),at);}catch(ex){error=ex.message;return;}
+      // A resolved snapshot holds whole declarations, not patches: check them in full.
+      if(object(next) && own(next,'trace')){
+        var problems=FlowCanon.traceDeclarationErrors(next.trace,node?'node':'edge',page);
+        if(problems.length)error='Topology '+at+': trace'+(problems[0].key==null?'':'.spans.'+problems[0].key)+': '+problems[0].message;
+      }
     }
     ((before.topologyProvenance || {}).imports || []).forEach(function(imp){
       (imp.nodes || []).forEach(function(id){check((before.nodes || {})[id],(after.nodes || {})[id],true,id);});
@@ -496,7 +621,7 @@ var FlowTopology = (function(){
       var target=sec.id?next.find(function(s){return s.id===sec.id;}):next[index];
       if(!target || JSON.stringify(protectedStructure(sec.diagram))!==JSON.stringify(protectedStructure(target.diagram)))
         error='Imported topology structure is read only in this snapshot. Tracking, consumer steps, paths, failures, and panels remain editable.';
-      else error=snapshotTrackingError(sec.diagram,target.diagram);
+      else error=snapshotTrackingError(sec.diagram,target.diagram,after);
     });
     return error;
   }
@@ -540,7 +665,8 @@ var FlowTopology = (function(){
     return mode==='wrapped'?result:mode==='diagram'?result.page.sections[0].diagram:result.page;
   }
   return {validateDeclarations:function(specs){materializeSources(specs,true);},validateTracking:validateTracking,mergeOverlay:mergeOverlay,mergeTelemetry:mergeTelemetry,
-    telemetryDrops:function(d){return (telemetryDrops.get(d) || []).map(function(drop){return clone(drop);});},mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
+    telemetryDrops:function(d){return (telemetryDrops.get(d) || []).map(function(drop){return clone(drop);});},mergeTrace:mergeTrace,
+    traceFindings:traceFindings,mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
 })();
 FlowCanon.materializeTopology=FlowTopology.materialize;
 FlowCanon.topologyDependencies=FlowTopology.dependencies;

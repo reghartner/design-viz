@@ -23,6 +23,8 @@ var FlowviewCompatibility = (function(){
     'flow.ticket-availability':['Ticket-gated node and connection availability','0.2.0'],
     'flow.telemetry':['Telemetry signal bindings','0.2.0'],
     'flow.telemetry-merge':['Imported metrics bindings that merge with the provider','0.2.0'],
+    'flow.trace-spans':['Trace spans declared on nodes and connections','0.2.0'],
+    'flow.trace-scope':['Steps that inherit and narrow declared trace spans','0.2.0'],
     'layout.controls-scale':['Whole step-control sizing in both placements','0.2.0'],
     'layout.playback-position':['Play buttons above or beside steps','0.2.0'],
     'content.edge-json-contracts':['Edge JSON contracts and step replacements','0.2.0'],
@@ -76,7 +78,7 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
-      function tracked(value){if(object(value) && Object.prototype.hasOwnProperty.call(value,'telemetry')){used['flow.telemetry']=true;if(object(value.telemetry) && value.telemetry.extends===true)used['flow.telemetry-merge']=true;}if(object(value) && value.missingWork===true){used['flow.missing-work']=true;used['flow.live-status']=true;}if(object(value) && value.existsWhen==='tickets-done')used['flow.ticket-availability']=true;return object(value) && ['tickets','prs'].some(function(key){return Array.isArray(value[key]) && value[key].length;});}
+      function tracked(value){if(object(value) && Object.prototype.hasOwnProperty.call(value,'trace'))used['flow.trace-spans']=true;if(object(value) && Object.prototype.hasOwnProperty.call(value,'telemetry')){used['flow.telemetry']=true;if(object(value.telemetry) && value.telemetry.extends===true)used['flow.telemetry-merge']=true;}if(object(value) && value.missingWork===true){used['flow.missing-work']=true;used['flow.live-status']=true;}if(object(value) && value.existsWhen==='tickets-done')used['flow.ticket-availability']=true;return object(value) && ['tickets','prs'].some(function(key){return Array.isArray(value[key]) && value[key].length;});}
       Object.values(d.nodes || {}).forEach(function(value){if(object(value) && value.missingWork===true){used['flow.missing-work']=true;used['flow.live-status']=true;}});
       Object.values(d.nodes || {}).concat(Array.isArray(d.edges)?d.edges:[]).forEach(function(value){if(tracked(value))used['flow.live-status']=true;});
       (Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp){
@@ -165,6 +167,7 @@ var FlowviewCompatibility = (function(){
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.coinOffsets) && Object.keys(s.coinOffsets).length;}))used['layout.coin-positions']=true;
       if(object(d.nodes) && Object.keys(d.nodes).some(function(id){return object(d.nodes[id]) && d.nodes[id].style!=null;}))used['media.node-styles']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.panelVisibility!=null;}))used['flow.panel-visibility']=true;
+      if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return object(s) && Object.prototype.hasOwnProperty.call(s,'traceScope');}))used['flow.trace-scope']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return object(s) && Object.prototype.hasOwnProperty.call(s,'ticketFilter');}))used['flow.step-ticket-filter']=true;
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;

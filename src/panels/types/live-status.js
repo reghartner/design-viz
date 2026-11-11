@@ -389,15 +389,40 @@
       var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Turn on Metrics overlay to refresh explicit bindings.':'Turn on Metrics overlay to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
       var status=el(body,'p','status','dv-trace-mode-status',[message,trace.hasMappings?trace.status.note:'',trace.hasMappings?trace.notice:''].filter(Boolean).join(' '));status.setAttribute('role','status');
       // #1177: the latest span mapping with its Undo, and the step chooser of a drop on a carrier with several steps.
-      if(trace.mapped){var note=el(body,'div','map-note','dv-trace-map-note');note.setAttribute('role','status');
-        el(note,'span','text','dv-trace-map-note-text','Mapped '+trace.mapped.traceMatch.serviceName+' · '+trace.mapped.traceMatch.operation+' to step '+trace.mapped.label+(trace.mapped.unmatched?'; this step\'s parent, attributes, namespace or occurrence do not match this span, so nothing lights.':'.'));
-        button(note,'undo','reader-button dv-trace-map-undo','Undo','undoTraceMap');}
+      /* #1290 PR 9: a role select for a declaration on a node or connection, default first, then the button
+         that carries the chosen role. Both are placed in call order by el(), never moved afterwards: moving a
+         focused control blurs it (#1290 whole-branch review m1). */
+      function declareControls(parent,info,key,cls,text,method){
+        var sel=el(parent,'select','declare-role','reader-button tbtn dv-trace-declare-role');sel.setAttribute('aria-label','Role for the span declared on '+info.label);
+        info.roles.forEach(function(r){el(sel,'option',r,'',r).value=r;});
+        if(sel._declareKind!==info.kind || info.roles.indexOf(sel.value)<0){sel.value=info.roles[0];sel._declareKind=info.kind;}
+        var go=button(parent,key,cls,text,method);
+        sel._declareGo=go;go._liveArgument={role:sel.value};
+        // A refused declaration says why beside its button ("Already declared as … on …").
+        if(info.error){var why=el(parent,'p','declare-error','dv-trace-declare-error',info.error);why.setAttribute('role','status');why.id=why.id || 'dv-trace-declare-error-'+Math.random().toString(36).slice(2,10);go.setAttribute('aria-describedby',why.id);}
+        else go.removeAttribute('aria-describedby');
+        // A refusal is about the role it was for: choosing another role clears it.
+        if(!sel._declareChange){sel._declareChange=function(){if(sel._declareGo)sel._declareGo._liveArgument={role:sel.value};var owner=host._livePanelApi;if(owner && owner.clearTraceDeclareError)owner.clearTraceDeclareError();};sel.addEventListener('change',sel._declareChange);}
+        return go;
+      }
+      if(trace.mapped && !trace.declared){var note=el(body,'div','map-note','dv-trace-map-note');note.setAttribute('role','status');
+        el(note,'span','text','dv-trace-map-note-text','Mapped '+trace.mapped.traceMatch.serviceName+' · '+trace.mapped.traceMatch.operation+' to step '+trace.mapped.label+(trace.mapped.replacedScope?'; its trace scope was replaced':'')+(trace.mapped.unmatched?'; this step\'s parent, attributes, namespace or occurrence do not match this span, so nothing lights.':'.'));
+        button(note,'undo','reader-button dv-trace-map-undo','Undo','undoTraceMap');
+        // The mapping a drop on a node or connection made can become a declaration on it instead (one pending change).
+        if(trace.declareOffer){var instead=declareControls(note,trace.declareOffer,'declare','reader-button dv-trace-declare-instead','Declare on '+trace.declareOffer.label+' instead','declareTraceSpanInstead');
+          instead.title='Take this mapping back and declare the span on '+trace.declareOffer.label+' with the role chosen beside it.';}}
+      if(trace.declared){var dn=el(body,'div','declare-note','dv-trace-declare-note');dn.setAttribute('role','status');
+        el(dn,'span','text','dv-trace-declare-note-text','Declared '+trace.declared.key+' ('+trace.declared.span.serviceName+' · '+trace.declared.span.operation+') on '+trace.declared.label+'.');
+        button(dn,'undo','reader-button dv-trace-declare-undo','Undo','undoTraceDeclare');}
       if(trace.mapChooser){
         var mc=trace.mapChooser,chooser=el(body,'div','map-chooser','dv-trace-map-chooser');chooser.setAttribute('role','group');chooser.setAttribute('aria-label','Choose the step for '+mc.label);
-        el(chooser,'p','prompt','dv-trace-map-prompt',mc.steps.length?'Map '+mc.span+' to which step of '+mc.label+'?':'No step names '+mc.label+'. Drop '+mc.span+' on a step instead.');
+        el(chooser,'p','prompt','dv-trace-map-prompt',mc.steps.length?'Map '+mc.span+' to which step of '+mc.label+'?':mc.declare?'No step names '+mc.label+'. Declare '+mc.span+' on it, or drop it on a step.':'No step names '+mc.label+'. Drop '+mc.span+' on a step instead.');
         // Focus goes back to the dragged span row (else the panel) after a pick, Cancel or Esc (#1180).
         var back=function(){var row=host.querySelector('.dv-trace-span[data-span-id="'+mc.spanId+'"]');if(row && row.focus)row.focus({preventScroll:true});else if(host.focus)host.focus({preventScroll:true});};
         mc.steps.forEach(function(step){var choice=button(chooser,'step-'+step.id,'reader-button dv-trace-map-choice',step.label,'chooseTraceMapStep');choice._liveArgument={stepId:step.id};choice.disabled=!!step.disabled;choice._mapBack=back;});
+        // #1290 PR 9: or declare the span on the carrier it was dropped on.
+        if(mc.declare){var dec=declareControls(chooser,mc.declare,'declare','reader-button dv-trace-map-declare','Declare on '+mc.declare.label,'declareTraceSpan');dec._mapBack=back;
+          dec.title='Declare '+mc.span+' on '+mc.declare.label+' with the role chosen beside it, instead of mapping it to a step.';}
         var cancel=button(chooser,'cancel','reader-button dv-trace-map-cancel','Cancel','cancelTraceMapChooser');cancel._mapBack=back;
         chooser._mapBack=back;
         if(!chooser._mapKey){chooser._mapKey=function(ev){if(ev.key!=='Escape')return;ev.preventDefault();ev.stopPropagation();var owner=host._livePanelApi;if(owner)owner.cancelTraceMapChooser();if(chooser._mapBack)chooser._mapBack();};chooser.addEventListener('keydown',chooser._mapKey);}
@@ -430,7 +455,8 @@
       var line=el(detail,'div','request-line','dv-trace-request-line'),icons=el(line,'div','icons','dv-trace-request-icons'),card=el(line,'details','request','dv-trace-request'),matchedSteps=model.mapping?model.rows.filter(function(r){return r.status==='matched';}).length:0;
       // #1175: an optional step missing from this trace does not count against coverage. #1193: nor does a step
       // without a traceMatch ("unmapped"). The summary and the coverage line share these counts.
-      var optionalAbsent=model.rows.filter(function(r){return r.optional;}).length,unmappedSteps=model.rows.filter(function(r){return r.status==='unmapped';}).length,stepTotal=model.rows.length-optionalAbsent-unmappedSteps;
+      // #1290: nor does a step of another flow (traceScope.root); telemetryTraceCounts holds the rule.
+      var stepTotal=telemetryTraceCounts(model).total;
       // The carried focus is used once, and only while nothing else holds focus (the removed card left it on the body).
       var active=doc.activeElement,carried=!!host._traceCardFocus && (!active || active===doc.body || active.isConnected===false);host._traceCardFocus=false;
       var focusCard=card.contains(active) || carried;traceSection(card,'request',shownTrace);
@@ -443,7 +469,9 @@
       var candidate=e.candidates.find(function(c){return c.traceId===e.traceId;}),time=candidate && candidate.time || e.spans.map(function(s){return s.time;}).sort()[0];
       el(card,'p','completeness','dv-trace-completeness',e.completeness+' completeness · '+e.spans.length+' spans · absence is not an outcome');
       var limit=e.warnings.filter(function(w){return /200 spans|timeline unavailable/i.test(w);});if(model.warning)limit.push(model.warning);if(limit.length)el(card,'p','limit','dv-trace-limit',Array.from(new Set(limit)).join(' '));
-      if(model.mapping)el(card,'p','coverage','dv-trace-coverage',matchedSteps+'/'+stepTotal+' steps matched · '+(optionalAbsent?optionalAbsent+' optional not in this trace · ':'')+(unmappedSteps?unmappedSteps+(unmappedSteps===1?' step':' steps')+' without a trace mapping · ':'')+model.mapping.unmatched.length+' spans unmatched');
+      if(model.mapping)el(card,'p','coverage','dv-trace-coverage',telemetryTraceCoverage(model));
+      // #1290: steps left without a mapping because their declared carriers are shared, in plain words.
+      if(model.mapping && telemetryTraceHints(model).length)el(card,'p','scope-hints','dv-trace-scope-hints',telemetryTraceHints(model).join(' '));
       if(trace.entries.length)returnedTraces(card);
       if(!selected.manual)button(el(card,'div','actions','dv-live-controls'),'pin','reader-button','Pin as evidence','pinSelectedTrace');
       var metadata=el(card,'details','metadata','dv-trace-metadata');el(metadata,'summary','summary','','Source and limitations');
@@ -478,7 +506,7 @@
             el(pick,'option','','','Choose a step…').value='';mapSteps.forEach(function(step){el(pick,'option',step.id,'',step.label).value=step.id;});
             if(!mapSteps.some(function(step){return step.id===pick.value;}))pick.value='';
             var apply=button(mapper,'apply','reader-button dv-trace-map-apply','Map to step','mapTraceSpan');pick._mapApply=apply;pick._mapSteps=mapSteps;
-            pick._mapShow=function(){var chosen=pick._mapSteps.find(function(step){return step.id===pick.value;});pick._mapApply.textContent=chosen?'Map to step: '+chosen.caption:'Map to step';pick._mapApply.disabled=!chosen;if(pick._mapApply._liveArgument)pick._mapApply._liveArgument.stepId=pick.value;};
+            pick._mapShow=function(){var chosen=pick._mapSteps.find(function(step){return step.id===pick.value;});pick._mapApply.textContent=chosen?'Map to step: '+chosen.caption+(chosen.scoped?' (replaces this step\'s trace scope)':''):'Map to step';pick._mapApply.disabled=!chosen;if(pick._mapApply._liveArgument)pick._mapApply._liveArgument.stepId=pick.value;};
             apply._liveArgument={context:selected.context,spanId:focusedSpan.id,stepId:pick.value};pick._mapShow();
             if(!pick._mapChange){pick._mapChange=function(){if(pick._mapShow)pick._mapShow();};pick.addEventListener('change',pick._mapChange);}
           }else el(mapper,'p','none','dv-trace-map-none','Every step of this diagram already has a traceMatch.');

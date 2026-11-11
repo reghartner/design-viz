@@ -12,11 +12,22 @@ function planDeleteStep(text, raw, sectionIdx, stepIdx){
     if (got.d.paths.some(function(p){return p.steps.length === 1 && p.steps[0] === id;}))
       return {error:'This is the only step in a path. Remove that path or add another step first.'};
   }
+  var orphans=[];
   var plan=builderRewrite(text, raw, got.path, function(d){
     d.steps.splice(stepIdx,1);
     (d.paths || []).forEach(function(p){p.steps=p.steps.filter(function(ref){return ref!==id;});});
     (d.layouts || []).forEach(function(v){if(Array.isArray(v.steps))v.steps=v.steps.filter(function(ref){return ref!==id;});});
+    // #1290: a trace parent step that names the deleted step is removed in the same edit,
+    // so the board stays valid and one Undo brings both back.
+    if(id)(d.steps || []).forEach(function(st){
+      if(!st || typeof st!=='object')return;
+      var hit=false;
+      [].concat(st.traceMatch || []).forEach(function(m){if(m && typeof m==='object' && m.parentStepId===id){delete m.parentStepId;hit=true;}});
+      if(st.traceScope && typeof st.traceScope==='object' && st.traceScope.parentStepId===id){delete st.traceScope.parentStepId;hit=true;}
+      if(hit)orphans.push(st.id || st.text || 'untitled');
+    });
   });
+  if(!plan.error && orphans.length)plan.message='Step deleted. '+(orphans.length===1?'Step “'+orphans[0]+'” used it as its trace parent step; that parent is removed.':'Steps '+orphans.map(function(n){return '“'+n+'”';}).join(', ')+' used it as their trace parent step; those parents are removed.');
   return builderDetailCascade(plan,sectionIdx,function(detail,owner,target){
     if(target===sectionIdx && detail.step===id)delete detail.step;
     if(detail.stepMap){
@@ -41,6 +52,12 @@ function planRenameStep(text,raw,sectionIdx,stepIdx,newId){
     if(!oldId)return;
     (d.paths || []).forEach(function(path){path.steps=path.steps.map(function(id){return id===oldId?newId:id;});});
     (d.layouts || []).forEach(function(view){if(view.steps)view.steps=view.steps.map(function(id){return id===oldId?newId:id;});});
+    // #1290: trace match and trace scope parents that name the step follow it.
+    (d.steps || []).forEach(function(st){
+      if(!st || typeof st!=='object')return;
+      [].concat(st.traceMatch || []).forEach(function(m){if(m && typeof m==='object' && m.parentStepId===oldId)m.parentStepId=newId;});
+      if(st.traceScope && typeof st.traceScope==='object' && st.traceScope.parentStepId===oldId)st.traceScope.parentStepId=newId;
+    });
   });
   if(!oldId)return plan;
   return builderDetailCascade(plan,sectionIdx,function(detail,owner,target){
@@ -555,10 +572,152 @@ function traceMatchFormEdit(value,edit){
   }
   return {error:'Unknown trace match edit.'};
 }
+/* #1290 PR 7: a step's traceScope, edited from the step form. Each edit is one source change.
+   Ops: create (also removes a trace match), remove, root {serviceName, operation}, parent {value},
+   attribute {key, attrName, value, type}, skip {carrier, entry, counts}, optional {value},
+   number {field: maxDurationMs | maxQueueDepth, value}. opts.allowed lists the attribute names
+   the board can match (FlowCanon.traceAttributeNames of the resolved page). */
+function traceScopeObject(v){return !!v && typeof v==='object' && !Array.isArray(v);}
+function traceScopeLoops(steps,stepId,parentId){
+  // Would stepId → parentId close a loop through traceMatch or traceScope parents?
+  var parents=function(id){
+    var st=steps.find(function(x){return x && x.id===id;});if(!st)return [];
+    if(id===stepId)return [parentId];
+    return [].concat(st.traceMatch || []).map(function(m){return m && m.parentStepId;}).concat(traceScopeObject(st.traceScope) && st.traceScope.parentStepId?[st.traceScope.parentStepId]:[]).filter(Boolean);
+  };
+  var seen={},queue=[parentId];
+  while(queue.length){var id=queue.shift();if(id===stepId)return true;if(seen[id])continue;seen[id]=true;queue=queue.concat(parents(id));}
+  return false;
+}
+function traceScopeCarriers(d,st){
+  var keys=[],failures=st && st.failures && typeof st.failures==='object' && !Array.isArray(st.failures)?st.failures:{};
+  if(st && typeof st.edge==='string')keys.push(st.edge);
+  if(st && Array.isArray(st.edges))st.edges.forEach(function(k){if(typeof k==='string' && keys.indexOf(k)<0)keys.push(k);});
+  var nodes=d && d.nodes && typeof d.nodes==='object'?d.nodes:{},edges=d && Array.isArray(d.edges)?d.edges:[];
+  function spansOf(v){var sp=v && v.trace && typeof v.trace==='object' && v.trace.spans && typeof v.trace.spans==='object' && !Array.isArray(v.trace.spans)?v.trace.spans:{};
+    return Object.keys(sp).filter(function(k){return sp[k] && typeof sp[k]==='object' && !Array.isArray(sp[k]);}).map(function(k){return {key:k,span:sp[k],role:sp[k].role};});}
+  var out=keys.filter(function(k){return failures[k]!=='dropped' && failures[k]!=='blocked';}).map(function(k){
+    var e=edges.find(function(x){return x && x.from+'->'+x.to===k;}),from=e && nodes[e.from],to=e && nodes[e.to];
+    var title=e?(from && from.title || e.from)+' → '+(to && to.title || e.to):k;
+    return {kind:'edge',id:k,title:title,spans:e?spansOf(e):[]};
+  });
+  (st && Array.isArray(st.nodes)?st.nodes:[]).forEach(function(n){if(typeof n!=='string')return;var v=nodes[n];out.push({kind:'node',id:n,title:v && v.title || n,spans:v?spansOf(v):[]});});
+  // An edge step owns its connection's send spans; a receive span only times the hand-off.
+  out.forEach(function(c){c.owned=c.kind==='edge'?c.spans.filter(function(x){return x.role==='send';}):c.spans;c.handoff=c.kind==='edge'?c.spans.filter(function(x){return x.role!=='send';}):[];});
+  return out;
+  }
+function traceScopeSpanText(x){
+  var m=x.span,svc=String(m.serviceName || '');
+  if(typeof m.operation==='string')return x.key+' · '+svc+' '+m.operation;
+  if(typeof m.operationPrefix==='string')return x.key+' · '+svc+' '+m.operationPrefix+'… (prefix)';
+  var attrs=m.attributes && typeof m.attributes==='object'?m.attributes:{};
+  return x.key+' · '+svc+' where '+Object.keys(attrs).map(function(k){return k+'='+String(attrs[k]);}).join(', ');
+  }
+/* The paths a step is on (every step when the board has no paths), as the core maps them. */
+function traceScopeRoutes(d,index){
+  var steps=d && Array.isArray(d.steps)?d.steps:[];
+  var routes=typeof diagramPathList==='function'?diagramPathList(d).filter(function(r){return r.indices.indexOf(index)>=0;}):[];
+  return routes.length?routes:[{label:'',indices:steps.map(function(s,i){return i;})}];
+}
+/* Where step `index` inherits span x of carrier c ({kind, id}): the path labels, by the core D9
+   rule per path (FlowTraceMatch.effectiveSelector over that path's steps; a traceScope inherits
+   shared carriers too), less skips by name or role:<role>. An edge step owns only send spans.
+   Returns {on:[labels], all:<paths the step is on>}. */
+function traceScopeInheritedOn(d,index,c,x){
+  var steps=d && Array.isArray(d.steps)?d.steps:[],st=steps[index],none={on:[],all:0};
+  if(!st || typeof st!=='object' || st.traceMatch!=null)return none;
+  if(c.kind==='edge' && x.role!=='send')return none;
+  if(!traceScopeCarriers(d,st).some(function(y){return y.kind===c.kind && y.id===c.id;}))return none;
+  var scope=traceScopeObject(st.traceScope)?st.traceScope:null,skip=scope && traceScopeObject(scope.skip)?scope.skip:{},list=Array.isArray(skip[c.id])?skip[c.id]:[];
+  if(list.indexOf(x.key)>=0 || list.indexOf('role:'+x.role)>=0)return none;
+  var routes=traceScopeRoutes(d,index);
+  var on=routes.filter(function(route){
+    if(scope)return true;
+    var eff=typeof FlowTraceMatch!=='undefined' && FlowTraceMatch.effectiveSelector?FlowTraceMatch.effectiveSelector(d,st,route.indices.map(function(i){return steps[i];}).filter(Boolean)):null;
+    return !!(eff && Array.isArray(eff.inherits) && eff.inherits.indexOf(c.id)>=0);
+  }).map(function(r){return r.label;});
+  return {on:on,all:routes.length};
+}
+function traceScopeNames(list){return list.length>1?list.slice(0,-1).join(', ')+' and '+list[list.length-1]:list[0] || '';}
+function stepTraceScopeTitle(st){return '“'+String(st && st.text || st && st.id || '').replace(/\s+/g,' ').trim()+'”';}
+function planStepTraceScope(text,raw,sectionIdx,stepIdx,edit,opts){
+  var got=builderStepAt(raw,sectionIdx,stepIdx);
+  if(!got)return {error:'Step not found. Reselect it and try again.'};
+  var st=got.st,op=edit && edit.op,had=Object.prototype.hasOwnProperty.call(st,'traceScope');
+  if(op==='create'){
+    if(typeof st.id!=='string' || !st.id.trim())return {error:'A trace scope needs a stable step ID. Enter one in Step ID above, then add the scope.',field:'create'};
+    if(had && traceScopeObject(st.traceScope))
+      return Object.prototype.hasOwnProperty.call(st,'traceMatch')?planSetField(text,raw,got.path,'traceMatch',null):{noop:true};
+    return Object.prototype.hasOwnProperty.call(st,'traceMatch')?planSetFields(text,raw,got.path,[['traceScope','{}'],['traceMatch',null]]):planSetField(text,raw,got.path,'traceScope','{}');
+  }
+  if(op==='remove')return had?planSetField(text,raw,got.path,'traceScope',null):{noop:true};
+  if(!traceScopeObject(st.traceScope))return {error:'Add a trace scope first.'};
+  var scope=builderClone(st.traceScope),before=JSON.stringify(scope);
+  function trimmed(v){return typeof v==='string'?v.trim():'';}
+  if(op==='root'){
+    var service=trimmed(edit.serviceName),operation=trimmed(edit.operation);
+    if(!service && !operation){if(edit.clear)delete scope.root;else return {error:'A trace root needs a service and an operation. To remove it, use Clear trace root.',field:edit.field || 'serviceName'};}
+    else if(!service)return {error:edit.field==='serviceName'?'A trace root needs a service and an operation. To remove it, use Clear trace root.':'Enter the root service too: a trace root is a service and an operation.',field:'serviceName'};
+    else if(!operation)return {error:edit.field==='operation'?'A trace root needs a service and an operation. To remove it, use Clear trace root.':'Enter the root operation too: a trace root is a service and an operation.',field:'operation'};
+    else scope.root={serviceName:service,operation:operation};
+  }else if(op==='parent'){
+    var parent=trimmed(edit.value),steps=(got.d && got.d.steps) || [];
+    if(!parent)delete scope.parentStepId;
+    else{
+      if(parent===st.id)return {error:'A step cannot be its own parent step.',field:'parent'};
+      var ps=steps.find(function(x){return x && x.id===parent;});
+      if(!ps)return {error:'There is no step with ID '+parent+'.',field:'parent'};
+      if(traceScopeLoops(steps,st.id,parent))return {error:'Step '+stepTraceScopeTitle(ps)+' already depends on this step, so this would loop. Choose another parent step.',field:'parent'};
+      scope.parentStepId=parent;
+    }
+  }else if(op==='attribute'){
+    var attrs=traceScopeObject(scope.attributes)?scope.attributes:{},key=edit.key==null?null:edit.key,name=edit.attrName==null?null:trimmed(edit.attrName);
+    if(key!=null && !Object.prototype.hasOwnProperty.call(attrs,key))return {error:'Attribute '+key+' is not on this trace scope.'};
+    if(name==null){var rest={};Object.keys(attrs).forEach(function(k){if(k!==key)rest[k]=attrs[k];});attrs=rest;}
+    else{
+      if(!name)return {error:'Enter the attribute name, for example db.system.',field:'attribute'};
+      var allowed=opts && Array.isArray(opts.allowed)?opts.allowed:null;
+      if(allowed && allowed.indexOf(name)<0)return {error:'Attribute '+name+' is not one this board can match. Use a supported attribute such as db.system, or list it in a trace connection\'s allowedAttributes.',field:'attribute'};
+      if(name!==key && Object.prototype.hasOwnProperty.call(attrs,name))return {error:'Attribute '+name+' is already on this trace scope.',field:'attribute'};
+      var type=edit.type || (key!=null?typeof attrs[key]:'string');
+      if(['string','number','boolean'].indexOf(type)<0)return {error:'Attribute types are text, number or true/false.',field:'attribute'};
+      var parsed=traceMatchAttributeValue(edit.value!==undefined?edit.value:key!=null?String(attrs[key]):'',type,name);
+      if(parsed.error)return {error:parsed.error,field:'attribute'};
+      var out={};
+      if(key==null){Object.keys(attrs).forEach(function(k){out[k]=attrs[k];});out[name]=parsed.value;}
+      else Object.keys(attrs).forEach(function(k){if(k===key)out[name]=parsed.value;else out[k]=attrs[k];});
+      attrs=out;
+    }
+    if(Object.keys(attrs).length)scope.attributes=attrs;else delete scope.attributes;
+  }else if(op==='skip'){
+    var carrier=edit.carrier,entry=edit.entry;
+    if(typeof carrier!=='string' || !carrier || typeof entry!=='string' || !entry)return {error:'Choose a span to skip.'};
+    var skip=traceScopeObject(scope.skip)?scope.skip:{},list=Array.isArray(skip[carrier])?skip[carrier].slice():[];
+    if(edit.counts)list=list.filter(function(x){return x!==entry;});else if(list.indexOf(entry)<0)list.push(entry);
+    var nextSkip={};Object.keys(skip).forEach(function(k){if(k!==carrier)nextSkip[k]=skip[k];else if(list.length)nextSkip[k]=list;});
+    if(!Object.prototype.hasOwnProperty.call(skip,carrier) && list.length)nextSkip[carrier]=list;
+    if(Object.keys(nextSkip).length)scope.skip=nextSkip;else delete scope.skip;
+  }else if(op==='optional'){
+    if(edit.value===true)scope.optional=true;else delete scope.optional;
+  }else if(op==='number'){
+    var field=edit.field;if(field!=='maxDurationMs' && field!=='maxQueueDepth')return {error:'Unknown trace scope field.'};
+    var raw_=trimmed(edit.value==null?'':String(edit.value));
+    if(!raw_)delete scope[field];
+    else{
+      var n=Number(raw_);
+      if(!Number.isFinite(n) || n<0)return {error:field==='maxDurationMs'?'Time budget is a number of milliseconds, 0 or more.':'Max queue depth is a number, 0 or more.',field:field};
+      scope[field]=n;
+    }
+  }else return {error:'Unknown trace scope edit.'};
+  if(JSON.stringify(scope)===before)return {noop:true};
+  return planSetField(text,raw,got.path,'traceScope',JSON.stringify(scope));
+}
 function planStepTraceMatch(text,raw,sectionIdx,stepIdx,edit){
   var got=builderStepAt(raw,sectionIdx,stepIdx);
   if(!got)return {error:'Step not found. Reselect it and try again.'};
   var r=traceMatchFormEdit(got.st.traceMatch,edit);
   if(r.error || r.noop)return r;
+  // #1290: a step has traceMatch or traceScope, never both: writing a trace match replaces the scope.
+  if(r.value!=null && Object.prototype.hasOwnProperty.call(got.st,'traceScope'))return planSetFields(text,raw,got.path,[['traceMatch',JSON.stringify(r.value)],['traceScope',null]]);
   return planSetField(text,raw,got.path,'traceMatch',r.value==null?null:JSON.stringify(r.value));
 }

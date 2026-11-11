@@ -60,6 +60,19 @@ function boardEditResolveChain(raw,chain){
   })(raw,0,[]);
   return found;
 }
+/* #1290 PR 9: two span declarations are the same when every selector and label field matches
+   (service, operation or prefix, role, namespace and attributes); the key is compared elsewhere. */
+function boardEditSameSpan(a,b){
+  if(!a || !b || typeof a!=='object' || typeof b!=='object')return false;
+  var attrs=function(x){var v=x.attributes && typeof x.attributes==='object'?x.attributes:{};return JSON.stringify(Object.keys(v).sort().map(function(k){return [k,v[k]];}));};
+  return ['serviceName','operation','operationPrefix','role','namespace'].every(function(k){return (a[k]===undefined?null:a[k])===(b[k]===undefined?null:b[k]);}) && attrs(a)===attrs(b);
+}
+// Key-order-independent JSON for comparing authored values (arrays keep their order).
+function boardEditCanonical(v){
+  if(Array.isArray(v))return '['+v.map(boardEditCanonical).join(',')+']';
+  if(v && typeof v==='object')return '{'+Object.keys(v).sort().map(function(k){return JSON.stringify(k)+':'+boardEditCanonical(v[k]);}).join(',')+'}';
+  return JSON.stringify(v===undefined?null:v);
+}
 function boardEditSamePrefix(path,prefix){return prefix.every(function(part,i){return path[i]===part;});}
 
 function createBoardEditor(options){
@@ -132,7 +145,10 @@ function createBoardEditor(options){
   // `restore` {at, item}: an add that undoes a pending remove puts the removed entry back where it was (#1253).
   function splice(source,t,op,ticket,match,restore){
     // #1180: a replacement swaps serviceName and operation and keeps the step's other traceMatch fields.
-    if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation},typeof match.nodeId==='string' && match.nodeId?{nodeId:match.nodeId}:{}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));return set?set.text:null;}
+    if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation},typeof match.nodeId==='string' && match.nodeId?{nodeId:match.nodeId}:{}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));
+      // #1290: a step has traceMatch or traceScope, never both: the mapping replaces the scope.
+      if(set && t.local && Object.prototype.hasOwnProperty.call(t.local,'traceScope'))set=jsonSetField(set.text,t.path,'traceScope',null);
+      return set?set.text:null;}
     if(op==='clear-missing-work'){
       if(t.imported){var cleared=planTopologyTracking(source,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,'missingWork',true,true,context,t.index);return cleared.error?null:cleared.text;}
       var removed=jsonSetField(source,t.path,'missingWork',null);
@@ -156,7 +172,9 @@ function createBoardEditor(options){
     var entry={op:op};if(ticket!=null)entry.ticket=ticket;entry.path=t.path.slice();entry.label=t.label;
     if(t.kind==='step'){entry.step=t.step;entry.traceMatch={serviceName:match.serviceName,operation:match.operation};
       // The change describes the full span mapping that results: a nodeId written now or kept from the step (#1192).
-      var nodeId=typeof match.nodeId==='string' && match.nodeId?match.nodeId:t.previous && !Array.isArray(t.previous) && typeof t.previous.nodeId==='string' && t.previous.nodeId?t.previous.nodeId:null;if(nodeId)entry.traceMatch.nodeId=nodeId;if(t.previous){entry.replaces={serviceName:t.previous.serviceName,operation:t.previous.operation};if(typeof t.previous.nodeId==='string' && t.previous.nodeId)entry.replaces.nodeId=t.previous.nodeId;}}
+      var nodeId=typeof match.nodeId==='string' && match.nodeId?match.nodeId:t.previous && !Array.isArray(t.previous) && typeof t.previous.nodeId==='string' && t.previous.nodeId?t.previous.nodeId:null;if(nodeId)entry.traceMatch.nodeId=nodeId;if(t.previous){entry.replaces={serviceName:t.previous.serviceName,operation:t.previous.operation};if(typeof t.previous.nodeId==='string' && t.previous.nodeId)entry.replaces.nodeId=t.previous.nodeId;}
+      // #1290: the traceScope the mapping replaced, so board-sync pull can tell whether a local copy changed it.
+      if(t.local && Object.prototype.hasOwnProperty.call(t.local,'traceScope'))entry.replacesScope=JSON.parse(JSON.stringify(t.local.traceScope));}
     else if(t.kind==='node')entry.node=t.node;else entry.edge=t.edge.slice();
     return entry;
   }
@@ -185,9 +203,13 @@ function createBoardEditor(options){
     // The pending list changes before the render, so the re-rendered board shows the new count at once (#1253);
     // a refused render puts it back.
     var entry=record(t,op,ticket,match),chain=boardEditChain(t.raw,t.path),kept=ops.slice(),befores=ops.map(function(o){return o.before;});
-    if(inverse>=0 && carrierTickets(next,t.path)===ops[inverse].tickets){ops.splice(inverse,1);ops.slice(inverse).forEach(function(o){o.before=undefined;});}
+    // Every exact-text snapshot taken after the cancelled op still holds it: drop them all, so no Undo brings it
+    // back (#1290 whole-branch review M1: a swap's restore text and its swapped mapping's before).
+    if(inverse>=0 && carrierTickets(next,t.path)===ops[inverse].tickets){ops.splice(inverse,1);ops.slice(inverse).forEach(function(o){o.before=undefined;o.restore=undefined;if(o.swapped)o.swapped.before=undefined;});}
     else{
       var made={entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,previous:op==='trace-match'?t.previous:undefined,before:op==='trace-match'?before:undefined};
+      // #1290: the traceScope a mapping replaced, so its Undo can put it back in any edit order.
+      if(op==='trace-match' && t.local && Object.prototype.hasOwnProperty.call(t.local,'traceScope'))made.scope=JSON.parse(JSON.stringify(t.local.traceScope));
       if(op==='add' || op==='remove')made.tickets=carrierTickets(text,t.path);
       if(op==='remove' && !t.imported){var list=Array.isArray(t.local.tickets)?t.local.tickets:[],at=list.findIndex(function(item){return (trackingTicket(item) || {}).key===ticket;});if(at>=0)made.removed={at:at,item:list[at]};}
       ops.push(made);
@@ -203,8 +225,11 @@ function createBoardEditor(options){
     if(error){if(win.console)console.warn('flowspec: board edit refused: '+error);return false;}
     text=next;return true;
   }
-  // The text from before a mapping (for its Undo) stays out of the stash.
-  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops.map(function(o){return {entry:o.entry,chain:o.chain,replayable:o.replayable,kind:o.kind,previous:o.previous};})}));}catch(ex){}}
+  // The text from before a mapping (for its Undo) stays out of the stash, and so does a replaced
+  // traceScope: replaying a mapping reads it again from the step it is applied to.
+  // A mapping also stashes the traceScope it replaced (or that there was none), so a replay can refuse when
+  // their version gave the step a scope or changed that one (#1290 whole-branch review M2).
+  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops.map(function(o){var s={entry:o.entry,chain:o.chain,replayable:o.replayable,kind:o.kind,previous:o.previous};if(o.entry.op==='trace-match'){s.hadScope=o.scope!==undefined;if(s.hadScope)s.scope=o.scope;}return s;})}));}catch(ex){}}
   function unstash(){try{win.sessionStorage.removeItem(stashKey);}catch(ex){}}
   function history(source,entry){
     var raw=parsed(source),owner=raw && raw.page?['page']:[],page=specValueAt(raw,owner),list=page && page.editHistory,itemText=JSON.stringify(entry,null,2);
@@ -222,34 +247,74 @@ function createBoardEditor(options){
     try{saved=JSON.parse(win.sessionStorage.getItem(stashKey) || 'null');}catch(ex){saved=null;}
     unstash();
     if(!saved || !Array.isArray(saved.ops) || !saved.ops.length)return;
-    var applied=0,already=0,dropped=[];
+    // `dropped`: changes whose carrier moved, went or is ambiguous; `refused`: changes whose carrier is there
+    // but cannot take them, each with the reason that is true for it (#1290 PR 9 review c2).
+    var applied=0,already=0,dropped=[],refused=[];
+    function spanName(sp){return sp.serviceName+' · '+sp.operation;}
     saved.ops.forEach(function(op){
       var entry=op && op.entry;if(!entry)return;
       var where=entry.label || entry.node || entry.step || (entry.edge || []).join(' → ');
-      var describe=entry.op==='clear-missing-work'?'Missing work cleared from '+where:entry.op==='trace-match'?'span mapped to '+where:entry.ticket+' '+(entry.op==='add'?'on ':'off ')+where;
+      var tm=entry.traceMatch || {},sp=entry.span || {};
+      var describe=entry.op==='clear-missing-work'?'Missing work cleared from '+where:entry.op==='trace-match'?'span '+tm.serviceName+' · '+tm.operation+' mapped to '+where:entry.op==='trace-span'?'span '+sp.key+' ('+spanName(sp)+') declared on '+where:entry.ticket+' '+(entry.op==='add'?'on ':'off ')+where;
+      function refuse(reason){refused.push(describe+' could not be re-applied: '+reason);}
       var raw=parsed(text),paths=op.replayable?boardEditResolveChain(raw,op.chain):[];
       var ref=paths.length===1?refFor(raw,paths[0],op.kind,entry):null;
       if(!ref){dropped.push(describe);return;}
       active=true;
       var before=text;
+      // #1290 PR 9: a declaration the winner already has (same key, service and operation) needs nothing.
+      if(entry.op==='trace-span'){
+        var tt=null;try{tt=target(text,ref);}catch(ex){tt=null;}var have=tt && shownCarrier(tt),theirs=have && have.trace && have.trace.spans && have.trace.spans[entry.span.key];
+        // The whole declared span is compared; another span under that key keeps the winner's, and this change is dropped.
+        if(theirs){
+          if(boardEditSameSpan(theirs,entry.span)){already++;return;}
+          var same=theirs.serviceName===sp.serviceName && theirs.operation===sp.operation;
+          refuse('their version already declares a different span under '+sp.key+' ('+(typeof theirs.operation==='string'?spanName(theirs):theirs.serviceName+' · '+(theirs.operationPrefix || '')+'…')+(same || theirs.role!==sp.role?', role '+theirs.role:'')+'); drop the span again to declare it; it gets a new name');
+          return;
+        }
+        // The same span under another key in their version is already there: no second declaration.
+        var hs=have && have.trace && have.trace.spans && typeof have.trace.spans==='object'?have.trace.spans:{};
+        if(Object.keys(hs).some(function(k){return boardEditSameSpan(hs[k],entry.span);})){already++;return;}
+        if(declare(ref,entry.span,entry.span.key,false)){applied++;return;}
+        var why=tt?declaration(tt,entry.span,null):null;
+        if(why && why.error)refuse(/^Already declared as /.test(why.error)?'their version already declares it as '+why.error.replace(/^Already declared as /,'').replace(/ on .*$/,''):why.error.replace(/\.$/,'').replace(/^./,function(c){return c.toLowerCase();}));
+        else dropped.push(describe);
+        return;
+      }
+      // A mapping removes the step's traceScope: never one their version added or changed (#1290 review M2).
+      if(entry.op==='trace-match'){
+        var at_=specValueAt(parsed(text),paths[0]),theirScope=at_ && typeof at_==='object'?at_.traceScope:undefined;
+        if(theirScope!==undefined && (!op.hadScope || boardEditCanonical(theirScope)!==boardEditCanonical(op.scope))){
+          refuse(op.hadScope?'their version changed that step\'s trace scope; edit it in Inspect':'their version gives that step a trace scope; edit it in Inspect');return;}
+      }
       if(!apply(entry.op,ref,entry.ticket,null,entry.traceMatch,op.previous) && text===before){
-        // A clear with no marker of this board's left to clear is dropped (#855).
-        if(entry.op==='clear-missing-work'){dropped.push(describe);return;}
-        // A step that already has this exact traceMatch needs nothing; any other is dropped (#1078).
-        if(entry.op==='trace-match'){var step=specValueAt(parsed(text),paths[0]),m=step && step.traceMatch,want=entry.traceMatch || {};if(m && m.serviceName===want.serviceName && m.operation===want.operation)already++;else dropped.push(describe);return;}
+        // A clear with no marker of this board's left to clear is dropped (#855), saying why.
+        if(entry.op==='clear-missing-work'){var mk=null;try{mk=marker(target(text,ref));}catch(ex){mk=null;}
+          refuse(mk && !mk.clearable?'the Missing work marker on '+where+' comes from '+mk.source+' in their version':'their version has no Missing work marker on '+where+' to clear');return;}
+        // A step that already has this exact traceMatch needs nothing; any other is dropped (#1078), saying why.
+        if(entry.op==='trace-match'){var step=specValueAt(parsed(text),paths[0]),m=step && step.traceMatch,want=entry.traceMatch || {};
+          if(m && m.serviceName===want.serviceName && m.operation===want.operation){already++;return;}
+          refuse(Array.isArray(m)?'their version gives that step alternatives; edit it in Inspect':m?'their version maps that step to '+m.serviceName+' · '+m.operation:'their version removed the trace match it replaced');return;}
         // Already true in the winning version: nothing left to do for it.
-        var t=target(text,ref);var has=t && authoredKeys(t).indexOf(entry.ticket)>=0;
-        if(t && ((entry.op==='add')===has))already++;else dropped.push(describe);
+        var t=null;try{t=target(text,ref);}catch(ex){t=null;}var has=t && authoredKeys(t).indexOf(entry.ticket)>=0;
+        if(t && ((entry.op==='add')===has)){already++;return;}
+        if(!t){dropped.push(describe);return;}
+        // The carrier is there: say why it cannot take the ticket change.
+        var inherited=null;
+        if(t.imported){try{var it=topologyTrackingTarget(text,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,context,t.index);if(!it.error && it.inherited.tickets.indexOf(entry.ticket)>=0)inherited=providerTitle(it.got.d.topologyImports[it.index].spec);}catch(ex){inherited=null;}}
+        refuse(inherited?'their version already gets '+entry.ticket+' on '+where+' from '+inherited:entry.op==='add'?'their version could not take '+entry.ticket+' on '+where:'their version could not drop '+entry.ticket+' from '+where);
         return;
       }
       applied++;
     });
     if(!ops.length)active=false;
     // #1253: a change the winning version already has is not re-applied, and "Save again" only when one is pending.
-    var parts=[applied+' of your changes were re-applied'];
+    // One sentence for the counts, then one sentence per refused change (#1290 PR 9 review c3).
+    var parts=[applied+' of your changes '+(applied===1?'was':'were')+' re-applied'];
     if(already)parts.push(already+' '+(already===1?'was':'were')+' already in their version');
-    parts.push(dropped.length+' could not be (carrier moved, removed or ambiguous)'+(dropped.length?': '+dropped.join('; '):''));
-    notice={kind:'warn',text:'Another editor saved first. '+parts.join('; ')+'.'+(ops.length?' Save again.':'')};
+    if(dropped.length)parts.push(dropped.length+' could not be (carrier moved, removed or ambiguous): '+dropped.join('; '));
+    var sentences=refused.map(function(text){return ' '+text.charAt(0).toUpperCase()+text.slice(1)+'.';}).join('');
+    notice={kind:'warn',text:'Another editor saved first. '+parts.join('; ')+'.'+sentences+(ops.length?' Save again.':'')};
     changed();
   }
   // A rendered-carrier reference for a concrete path in raw.
@@ -279,19 +344,129 @@ function createBoardEditor(options){
   function undoMap(){
     if(!active || saving || readOnly)return false;var at=lastMapping();if(at<0)return false;
     var op=ops[at],next=at===ops.length-1 && op.before!=null?op.before:null;
-    if(next==null){var set=jsonSetField(text,op.entry.path,'traceMatch',op.previous?JSON.stringify(op.previous):null);next=set && set.text;}
+    if(next==null){
+      var set=jsonSetField(text,op.entry.path,'traceMatch',op.previous?JSON.stringify(op.previous):null);
+      if(set && op.scope!==undefined)set=jsonSetField(set.text,op.entry.path,'traceScope',JSON.stringify(op.scope));
+      next=set && set.text;
+    }
     if(next==null || !render(next))return false;
     ops.splice(at,1);question=null;changed();return true;
   }
   function beforeUnload(ev){if(!ops.length || reloading)return;ev.preventDefault();ev.returnValue='';return '';}
   win.addEventListener('beforeunload',beforeUnload);
 
+  /* #1290 PR 9: "Declare on this node/connection". A dropped span becomes a declaration
+     trace.spans.<key> {serviceName, operation, role} on a local carrier, or an added span in the
+     consumer overlay of an imported one. The key is a slug of the operation, unique on the carrier;
+     a provider name this board hides is still taken. */
+  var DECLARE_ROLES={node:['process','database','cache','call','work'],edge:['send','receive']};
+  // The key: the operation's last meaningful segment (after the last "/", skipping {id}, :id and numbers;
+  // the whole operation when it has no "/"), slugged and starting with a letter.
+  // A provider named by its page title (its spec id when it has none), as the rest of #1290 does.
+  function providerTitle(id){
+    var specs=context && Array.isArray(context.specs)?context.specs:[],spec=specs.find(function(x){return x && x.page && x.page.canon && x.page.canon.id===id;});
+    return spec && typeof spec.page.title==='string' && spec.page.title.trim()?spec.page.title.trim():id;
+  }
+  function slug(operation){
+    var op=String(operation),method=/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+\//i.exec(op);
+    var parts=op.split('/').map(function(p){return p.trim();}).filter(function(p){return p && !/^\{.*\}$/.test(p) && !/^:/.test(p) && !/^\d+$/.test(p);});
+    // A leading HTTP method stays: "GET /orders" is get-orders.
+    if(op.indexOf('/')>=0 && parts.length)op=(method?method[1]+' ':'')+parts[parts.length-1].replace(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/i,'');
+    var s=op.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+    if(!s)s='span';if(!/^[a-z]/.test(s))s='span-'+s;
+    return s.slice(0,64).replace(/-+$/,"");
+  }
+  function shownCarrier(t){
+    var view=resolved(t.raw),shown=sectionAt(view,t.section);if(!shown || !shown.d)return null;
+    return t.kind==='node'?(shown.d.nodes || {})[t.node]:(shown.d.edges || [])[t.index];
+  }
+  function takenKeys(t){
+    var carrier=shownCarrier(t),keys=[],add=function(k){if(keys.indexOf(k)<0)keys.push(k);};
+    var spans=carrier && carrier.trace && carrier.trace.spans && typeof carrier.trace.spans==='object'?carrier.trace.spans:{};Object.keys(spans).forEach(add);
+    var own=t.local && t.local.trace && typeof t.local.trace==='object'?t.local.trace:null;
+    if(own && own.spans && typeof own.spans==='object')Object.keys(own.spans).forEach(add);
+    if(own && Array.isArray(own.hide))own.hide.forEach(function(k){if(typeof k==='string')add(k);});
+    return keys;
+  }
+  function declaration(t,span,key){
+    if(!t || (t.kind!=='node' && t.kind!=='edge'))return {error:'Drop the span on a node or connection.'};
+    if(!span || typeof span.operation!=='string' || !span.operation.trim())return {error:'This span has no operation, so it cannot be declared.'};
+    if(typeof span.serviceName!=='string' || !span.serviceName.trim())return {error:'This span has no service name, so it cannot be declared.'};
+    if(DECLARE_ROLES[t.kind].indexOf(span.role)<0)return {error:t.kind==='node'?'A node\'s span role is one of process, database, cache, call or work.':'A connection\'s span role is send or receive.'};
+    // A span this carrier already declares (inherited or its own) under another key is not declared twice.
+    if(!key){var have=shownCarrier(t),hs=have && have.trace && have.trace.spans && typeof have.trace.spans==='object'?have.trace.spans:{};
+      var same=Object.keys(hs).find(function(k){var x=hs[k];return x && x.serviceName===span.serviceName && x.operation===span.operation && x.role===span.role;});
+      if(same)return {error:'Already declared as '+same+' on '+t.label+'.'};}
+    var taken=takenKeys(t),base=key || slug(span.operation),next=base,n=2;
+    while(taken.indexOf(next)>=0)next=base+'-'+(n++);
+    return {key:next,span:{serviceName:span.serviceName,operation:span.operation,role:span.role}};
+  }
+  // The text with `key` set to `value` (null removes it) in the carrier's own trace, or null.
+  function writeSpan(source,t,key,value){
+    var own=t.local && t.local.trace && typeof t.local.trace==='object'?JSON.parse(JSON.stringify(t.local.trace)):{};
+    var spans=own.spans && typeof own.spans==='object'?own.spans:{};
+    if(value)spans[key]=value;else delete spans[key];
+    if(Object.keys(spans).length)own.spans=spans;else delete own.spans;
+    var empty=!Object.keys(own).length;
+    if(t.imported){var plan=planTopologyTracking(source,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,'trace',empty?null:own,empty,context,t.index);return plan.error?null:plan.text;}
+    var set=jsonSetField(source,t.path,'trace',empty?null:JSON.stringify(own));return set?set.text:null;
+  }
+  // The text without pending mapping op `op` (its exact `before` when it is the last change).
+  function withoutMapping(source,op,last){
+    if(last && op.before!=null)return op.before;
+    var set=jsonSetField(source,op.entry.path,'traceMatch',op.previous?JSON.stringify(op.previous):null);
+    if(set && op.scope!==undefined)set=jsonSetField(set.text,op.entry.path,'traceScope',JSON.stringify(op.scope));
+    return set?set.text:null;
+  }
+  /* `swap`: "Declare on <title> instead" (team-lead ruling, #1290 PR 9): the latest pending mapping is
+     taken out and the declaration takes its place, one pending change; its Undo restores the mapping. */
+  function declare(ref,span,key,swap){
+    if(!active || saving || readOnly)return false;
+    var at=swap?lastMapping():-1;if(swap && at<0)return false;
+    var source=swap?withoutMapping(text,ops[at],at===ops.length-1):text;if(source==null)return false;
+    var t;try{t=target(source,ref);}catch(ex){t=null;}if(!t || t.kind==='step')return false;
+    var d=declaration(t,span,key);if(d.error)return false;
+    var next=writeSpan(source,t,d.key,d.span),before=text;
+    if(next==null || next===source)return false;
+    var entry={op:'trace-span',path:t.path.slice(),label:t.label};
+    if(t.kind==='node')entry.node=t.node;else entry.edge=t.edge.slice();
+    entry.span={key:d.key,serviceName:d.span.serviceName,operation:d.span.operation,role:d.span.role};
+    var chain=boardEditChain(t.raw,t.path),kept=ops.slice(),befores=ops.map(function(o){return o.before;});
+    var made={entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,before:swap?null:before};
+    if(swap){made.swapped=ops[at];made.restore=before;if(at!==ops.length-1)ops[at].before=undefined;ops.splice(at,1);ops.slice(at).forEach(function(o){if(o.entry.op==='trace-match')o.before=undefined;});}
+    ops.push(made);
+    if(!render(next)){ops=kept;kept.forEach(function(o,i){o.before=befores[i];});return false;}
+    question=null;changed();return true;
+  }
+  function lastDeclaration(){for(var i=ops.length-1;i>=0;i--)if(ops[i].entry.op==='trace-span')return i;return -1;}
+  function undoDeclare(){
+    if(!active || saving || readOnly)return false;var at=lastDeclaration();if(at<0)return false;
+    var op=ops[at],last=at===ops.length-1,next=null;
+    // A swapped-in declaration that is the last change: the exact text with the mapping comes back.
+    if(last && op.swapped && op.restore!=null)next=op.restore;
+    else if(last && op.before!=null)next=op.before;
+    else{
+      var raw=parsed(text),ref=refFor(raw,op.entry.path,op.kind,op.entry),t=null;try{t=ref && target(text,ref);}catch(ex){t=null;}
+      next=t?writeSpan(text,t,op.entry.span.key,null):null;
+      // Then the mapping it replaced goes back on its step, as it was.
+      if(next!=null && op.swapped){var m=op.swapped,tm=m.entry.traceMatch,written=Object.assign({},m.previous && !Array.isArray(m.previous)?m.previous:{},{serviceName:tm.serviceName,operation:tm.operation},typeof tm.nodeId==='string'?{nodeId:tm.nodeId}:{});
+        var set=jsonSetField(next,m.entry.path,'traceMatch',JSON.stringify(written));if(set && m.scope!==undefined)set=jsonSetField(set.text,m.entry.path,'traceScope',null);next=set?set.text:null;}
+    }
+    if(next==null || !render(next))return false;
+    ops.splice(at,1);
+    if(op.swapped){op.swapped.before=last?op.swapped.before:undefined;ops.push(op.swapped);}
+    changed();return true;
+  }
+  // Which pending trace change is newest, for the one result note the Trace view shows.
+  function lastTrace(){if(readOnly)return null;for(var i=ops.length-1;i>=0;i--){if(ops[i].entry.op==='trace-match')return 'map';if(ops[i].entry.op==='trace-span')return 'declare';}return null;}
+  function declared(){var at=lastDeclaration();if(at<0 || readOnly)return null;var e=ops[at].entry;return {key:e.span.key,label:e.label,span:{serviceName:e.span.serviceName,operation:e.span.operation,role:e.span.role}};}
+
   // The latest pending span mapping, for the result note and its Undo (#1177).
-  function mapped(){var at=lastMapping();if(at<0 || readOnly)return null;var e=ops[at].entry;return {step:e.step,label:e.label,traceMatch:{serviceName:e.traceMatch.serviceName,operation:e.traceMatch.operation}};}
+  function mapped(){var at=lastMapping();if(at<0 || readOnly)return null;var e=ops[at].entry,out={step:e.step,label:e.label,traceMatch:{serviceName:e.traceMatch.serviceName,operation:e.traceMatch.operation}};if(ops[at].scope!==undefined)out.replacedScope=true;return out;}
   var api={
     state:function(){
       return {editable:canEdit && !!artifact && !readOnly,blocked:fallback?"Editing is off: this board couldn't load its latest version, so saving would overwrite newer changes.":'',
-        active:active && !readOnly,pending:ops.length,saving:saving,readOnly:readOnly,notice:notice?{kind:notice.kind,text:notice.text}:null,mapped:mapped()};
+        active:active && !readOnly,pending:ops.length,saving:saving,readOnly:readOnly,notice:notice?{kind:notice.kind,text:notice.text}:null,mapped:mapped(),declared:declared(),lastTrace:lastTrace()};
     },
     onChange:function(fn){listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
     start:function(){if(!canEdit || !artifact || fallback || readOnly || active)return;active=true;notice=null;changed();},
@@ -305,6 +480,11 @@ function createBoardEditor(options){
     // replaced only when `previous` names it (#1177).
     mapSpan:function(ref,match,previous){return apply('trace-match',ref,null,null,match,previous || null);},
     undoMap:undoMap,
+    // #1290 PR 9: declare a dropped span on a node or connection; the preview names its key first.
+    declareSpan:function(ref,span){return declare(ref,span,null,false);},
+    declareInstead:function(ref,span){return declare(ref,span,null,true);},
+    declarePreview:function(ref,span){var t=null;try{t=target(text,ref);}catch(ex){t=null;}if(!t)return {error:'That node or connection is not on this board.'};var d=declaration(t,span,null);return d.error?{error:d.error}:{key:d.key};},
+    undoDeclare:undoDeclare,
     // {clearable:true} for a marker set on this board, {clearable:false, source} for a provider-inherited one, else null.
     missingWork:function(ref){if(!active || readOnly)return null;try{return marker(target(text,ref));}catch(ex){return null;}},
     question:function(){return active && !readOnly && question?{ref:question.ref,ticket:question.ticket}:null;},

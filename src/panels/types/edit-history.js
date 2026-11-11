@@ -18,11 +18,14 @@
   function clears(change){return change.op==='clear-missing-work';}
   // #1078: a span mapped to a step names the span (service · operation), never a ticket.
   function maps(change){return change.op==='trace-match';}
-  function spanText(change){var m=change.traceMatch || {};return m.serviceName+' · '+m.operation;}
-  function opText(change){return clears(change)?'Missing work cleared from':maps(change)?'mapped to step':change.op==='remove'?'removed from':'added to';}
+  // #1290 PR 9: a span declared on a node or connection names its key and the span.
+  function declares(change){return change.op==='trace-span';}
+  function spanLike(change){return maps(change) || declares(change);}
+  function spanText(change){if(declares(change)){var d=change.span || {};return d.key+' ('+d.serviceName+' · '+d.operation+')';}var m=change.traceMatch || {};return m.serviceName+' · '+m.operation;}
+  function opText(change){return clears(change)?'Missing work cleared from':maps(change)?'mapped to step':declares(change)?'declared on':change.op==='remove'?'removed from':'added to';}
   // #1180: a mapping that replaced a traceMatch names it.
   function replacedText(change){var r=maps(change) && change.replaces;return r && typeof r==='object'?' (replaced '+r.serviceName+' · '+r.operation+')':'';}
-  function changeText(change){return (clears(change)?'':maps(change)?spanText(change)+' ':change.ticket+' ')+opText(change)+' '+carrierLabel(change)+replacedText(change);}
+  function changeText(change){return (clears(change)?'':spanLike(change)?spanText(change)+' ':change.ticket+' ')+opText(change)+' '+carrierLabel(change)+replacedText(change);}
   function countText(n){return n+' '+(n===1?'change':'changes');}
   /* #974: an agent entry reads editor · agent · time · its one-line summary; a summary
      replaces the count and the first change. Rows without ticket changes do not expand. */
@@ -48,7 +51,7 @@
       if(!entry.changes.length)return '<li class="dv-edit-entry" data-edit-at="'+esc(entry.at)+'"><div class="dv-edit-summary">'+head+'</div></li>';
       return '<li class="dv-edit-entry" data-edit-at="'+esc(entry.at)+'"><details class="dv-edit-details"><summary class="dv-edit-summary">'+head+'</summary>'+
         '<ul class="dv-edit-changes">'+entry.changes.map(function(change){
-          return '<li class="dv-edit-change" data-edit-op="'+esc(change.op)+'"'+(clears(change)?'>':maps(change)?'><span class="dv-edit-span">'+esc(spanText(change))+'</span>':' data-edit-ticket="'+esc(change.ticket)+'"><span class="dv-edit-ticket">'+esc(change.ticket)+'</span>')+
+          return '<li class="dv-edit-change" data-edit-op="'+esc(change.op)+'"'+(clears(change)?'>':spanLike(change)?'><span class="dv-edit-span">'+esc(spanText(change))+'</span>':' data-edit-ticket="'+esc(change.ticket)+'"><span class="dv-edit-ticket">'+esc(change.ticket)+'</span>')+
             '<span class="dv-edit-op">'+esc(opText(change))+'</span><span class="dv-edit-carrier">'+esc(carrierLabel(change))+'</span>'+(replacedText(change)?'<span class="dv-edit-replaced">'+esc(replacedText(change))+'</span>':'')+'</li>';
         }).join('')+'</ul></details></li>';
     }).join('')+'</ol>';
@@ -79,7 +82,7 @@
         var changes=el(details,'ul','dv-edit-changes');
         entry.changes.forEach(function(change){
           var row=el(changes,'li','dv-edit-change');row.setAttribute('data-edit-op',change.op);
-          if(maps(change))el(row,'span','dv-edit-span',spanText(change));
+          if(spanLike(change))el(row,'span','dv-edit-span',spanText(change));
           else if(!clears(change)){
             row.setAttribute('data-edit-ticket',change.ticket);el(row,'span','dv-edit-ticket',change.ticket);
             // The ticket title is live evidence from the status map; absent until a connector answers.

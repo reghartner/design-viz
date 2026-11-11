@@ -1,5 +1,41 @@
 # Changelog
 
+## Trace spans declared on nodes and connections (2026-11-11)
+
+- Nodes and connections can declare the trace spans that belong to them under
+  `trace.spans` (#1290): exact operation, operation prefix or attributes only, with a role
+  (process, database, cache, call, work; send or receive on a connection). A loaded trace
+  times a node from its spans and a connection by its hand-off (receive start minus send
+  start). The receiving span is the connection's own receive span, else the receiving
+  node's process spans; a connection whose send spans no receiving span pairs with reads
+  "send only".
+- Declarations travel with topology imports. An importing board changes, adds or hides one
+  span through its `nodeTracking` / `edgeTracking` `trace` overlay; the rest keeps
+  following the provider. An invalid provider declaration fails the provider's build and is
+  dropped with a warning on consumers.
+- Steps without `traceMatch` inherit the spans of the nodes and connections they light (a
+  step on a connection owns only its send spans).
+  `traceScope` narrows them (root, parent step, attributes, skip by name or role) and holds
+  the optional flag and budgets. A carrier that several steps on a path light needs a scope;
+  a span two steps claim is ambiguous. Pages need `flow.trace-spans` / `flow.trace-scope`.
+  Reference approvals digest each step's effective selector, so a provider edit to a span a
+  step inherits asks for a new approval, and a declared operation or prefix that the approved reference trace
+  never shows warns on the board that owns the declaration.
+- Workbench (desktop): Inspect → Tracking → Trace spans on a node or connection, local and
+  imported; a trace scope mode in a step's Code and trace evidence; declared spans in the
+  Links window. Board Edit mode can declare a dropped span on a node or connection
+  ("Declare on …"), saved as a `trace-span` edit-history change, and
+  `tools/board-sync.js pull` brings those edits into a local copy.
+- A `traceMatch` on a node or edge now warns "…, or declare it under trace.spans". The
+  authoring packet routes the traces docs for declarations and scopes too, with examples in
+  `examples/canon/topology/orders-*.json` and `examples/trace-ready/declared.spec.json`.
+- `tools/canon/trace-cli.mjs compare` on a board with `topologyImports` still runs without
+  `--resolve-imports` (#1123), except when a reference step without `traceMatch` lights an
+  imported node or connection: that step can inherit the provider's declared spans, which
+  only resolution shows, so compare stops and names the option. Such boards compared
+  without the option before; add `--resolve-imports`.
+- Published boards pick this up when they are republished.
+
 ## Live status header without a GitHub connector (2026-11-04)
 
 - The Live status header no longer shows "GitHub not connected" (#1022). PR links

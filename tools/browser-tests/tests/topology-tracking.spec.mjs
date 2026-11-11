@@ -465,7 +465,7 @@ own Test + flip plan. Local rows E16–E20 live in tests/board-edit.spec.mjs.
 | I4 clear only, no Undo (test review c1, c2) | same board: the unmarked imported edge canon::api → canon::store and the unmarked imported node canon::store (its "No change needed" popover) in Edit mode; after the clear | both popovers have no button named /missing work/i and no checkbox; after the clear the Live status panel and canon::api's reopened popover (it lists CAN-1 and LOC-1) have no button named /undo/i, and that popover has no Clear button | a Set/Mark Missing work control on imported carriers; an Undo control. Absence guards: they pass at the baseline |
 | I5 imported edge, post-drop Clear | overlay edgeTracking["api->store"] {tickets [LOC-2], missingWork} | EX-1 dropped on the edge label → `.dv-live-question` "Does EX-1 cover the missing work?" → Clear → the live break is gone; Save 2 → edgeTracking == {"api->store":{tickets:["LOC-2","EX-1"]}}; changes [add, clear-missing-work] with edge ["canon::api","canon::store"], label "API → Store" | clearing only the add; writing to the resolved edge |
 | I6 provider-inherited markers | provider api and api → store marked; the consumer overlay repeats the node marker | outside Edit mode no `.dv-live-missing-source`; in Edit mode each popover's `.dv-live-missing-source` reads 'Missing work comes from the source diagram "provider" and must be cleared there.' and has no Clear button; drops of EX-1 on both add without opening a popover; Save → nodeTracking {api:{tickets ["EX-1"], missingWork}}, edgeTracking {"api->store":{tickets ["EX-1"]}}; both carriers still paint Missing | a Clear button for an inherited marker; removing the consumer copy of an inherited marker; a question after the drop |
-| I7 conflict replay after imports swap | imports "one" and "two", two's overlay marks api; clear on two::api; the winner swaps the imports | notice "1 of your changes were re-applied"; Save → overlay 0 (as "two") has no nodeTracking, overlay 1 (as "one") none; change path to topologyImports[0] | replay by stored import index |
+| I7 conflict replay after imports swap | imports "one" and "two", two's overlay marks api; clear on two::api; the winner swaps the imports | notice "1 of your changes was re-applied"; Save → overlay 0 (as "two") has no nodeTracking, overlay 1 (as "one") none; change path to topologyImports[0] | replay by stored import index |
 Flip: drop the inherited check → I6 shows a Clear button.
 */
 import {buildBoard as buildEditBoard,serveWinner,mockRuntime,publishes,openBoard,showBoard,TRACKING,PANELS,cardPoint,nodeCard,edgeLabel,dragTicket,startEditing,saveButton,reloadRecordingDialogs,
@@ -523,7 +523,7 @@ test('I3 desktop board conflict replay finds a swapped topology import by its pr
   await saveButton(panel).click();await expect.poll(()=>publishes(page).then(list=>list.length)).toBe(1);
   const winner=structuredClone(consumer);winner.page.sections[0].diagram.topologyImports.reverse();
   await serveWinner(board,winner);expect(await reloadRecordingDialogs(page)).toEqual([]);({root,panel}=await showBoard(page));
-  await expect(panel.locator('.dv-live-edit-notice')).toHaveText(/1 of your changes were re-applied; 0 could not be/);
+  await expect(panel.locator('.dv-live-edit-notice')).toHaveText(/1 of your changes was re-applied\./);
   await page.waitForTimeout(500);expect(await publishes(page)).toEqual([]);
   const saved=JSON.parse(await saveBoard(page,panel,1));
   expect(overlay(saved,0).as).toBe('two');expect(overlay(saved,0).nodeTracking).toEqual({api:{tickets:['EX-1']}});
@@ -617,7 +617,7 @@ test('I7 desktop board conflict replay re-applies an imported clear onto a swapp
   await saveButton(panel).click();await expect.poll(()=>publishes(page).then(list=>list.length)).toBe(1);
   const winner=structuredClone(consumer);winner.page.sections[0].diagram.topologyImports.reverse();
   await serveWinner(board,winner);expect(await reloadRecordingDialogs(page)).toEqual([]);({root,panel}=await showBoard(page));
-  await expect(panel.locator('.dv-live-edit-notice')).toHaveText(/1 of your changes were re-applied; 0 could not be/);
+  await expect(panel.locator('.dv-live-edit-notice')).toHaveText(/1 of your changes was re-applied\./);
   await page.waitForTimeout(500);expect(await publishes(page)).toEqual([]);
   const saved=JSON.parse(await saveBoard(page,panel,1));
   expect(overlay(saved,0).as).toBe('two');expect(overlay(saved,0).nodeTracking).toBeUndefined();

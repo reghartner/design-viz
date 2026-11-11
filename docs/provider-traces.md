@@ -318,6 +318,17 @@ by absence. Provider errors, budget violations and supplied queue/backpressure
 conditions are shown separately. An unavailable or over-200-span timeline retains
 its identity and warnings without asserting missing operations.
 
+### Duplicate calls and retries
+
+For duplicate calls, first use a verified parent/link or retained attribute.
+`occurrence:1` is only valid for fully timed, non-overlapping serial calls;
+concurrent calls remain ambiguous. `repeat:"attempts"` requires distinct whole-number
+`retry.attempt` values and a common parent; do not combine it with `occurrence`.
+One span matching two steps is ambiguous. Do not silence ambiguity by renaming
+nodes, taking the first span or inventing attributes. Leave the unresolved
+mapping visible and report what instrumentation/context is missing. Per-transport
+root spans of one step: [alternatives](#tracematch-alternatives).
+
 ### traceMatch alternatives
 
 When the same logical operation is recorded by different root spans depending on
@@ -381,6 +392,109 @@ The adapter drops legacy `timestamp` entries from outgoing `raw_row_columns`
 without changing the authored query: Honeycomb always returns that column.
 The Status panel’s Trace mode supersedes the former step-owned trace disclosure
 and fallback rail. Selecting or navigating steps never opens or selects a trace.
+
+## Trace spans declared on nodes and connections (#1290)
+
+A node or connection can declare the trace spans that belong to it under `trace.spans`,
+an object keyed by a short span name (a letter, then letters, digits, `-` or `_`):
+
+```json
+"worker": {"title": "Order worker", "trace": {"spans": {
+  "process": {"serviceName": "order-worker", "operation": "process orders", "role": "process"},
+  "find":    {"serviceName": "order-worker", "operationPrefix": "find ", "role": "database"},
+  "cache":   {"serviceName": "order-worker", "attributes": {"db.system": "redis"}, "role": "cache"}
+}}}
+```
+
+A declaration has `serviceName` and exactly one way to name its spans: an exact
+`operation`, an `operationPrefix` of at least two characters, or neither with at least
+one `attributes` value (every span of that service with those values). `namespace` and
+`attributes` narrow any of the three. `attributes` uses the allowlist of
+[Allowed match attributes](#allowed-match-attributes). `role` is required and is a label,
+not a matcher: `process`, `database`, `cache`, `call` or `work` on a node; `send` or
+`receive` on a connection. Budgets and `optional` belong to steps, not declarations.
+`src/canon.js` reports a malformed declaration with the carrier and span name, for
+example `nodes.worker.trace.spans.find: operation and operationPrefix cannot be combined`.
+Step `traceMatch` is unchanged. Pages that declare spans need the `flow.trace-spans`
+capability.
+
+**Imports.** Declarations hold no node ids, so a topology import carries them on the
+imported node and connection under the `as::` id, nested re-exports included. The
+importer changes, adds or hides one span through its existing `nodeTracking` /
+`edgeTracking` overlay; every other span and field keeps coming from the provider:
+
+```json
+"nodeTracking": {"worker": {"trace": {
+  "spans": {
+    "process": {"operation": "process orders v2"},
+    "audit": {"serviceName": "order-worker", "operation": "audit write", "role": "database"}
+  },
+  "hide": ["cache"]
+}}}
+```
+
+An entry is a field patch (`null` deletes that field); a `null` entry or a name in `hide`
+hides that span. A hide for a span the provider does not declare is kept in case it
+returns, with a warning; a span both hidden and patched warns and the hide wins. Setting
+`operation` removes an inherited `operationPrefix`, and the reverse. To match by
+attributes alone, set `operation` (or `operationPrefix`) to `null` and give `attributes`;
+`attributes` is replaced as a whole. Hiding every span removes the carrier's `trace`. A
+resolved snapshot may edit `trace` on imported carriers; their structure stays read only.
+`examples/canon/topology/orders-platform.json` and `orders-board.json` are a worked pair.
+
+**Invalid provider declarations.** The provider's own validation reports them. A consumer
+does not fail on them: an inherited span its validation rejects is not used on that board,
+with a warning naming the provider path, unless the consumer's patch fixes it. When the
+reason is an attribute this board's trace connections do not allow, the warning names it.
+A patch that breaks a valid provider span, or that names a span the provider does not
+declare without giving a full declaration, is an error at the overlay
+(`topologyImports[i].nodeTracking.<id>.trace.spans.<name>`), and that span is left out.
+Honeycomb number or boolean attribute values warn, as for step `traceMatch`.
+
+**In a loaded trace.** A declared node shows the union time of the spans its declarations
+match, with each declaration in the label's title; see
+[Live status trace labels](live-status.md). A declaration matches spans of its
+`serviceName` by exact `operation`, by `operationPrefix`, or by `attributes` alone, and one
+span may match several carriers. A connection reads the hand-off from its `send` span to the
+receiving span: its own `receive` declaration, or else the receiving node's `process` spans
+(see [Live status trace labels](live-status.md)).
+
+**Steps inherit declared spans (`traceScope`).** A step without `traceMatch` inherits the
+spans declared on the carriers it lights directly: its nodes, and its delivered connections'
+own `send` spans (never an endpoint node's; a declared `receive`, like the receiving node's
+`process` spans, only times the hand-off). Without a `traceScope` it inherits
+only from carriers no other step on the same path lights; when every declared carrier it
+lights is shared, it stays unmapped: the validator names the carrier, the other step and the
+path and asks for a `traceScope`; the reader names them by title. A step lighting one node
+(and no connection) annotates that node; a step lighting two or more nodes annotates none of
+them and shows only in the Status list and the coverage line. A step has `traceMatch` or `traceScope`, never
+both. `traceScope` (all fields optional; `{}` inherits from shared carriers too):
+
+```json
+{"id": "work", "nodes": ["platform::worker"], "traceScope": {
+  "root": {"serviceName": "web", "operation": "POST /checkout"},
+  "parentStepId": "submit",
+  "attributes": {"deployment.environment.name": "prod"},
+  "skip": {"platform::worker": ["find", "role:cache"]},
+  "optional": false, "maxDurationMs": 250, "maxQueueDepth": 100}}
+```
+
+- `root`: in a trace whose root span is another operation the step reads **Not this flow**
+  (neutral, not counted); with no root span in the trace the root is not checked.
+- `parentStepId`: keeps spans that descend from that step's spans, and spans whose ancestry is
+  not in the trace (named in the row); drops spans whose known ancestry leads elsewhere.
+- `attributes`: exact values every inherited span must have (the allowlist above).
+- `skip`: span names, or `role:<role>`, per carrier id (imported ids such as
+  `platform::worker`). A name the carrier does not declare, or a carrier the step does not
+  light, warns and is ignored.
+- `optional`, `maxDurationMs` (the union time of a node step's spans, or an edge step's
+  hand-off), `maxQueueDepth`: as on `traceMatch`; database spans give *Database slow*.
+
+A span that two steps both claim (inherited or explicit) makes both **ambiguous**, naming the
+span and the other step; the earlier step never wins. Imported carriers use the consumer's
+merged declarations, so its overlay additions, hides and overrides change what steps inherit.
+Pages using `traceScope` need the `flow.trace-scope` capability. Reference approvals cover
+inherited declarations too; see `docs/canon.md` (reference traces).
 
 ## Honeycomb lookback
 

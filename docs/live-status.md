@@ -1312,12 +1312,15 @@ always calls at once. When that answer is older than five minutes it still shows
 at once, and the due refresh runs in the background ("Refreshing…") (#1293).
 
 **Refresh now** (a recycle icon beside the Metrics overlay switch, while Metrics
-is on in Live) calls the providers at once and restarts the five-minute timer
-from that answer. It is busy while a refresh runs and then cools down for 60 s,
-because Honeycomb allows 10 query results a minute; a click within 60 s of any
-refresh makes no call and names when it is available again. It is hidden while
-Metrics is off and in Over time; in the Trace view it refreshes the metric
-values, and example traces keep the session's search. A rejection reports the error and keeps the previous map. Turning
+is on in Live) calls the providers at once, searches example traces again, and
+restarts the five-minute timer from that answer. It is busy while a refresh runs
+and then cools down for 60 s, because Honeycomb allows 10 query results a minute;
+a click within 60 s of any refresh makes no call, and the Metrics line says when
+it is available again. A Refresh now that turning Metrics off interrupted still
+holds its cooldown, since the request may already have reached the provider.
+After an answer that names a failed query, turning Metrics off and on waits until
+60 s after that call. A reuse under five minutes keeps its example traces; an
+overdue one searches them again. It is hidden while Metrics is off and in Over time. A rejection reports the error and keeps the previous map. Turning
 Metrics off or destroying the page aborts the signal, stops the timer and drops any
 late answer; turning it off also clears the map. `report.note(text)` attaches a note
 to that answer, such as a query that failed while the others answered; it becomes

@@ -624,6 +624,8 @@
       if(!metrics.available && metrics.note)metricsText=metrics.note;
       // #1293: a refresh over a shown answer keeps the answer and says so.
       if(answered && metrics.busy)metricsText+=' · Refreshing…';
+      // #1313: the Refresh now cooldown, as visible text (role=status) and not only in the button's tooltip.
+      if(metrics.refreshNow && metrics.refreshNow.state==='cooldown' && metrics.refreshNow.untilText)metricsText+=' · Refresh now available at '+metrics.refreshNow.untilText;
       if(metrics.environment)metricsText+=' · '+metrics.environment;
       el(metricsConnection,'span','text','',metricsText);metricsConnection.title=metricsText;
       metricsConnection.hidden=!metrics.available && !metrics.note;

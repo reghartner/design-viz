@@ -31,7 +31,7 @@ log searches are listed once at the end.
 Firmware publishes the press event.
 Ingest validates it.
 
-- edge `device->ingest` event · tickets FW-46
+- edge `device->ingest` Event intake call · tickets FW-46
   - metric rate (grafana) unit req/h
 - node `ingest` Event ingest · tickets BE-67, BE-70 · exists when tickets-done
   - metric errors (grafana) unit req/h · pass max 0.01 ratio of rate

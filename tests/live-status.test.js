@@ -5198,6 +5198,8 @@ test('DC6 Declare on <title> instead survives the re-render the mapping causes',
 test('DC7 the Declare-instead offer ends once its mapping is no longer pending (Undo or Save)',async()=>{
  const b=mapBoard();const s=await b.focus();
  spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ // A paint before the board editor has written the mapping keeps the offer.
+ b.api.setTraceShow(true);
  b.editor.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});b.api.setTraceShow(true);
  assert.ok(b.m.body.querySelector('.dv-trace-map-note button.dv-trace-declare-instead'),'offered while the mapping is pending');
  // Undo (or Save): no pending mapping any more.

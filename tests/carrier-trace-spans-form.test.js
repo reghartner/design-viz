@@ -8,6 +8,11 @@
 | E3 | Imported node and connection: each inherited span says which provider it comes from; a field edit stores only that field in the consumer overlay; hide and show again; Revert one span; Revert all (one Undo step); a consumer span is added here; tickets and metrics in the overlay are kept; the provider is untouched. Inherited span names are read only. |
 | E4 | Validator messages for a span sit beside it. |
 | E5 | A connection shows its receive side from the receiving node's process spans, and Declare receive span here adds a valid receive span. Text boxes get no editor. |
+| E6 | A broken override is shown with its error, never as hidden; unrelated edits keep it as written; unsupported attributes are refused. |
+| E7 | Rename a local or added span in one Undo, keeping its fields and traceScope.skip names; inherited names are read only. |
+| E8 E9 | A receiver without process spans says so and offers Declare receive span here; attribute values have a type. |
+| E10 | A name the provider declares is taken even while hidden here: rename and Add span are refused beside the name; the hide is kept. |
+| E11 | A refused attribute type change is explained beside that type select. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -213,4 +218,30 @@ test('E8 E9 a receiver without process spans says so and still offers a receive 
   assert.equal(diagramOf(ui.raw).nodes.worker.trace.spans.process.attributes['http.response.status_code'],200);
   oneStep(ui,()=>ui.set('process attribute http.response.status_code type','string'),NODE);
   assert.equal(diagramOf(ui.raw).nodes.worker.trace.spans.process.attributes['http.response.status_code'],'200');
+});
+
+test('E10 a span name the provider declares is taken even while hidden here: rename and add are refused beside the name',()=>{
+  const f=imported(),ui=harness(f.consumer,f.context),INODE={kind:'node',section:0,id:'shared::worker'};
+  const overlay=()=>plain(diagramOf(ui.raw).topologyImports[0].nodeTracking.worker.trace);
+  ui.select(INODE);ui.check('find hidden for this document',true);
+  addSpan(ui,{name:'audit',service:'order-worker',value:'audit write',role:'database'});ui.select(INODE);
+  const kept={spans:{audit:{serviceName:'order-worker',operation:'audit write',role:'database'}},hide:['find']};
+  assert.deepEqual(overlay(),kept);
+  let held=ui.text;ui.set('audit name','find');
+  assert.equal(ui.text,held,'the rename changes nothing');
+  assert.match(ui.beside('audit name'),/^find is a span provider declares \(hidden here\); pick another name, or show it and change it instead\.$/);
+  ui.select(INODE);held=ui.text;addSpan(ui,{name:'find',service:'other',value:'get',role:'cache'});
+  assert.equal(ui.text,held,'the add changes nothing');
+  assert.match(ui.beside('New span name'),/^find is a span provider declares \(hidden here\); pick another name, or show it and change it instead\.$/);
+  assert.deepEqual(overlay(),kept,'the hide is kept');
+});
+
+test('E11 a refused attribute type change says why beside the type it changed',()=>{
+  const ui=harness(board()).select(NODE);addSpan(ui,{name:'process',service:'s',value:'v',role:'process'});ui.select(NODE);
+  ui.control('process new attribute name').value='http.response.status_code';ui.control('process new attribute value').value='200';ui.control('process new attribute type').value='number';ui.click('Add attribute to process');
+  const held=ui.text;ui.set('process attribute http.response.status_code type','boolean');
+  assert.equal(ui.text,held,'nothing written');
+  assert.match(ui.beside('process attribute http.response.status_code type'),/true or false/,'the message sits beside the type select');
+  assert.equal(ui.beside('process new attribute name'),'','not beside the new attribute name');
+  assert.equal(ui.control('process attribute http.response.status_code type').value,'number','the select goes back to the stored type');
 });

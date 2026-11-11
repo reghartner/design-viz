@@ -5,7 +5,7 @@
    tools/browser-tests/tests/step-trace-scope-form.spec.mjs.
 | row | rule |
 |---|---|
-| S1 | Without a scope the form says what the step inherits, naming a shared node or connection and the other step by title; a step whose carriers declare nothing opens on its own span as before, and its scope view says so; the spans are listed read only. |
+| S1 | Without a scope the form says what the step inherits, naming a shared node or connection and the other step by title, per path when paths differ (as the core D9 rule counts); a receive-only connection gets a hint; a step whose carriers declare nothing opens on its own span as before, and its scope view says so; the spans are listed read only. |
 | S2 | Mode switch: the radios change only the view; "Use its nodes and connections (removes this step's trace match)", Add trace scope, Remove trace scope and Add trace match (replaces the scope) are one Undo step each. |
 | S3 | Skip checkboxes name the span, its service and its operation; checked means the span counts; unchecking writes skip, checking again removes it (no empty skip left); role checkboxes write role:<role>; a connection lists only its send spans and says a receive span times the hand-off. |
 | S4 | An imported node lists its merged spans (consumer overlay added and hidden spans included); skip uses the namespaced id; the import is untouched. |
@@ -13,6 +13,7 @@
 | S6 | A skip that names a span or carrier the step no longer has is listed with its reason and a Remove button. |
 | S7 | A step without an ID cannot take a scope: the refusal sits beside Add trace scope and Go to Step ID focuses the existing Step ID field. |
 | S8 | Validator messages for the step's traceScope sit beside the field they name, in status notes; the fold summary counts them. |
+| S9 | Renaming a step ID rewrites traceMatch.parentStepId and traceScope.parentStepId references to it in the same edit (one Undo step). |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -92,6 +93,16 @@ test('S1 without a scope: what the step inherits, the shared carrier and the oth
   ui.select(0);
   assert.equal(ui.control(OWN).checked,true,'a step with a trace match opens on its own span');
   assert.ok(ui.h.guide.querySelector('fieldset.trace-match-editor'),'the #1238 form is shown');
+  // Sharing is per path, as the core and the validator count it: Work again is only on Path A.
+  const two=harness(d=>{d.paths=[{id:'a',label:'Path A',steps:['request','publish','work','again']},{id:'b',label:'Path B',steps:['request','work','store']}];}).select(2);
+  assert.deepEqual(two.texts('.trace-scope-status'),['On Path A: inherits nothing (Worker is also lit by step “Work again”). On Path B: inherits from Worker (3 spans).']);
+  assert.deepEqual(two.texts('.trace-scope-also'),['Also lit by step “Work again” on Path A.']);
+  two.select(4);
+  assert.deepEqual(two.texts('.trace-scope-status'),['Inherits from Store (2 spans).'],'one path: the plain line');
+  // A connection that declares only a receive span gives an edge step nothing of its own.
+  const recv=harness(d=>{delete d.edges[0].trace.spans.publish;}).select(1);
+  assert.deepEqual(recv.texts('.trace-scope-status'),['Inherits nothing: its nodes and connections declare no spans this step can own.']);
+  assert.deepEqual(recv.texts('.trace-scope-hint'),['This connection declares only a receive span; declare a send span on it for this step to have spans of its own.']);
 });
 
 test('S2 mode switch: radios change the view only; each write is one Undo step',()=>{
@@ -222,4 +233,19 @@ test('S8 validator messages sit beside their field; the fold summary counts them
   ui.reselect();oneStep(ui,()=>ui.click('Remove trace scope'));
   assert.equal(Object.hasOwn(ui.step(3),'traceScope'),false);
   assert.equal(ui.texts('summary').find(x=>x.startsWith('Code and trace evidence')),'Code and trace evidence');
+});
+
+test('S9 renaming a step ID rewrites the trace match and trace scope parent references to it, in one Undo step',()=>{
+  const ui=harness(d=>{d.steps[3].traceScope={parentStepId:'work'};
+    d.steps[1].traceMatch=[{serviceName:'order-api',operation:'publish orders',parentStepId:'work'},{serviceName:'order-api',operation:'publish',parentStepId:'request'}];
+    d.steps[6].traceMatch={serviceName:'x',operation:'y',parentStepId:'work'};}).select(2);
+  const id=ui.h.guide.querySelectorAll('input').find(i=>i.placeholder==='optional stable-step-id');
+  assert.equal(id.value,'work');
+  oneStep(ui,()=>{id.value='labor';id.fire('change');ui.h.flush();});
+  const steps=diagramOf(ui.raw).steps;
+  assert.equal(steps[2].id,'labor');
+  assert.equal(steps[3].traceScope.parentStepId,'labor');
+  assert.deepEqual(plain(steps[1].traceMatch).map(m=>m.parentStepId),['labor','request']);
+  assert.equal(steps[6].traceMatch.parentStepId,'labor');
+  assert.deepEqual(plain(ui.e.C.FlowCanon.validate(ui.raw)).filter(m=>/parentStepId/.test(m)),[]);
 });

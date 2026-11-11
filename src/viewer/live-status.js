@@ -2355,11 +2355,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // Load the chosen line's trace exactly as a pasted ID, then focus the line's span.
     loadLogTrace:async function(index){
       if(retired)return null;var row=logLookup.row(index);if(!row || !row.traceId)return null;
-      api.setDirectTraceField({field:'input',value:row.traceId});logLookup.chosen(index,'');
+      // #1349: the span note goes to this row's results, never to another search shown by then.
+      var mark=logLookup.marker(index);api.setDirectTraceField({field:'input',value:row.traceId});mark('');
       // #1124: a not-found report knows the line's time and whether a next line exists.
       var result=await api.loadDirectTrace(false,{at:row.time,next:logLookup.next(index)>=0});if(retired || !result || !row.spanId)return result;
       var selected=traceSnapshot().selected;
-      if(!(selected && selected.manual && selected.exemplar.selectionToken===result.selectionToken && api.selectTraceSpan({context:selected.context,spanId:row.spanId})))logLookup.chosen(index,'Span '+row.spanId+' from the log line is not in this trace.');
+      if(!(selected && selected.manual && selected.exemplar.selectionToken===result.selectionToken && api.selectTraceSpan({context:selected.context,spanId:row.spanId})))mark('Span '+row.spanId+' from the log line is not in this trace.');
       return result;
     },
     loadNextLogTrace:function(){if(retired)return Promise.resolve(null);var next=logLookup.next();return next<0?Promise.resolve(null):api.loadLogTrace(next);},

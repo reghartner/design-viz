@@ -68,11 +68,12 @@ function createTelemetryLogLookup(page,transport,hooks){
   function changed(){if(!dead && typeof hooks.changed==='function')hooks.changed();}
   function cancel(){serial++;if(timer)clearTimeout(timer);timer=null;if(abort)abort.abort();abort=null;busy=false;}
   function forget(){result=null;results=Object.create(null);}
-  // Show another search: a running Find is dropped; the shown search's results are kept for it.
+  // Show another search: a running Find is dropped, also one still waiting for the connector check (its
+  // results so far go with it); a result is kept under the search that ran it.
   function select(id){
     if(form.lookup===id)return;
-    if(busy){cancel();result=null;}
-    if(result)results[form.lookup]=result;
+    if(busy || abort){var running=busy;cancel();if(running)result=null;}
+    if(result)results[result.lookup]=result;
     form.lookup=id;form.value=boxValues[id] || '';result=results[id] || null;delete results[id];
   }
   function sync(){
@@ -188,13 +189,17 @@ function createTelemetryLogLookup(page,transport,hooks){
       result={lookup:request.lookup,rows:[],error:errorText(e)};changed();return null;
     }finally{if(mine===serial && timer){clearTimeout(timer);timer=null;}}
   }
-  // The row a reader chose, and what happened when its trace loaded.
+  // The row a reader chose, and what happened when its trace loaded. #1349: marker(index) is tied to the shown
+  // results; a later note lands there, shown or kept, and is dropped once a new Find or a clear replaced them.
   function row(index){var r=result && result.rows[index];return r?JSON.parse(JSON.stringify(r)):null;}
-  function chosen(index,note){if(!result || !result.rows[index])return;result.chosen=index;result.chosenNote=note || '';changed();}
+  function marker(index){
+    var r=result;
+    return function(note){if(dead || !r || !r.rows[index] || r!==result && results[r.lookup]!==r)return;r.chosen=index;r.chosenNote=note || '';if(r===result)changed();};
+  }
   // The next row with a trace id after `from` (default: the chosen row), or -1 (#1124).
   function next(from){if(!result)return -1;if(from===undefined)from=result.chosen;if(typeof from!=='number')return -1;for(var i=from+1;i<result.rows.length;i++)if(result.rows[i].traceId)return i;return -1;}
   if(transport && typeof transport.onAccountChanged==='function')off=transport.onAccountChanged(retire);
   // #1145: while a loaded trace moves the view to its own day, the results stay; the reader's own day change still clears them.
   function hold(on){holding=!!on;if(!holding && !dead)sync();}
-  return {snapshot:snapshot,set:set,find:find,recheck:recheck,row:row,chosen:chosen,next:next,hold:hold,clear:function(){cancel();forget();changed();},destroy:function(){cancel();dead=true;if(off)off();}};
+  return {snapshot:snapshot,set:set,find:find,recheck:recheck,row:row,marker:marker,next:next,hold:hold,clear:function(){cancel();forget();changed();},destroy:function(){cancel();dead=true;if(off)off();}};
 }

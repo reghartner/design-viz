@@ -4475,6 +4475,30 @@ test('#1173 #1233 #1349 one Log search dropdown shows only the selected search; 
  assert.ok(nm.body.querySelector('.dv-trace-logs textarea'),'its query field');
  none.ctl.liveStatus.destroy();
 });
+/* #1349 review c1: the "Span … is not in this trace." note from a log-row Load belongs to the results that row came from.
+   Start a load, switch searches, the load finishes: the note lands on the first search's row, not the shown search's.
+   The selected search also survives leaving and re-entering the Trace view. */
+test('#1349 a log-row Load that finishes after a switch notes only its own search; the selected search survives leaving Trace',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+ const fs=require('node:fs'),path=require('node:path'),RECORDED=fs.readFileSync(path.join(__dirname,'fixtures/provider-traces/honeycomb-trace.txt'),'utf8'),ID='8413cd87a9f15b6bfe8e1acf5b3346d0',GONE='ffffffffffffffff';
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const data=[{timestamp:(BigInt(Date.now()-600000)*1000000n).toString(),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:{cameraModel:'arch',trace_id:ID,span_id:GONE}}];
+ const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'},errors:{label:'Recent errors',query:'{app="cams"} |= "error"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+ let hold=null;
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async()=>{const wait=hold;if(wait)await wait.promise;return {payload:RECORDED};},logsConnector:async()=>'Grafana',queryLogs:async()=>({data})}}}),api=h.ctl.liveStatus;
+ const logs=()=>api.snapshot().trace.direct.logs,note='Span '+GONE+' from the log line is not in this trace.';
+ api.setStatusMode('trace');await settle();api.setDirectTraceField({field:'environment',value:'prod'});
+ api.setLogLookupField({field:'lookup',value:'errors'});await api.findLogLines('errors');api.setLogLookupField({field:'lookup',value:'camera'});
+ api.setLogLookupField({field:'value',value:'arch',lookup:'camera'});await api.findLogLines('camera');assert.equal(logs().result.lookup,'camera');assert.equal(logs().result.rows.length,1);
+ hold={};hold.promise=new Promise(resolve=>{hold.release=resolve;});const loading=api.loadLogTrace(0);await settle();
+ api.setLogLookupField({field:'lookup',value:'errors'});const release=hold.release;hold=null;release();assert.ok(await loading,'the trace loads');await settle();
+ let r=logs().result;assert.equal(r.lookup,'errors');assert.deepEqual([r.chosen,r.chosenNote],[undefined,undefined],'the shown search\'s row gets no note');
+ api.setLogLookupField({field:'lookup',value:'camera'});r=logs().result;assert.deepEqual([r.lookup,r.chosen,r.chosenNote],['camera',0,note],'the note is on the row it came from');
+ // Leaving the Trace view and coming back keeps the selected search, its value and its results.
+ api.setLogLookupField({field:'lookup',value:'errors'});api.setStatusMode('jira');await settle();api.setStatusMode('trace');await settle();
+ assert.equal(logs().form.lookup,'errors','the selected search survives leaving Trace');assert.equal(logs().result && logs().result.lookup,'errors');assert.equal(logs().form.values.camera,'arch');
+ api.destroy();
+});
 // #1182 c2: one open-state slot. Another trace resets it (pick A, open, pick B, back to A: collapsed); a re-poll with the
 // same entry key keeps it; focus inside a card removed by a Load moves to the new card's line once.
 test('#1173 a repaint never takes focus from outside the panel after a pick in the card',async()=>{

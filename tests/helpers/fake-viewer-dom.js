@@ -26,7 +26,8 @@ function makeDom(log){
       getBoundingClientRect(){return {left:0,top:0,right:0,bottom:0,width:0,height:0};},getRootNode(){return doc;},
       matches(selector){return selector.split(',').some(s=>{s=s.trim();return s.startsWith('.') && s.slice(1).split('.').every(c=>cls.includes(c));});},
       closest(selector){for(let at=proxyOf(el);at;at=at.parentElement)if(at.matches && at.matches(selector))return at;return null;}};
-    const proxy=new Proxy(el,{get(t,k){return k in t?t[k]:typeof k==='string'?noop:undefined;},set(t,k,v){t[k]=v;return true;}});
+    // Unknown methods are no-ops; expando properties (_name) read as undefined, as on a real element.
+    const proxy=new Proxy(el,{get(t,k){return k in t?t[k]:typeof k==='string' && k[0]!=='_'?noop:undefined;},set(t,k,v){t[k]=v;return true;},deleteProperty(t,k){delete t[k];return true;}});
     proxies.set(el,proxy);el.ownerDocument=null;return proxy;
   }
   doc={nodeType:9,createElement:element,createElementNS:(ns,t)=>element(t),createComment:()=>element('#comment'),createTextNode:t=>Object.assign(element('#text'),{textContent:t}),

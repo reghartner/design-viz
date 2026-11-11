@@ -91,6 +91,13 @@ class AuthoringPacketTests(unittest.TestCase):
         raw['page']['sections'][0]['diagram']['steps'][0]['traceMatch']['nodeId'] = 'shared::n'
         raw['page']['sections'][0]['diagram']['topologyImports'] = [{'spec': 'provider', 'export': 'core', 'as': 'shared'}]
         self.assertIn('traces', packet.infer(raw)[1])
+        # #1290: spans declared on a node or edge, a step traceScope, or a consumer overlay's trace route traces too.
+        for place in ['node', 'scope', 'overlay']:
+            raw = simple_spec(); d = raw['page']['sections'][0]['diagram']
+            if place == 'node': d['nodes'][next(iter(d['nodes']))]['trace'] = {'spans': {'process': {'serviceName': 'api', 'operation': 'send', 'role': 'process'}}}
+            if place == 'scope': d['steps'][0]['traceScope'] = {}
+            if place == 'overlay': d['topologyImports'] = [{'spec': 'provider', 'export': 'core', 'as': 'shared', 'nodeTracking': {'n': {'trace': {'hide': ['process']}}}}]
+            self.assertIn('traces', packet.infer(raw)[1], place)
         text, meta = packet.generate([], ['traces'], mode='edit')
         self.assertIn('steps', meta['selected']['features'])
         self.assertIn('docs/trace-ready-authoring.md', [p['path'] for p in meta['provenance']])

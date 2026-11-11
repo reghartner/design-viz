@@ -747,6 +747,55 @@ function editHistoryEntries(page, warn){
   return kept.map(function(item){return item.entry;});
 }
 
+/* #1290: steps inherit the trace spans declared on the carriers they light. Warn, in plain words,
+   when a traceScope skip names a span the carrier does not declare or a carrier the step does
+   not light (both ignored, so a provider change never fails the board), and when a step
+   inherits nothing because every declared carrier it lights is shared with another step on a
+   path and it has no traceScope. */
+function traceScopeWarnings(d,DP,warnings){
+  var steps=Array.isArray(d.steps)?d.steps:[];
+  function declared(kind,id){
+    var value=kind==='node'?(specObject(d.nodes) && d.nodes[id]):(Array.isArray(d.edges)?d.edges:[]).find(function(e){return specObject(e) && e.from+'->'+e.to===id;});
+    var spans=specObject(value) && specObject(value.trace) && specObject(value.trace.spans)?value.trace.spans:null;
+    return spans && Object.keys(spans).filter(function(k){return specObject(spans[k]);}).map(function(k){return {key:k,role:spans[k].role};});
+  }
+  function lit(st){
+    var keys=[],failures=specObject(st.failures)?st.failures:{};
+    if(typeof st.edge==='string')keys.push(st.edge);
+    if(Array.isArray(st.edges))st.edges.forEach(function(k){if(typeof k==='string' && keys.indexOf(k)<0)keys.push(k);});
+    return keys.filter(function(k){return failures[k]!=='dropped' && failures[k]!=='blocked';}).map(function(k){return {kind:'edge',id:k};})
+      .concat((Array.isArray(st.nodes)?st.nodes:[]).filter(function(n){return typeof n==='string';}).map(function(n){return {kind:'node',id:n};}));
+  }
+  var paths=typeof diagramPathList==='function'?diagramPathList(d):[{indices:steps.map(function(s,i){return i;})}],warned=Object.create(null);
+  steps.forEach(function(st,i){
+    if(!specObject(st) || st.traceMatch!=null)return;
+    var at=DP+'.steps['+i+']',carriers=lit(st).filter(function(c){return declared(c.kind,c.id);});
+    if(specObject(st.traceScope) && specObject(st.traceScope.skip))Object.keys(st.traceScope.skip).forEach(function(id){
+      var list=Array.isArray(st.traceScope.skip[id])?st.traceScope.skip[id]:[],where=at+'.traceScope.skip.'+id;
+      var hit=lit(st).find(function(c){return c.id===id;});
+      if(!hit){warnings.push(where+': step '+(st.id || i)+' does not light '+id+'; that skip is ignored');return;}
+      var spans=declared(hit.kind,id) || [];
+      list.forEach(function(entry){
+        if(typeof entry!=='string')return;
+        if(entry.indexOf('role:')===0){var role=entry.slice(5);if(!spans.some(function(x){return x.role===role;}))warnings.push(where+': '+id+' declares no trace span with role '+role+'; that skip is ignored');}
+        else if(!spans.some(function(x){return x.key===entry;}))warnings.push(where+': '+id+' declares no trace span named '+entry+'; that skip is ignored');
+      });
+    });
+    if(st.traceScope!=null || !carriers.length || warned[i])return;
+    // Shared on any path that holds this step.
+    var others=null,shared=null;
+    paths.forEach(function(path){
+      if(others || path.indices.indexOf(i)<0)return;
+      var free=carriers.filter(function(c){
+        var with_=path.indices.filter(function(j){return j!==i && specObject(steps[j]) && lit(steps[j]).some(function(o){return o.kind===c.kind && o.id===c.id;});});
+        if(with_.length && !shared){shared=c;others=with_.map(function(j){return steps[j].id || String(j);});}
+        return !with_.length;
+      });
+      if(free.length){others=null;shared=null;}
+    });
+    if(shared){warned[i]=true;warnings.push(at+': step '+(st.id || i)+' inherits no trace spans because '+shared.id+' is also lit by '+(others.length>1?'steps ':'step ')+others.join(', ')+'; add a traceScope to this step to choose its spans');}
+  });
+}
 function validate(page){
   var errors = [], warnings = [], notes = [];
   if (!specObject(page)){ errors.push('top level: expected {page:{blocks:[...]}} (or sections), or a bare diagram with nodes+rows'); return {errors:errors, warnings:warnings}; }
@@ -791,6 +840,7 @@ function validate(page){
     });
     // #1290: provider spans dropped for this board warn at the carrier; overlay findings sit at the overlay.
     if(typeof FlowTopology!=='undefined' && FlowTopology.traceFindings){var spanFindings=FlowTopology.traceFindings(d,DP);errors.push.apply(errors,spanFindings.errors);warnings.push.apply(warnings,spanFindings.warnings);}
+    traceScopeWarnings(d,DP,warnings);
     // A resolved snapshot already carries overlay bindings on its imported carriers.
     if(!d.topologyProvenance)(Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp,i){
       if(!specObject(imp))return;

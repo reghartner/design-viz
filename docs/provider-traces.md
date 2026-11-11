@@ -448,6 +448,39 @@ span may match several carriers. A connection reads the hand-off from its `send`
 receiving span: its own `receive` declaration, or else the receiving node's `process` spans
 (see [Live status trace labels](live-status.md)).
 
+**Steps inherit declared spans (`traceScope`).** A step without `traceMatch` inherits the
+spans declared on the carriers it lights directly: its nodes, and its delivered connections'
+own `send` and `receive` spans (never an endpoint node's). Without a `traceScope` it inherits
+only from carriers no other step on the same path lights; when every declared carrier it
+lights is shared, it stays unmapped and the reader and the validator say which carrier and
+which other step, and ask for a `traceScope`. A step has `traceMatch` or `traceScope`, never
+both. `traceScope` (all fields optional; `{}` inherits from shared carriers too):
+
+```json
+{"id": "work", "nodes": ["platform::worker"], "traceScope": {
+  "root": {"serviceName": "web", "operation": "POST /checkout"},
+  "parentStepId": "submit",
+  "attributes": {"deployment.environment.name": "prod"},
+  "skip": {"platform::worker": ["find", "role:cache"]},
+  "optional": false, "maxDurationMs": 250, "maxQueueDepth": 100}}
+```
+
+- `root`: in a trace whose root span is another operation the step reads **Not this flow**
+  (neutral, not counted); with no root span in the trace the root is not checked.
+- `parentStepId`: keeps spans that descend from that step's spans, and spans whose ancestry is
+  not in the trace (named in the row); drops spans whose known ancestry leads elsewhere.
+- `attributes`: exact values every inherited span must have (the allowlist above).
+- `skip`: span names, or `role:<role>`, per carrier id (imported ids such as
+  `platform::worker`). A name the carrier does not declare, or a carrier the step does not
+  light, warns and is ignored.
+- `optional`, `maxDurationMs` (the union time of a node step's spans, or an edge step's
+  hand-off), `maxQueueDepth`: as on `traceMatch`; database spans give *Database slow*.
+
+A span that two steps both claim (inherited or explicit) makes both **ambiguous**, naming the
+span and the other step; the earlier step never wins. Imported carriers use the consumer's
+merged declarations, so its overlay additions, hides and overrides change what steps inherit.
+Pages using `traceScope` need the `flow.trace-scope` capability.
+
 ## Honeycomb lookback
 
 The Load trace form says under the trace ID field which time window a load

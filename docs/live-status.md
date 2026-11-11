@@ -2456,6 +2456,14 @@ step `traceMatch` row moves into the label's title with its time, budget and con
 warning or error colour; undeclared connections keep the step time. A receiver that starts
 before its send (clock skew) counts as 0 ms and the title says so.
 
+Steps that inherit declared spans (`traceScope`, see
+[provider traces](provider-traces.md#trace-spans-declared-on-nodes-and-connections-1290)) count
+in the coverage line like `traceMatch` steps. A step of another flow reads `Not this flow` and
+is left out, like a missing optional step; the line ends with the carriers timed from their
+declarations (`· 3 nodes and 2 connections timed`). A step left without a mapping because its
+declared carriers are shared gets a plain hint below the line, for example `Step work: worker
+is also lit by step reply; add a trace scope to this step to choose its spans.`
+
 A step that may be absent from a trace (for example, its operation runs in a different
 trace) can carry `traceMatch.optional: true`; with alternatives, set it on every
 alternative ([canon rules](canon.md#reference-traces-and-incident-alternates)). A step whose

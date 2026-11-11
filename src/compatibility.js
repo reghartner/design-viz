@@ -24,6 +24,7 @@ var FlowviewCompatibility = (function(){
     'flow.telemetry':['Telemetry signal bindings','0.2.0'],
     'flow.telemetry-merge':['Imported metrics bindings that merge with the provider','0.2.0'],
     'flow.trace-spans':['Trace spans declared on nodes and connections','0.2.0'],
+    'flow.trace-scope':['Steps that inherit and narrow declared trace spans','0.2.0'],
     'layout.controls-scale':['Whole step-control sizing in both placements','0.2.0'],
     'layout.playback-position':['Play buttons above or beside steps','0.2.0'],
     'content.edge-json-contracts':['Edge JSON contracts and step replacements','0.2.0'],
@@ -165,6 +166,7 @@ var FlowviewCompatibility = (function(){
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.coinOffsets) && Object.keys(s.coinOffsets).length;}))used['layout.coin-positions']=true;
       if(object(d.nodes) && Object.keys(d.nodes).some(function(id){return object(d.nodes[id]) && d.nodes[id].style!=null;}))used['media.node-styles']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && s.panelVisibility!=null;}))used['flow.panel-visibility']=true;
+      if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return object(s) && Object.prototype.hasOwnProperty.call(s,'traceScope');}))used['flow.trace-scope']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return object(s) && Object.prototype.hasOwnProperty.call(s,'ticketFilter');}))used['flow.step-ticket-filter']=true;
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;

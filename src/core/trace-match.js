@@ -3,6 +3,23 @@
 var FlowTraceMatch = (function(){
   const numeric=v=>v!==null && v!=='' && v!==undefined && Number.isFinite(Number(v)) ? Number(v) : null;
   const truth=v=>v===true || v==='true' || v===1;
+const object=v=>!!v && typeof v==='object' && !Array.isArray(v),own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+/* The carriers a step lights directly: its delivered edges (edge/edges less dropped or blocked
+   failures, as stepDeliveredKeys in src/core/paths.js) and its nodes. Endpoints are not lit. */
+function litCarriers(step){
+  const keys=[],failures=object(step.failures)?step.failures:{};
+  if(typeof step.edge==='string')keys.push(step.edge);
+  if(Array.isArray(step.edges))step.edges.forEach(k=>{if(typeof k==='string' && !keys.includes(k))keys.push(k);});
+  return {edges:keys.filter(k=>!(own(failures,k) && (failures[k]==='dropped' || failures[k]==='blocked'))),nodes:Array.isArray(step.nodes)?step.nodes.filter(n=>typeof n==='string'):[]};
+}
+// Wall-clock time several intervals cover, overlaps counted once.
+function unionMs(intervals){
+  const list=intervals.filter(i=>Number.isFinite(i.startMs) && Number.isFinite(i.durationMs)).sort((a,b)=>a.startMs-b.startMs);
+  if(!list.length)return null;
+  let total=0,start=list[0].startMs,end=start+list[0].durationMs;
+  list.slice(1).forEach(i=>{if(i.startMs>end){total+=end-start;start=i.startMs;}end=Math.max(end,i.startMs+i.durationMs);});
+  return total+end-start;
+}
 function baseSteps(d){
   if(!d.paths?.length)return d.steps || [];
   return d.paths[0].steps.map(id=>d.steps.find(s=>s.id===id));
@@ -23,7 +40,7 @@ function mapTrace(d,trace,pathId){
     if(visiting.has(step.id))throw new Error('Cyclic traceMatch.parentStepId.');
     visiting.add(step.id);
     const m=step.traceMatch;
-    if(!m || Array.isArray(m) && !m.length){visiting.delete(step.id);return {stepId:step.id,status:'unmapped',spans:[],conditions:[]};}
+    if(!m || Array.isArray(m) && !m.length){const inherited=inherit(step);visiting.delete(step.id);results.set(step.id,inherited);return inherited;}
     // Alternatives are tried in order; the first match wins. Without a match the
     // first ambiguous result is kept (it needs a selector fix), else the last
     // applicable one. An alternative whose parent step is not on this path ranks last.
@@ -37,6 +54,95 @@ function mapTrace(d,trace,pathId){
     // since nothing tells whose span it is. Matched or ambiguous is unchanged.
     if(result.status==='missing' && [].concat(m).every(a=>a && a.optional===true) && !tried.some(r=>unattributed.has(r)))Object.assign(result,{detail:'Optional, not in this trace.'+(result.detail?' '+result.detail:''),conditions:[],optional:true});
     visiting.delete(step.id);results.set(step.id,result);return result;
+  }
+  // The conditions of a matched step: errors, delivery, budget on durationMs, queue, backpressure, retries.
+  function conditions(result,candidates,m,durationMs,retries,database){
+    const condition=(kind,label,extra={})=>result.conditions.push({kind,nodeId:m.nodeId,label,spanIds:candidates.map(s=>s.id),...extra});
+    const errors=candidates.filter(s=>s.error);
+    if(errors.length)condition('service-error','Service error'+(errors[0].statusCode?' · HTTP '+errors[0].statusCode:''));
+    if(candidates.some(s=>truth(s.attributes['flow.delivery_failed'])))condition('delivery-failed','Delivery failed (explicit telemetry)');
+    const times=candidates.map(s=>s.durationMs).filter(n=>n!==null);
+    if(m.maxDurationMs!=null && durationMs!==null && durationMs>m.maxDurationMs)
+      condition(database?'database-slow':'slow',(database?'Database slow':'Slow operation')+' · '+durationMs+' ms / '+m.maxDurationMs+' ms budget',{durationMs,budgetMs:m.maxDurationMs});
+    if(m.maxDurationMs!=null && times.length!==candidates.length)condition('unknown','Duration not recorded; timing budget cannot be checked.');
+    const depths=candidates.map(s=>numeric(s.attributes['messaging.queue.depth'] ?? s.attributes['queue.depth'])).filter(n=>n!==null && n>=0);
+    if(m.maxQueueDepth!=null && !depths.length)condition('unknown','Queue depth not recorded; queue budget cannot be checked.');
+    if(m.maxQueueDepth!=null && depths.length && Math.max(...depths)>m.maxQueueDepth){
+      const ages=candidates.map(s=>numeric(s.attributes['messaging.message.age_ms'])).filter(n=>n!==null && n>=0);
+      condition('queue-buildup','Queue buildup · '+Math.max(...depths)+' messages'+(ages.length?' · oldest '+Math.max(...ages)+' ms':''),{queueDepth:Math.max(...depths),oldestAgeMs:ages.length?Math.max(...ages):null});
+    }
+    if(candidates.some(s=>truth(s.attributes['flow.backpressure'])))condition('backpressure','Backpressure reported by service');
+    if(retries)condition('retry',candidates.length+' recorded attempts',{attempts:candidates.length});
+  }
+  /* #1290: a step without traceMatch inherits the spans declared on the carriers it lights:
+     its nodes' declarations and its delivered edges' own declarations (never an endpoint's).
+     Without traceScope it inherits only from carriers no other step on this path lights; a
+     shared carrier needs a scope, so the step stays unmapped with a hint. traceScope narrows:
+     skip (span names or role:<role> per carrier), attributes, root, parentStepId (spans whose
+     ancestry is not in the trace are kept, rule 7), optional and budgets. */
+  let declared=null;
+  const litBy=new Map();
+  steps.forEach(st=>{if(!st)return;const lit=litCarriers(st);lit.nodes.map(id=>'node:'+id).concat(lit.edges.map(k=>'edge:'+k)).forEach(key=>{if(!litBy.has(key))litBy.set(key,[]);if(!litBy.get(key).includes(st.id))litBy.get(key).push(st.id);});});
+  const spanName=x=>x.serviceName+' '+x.operation;
+  function unknownAncestry(span){
+    const seen=new Set(),queue=[span.parentId,...(span.links || [])];
+    while(queue.length){const id=queue.shift();if(!id || seen.has(id))continue;seen.add(id);const p=byId.get(id);if(!p)return true;queue.push(p.parentId,...(p.links || []));}
+    return false;
+  }
+  function inherit(step){
+    const scope=object(step.traceScope)?step.traceScope:null,c=declared || (declared=carrierSpans(d,trace)),lit=litCarriers(step);
+    const base={stepId:step.id,nodeId:lit.nodes.length===1 && !lit.edges.length?lit.nodes[0]:null,spans:[],conditions:[],detail:'',inherited:true};
+    let used=lit.nodes.filter(id=>c.nodes[id]).map(id=>({kind:'node',id,list:c.nodes[id]})).concat(lit.edges.filter(k=>c.edges[k]).map(k=>({kind:'edge',id:k,list:c.edges[k]})));
+    // An unmapped step annotates nothing, as before.
+    if(!used.length)return Object.assign(base,{status:'unmapped',inherited:false,nodeId:null});
+    const others=x=>(litBy.get(x.kind+':'+x.id) || []).filter(id=>id!==step.id),notes=[];
+    if(!scope){
+      const shared=used.filter(x=>others(x).length);used=used.filter(x=>!others(x).length);
+      if(!used.length){const o=others(shared[0]);return Object.assign(base,{status:'unmapped',nodeId:null,hint:shared[0].id+' is also lit by '+(o.length>1?'steps ':'step ')+o.join(', ')+'; add a trace scope to this step to choose its spans.'});}
+      if(shared.length)notes.push(shared.map(x=>x.id).join(', ')+(shared.length>1?' are':' is')+' also lit by other steps; add a trace scope to inherit '+(shared.length>1?'their':'its')+' spans.');
+    }
+    const skip=scope && object(scope.skip)?scope.skip:{},roles=[];let spans=[];
+    used.forEach(x=>{const list=Array.isArray(skip[x.id])?skip[x.id]:[];x.list.forEach(dc=>{if(list.includes(dc.key) || list.includes('role:'+dc.role))return;roles.push(dc.role);dc.spans.forEach(sp=>{if(!spans.includes(sp))spans.push(sp);});});});
+    if(scope && object(scope.attributes))spans=spans.filter(sp=>Object.keys(scope.attributes).every(k=>(sp.attributes || {})[k]===scope.attributes[k]));
+    if(scope && object(scope.root)){
+      const roots=trace.spans.filter(sp=>!sp.parentId && !(sp.links || []).some(id=>byId.has(id))).sort((a,b)=>a.startMs-b.startMs);
+      if(!roots.length)notes.push('The trace\'s root span is not in this trace, so the root was not checked.');
+      else if(!roots.some(r=>r.serviceName===scope.root.serviceName && r.operation===scope.root.operation))
+        return Object.assign(base,{status:'missing',notThisFlow:true,detail:'Not this flow: this trace starts at '+spanName(roots[0])+', not '+scope.root.serviceName+' '+scope.root.operation+'.'});
+    }
+    let unclear=false;
+    if(scope && scope.parentStepId){
+      const parent=steps.find(x=>x && x.id===scope.parentStepId);
+      if(!parent){spans=[];notes.push('Parent step '+scope.parentStepId+' is not on this path.');}
+      else{
+        const mapped=match(parent);
+        if(mapped.status!=='matched'){unclear=spans.length>0;spans=[];notes.push('Parent mapping is unavailable.');}
+        else{
+          const parents=mapped.spans.map(p=>p.id),lost=[];
+          spans=spans.filter(sp=>{if(related(sp,parents,byId))return true;if(unknownAncestry(sp)){lost.push(sp);return true;}return false;});
+          if(lost.length)notes.push(lost.length+(lost.length===1?' span\'s ancestry is':' spans\' ancestry is')+' not in this trace ('+lost.map(spanName).join(', ')+'); '+(lost.length===1?'it was':'they were')+' kept.');
+        }
+      }
+    }
+    const result=Object.assign(base,{status:unclear?'ambiguous':spans.length?'matched':'missing',spans,detail:notes.join(' ')});
+    if(result.status==='matched'){
+      // An edge step's time is its hand-off; a node step's the union of its spans.
+      let durationMs=null;
+      if(!lit.nodes.some(id=>c.nodes[id]) && used.every(x=>x.kind==='edge')){
+        const intervals=[];
+        used.forEach(x=>{
+          const edge=(d.edges || []).find(e=>e && e.from+'->'+e.to===x.id),own=x.list.filter(dc=>dc.role==='receive');
+          const sends=[].concat(...x.list.filter(dc=>dc.role==='send').map(dc=>dc.spans)).filter(sp=>spans.includes(sp));
+          const receivers=own.length?[].concat(...own.map(dc=>dc.spans)):edge?[].concat(...(c.nodes[edge.to] || []).filter(dc=>dc.role==='process').map(dc=>dc.spans)):[];
+          handoffs(trace,sends,receivers).forEach(p=>{if(p.receive)intervals.push({startMs:p.send.startMs,durationMs:Math.max(0,p.receive.startMs-p.send.startMs)});});
+        });
+        durationMs=intervals.length?unionMs(intervals):unionMs(spans);
+      }else durationMs=unionMs(spans);
+      result.durationMs=durationMs;
+      conditions(result,spans,{maxDurationMs:scope?scope.maxDurationMs:undefined,maxQueueDepth:scope?scope.maxQueueDepth:undefined,nodeId:result.nodeId},durationMs,false,roles.length>0 && roles.every(r=>r==='database'));
+    }else if(result.status==='missing' && scope && scope.optional===true)Object.assign(result,{optional:true,detail:'Optional, not in this trace.'+(result.detail?' '+result.detail:'')});
+    else result.conditions.push({kind:result.status==='missing'?'unknown':'ambiguous',nodeId:result.nodeId,label:result.status==='missing'?'Not observed · outcome unknown':'Ambiguous span mapping',spanIds:[]});
+    return result;
   }
   function attempt(step,m,alternative){
     let candidates=named(m);
@@ -61,31 +167,22 @@ function mapTrace(d,trace,pathId){
     const status=detail && candidates.length || candidates.length>1 && !retries ? 'ambiguous' : candidates.length?'matched':'missing';
     const result={stepId:step.id,nodeId:m.nodeId || null,status,detail,spans:candidates,conditions:[]};
     if(status==='matched'){
-      const condition=(kind,label,extra={})=>result.conditions.push({kind,nodeId:m.nodeId,label,spanIds:candidates.map(s=>s.id),...extra});
-      const errors=candidates.filter(s=>s.error);
-      if(errors.length)condition('service-error','Service error'+(errors[0].statusCode?' · HTTP '+errors[0].statusCode:''));
-      if(candidates.some(s=>truth(s.attributes['flow.delivery_failed'])))condition('delivery-failed','Delivery failed (explicit telemetry)');
-      const times=candidates.map(s=>s.durationMs).filter(n=>n!==null),durationMs=times.length?Math.max(...times):null;
-      if(m.maxDurationMs!=null && durationMs!==null && durationMs>m.maxDurationMs){
-        const database=m.role==='database' || candidates.some(s=>s.attributes['db.system'] || s.attributes['db.system.name']);
-        condition(database?'database-slow':'slow',(database?'Database slow':'Slow operation')+' · '+durationMs+' ms / '+m.maxDurationMs+' ms budget',{durationMs,budgetMs:m.maxDurationMs});
-      }
-      if(m.maxDurationMs!=null && times.length!==candidates.length)condition('unknown','Duration not recorded; timing budget cannot be checked.');
-      const depths=candidates.map(s=>numeric(s.attributes['messaging.queue.depth'] ?? s.attributes['queue.depth'])).filter(n=>n!==null && n>=0);
-      if(m.maxQueueDepth!=null && !depths.length)condition('unknown','Queue depth not recorded; queue budget cannot be checked.');
-      if(m.maxQueueDepth!=null && depths.length && Math.max(...depths)>m.maxQueueDepth){
-        const ages=candidates.map(s=>numeric(s.attributes['messaging.message.age_ms'])).filter(n=>n!==null && n>=0);
-        condition('queue-buildup','Queue buildup · '+Math.max(...depths)+' messages'+(ages.length?' · oldest '+Math.max(...ages)+' ms':''),{queueDepth:Math.max(...depths),oldestAgeMs:ages.length?Math.max(...ages):null});
-      }
-      if(candidates.some(s=>truth(s.attributes['flow.backpressure'])))condition('backpressure','Backpressure reported by service');
-      if(retries)condition('retry',candidates.length+' recorded attempts',{attempts:candidates.length});
+      const times=candidates.map(s=>s.durationMs).filter(n=>n!==null);
+      conditions(result,candidates,m,times.length?Math.max(...times):null,retries,m.role==='database' || candidates.some(s=>s.attributes['db.system'] || s.attributes['db.system.name']));
     }else result.conditions.push({kind:status==='missing'?'unknown':'ambiguous',nodeId:m.nodeId,label:status==='missing'?'Not observed · outcome unknown':'Ambiguous span mapping',spanIds:candidates.map(s=>s.id)});
     if(off)offPath.add(result);if(unclear)unattributed.add(result);
     return result;
   }
   const mapped=steps.map(match),owners=new Map();
   for(const item of mapped.filter(r=>r.status==='matched'))for(const span of item.spans){if(!owners.has(span.id))owners.set(span.id,[]);owners.get(span.id).push(item);}
-  for(const items of owners.values())if(items.length>1)for(const item of items){item.status='ambiguous';item.conditions=[{kind:'ambiguous',nodeId:item.nodeId,label:'One span matches multiple authored steps; refine the selectors.',spanIds:item.spans.map(s=>s.id)}];}
+  // One span in two steps' sets makes both ambiguous; nothing goes to the earlier step. With an
+  // inheriting step involved, the condition names the span and the other step (#1290).
+  const shared=new Set();for(const items of owners.values())if(items.length>1)items.forEach(item=>shared.add(item));
+  for(const item of shared){
+    const span=item.spans.find(sp=>owners.get(sp.id).length>1),with_=owners.get(span.id).filter(x=>x!==item);
+    const label=item.inherited || with_.some(x=>x.inherited)?spanName(span)+' is also matched by '+(with_.length>1?'steps ':'step ')+with_.map(x=>x.stepId).join(', ')+'; add a trace scope (root, parent step or attributes) to separate them.':'One span matches multiple authored steps; refine the selectors.';
+    item.status='ambiguous';item.conditions=[{kind:'ambiguous',nodeId:item.nodeId,label,spanIds:item.spans.map(s=>s.id)}];
+  }
   const used=new Set(mapped.filter(r=>r.status==='matched').flatMap(r=>r.spans.map(s=>s.id)));
   return {steps:mapped,unmatched:trace.spans.filter(s=>!used.has(s.id)).map(s=>({id:s.id,serviceName:s.serviceName,operation:s.operation})),warnings:trace.warnings};
 }

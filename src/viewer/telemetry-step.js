@@ -46,18 +46,19 @@ function telemetryTraceModel(diagram,pathId,exemplar){
   }catch(ex){warning=ex.message;}
   var nodes=Object.create(null),edges=Object.create(null),rows=[];
   if(mapping)mapping.steps.forEach(function(match){
-    var step=(diagram.steps || []).find(function(s){return s.id===match.stepId;}),selector=FlowTraceMatch.selector(step,match) || {},keys=stepDeliveredKeys(step);
+    // #1290: an inheriting step has no selector; its traceScope holds its budget.
+    var step=(diagram.steps || []).find(function(s){return s.id===match.stepId;}),selector=FlowTraceMatch.selector(step,match) || (match.inherited && step.traceScope) || {},keys=stepDeliveredKeys(step);
     var exact=(diagram.edges || []).filter(function(e){return keys.indexOf(e.from+'->'+e.to)>=0 && (!match.nodeId || e.to===match.nodeId);});
-    var duration=match.status==='matched'?Math.max.apply(null,match.spans.map(function(s){return s.durationMs;})):null;
+    var duration=match.status!=='matched'?null:match.durationMs!=null?match.durationMs:Math.max.apply(null,match.spans.map(function(s){return s.durationMs;}));
     var kinds=match.conditions.map(function(c){return c.kind;}),tone=match.status!=='matched'?'unknown':kinds.some(function(k){return k==='service-error' || k==='delivery-failed';})?'error':kinds.some(function(k){return ['slow','database-slow','queue-buildup','backpressure'].indexOf(k)>=0;})?'warning':'observed';
-    var label=match.status==='matched'?telemetryTraceDuration(duration):match.status==='missing'?'Not observed':match.status==='ambiguous'?'Ambiguous':'Unmapped';
+    var label=match.status==='matched'?telemetryTraceDuration(duration):match.notThisFlow?'Not this flow':match.status==='missing'?'Not observed':match.status==='ambiguous'?'Ambiguous':'Unmapped';
     // The step's other traceMatch alternatives, never the one behind this row. "seen" =
     // a span with that service and operation is in this trace: an alternative after the
     // matched one is not tried; one before it was rejected (ambiguous, parent, occurrence).
     var others=Array.isArray(step.traceMatch)?step.traceMatch.filter(function(a,i){return a && i!==match.alternative;}).map(function(a){
       return {name:a.serviceName+' '+a.operation,seen:normalized.spans.some(function(s){return s.serviceName===a.serviceName && s.operation===a.operation && (!a.namespace || s.attributes['service.namespace']===a.namespace) && Object.keys(a.attributes || {}).every(function(k){return s.attributes[k]===a.attributes[k];});})};
     }):[];
-    var row={id:match.stepId,nodeId:match.nodeId,edgeIndex:exact.length===1?diagram.edges.indexOf(exact[0]):null,status:match.status,tone:tone,duration:duration,budget:selector.maxDurationMs,label:label,operation:selector.operation || step.text || step.id,service:selector.serviceName,alternative:match.alternative,optional:!!match.optional,otherAlternatives:others,detail:match.detail,conditions:match.conditions,spanIds:match.spans.map(function(s){return s.id;}),
+    var row={id:match.stepId,nodeId:match.nodeId,edgeIndex:exact.length===1?diagram.edges.indexOf(exact[0]):null,status:match.status,tone:tone,duration:duration,budget:selector.maxDurationMs,label:label,operation:selector.operation || step.text || step.id,service:selector.serviceName,alternative:match.alternative,optional:!!match.optional,notThisFlow:!!match.notThisFlow,inherited:!!match.inherited,hint:match.hint || null,otherAlternatives:others,detail:match.detail,conditions:match.conditions,spanIds:match.spans.map(function(s){return s.id;}),
       intervals:match.spans.map(function(s){return {id:s.id,startMs:s.startMs,durationMs:s.durationMs};})};rows.push(row);
     // Only explicit stable node IDs and a uniquely delivered edge may annotate
     // the canvas. A service name or display title is never a join key.
@@ -273,12 +274,32 @@ function telemetryTraceSpanTime(rows){
 function telemetryTraceRowTitle(r){
   var others=r.otherAlternatives || [],absent=others.filter(function(a){return !a.seen;}),unused=others.filter(function(a){return a.seen;});
   var named=r.alternative!=null && r.status==='matched'?'Matched: '+r.service+' '+r.operation:r.operation;
-  return [r.optional?'optional, not in this trace: '+r.service+' '+r.operation:named+': '+(r.duration!=null?r.duration+' ms':r.label)+(r.budget!=null?' / '+r.budget+' ms budget':'')].concat(r.conditions.map(function(c){return c.label;}),
+  if(r.notThisFlow)return 'not this flow: '+r.operation;
+  return [r.optional?'optional, not in this trace: '+(r.service?r.service+' ':'')+r.operation:named+': '+(r.duration!=null?r.duration+' ms':r.label)+(r.budget!=null?' / '+r.budget+' ms budget':'')].concat(r.conditions.map(function(c){return c.label;}),
     absent.length?['not in this trace: '+absent.map(function(a){return a.name;}).join(', ')]:[],unused.length?['in this trace, not matched: '+unused.map(function(a){return a.name;}).join(', ')]:[]).join('; ');
 }
+/* #1290: the counts behind the Selected request coverage line. Optional steps missing from the
+   trace, steps of another flow and steps without a mapping are not counted as to-match; timed
+   carriers are the nodes and connections with a matched declared-span row. */
+function telemetryTraceCounts(model){
+  var rows=model.rows || [],n=function(f){return rows.filter(f).length;};
+  var optional=n(function(r){return r.optional;}),other=n(function(r){return r.notThisFlow;}),unmapped=n(function(r){return r.status==='unmapped';});
+  // Timed carriers are those timed from their declared spans (#1290), so boards without declarations read as before.
+  function timed(map){return Object.keys(map || {}).filter(function(k){return map[k].some(function(r){return r.kind==='carrier' && r.status==='matched';});}).length;}
+  return {matched:n(function(r){return r.status==='matched';}),total:rows.length-optional-other-unmapped,optional:optional,notThisFlow:other,unmapped:unmapped,
+    unmatched:model.mapping?model.mapping.unmatched.length:0,nodes:timed(model.nodes),edges:timed(model.edges)};
+}
+function telemetryTraceCoverage(model){
+  var c=telemetryTraceCounts(model),plural=function(n,one,many){return n+' '+(n===1?one:many);};
+  var timed=[c.nodes?plural(c.nodes,'node','nodes'):'',c.edges?plural(c.edges,'connection','connections'):''].filter(Boolean).join(' and ');
+  return c.matched+'/'+c.total+' steps matched · '+(c.optional?c.optional+' optional not in this trace · ':'')+(c.notThisFlow?c.notThisFlow+' not this flow · ':'')+
+    (c.unmapped?c.unmapped+(c.unmapped===1?' step':' steps')+' without a trace mapping · ':'')+c.unmatched+' spans unmatched'+(timed?' · '+timed+' timed':'');
+}
+// Plain hints for steps left without a mapping because their carriers are shared.
+function telemetryTraceHints(model){return (model.rows || []).filter(function(r){return r.hint;}).map(function(r){return 'Step '+r.id+': '+r.hint;});}
 function telemetryTraceLabel(listed){
   // #1175: an optional step missing from this trace is left out of the label; the title lists it.
-  var rows=listed.filter(function(r){return !r.optional;}),time=telemetryTraceSpanTime(rows),one=rows.length===1 && rows[0],steps=rows.filter(function(r){return r.kind!=='carrier';});
+  var rows=listed.filter(function(r){return !r.optional && !r.notThisFlow;}),time=telemetryTraceSpanTime(rows),one=rows.length===1 && rows[0],steps=rows.filter(function(r){return r.kind!=='carrier';});
   function count(status,word){var n=rows.filter(function(r){return r.status===status;}).length;return n?n+' '+word:'';}
   // On the canvas the service and operation are cut to 40 characters; the title keeps them whole.
   var name=one && one.service+' '+one.operation,text=one && one.kind==='carrier' && one.text?one.text:one && one.status!=='matched'?one.label:one?[one.alternative!=null?'Matched: '+(name.length>40?name.slice(0,39)+'…':name):'',time || one.label].filter(Boolean).join(' · '):

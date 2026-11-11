@@ -13,7 +13,9 @@
     "grafana": {
      "prometheus": "prom-main",
      "loki": "loki-main",
-     "cloudwatch": "cw-main"
+     "cloudwatch": "cw-main",
+     "tempo": "tempo-main",
+     "sql": "sql-main"
     },
     "environment": "stg",
     "environments": {
@@ -27,6 +29,9 @@
       "variables": {
        "iotAccount": "139648982912",
        "queueAccount": "970642438387"
+      },
+      "grafana": {
+       "prometheus": "prom-prd"
       }
      }
     },
@@ -64,8 +69,27 @@
        "DB-300"
       ]
      }
+    },
+    "refreshMs": 300000,
+    "honeycomb": {
+     "environment": "prod",
+     "dataset": "doorbell"
+    },
+    "variables": {
+     "region": "us-east-1"
     }
-   }
+   },
+   "jira": {
+    "site": "https://acme.atlassian.net",
+    "epic": "DOOR-100"
+   },
+   "dependencies": [
+    {
+     "ticket": "BE-68",
+     "on": "BE-67",
+     "reason": "needs the validated event contract"
+    }
+   ]
   },
   "blocks": [
    {
@@ -126,7 +150,8 @@
         "api->store": {
          "tickets": [
           "PLAT-8"
-         ]
+         ],
+         "existsWhen": "tickets-done"
         }
        },
        "edgeOverrides": {
@@ -160,7 +185,15 @@
          "endLine": 18,
          "purpose": "Debounces the button press."
         }
-       ]
+       ],
+       "link": "https://github.com/fictional-home/firmware/blob/main/press.c#L3",
+       "deltaLinks": [
+        {
+         "label": "Firmware change",
+         "url": "https://github.com/fictional-home/firmware/pull/12"
+        }
+       ],
+       "group": "hardware"
       },
       "ingest": {
        "title": "Event ingest",
@@ -188,6 +221,35 @@
          "p95": {
           "grafana": "histogram_quantile(0.95, sum by (le)(rate(http_server_request_duration_seconds_bucket{service=\"event-ingest\"}[5m])))",
           "unit": "s"
+         },
+         "traces": {
+          "tempo": "{ resource.service.name = \"event-ingest\" && span.http.route = \"/v1/events\" && status = error }",
+          "unit": "spans",
+          "window": "1h",
+          "role": "error",
+          "label": "Error spans"
+         },
+         "backlog": {
+          "sql": "select count(*) as n\nfrom device_events\nwhere status = 'pending' and received_at > now() - interval '1 hour'",
+          "unit": "rows",
+          "showOnCard": false
+         },
+         "spans": {
+          "honeycomb": {
+           "calculations": [
+            {
+             "op": "COUNT"
+            }
+           ],
+           "filters": [
+            {
+             "column": "service.name",
+             "op": "=",
+             "value": "event-ingest"
+            }
+           ]
+          },
+          "unit": "spans"
          }
         },
         "proof": {
@@ -201,6 +263,9 @@
          "p95": {
           "max": 0.5
          }
+        },
+        "links": {
+         "dashboard": "https://grafana.example.test/d/event-ingest"
         }
        },
        "codeRefs": [
@@ -218,7 +283,11 @@
          "endLine": 72,
          "purpose": "Validates the device event."
         }
-       ]
+       ],
+       "prs": [
+        "https://github.com/fictional-home/doorbell-services/pull/91"
+       ],
+       "existsWhen": "tickets-done"
       },
       "iot": {
        "title": "AWS IoT",
@@ -288,8 +357,19 @@
        "telemetry": {
         "use": "kafka-topic",
         "topic": "device-events",
-        "group": "notify-consumers"
-       }
+        "group": "notify-consumers",
+        "signals": {
+         "consumed": {
+          "loki": "sum(count_over_time({app=\"notify\",env=\"${env}\"} |= \"event consumed\" [5m]))",
+          "unit": "events",
+          "missingMeansZero": true,
+          "links": {
+           "query": "https://grafana.example.test/explore?notify"
+          }
+         }
+        }
+       },
+       "missingWork": true
       }
      },
      "rows": [
@@ -319,6 +399,10 @@
           "grafana": "sum(rate(http_server_requests_total{service=\"event-ingest\",route=\"/v1/events\",client=\"doorbell\"}[5m]))*3600",
           "unit": "req/h"
          }
+        },
+        "card": {
+         "title": "Event intake",
+         "side": "below"
         }
        }
       },
@@ -343,7 +427,11 @@
         "use": "kafka-topic",
         "topic": "device-events",
         "group": "notify-consumers"
-       }
+       },
+       "tickets": [
+        "BE-68",
+        "BE-69"
+       ]
       },
       {
        "from": "ingest",
@@ -412,7 +500,16 @@
         "operation": "POST /v1/events",
         "maxDurationMs": 500,
         "nodeId": "ingest"
-       }
+       },
+       "link": "https://wiki.example.test/doorbell/publish",
+       "lane": "FW",
+       "deltaLinks": [
+        {
+         "label": "Publish design",
+         "url": "https://wiki.example.test/doorbell/publish-v2"
+        }
+       ],
+       "delta": true
       },
       {
        "id": "route",
@@ -435,6 +532,9 @@
          "operation": "retry device-events",
          "parentStepId": "publish"
         }
+       ],
+       "ticketFilter": [
+        "BE-69"
        ]
       },
       {
@@ -458,7 +558,14 @@
          "state": "Lost"
         }
        },
-       "delta": true
+       "delta": true,
+       "conditions": [
+        {
+         "kind": "service-error",
+         "label": "IoT authorization refused",
+         "nodeId": "iot"
+        }
+       ]
       }
      ],
      "paths": [
@@ -480,7 +587,12 @@
         "refused"
        ]
       }
-     ]
+     ],
+     "groups": {
+      "hardware": {
+       "label": "Hardware"
+      }
+     }
     }
    },
    {
@@ -529,6 +641,11 @@
      }
     ]
    }
-  ]
+  ],
+  "lanes": {
+   "FW": {
+    "color": "#38bdf8"
+   }
+  }
  }
 }

@@ -177,3 +177,188 @@ test('the Elements renderer has an index table and one sheet per element with ev
   assert.match(text, /POST \/v1\/events/, 'trace rules on the element they point at');
   assert.equal(C.textViewElements(model), text);
 });
+
+/* ---- review cycle 1: every attachment kind, in every layout that shows it ---- */
+
+// Layout-only fields: they place or paint an element and are the only authored
+// leaves the text view leaves out. Keep this list equal to TEXT_VIEW_LAYOUT.
+const LAYOUT_ONLY = ['fromPort', 'toPort', 'curveControls', 'curvePoints', 'coinOffsets', 'color', 'tint', 'icon', 'presentation',
+  'textStyle', 'tone', 'x', 'y', 'w', 'h', 'width', 'height', 'position', 'labelOffset', 'labelPosition'];
+const IMPORT_LAYOUT_ONLY = ['position', 'nodePositions'];
+const flatEscape = v => String(v).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+function authoredLeaves(page){
+  const out = [], skip = new Set(LAYOUT_ONLY.concat(IMPORT_LAYOUT_ONLY));
+  const walk = (v, at) => {
+    if (Array.isArray(v)) v.forEach((x, i) => walk(x, at + '[' + i + ']'));
+    else if (v && typeof v === 'object') Object.keys(v).forEach(k => { if (!skip.has(k)) walk(v[k], at + '.' + k); });
+    else if ((typeof v === 'string' && v) || typeof v === 'number') out.push([at, v]);
+  };
+  C.sectionRecords(page).forEach(r => {
+    const d = r.section && r.section.diagram;
+    if (!d) return;
+    for (const key of ['nodes', 'edges', 'steps', 'topologyImports']) walk(d[key], r.reference + '.' + key);
+  });
+  walk(page.tracking, 'tracking');
+  return out;
+}
+
+test('every authored leaf of nodes, edges, steps, imports and tracking reaches the flat lines', () => {
+  assert.deepEqual(plain(C.TEXT_VIEW_LAYOUT), LAYOUT_ONLY, 'the module and this test share one layout-only list');
+  for (const [name, page] of [['resolved', resolvedPage()], ['unresolved', C.normalize(read('board.json'))], ['provider', C.normalize(read('platform.json'))]]){
+    const flat = C.textViewFlat(C.textViewModel(page)), leaves = authoredLeaves(page);
+    assert.ok(leaves.length > (name === 'provider' ? 15 : 150), name + ' fixture is rich');
+    const missing = leaves.filter(([, v]) => !flat.includes(flatEscape(v)));
+    assert.deepEqual(missing, [], name + ': authored data missing from the flat lines');
+  }
+});
+
+test('each attachment kind appears in each layout that shows it', () => {
+  const model = C.textViewModel(resolvedPage());
+  const flat = C.textViewFlat(model), elements = C.textViewElements(model);
+  const steps = {happy: C.textViewSteps(model, {queries: 'full'}), refused: C.textViewSteps(model, {queries: 'full', pathId: 'refused'})};
+  const cases = [
+    // [what, flat line, steps text (path, substring), elements substring]
+    ['element code ref', 'node delivery/ingest code.ingest.accept.path src/ingest.js', ['happy', '  - code ingest.accept src/ingest.js:40-72 @222222222222 — Validates the device event.'],
+      '- Code ingest.accept: https://github.com/fictional-home/doorbell-services · src/ingest.js · lines 40-72 · revision 2222222222222222222222222222222222222222'],
+    ['code ref anchor', 'node delivery/ingest code.ingest.accept.anchor.start // flow:acceptEvent:start', null, 'anchor // flow:acceptEvent:start … // flow:acceptEvent:end'],
+    ['imported code ref', 'node delivery/platform::api code.orders-api.create.lines 10-24', ['happy', '  - code orders-api.create src/orders-api.js:10-24'], '- Code orders-api.create:'],
+    ['step code ref', 'step delivery/happy/2 code.ingest.route.path src/ingest.js', ['happy', '- code ingest.route src/ingest.js:80-96 @222222222222 — Routes the validated event.'], null],
+    ['trace rule', 'step delivery/happy/2 trace event-ingest POST /v1/events · maxDurationMs 500 · nodeId ingest',
+      ['happy', '- trace match: event-ingest POST /v1/events · maxDurationMs 500 · nodeId ingest'], '- Trace rule (step happy/2): event-ingest POST /v1/events'],
+    ['trace alternatives', 'step delivery/happy/3 trace notify retry device-events · parentStepId publish', ['happy', '- trace match: notify retry device-events · parentStepId publish'], null],
+    ['panel patch', 'step delivery/happy/2 panel.outcome {"state":"Pressed"}', ['happy', '- panel outcome: `{"state":"Pressed"}`'], null],
+    ['binding', 'node delivery/ingest binding.entityRef component:default/event-ingest', ['happy', '  - binding component:default/event-ingest'],
+      '- Binding: catalogUrl https://backstage.example.test/catalog/default/component/event-ingest · entityRef component:default/event-ingest'],
+    ['element delta', 'node delivery/device delta.text Debounce moved to firmware.', ['happy', '  - delta Debounce moved to firmware.'], '- Delta (marked): Debounce moved to firmware.'],
+    ['element delta flag', 'node delivery/device delta true', ['happy', '- node `device` Doorbell device · tickets FW-45 · changed'], null],
+    ['element delta link', 'node delivery/device delta.link https://github.com/fictional-home/firmware/pull/12 Firmware change', null, '  - Firmware change: https://github.com/fictional-home/firmware/pull/12'],
+    ['step delta', 'step delivery/happy/2 delta true', ['happy', '### 2. `publish` · +1m (2026-09-24 · 22:31) · changed'], null],
+    ['step delta link', 'step delivery/happy/2 delta.link https://wiki.example.test/doorbell/publish-v2 Publish design', ['happy', '- delta link Publish design: https://wiki.example.test/doorbell/publish-v2'], null],
+    ['step time', 'step delivery/happy/2 time +1m', ['happy', '· +1m (2026-09-24 · 22:31)'], null],
+    ['story clock', 'step delivery/refused/2 at 2026-09-24 · 23:00', ['refused', '· 23:00 (2026-09-24 · 23:00)'], null],
+    ['pull request', 'node delivery/ingest pr https://github.com/fictional-home/doorbell-services/pull/91', null, '- Pull requests: https://github.com/fictional-home/doorbell-services/pull/91'],
+    ['ticket browse link', 'node delivery/ingest ticket BE-70 https://acme.atlassian.net/browse/BE-70', ['happy', 'tickets BE-67, BE-70'], 'BE-70 (https://acme.atlassian.net/browse/BE-70)'],
+    ['edge ticket', 'edge delivery/ingest->notify ticket BE-69', ['happy', '- edge `ingest->notify` route · tickets BE-68, BE-69'], '| ingest->notify | edge | in, lag | 0 | BE-68, BE-69 |'],
+    ['prometheus', 'node delivery/ingest metric.p95.query grafana histogram_quantile(0.95, sum by (le)(rate(http_server_request_duration_seconds_bucket{service="event-ingest"}[5m])))',
+      ['happy', '- query: `histogram_quantile(0.95, sum by (le)(rate(http_server_request_duration_seconds_bucket{service="event-ingest"}[5m])))`'], '| p95 | grafana | s | max 0.5 |'],
+    ['tempo', 'node delivery/ingest metric.traces.query tempo { resource.service.name = "event-ingest" && span.http.route = "/v1/events" && status = error }',
+      ['happy', '- query: `{ resource.service.name = "event-ingest" && span.http.route = "/v1/events" && status = error }`'], '| traces | tempo | spans |  |'],
+    ['signal label, role, window', 'node delivery/ingest metric.traces.window 1h', ['happy', 'metric traces (tempo) unit spans · label Error spans · role error · window 1h'], '- `traces` · label Error spans · role error · window 1h'],
+    ['sql', 'node delivery/ingest metric.backlog.query sql select count(*) as n\\nfrom device_events\\nwhere status = \'pending\' and received_at > now() - interval \'1 hour\'',
+      ['happy', 'metric backlog (sql) unit rows'], '| backlog | sql | rows |  |'],
+    ['showOnCard', 'node delivery/ingest metric.backlog.showOnCard false', ['happy', 'metric backlog (sql) unit rows · showOnCard false'], '- `backlog` · showOnCard false'],
+    ['honeycomb', 'node delivery/ingest metric.spans.query.filters[0].value event-ingest', ['happy', '- filters[0].value: `event-ingest`'], '- calculations[0].op: `COUNT`'],
+    ['loki', 'node delivery/notify metric.consumed.query loki sum(count_over_time({app="notify",env="${env}"} |= "event consumed" [5m]))',
+      ['happy', '- query: `sum(count_over_time({app="notify",env="${env}"} |= "event consumed" [5m]))`'], '| consumed | loki | events |  |'],
+    ['missingMeansZero and query link', 'node delivery/notify metric.consumed.links.query https://grafana.example.test/explore?notify',
+      ['happy', 'metric consumed (loki) unit events · missingMeansZero true · link query https://grafana.example.test/explore?notify'], '- `consumed` · missingMeansZero true · link query https://grafana.example.test/explore?notify'],
+    ['cloudwatch logs', 'node delivery/iot metric.refused.query.breakdown.columns[0].label Latest reason', ['refused', '- breakdown.columns[0].label: `Latest reason`'], '- breakdown.columns[0].label: `Latest reason`'],
+    ['cloudwatch metric', 'node delivery/queue metric.sent.query.namespace AWS/SQS', ['refused', '- namespace: `AWS/SQS`'], '- namespace: `AWS/SQS`'],
+    ['telemetry link', 'node delivery/ingest telemetry.link.dashboard https://grafana.example.test/d/event-ingest', null, '- Telemetry link dashboard: https://grafana.example.test/d/event-ingest'],
+    ['telemetry card', 'edge delivery/device->ingest telemetry.card.title Event intake', null, '- Card: side below · title Event intake'],
+    ['template use', 'edge delivery/ingest->notify telemetry.use kafka-topic', null, '- Telemetry: queue · template kafka-topic'],
+    ['existsWhen', 'node delivery/ingest existsWhen tickets-done', ['happy', 'tickets BE-67, BE-70 · exists when tickets-done'], '- Exists when: tickets-done'],
+    ['imported edge existsWhen', 'edge delivery/platform::api->platform::store existsWhen tickets-done', ['happy', 'tickets PLAT-8 · exists when tickets-done'], null],
+    ['missingWork', 'node delivery/notify missingWork true', ['happy', 'tickets BE-68 · missing work'], '- Missing work: yes'],
+    ['node link', 'node delivery/device link https://github.com/fictional-home/firmware/blob/main/press.c#L3', ['happy', '  - link https://github.com/fictional-home/firmware/blob/main/press.c#L3'],
+      '- Link: https://github.com/fictional-home/firmware/blob/main/press.c#L3'],
+    ['step link', 'step delivery/happy/2 link https://wiki.example.test/doorbell/publish', ['happy', '- link https://wiki.example.test/doorbell/publish'], null],
+    ['ticket filter', 'step delivery/happy/3 ticketFilter BE-69', ['happy', '- ticket filter: BE-69'], null],
+    ['condition', 'step delivery/refused/2 condition service-error IoT authorization refused · nodeId iot', ['refused', '- condition: service-error IoT authorization refused · nodeId iot'], null],
+    ['failure', 'step delivery/refused/2 failure iot->queue dropped', ['refused', '- failure `iot->queue` dropped'], null],
+    ['other step field', 'step delivery/happy/2 lane FW', ['happy', '- lane: `FW`'], null],
+    ['other node field', 'node delivery/device group hardware', null, '- group: `hardware`'],
+    ['touches', 'step delivery/happy/4 touches node platform::store', ['happy', '- node `platform::store` Order store · imported (tv-platform core as platform)'], '- Steps: happy/4'],
+    ['edges in and out', null, null, '- Edges in: `ingest->platform::api`'],
+    ['dependency', 'page dependency BE-68 on BE-67 — needs the validated event contract', ['happy', '- dependency BE-68 on BE-67 — needs the validated event contract'], '- dependency BE-68 on BE-67 — needs the validated event contract'],
+    ['jira settings', 'page tracking.jira.epic DOOR-100', ['happy', '- tracking.jira.epic: `DOOR-100`'], '- tracking.jira.site: `https://acme.atlassian.net`'],
+    ['telemetry settings', 'page tracking.telemetry.refreshMs 300000', ['happy', '- tracking.telemetry.variables.region: `us-east-1`'], '- tracking.telemetry.honeycomb.dataset: `doorbell`'],
+    ['environment profile override', 'page tracking.telemetry.environments.prd.grafana.prometheus prom-prd', ['happy', '- tracking.telemetry.environments.prd.grafana.prometheus: `prom-prd`'], null],
+    ['template definition', 'page tracking.telemetry.templates.kafka-topic.params group', null, '- tracking.telemetry.templates.kafka-topic.params: `topic`'],
+    ['log search', 'page logsearch.camera-model.value DB-300', ['happy', '  - query: `{app="device-gateway",env="${env}"} |= "camera_model" | json | camera_model="$value"`'], '  - fields.traceId: trace_id'],
+    ['import', 'section delivery import platform tv-platform core', ['happy', 'Imports: `platform` from tv-platform export core'], 'Imports: `platform` from tv-platform export core'],
+  ];
+  const all = lines(flat);
+  for (const [what, line, step, sheet] of cases){
+    if (line) assert.ok(all.includes(line), what + ' flat: ' + line);
+    if (step) assert.ok(steps[step[0]].includes(step[1]), what + ' steps: ' + step[1]);
+    if (sheet) assert.ok(elements.includes(sheet), what + ' elements: ' + sheet);
+  }
+});
+
+test('markdown keeps a multi-line query exact in a fenced block', () => {
+  const model = C.textViewModel(resolvedPage());
+  const query = read('board.json').page.blocks[0].diagram.nodes.ingest.telemetry.signals.backlog.sql;
+  for (const text of [C.textViewElements(model), C.textViewSteps(model, {queries: 'full'})]){
+    const at = text.indexOf('select count(*) as n');
+    assert.ok(at > 0);
+    const block = text.slice(text.lastIndexOf('```', at), text.indexOf('```', at) + 3).split('\n');
+    assert.deepEqual(block.slice(1, -1).map(line => line.trim()), query.split('\n'));
+  }
+  assert.ok(!C.textViewSteps(model).includes('from device_events'), 'names mode hides it');
+});
+
+test('an unresolved page lists its imports and overlays, and names step targets it does not hold', () => {
+  const model = C.textViewModel(C.normalize(read('board.json')));
+  const all = lines(C.textViewFlat(model));
+  assert.ok(all.includes('section delivery import platform tv-platform core unresolved'));
+  assert.ok(all.includes('section delivery import.platform.nodeTracking.api.tickets PLAT-7'));
+  assert.ok(all.includes('section delivery import.platform.edgeOverrides.api->store.label Persist order'));
+  assert.ok(all.includes('step delivery/happy/4 touches edge platform::api->platform::store (not in this diagram)'));
+  assert.match(C.textViewSteps(model), /Imports: `platform` from tv-platform export core \(not resolved\)/);
+  assert.match(C.textViewSteps(model), /- edge `platform::api->platform::store` \(not in this diagram\)/);
+});
+
+test('malformed entries are listed as problems and never print undefined', () => {
+  const page = {title: 'Broken', sections: [{id: 'b', diagram: {nodes: {a: {title: 'A'}, n: null}, rows: [['a']],
+    edges: [null, {from: 'a'}, {from: 'a', to: 'a', label: 'self'}], steps: [null, {text: 'ok', edge: 'a->a'}]}}]};
+  const model = C.textViewModel(page);
+  const outputs = [C.textViewFlat(model), C.textViewSteps(model, {queries: 'full'}), C.textViewElements(model)];
+  for (const text of outputs) assert.ok(!text.includes('undefined'), text);
+  const all = lines(outputs[0]);
+  assert.ok(all.includes('section b problem edges[0]: expected an object with from and to null'), outputs[0]);
+  assert.ok(all.includes('section b problem edges[1]: expected an object with from and to {"from":"a"}'));
+  assert.ok(all.includes('section b problem nodes.n: expected an object null'));
+  assert.ok(all.includes('section b problem steps[0]: expected an object null'));
+  assert.ok(all.includes('edge a->a label self'));
+  assert.ok(all.includes('step happy/1 touches edge a->a'));
+});
+
+test('a repeated from->to edge keeps its own attachments under a distinct owner', () => {
+  const board = read('board.json'), d = board.page.blocks[0].diagram;
+  d.edges.push({from: 'device', to: 'iot', label: 'retry publish', tickets: ['IOT-9']});
+  const model = C.textViewModel(C.normalize(board)), all = lines(C.textViewFlat(model));
+  assert.ok(all.includes('edge delivery/device->iot label publish'));
+  assert.ok(all.includes('edge delivery/device->iot#2 label retry publish'));
+  assert.ok(all.includes('edge delivery/device->iot#2 ticket IOT-9'));
+  assert.ok(all.includes('step delivery/refused/2 touches edge device->iot#2'));
+  assert.ok(all.includes('step delivery/refused/2 touches edge device->iot'));
+  assert.match(C.textViewElements(model), /\| device->iot #2 \| edge \|/);
+});
+
+test('owner ids stay unambiguous when ids contain / or ->', () => {
+  const page = {sections: [
+    {id: 'a/b', diagram: {nodes: {'x->y': {title: 'Arrow id'}, z: {title: 'Z'}}, rows: [['x->y', 'z']], edges: [{from: 'x->y', to: 'z', label: 'go'}], steps: [{text: 'one', edge: 'x->y->z'}]}},
+    {id: 'c', diagram: {nodes: {q: {title: 'Q'}}, rows: [['q']]}}]};
+  const all = lines(C.textViewFlat(C.textViewModel(page)));
+  assert.ok(all.includes('section a\\/b heading') || all.some(l => l.startsWith('node a\\/b/x->y ')), all.join('\n'));
+  assert.ok(all.includes('node a\\/b/x->y title Arrow id'), all.join('\n'));
+  assert.ok(all.includes('edge a\\/b/x-\\>y->z label go'));
+});
+
+test('flat keys of code references and trace rules survive an insertion before them', () => {
+  const before = lines(C.textViewFlat(C.textViewModel(resolvedPage())));
+  const board = read('board.json'), d = board.page.blocks[0].diagram, publish = d.steps.find(s => s.id === 'publish');
+  publish.codeRefs.unshift(Object.assign({}, publish.codeRefs[0], {id: 'ingest.parse', label: 'parseEvent', startLine: 60, endLine: 70, anchor: {start: '// flow:parseEvent:start', end: '// flow:parseEvent:end'}, purpose: 'Parses the event.'}));
+  publish.traceMatch = [{serviceName: 'gateway', operation: 'POST /v1/events'}, publish.traceMatch];
+  const after = lines(C.textViewFlat(C.textViewModel(resolvedPage(board))));
+  const removed = before.filter(line => !after.includes(line));
+  assert.deepEqual(removed, [], 'existing facts keep their lines');
+  assert.ok(after.includes('step delivery/happy/2 trace gateway POST /v1/events'));
+  assert.ok(after.includes('step delivery/happy/2 code.ingest.parse.purpose Parses the event.'));
+});
+
+test('page settings are printed only when the spec sets them', () => {
+  const all = lines(C.textViewFlat(C.textViewModel(C.normalize({sections: [{diagram: {nodes: {a: {title: 'A'}}, rows: [['a']]}}]}))));
+  assert.ok(!all.some(line => line.startsWith('page ')), all.join('\n'));
+});

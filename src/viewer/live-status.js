@@ -1737,6 +1737,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function outlineButton(o){return o.classList.contains('dv-live-target')?o:o._livePointerTarget || o;}
   // A shown card's query links follow its carrier button in Tab order, then Tab moves on past the card.
   function peekTab(ev){
+    // Tab is keyboard navigation: a card shows on focus again even after an earlier touch.
+    if(ev.key==='Tab')lastPointer='keyboard';
     if(ev.key!=='Tab' || ev.altKey || ev.ctrlKey || ev.metaKey)return;
     var o=metricsOutlineOf(ev.target),card=o && o._metricsCard;if(!card || !card.classList.contains('dv-metrics-peek'))return;
     var links=Array.prototype.slice.call(card.querySelectorAll('a.dv-metrics-query-link')),i=links.indexOf(ev.target),owner=outlineButton(o);if(!links.length)return;

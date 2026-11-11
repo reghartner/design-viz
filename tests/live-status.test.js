@@ -3327,7 +3327,11 @@ async function outlineBoard(raw,samples,tickets){
  // Focus is tracked on the document, as a browser does; a removed element keeps it until something else takes it.
  const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;},focus(){h.doc.activeElement=this;h.view.dispatchEvent({type:'focusin',target:this});}});
  for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
- for(const el of h.view.querySelectorAll('section'))el.focus=function(){h.doc.activeElement=this;};
+ for(const el of h.view.querySelectorAll('section')){
+  el.focus=function(){h.doc.activeElement=this;};
+  // The engine wraps each diagram in a focusable, named .board region (engine.js); the harness adds one per section.
+  const board=el.appendChild(new h.view.constructor('div',{'class':'board',tabindex:'0',role:'region','aria-label':'Diagram diagram'}));board.ownerDocument=h.doc;board.focus=function(){h.doc.activeElement=this;};
+ }
  for(const el of h.view.querySelectorAll('text.lbl'))el.focus=function(){h.doc.activeElement=this;};
  if(tickets)h.ctl.liveStatus.apply(tickets);
  h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
@@ -3388,11 +3392,12 @@ test('#1324 focus on a link inside an open Outline card returns to the same link
  assert.ok(!!now && now.isConnected!==false && after._metricsCard.contains(now) && now.getAttribute('data-signal')==='rate','focus is on the same link in the repainted card');
  h.ctl.liveStatus.destroy();
 });
-test('#1324 a Refresh now repaint keeps the hover card open and keyboard focus on its carrier',async()=>{
+test('#1324 a Refresh now repaint keeps the hovered card open',async()=>{
  const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
  const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
  assert.ok(typeof h.ctl.liveStatus.refreshMetricsNow==='function','Refresh now is on main');
- const halo=outlineOf(h,'a->b');halo.focus();h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',target:halo});
+ // Hover only: no focus on the halo, so main's focus restore cannot reopen the card.
+ const halo=outlineOf(h,'a->b');h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',target:halo});
  h.state.samples={'a->b':{signals:{rate:{value:888},errors:{value:0}}}};
  // Past the Refresh now cooldown in the viewer's clock.
  vm.runInContext('(function(){var real=Date.now;Date.now=function(){return real()+120000;};globalThis.__restoreNow=function(){Date.now=real;};})()',h.C);
@@ -3401,8 +3406,7 @@ test('#1324 a Refresh now repaint keeps the hover card open and keyboard focus o
   for(let i=0;i<6;i++)await settle();h.flush();
  }finally{vm.runInContext('__restoreNow()',h.C);}
  const after=outlineOf(h,'a->b');
- assert.ok(h.doc.activeElement===after,'keyboard focus stays on the same carrier outline');
- assert.ok(after._metricsCard.classList.contains('dv-metrics-peek')===true,'the card stays open');
+ assert.ok(after._metricsCard.classList.contains('dv-metrics-peek')===true,'the hovered card stays open');
  assert.ok(/888/.test(cardText(after._metricsCard)),'it shows the refreshed value');
  h.ctl.liveStatus.destroy();
 });
@@ -3423,8 +3427,31 @@ test('#1324 a carrier gone after an Outline repaint moves focus to its remaining
  h.ctl.liveStatus.setMetricsEnabled(false);h.flush();await settle();h.flush();
  now=h.doc.activeElement;
  assert.ok(!!now && now!==before && h.view.contains(now),'focus left the removed outline for an element on the board');
- assert.ok(now.tagName==='section','focus is on the carrier\'s board section, got '+(now && now.tagName));
- assert.ok(!!(now.getAttribute('aria-label') || now.getAttribute('aria-labelledby')),'the section focus lands on has an accessible name');
+ assert.ok(now.classList.contains('board'),'focus is on the carrier\'s named .board region, got '+(now && now.tagName));
+ assert.ok(!!now.getAttribute('aria-label'),'the board focus lands on is named');
+ const section=h.view.querySelector('section');
+ assert.ok(section.getAttribute('tabindex')===null && section.getAttribute('aria-label')===null,'the section gets no tabindex or name of its own');
+ h.ctl.liveStatus.destroy();
+ // The realistic route: a step change hides the focused carrier, and the next repaint drops its outline.
+ h=await outlineBoard(raw(false),{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
+ before=outlineOf(h,'a->b');before.focus();
+ for(const el of h.view.querySelectorAll('[data-dv-edge="0"]'))el.classList.add('view-step-hidden');
+ h.ctl.sections[0].sectionEl.dispatchEvent({type:'dv:pathchange'});h.flush();await settle();h.flush();
+ now=h.doc.activeElement;
+ assert.ok(outlineOf(h,'a->b')===null,'the step hid the carrier, so its outline is gone');
+ assert.ok(!!now && now.classList.contains('board'),'focus moves to the named board, not the page');
+ h.ctl.liveStatus.destroy();
+});
+test('#1324 a card closing when the repaint comes still closes after it',async()=>{
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
+ const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
+ const halo=outlineOf(h,'a->b');h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',target:halo});
+ // The pointer leaves for blank canvas: the card is due to close in 200 ms, and a repaint lands first.
+ h.view.dispatchEvent({type:'pointerout',pointerType:'mouse',target:halo,relatedTarget:null});
+ h.ctl.telemetry.apply({'a->b':{signals:{rate:{value:101},errors:{value:0}}}});h.flush();await settle();h.flush();
+ for(const [id,t] of [...h.timers])if(t.ms===200){h.timers.delete(id);t.fn();}
+ const after=outlineOf(h,'a->b');
+ assert.ok(after._metricsCard.classList.contains('dv-metrics-peek')===false,'the pending close still closes the card after the repaint');
  h.ctl.liveStatus.destroy();
 });
 test('#1294 follow-up: after a touch, Tab onto an Outline carrier shows its card on focus',async()=>{

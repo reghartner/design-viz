@@ -5353,6 +5353,8 @@ test('#1280 follow-up: in the capped Edit list a row never lands under the bar, 
 | DC5 | A span the carrier already declares is refused before the write: the board editor's reason ("Already declared as <key> on <title>.") shows beside the button, in the note and in the chooser. |
 | DC6 | (#1337 CI M5) the mapping re-renders the board: the offer of "Declare on <title> instead" survives the controller hand-over (rememberTrace / takeTrace), as the real board editor does it. |
 | DC7 | (#1337 c5) the offer ends with its mapping: once the mapping is no longer pending (Undo or Save), the offer is gone and a later pending mapping of that step does not bring it back. |
+| DC8 | (#1290 whole-branch review m1) a repaint never moves the role select or the Declare buttons (moving a focused element blurs it): they stay in place, select before button, with focus kept. |
+| DC9 | (m2) a mapping that replaced the step's trace scope says so in its note. |
 */
 const click=(el,h)=>{el.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});if(h)runTimers(h);};
 const SPAN={serviceName:MAP_MATCH.serviceName,operation:MAP_MATCH.operation};
@@ -5461,5 +5463,33 @@ test('DC7 the Declare-instead offer ends once its mapping is no longer pending (
  assert.ok(b.m.body.querySelector('.dv-trace-map-note'),'the new mapping has its note');
  // assert.ok, not assert.equal: a failing equal on a fake element prints the whole tree (node test runaway).
  assert.ok(b.m.body.querySelector('.dv-trace-map-note button.dv-trace-declare-instead')===null,'the stale offer does not come back');
+ b.api.destroy();
+});
+test('DC8 a repaint never moves the role select or the Declare button, so keyboard focus stays',async()=>{
+ let b=mapBoard();let s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ b.editor.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});b.api.setTraceShow(true);
+ const note=b.m.body.querySelector('.dv-trace-map-note'),role=note.querySelector('select.dv-trace-declare-role'),go=note.querySelector('button.dv-trace-declare-instead');
+ assert.ok(role && go);
+ const kids=()=>Array.from(note.children);
+ assert.ok(kids().indexOf(role)>=0 && kids().indexOf(role)<kids().indexOf(go),'the select comes before its button');
+ let moves=0;const real=note.insertBefore.bind(note);note.insertBefore=function(n,r){moves++;return real(n,r);};
+ if(role.focus)role.focus();
+ b.api.setTraceShow(true);b.api.setTraceShow(true);
+ assert.equal(moves,0,'nothing in the note is moved on a repaint');
+ assert.ok(note.querySelector('select.dv-trace-declare-role')===role && note.querySelector('button.dv-trace-declare-instead')===go,'the same controls stay');
+ b.api.destroy();
+ // The chooser too.
+ b=mapBoard({twoOnB:true});s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ const chooser=b.m.body.querySelector('.dv-trace-map-chooser');let cmoves=0;const creal=chooser.insertBefore.bind(chooser);chooser.insertBefore=function(n,r){cmoves++;return creal(n,r);};
+ b.api.setTraceShow(true);b.api.setTraceShow(true);
+ assert.equal(cmoves,0,'nothing in the chooser is moved on a repaint');
+ b.api.destroy();
+});
+test('DC9 a mapping that replaced the step\'s trace scope says so in its note',async()=>{
+ const b=mapBoard();await b.focus();
+ b.editor.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH,replacedScope:true});b.api.setTraceShow(true);
+ assert.equal(b.m.body.querySelector('.dv-trace-map-note-text').textContent,'Mapped currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies to step Show beta; its trace scope was replaced.');
  b.api.destroy();
 });

@@ -462,11 +462,12 @@ function createTelemetry(page,options,hooks){
   function envKey(){return environment || '';}
   // clear(), retractSources, availability loss and destroy end what the answers were for; a retry after them (a reconnect,
   // a new account) is not held back by an earlier failure either.
-  function forgetAnswers(){answers=Object.create(null);failedStartEnv=Object.create(null);failedAnswers=Object.create(null);waitingUntil=0;}
+  function forgetAnswers(){answers=Object.create(null);failedStartEnv=Object.create(null);failedAnswers=Object.create(null);waiting=Object.create(null);}
   /* #1293: Metrics on always shows the environment's cached answer at once, with its own time. Under 5 minutes old it makes
      no call; older, the due refresh runs at once in the background (busy, "Refreshing…") and the timer restarts from it. */
   function startLive(){
-    var key=envKey(),hit=answers[key],now=Date.now();
+    // The wait after a failed answer belongs to its environment; every path here but the wait branch clears it (#1313 c3).
+    var key=envKey(),hit=answers[key],now=Date.now();delete waiting[key];
     if(hit && hit.keys===JSON.stringify(bindingKeys()) && hit.config===JSON.stringify(api.config())){
       var fresh=now-hit.at<delay;
       // A host provider owns its tokens (its canChooseExemplar decides), so its exemplars are kept as they were. Ours
@@ -489,29 +490,31 @@ function createTelemetry(page,options,hooks){
       // #1313 c2: the failed answer stays on screen (its answered signals, and its note naming the failed ones), and
       // nothing reads loading: no call runs until the next try.
       var failed=failedAnswers[key];
-      if(failed && failed.keys===JSON.stringify(bindingKeys()) && failed.config===JSON.stringify(api.config())){var shown=copy(failed.value);Object.keys(shown).forEach(function(id){if(shown[id] && typeof shown[id]==='object')delete shown[id].exemplars;});store(shown,JSON.parse(failed.keys));}
+      if(failed && failed.keys===JSON.stringify(bindingKeys()) && failed.config===JSON.stringify(api.config())){var shown=copy(failed.value);
+        // Our exemplars' tokens died with the session; a host provider owns its tokens and keeps them, as on a reuse.
+        if(typeof options.restoreExemplars==='function')Object.keys(shown).forEach(function(id){if(shown[id] && typeof shown[id]==='object')delete shown[id].exemplars;});store(shown,JSON.parse(failed.keys));}
       setStatus({state:'ok',busy:false,refreshedAt:failed?failed.refreshedAt:new Date(last).toISOString(),note:failed?failed.note:''});
-      waitingUntil=last+TELEMETRY_REFRESH_NOW_GAP_MS;showCooldown(waitingUntil);
+      waiting[key]={until:last+TELEMETRY_REFRESH_NOW_GAP_MS,failedAt:failed?failed.refreshedAt:new Date(last).toISOString()};showCooldown(waiting[key].until);
     }
     poller.start(Math.max(0,wait));
   }
   /* #1293 Refresh now: the reader's "call now". Honeycomb allows 10 query results a minute, so a Refresh now never starts
      a refresh within 60 s of the previous one (automatic or not). A click inside that minute makes no call and shows the
      cooldown until it ends; a refresh in flight ignores clicks. Nothing is queued. */
-  var TELEMETRY_REFRESH_NOW_GAP_MS=60000,lastStart=null,failedStartEnv=Object.create(null),failedAnswers=Object.create(null),waitingUntil=0,refreshNowUntil=0,cooldownTimer=0;
+  var TELEMETRY_REFRESH_NOW_GAP_MS=60000,lastStart=null,failedStartEnv=Object.create(null),failedAnswers=Object.create(null),waiting=Object.create(null),refreshNowUntil=0,cooldownTimer=0;
   function stopCooldown(){if(cooldownTimer){clearTimeout(cooldownTimer);cooldownTimer=0;}}
   function showCooldown(until){refreshNowUntil=until;stopCooldown();var wait=until-Date.now();if(wait>0)cooldownTimer=setTimeout(function(){cooldownTimer=0;if(!retired)notify();},wait);}
   function refreshNowOn(){return !retired && enabled && available && !past && !!poller;}
   function refreshNowState(){
     if(!refreshNowOn())return {state:'off',until:null,refreshedAt:null};
-    var now=Date.now(),cooling=refreshNowUntil>now,waiting=!status.busy && waitingUntil>now;
+    var now=Date.now(),cooling=refreshNowUntil>now,wait=waiting[envKey()],waits=!status.busy && !!wait && wait.until>now;
     return {state:status.busy?'busy':cooling?'cooldown':'ready',until:cooling?new Date(refreshNowUntil).toISOString():null,refreshedAt:status.refreshedAt,
       // While off/on waits after a failed answer: its time and the next try.
-      waiting:waiting,failedAt:waiting?status.refreshedAt:null,nextTry:waiting?new Date(waitingUntil).toISOString():null};
+      waiting:waits,failedAt:waits?wait.failedAt:null,nextTry:waits?new Date(wait.until).toISOString():null};
   }
   // Each call owns its transient progress; retired generations cannot repaint.
   var poller=provider?liveStatusPoller(function(signal){
-    clearPending();var generation=requestGeneration,noted='',bound=bindings(),keys=bindingKeys(),env=envKey(),config=JSON.stringify(api.config());lastCallKeys=JSON.stringify(keys);var started=lastStart=Date.now();waitingUntil=0;
+    clearPending();var generation=requestGeneration,noted='',bound=bindings(),keys=bindingKeys(),env=envKey(),config=JSON.stringify(api.config());lastCallKeys=JSON.stringify(keys);var started=lastStart=Date.now();delete waiting[env];
     function current(id,name){var binding=bound.find(function(b){return b.id===id;});return !retired && enabled && available && !signal.aborted && generation===requestGeneration && keys[id]===bindingKeys()[id] && binding && binding.signals[name] && !proofVerdicts.isTraceSignal(binding.signals[name]);}
     var report={note:function(text){noted=typeof text==='string'?text:'';if(!retired && enabled && !signal.aborted && generation===requestGeneration){if(past)liveStatus=Object.assign({},liveStatus,{note:noted});else setStatus({note:noted});notify();}},
       pending:function(id,name){if(!current(id,name))return;if(!pending[id])pending[id]=Object.create(null);pendingKeys[id]=keys[id];pending[id][name]=true;notify();},
@@ -767,7 +770,7 @@ function createTelemetry(page,options,hooks){
         if(past)loadHistory();else if(poller)startLive();
         if(demo){var epoch=environmentGeneration,facade=Object.assign({},api,{apply:function(value){if(epoch===environmentGeneration)api.apply(value);}});var cleanup=demo.mount(environment?facade:api);demoCleanup=typeof cleanup==='function'?cleanup:null;}
       }else{
-        cancelHistory();if(poller)poller.stop();stopDemo();waitingUntil=0;
+        cancelHistory();if(poller)poller.stop();stopDemo();waiting=Object.create(null);
         liveMap=map=Object.create(null);resetObservations();if(past)past.map={};setStatus({state:'idle',busy:false,refreshedAt:null,note:''});
       }
       notify();

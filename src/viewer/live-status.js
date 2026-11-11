@@ -1720,7 +1720,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
      detail. On touch the first tap shows the card and a second tap (or a tap on the card) opens the detail. */
   // hoverHold: after a repaint, the pointer position then; a browser re-fires pointerover under a pointer that has not moved,
   // which must not reopen a card. A real move clears it.
-  var peekTimer=0,lastPointer='mouse',pointerAt=null,hoverHold=null;
+  var peekTimer=0,lastPointer='mouse',pointerAt=null,pointerCarrier=null,hoverHold=null;
+  function nearHold(ev){return !!hoverHold && Math.abs(ev.clientX-hoverHold.x)<=1 && Math.abs(ev.clientY-hoverHold.y)<=1;}
   function metricsOutlineOf(target){
     if(metricsStyleShown()!=='outline' || !target || !target.closest)return null;
     var o=target.closest('.dv-metrics-outline');if(o)return o;
@@ -1739,8 +1740,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
       shown.classList.add('dv-metrics-peek');if(outline._metricsLeader)outline._metricsLeader.classList.add('dv-metrics-peek');}
   }
   function metricsUnpeek(){if(peekTimer)clearTimeout(peekTimer);peekTimer=setTimeout(function(){peekTimer=0;var now=view.getRootNode && view.getRootNode().activeElement;if(!retired)metricsPeek(metricsOutlineOf(now));},200);}
-  function peekOver(ev){if(ev.pointerType==='touch')return;if(hoverHold && ev.clientX===hoverHold.x && ev.clientY===hoverHold.y)return;var o=metricsOutlineOf(ev.target);if(o)metricsPeek(o);}
-  function peekMove(ev){if(ev.pointerType==='touch')return;pointerAt={x:ev.clientX,y:ev.clientY};if(hoverHold && (ev.clientX!==hoverHold.x || ev.clientY!==hoverHold.y))hoverHold=null;}
+  function peekOver(ev){
+    if(ev.pointerType==='touch')return;var o=metricsOutlineOf(ev.target),id=o && o.getAttribute('data-metrics-carrier');pointerCarrier=id || null;
+    // Only the carrier that was under the still pointer at the repaint is held; another one arriving there opens.
+    if(o && nearHold(ev) && id===hoverHold.id)return;
+    if(o)metricsPeek(o);
+  }
+  function peekMove(ev){if(ev.pointerType==='touch')return;pointerAt={x:ev.clientX,y:ev.clientY};if(hoverHold && !nearHold(ev))hoverHold=null;}
+  function peekScroll(){hoverHold=null;}
+  function peekLeave(){pointerAt=null;pointerCarrier=null;hoverHold=null;}
   function peekOut(ev){if(ev.pointerType==='touch' || !metricsOutlineOf(ev.target))return;if(metricsOutlineOf(ev.relatedTarget)===metricsOutlineOf(ev.target))return;metricsUnpeek();}
   function peekDown(ev){lastPointer=ev.pointerType || 'mouse';if(lastPointer==='touch' && !metricsOutlineOf(ev.target) && !(pop && pop.contains(ev.target)))metricsPeek(null);}
   // Focus shows the card for keyboard and mouse readers; after a touch, focus moves (a closed popover returns it) never open a card over the board.
@@ -1765,9 +1773,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }
   }
   function peekBlur(ev){if(metricsOutlineOf(ev.target) && metricsOutlineOf(ev.relatedTarget)!==metricsOutlineOf(ev.target))metricsUnpeek();}
-  view.addEventListener('pointerover',peekOver);view.addEventListener('pointermove',peekMove);view.addEventListener('pointerout',peekOut);view.addEventListener('pointerdown',peekDown,true);
+  view.addEventListener('pointerover',peekOver);view.addEventListener('pointermove',peekMove);view.addEventListener('pointerleave',peekLeave);view.addEventListener('wheel',peekScroll,true);view.addEventListener('scroll',peekScroll,true);view.addEventListener('pointerout',peekOut);view.addEventListener('pointerdown',peekDown,true);
   view.addEventListener('focusin',peekFocus);view.addEventListener('focusout',peekBlur);view.addEventListener('keydown',peekTab,true);
-  destroyListeners.push(function(){if(peekTimer)clearTimeout(peekTimer);view.removeEventListener('pointerover',peekOver);view.removeEventListener('pointermove',peekMove);view.removeEventListener('pointerout',peekOut);view.removeEventListener('pointerdown',peekDown,true);view.removeEventListener('focusin',peekFocus);view.removeEventListener('focusout',peekBlur);view.removeEventListener('keydown',peekTab,true);});
+  destroyListeners.push(function(){if(peekTimer)clearTimeout(peekTimer);view.removeEventListener('pointerover',peekOver);view.removeEventListener('pointermove',peekMove);view.removeEventListener('pointerleave',peekLeave);view.removeEventListener('wheel',peekScroll,true);view.removeEventListener('scroll',peekScroll,true);view.removeEventListener('pointerout',peekOut);view.removeEventListener('pointerdown',peekDown,true);view.removeEventListener('focusin',peekFocus);view.removeEventListener('focusout',peekBlur);view.removeEventListener('keydown',peekTab,true);});
   function carrierClick(ev){
     if(authoring || retired || ev.defaultPrevented || ev.button>0)return;
     var tapped=lastPointer==='touch' && metricsOutlineOf(ev.target);
@@ -2253,7 +2261,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       // A close already due when the repaint came (the pointer or focus had left) still happens.
       if(peekNow && peekClosing)metricsUnpeek();
       // #1324: exactly the card shown before the repaint stays shown; a resting pointer does not reopen another.
-      hoverHold=metricsStyleShown()==='outline' && pointerAt?{x:pointerAt.x,y:pointerAt.y}:null;
+      hoverHold=metricsStyleShown()==='outline' && pointerAt && pointerCarrier?{x:pointerAt.x,y:pointerAt.y,id:pointerCarrier}:null;
       if(active){
         var target=openBinding && openBinding.el.isConnected && Array.from(openBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===openId && !el.classList.contains('dv-metrics-label-hidden') && !!(el._liveCarrier && el._liveCarrier.metricsOnly)===openMetrics;});
         if(target){active=target;refreshPopover();}else close(false);

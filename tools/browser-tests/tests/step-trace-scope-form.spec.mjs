@@ -16,7 +16,7 @@ async function open(page,server){
   await page.setViewportSize({width:1440,height:1000});
   const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
   const provider=model('provider',{nodes:{store:{title:'Store',trace:{spans:{write:{serviceName:'store-svc',operation:'INSERT orders',role:'database'},read:{serviceName:'store-svc',operationPrefix:'SELECT ',role:'database'}}}}},
-    rows:[['store']],topologyExports:{core:{nodes:['store']}}});
+    rows:[['store']],topologyExports:{core:{nodes:['store'],edges:[]}}});
   const steps=[{id:'request',text:'Request',nodes:['local'],traceMatch:{serviceName:'gateway',operation:'POST /orders'}},
     {id:'persist',text:'Persist',nodes:['canon::store']},{id:'again',text:'Persist again',nodes:['canon::store']}];
   const consumer=model('consumer',{autoplay:false,nodes:{local:{title:'Local worker',trace:{spans:{handle:{serviceName:'gateway',operation:'POST /orders',role:'process'}}}}},rows:[['local']],

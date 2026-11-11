@@ -206,7 +206,8 @@ function authoredLeaves(page, model){
   const out = [], skip = new Set(LAYOUT_ONLY.concat(IMPORT_LAYOUT_ONLY));
   const walk = (v, at, place) => {
     if (Array.isArray(v)) v.forEach((x, i) => walk(x, at + '[' + i + ']', place));
-    else if (v && typeof v === 'object') Object.keys(v).forEach(k => { if (!skip.has(k)) walk(v[k], at + '.' + k, place); });
+    // Layout names are skipped only as a carrier's own fields (below), as the module does.
+    else if (v && typeof v === 'object') Object.keys(v).forEach(k => walk(v[k], at + '.' + k, place));
     else if ((typeof v === 'string' && v) || typeof v === 'number' || typeof v === 'boolean') out.push(Object.assign({at, value: v}, place));
   };
   C.sectionRecords(page).forEach(r => {
@@ -498,4 +499,20 @@ test('log searches and their suggested values keep authored order in the flat li
   // Tickets stay a set: reordering them changes nothing.
   const tickets = read('board.json');tickets.page.blocks[0].diagram.nodes.ingest.tickets.reverse();
   assert.deepEqual(lines(C.textViewFlat(C.textViewModel(resolvedPage(tickets)))), before);
+});
+
+test('an edge end containing # cannot take the owner id of a repeated edge', () => {
+  const page = {sections: [{diagram: {nodes: {a: {title: 'A'}, b: {title: 'B'}, 'b#2': {title: 'B two'}}, rows: [['a', 'b', 'b#2']],
+    edges: [{from: 'a', to: 'b', label: 'first'}, {from: 'a', to: 'b', label: 'second'}, {from: 'a', to: 'b#2', label: 'hash'}]}}]};
+  const all = lines(C.textViewFlat(C.textViewModel(page)));
+  assert.ok(all.includes('edge a->b#2 label second'), all.join('\n'));
+  assert.ok(all.includes('edge a->b\\#2 label hash'), all.join('\n'));
+});
+
+test('a bad ticketFilter entry is a problem line', () => {
+  const page = {sections: [{diagram: {nodes: {a: {title: 'A', tickets: ['AB-2']}, b: {title: 'B'}}, rows: [['a', 'b']], edges: [{from: 'a', to: 'b', tickets: ['AB-3']}],
+    steps: [{id: 'one', text: 'One', edge: 'a->b', ticketFilter: ['AB-3', 'not a key']}]}}]};
+  const all = lines(C.textViewFlat(C.textViewModel(page)));
+  assert.ok(all.includes('step happy/1 problem ticketFilter[1]: not a ticket key "not a key"'), all.join('\n'));
+  assert.ok(all.includes('step happy/1 ticketFilter AB-3'));
 });

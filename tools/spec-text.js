@@ -40,6 +40,12 @@ needs no registry. Registry resolution uses the backend runtime built by
 python3 tools/build.py.
 \${variables} in queries are printed as written; no environment is applied.
 
+Not printed: page protocols (the legend), diagram panels definitions (only steps'
+panel patches and visibility are), groups definitions (a node's group name is),
+section prose, and layout fields (TEXT_VIEW_LAYOUT in src/core/text-view.js:
+positions, ports, sizes, colours, icons). An empty diff does not mean an
+unchanged spec.
+
 As a git diff textconv (git runs it from the repository root and hands it the old
 version as a temporary file, so a registry beside the spec is not found for that side;
 --no-resolve-imports gives both sides the same unresolved form):

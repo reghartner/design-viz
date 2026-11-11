@@ -10,6 +10,10 @@
 | X5 | Nested imports chain: provider → middle `extends` overlay → consumer `extends` overlay. | three specs | consumer sees provider + middle additions − consumer hides | merge applied only one level |
 | X7 | The merge is a generic FlowTopology.mergeOverlay(base, overlay, rules) (replace / fields / entries, hide and drop rules) that other imported kinds can reuse; mergeTelemetry is the metrics rule set on it. | plain objects | merged values; base untouched | metrics-only merge code that other kinds would have to copy |
 | X8 | A signal patch that names a source replaces the inherited source (a later provider switch, or a provider signal of the same name, never yields two sources); hiding every signal leaves the carrier unbound; nested provider drops are still reported under a merge overlay. | provider switches a to loki; provider adds c; nested provider with an unexpandable use | one source each; no telemetry; drop listed | 'use exactly one source' drops; an empty binding warning; silenced provider drops |
+| X11 | (#1345, Chuck 2026-11-11) Telemetry never asks for a live-status panel: a canon page with signals and telemetry datasource settings, an importer with imported signals, and a page with local signals give no "no live-status panel declared"; tickets (local or import-local) and ticket tracking still do; telemetry still keeps a panel from "the panel will be empty". | provider, consumer, local and ticket pages without and with a panel | the panel warnings exactly | warning a canon page so its build needs --allow-warnings |
+| X12 | (#1345) A consumer signal patch that names the inherited source with an object query and leaves out part of it warns at the overlay, naming the signal, the carrier and what is left out: Honeycomb calculations, filters (all or some), breakdowns; CloudWatch dimensions; CloudWatch Logs logGroups. | provider node, edge and store with Honeycomb, CloudWatch and CloudWatch Logs signals | warnings exactly | silently broken signals |
+| X13 | (#1345) A patch that keeps all of the provider's query (a restatement), a string query, or a source switch is a note, not a warning; a field patch and a local binding give nothing. | same provider | notes exactly; no warnings | notes that fail builds, or findings on plain field patches |
+| X14 | (#1345) Nested and twice-imported carriers: each overlay's findings sit at its own document and import; a middle diagram's finding is its own, not its importer's. | provider → middle → consumer; one provider imported twice | warnings and notes per document | findings at the wrong import or leaking across documents |
 | X6 | Validator: a merge overlay produces no telemetry warnings; a malformed `hide` warns at its overlay path. Compatibility declares `flow.telemetry-merge` only for merge overlays. | consumer docs | warnings; features | warnings on valid merges; silent malformed filters; older runtimes treating merges as replaces |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
@@ -144,4 +148,102 @@ test('#1266 X10 a provider that removes its binding leaves additions without a k
   assert.ok(seen.some(w=>/^\.kind: /.test(w)),'the missing kind is reported: '+seen.join(' | '));
   const kept=fixtures({extends:true,kind:'service',signals:{c:{loki:'qc'}}});delete diagramOf(kept.provider).nodes.api.telemetry;
   assert.deepEqual(nodeTelemetry(kept),{kind:'service',signals:{c:{loki:'qc'}}},'a stored kind keeps them a valid binding');
+});
+
+/* #1345 fixtures: a provider whose node, edge and second node carry structured queries. */
+const HC=()=>({dataset:'orders',calculations:[{op:'COUNT'}],filters:[{column:'service.name',op:'=',value:'api'},{column:'route',op:'=',value:'/x'}],breakdowns:['status']});
+const CW=()=>({namespace:'AWS/SNS',metric:'NumberOfMessagesPublished',region:'us-east-1',accountId:'123456789012',dimensions:{TopicName:'orders',Region:'us-east-1'},statistic:'Sum'});
+const CWL=()=>({logGroups:['g1','g2'],query:'filter level = "error" | stats count() as n',region:'us-east-1',valueField:'n'});
+function structured(id='provider',page={}){
+  return spec(id,{nodes:{api:{title:'API',telemetry:{kind:'service',signals:{received:{honeycomb:HC(),unit:'req'},errors:{loki:'sum(count_over_time({app="api"}[5m]))'}}}},
+      store:{title:'Store',telemetry:{kind:'service',signals:{failures:{cloudwatchLogs:CWL()}}}}},rows:[['api','store']],
+    edges:[{from:'api',to:'store',label:'Persist',telemetry:{kind:'call',signals:{published:{cloudwatch:CW()}}}}],
+    topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}},page);
+}
+const consumerOf=(imports,extra={})=>spec('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],edges:[],panels:[{id:'status',type:'live-status'}],topologyImports:imports,...extra});
+const findings=(doc,context)=>{const r=C.validate(C.normalize(C.FlowTopology.resolveSource(doc,context)));return {warnings:plain(r.warnings).filter(w=>/telemetry/.test(w)),notes:plain(r.notes || []).filter(w=>/telemetry/.test(w))};};
+const PANEL='page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup';
+const panelWarnings=doc=>plain(C.validate(C.normalize(doc)).warnings).filter(w=>/live-status panel declared|the panel will be empty/.test(w));
+
+test('#1345 X11 telemetry never asks for a live-status panel; tickets still do',()=>{
+  const canon=structured('provider',{tracking:{telemetry:{window:'24h',honeycomb:{environment:'prod',dataset:'orders'}}}});
+  assert.deepEqual(panelWarnings(canon),[],'a canon page with signals and telemetry settings, no panel');
+  const importer=spec('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'shared'}]});
+  const context={version:1,id:'consumer',specs:[canon,importer]};
+  assert.deepEqual(panelWarnings(importer),[],'an importer without a panel, unresolved');
+  assert.deepEqual(panelWarnings(C.FlowTopology.resolveSource(importer,context)),[],'and resolved, with the imported signals on its carriers');
+  const local=spec('local',{nodes:{a:{title:'A',telemetry:{kind:'service',signals:{up:{grafana:'up'}}}}},rows:[['a']]});
+  assert.deepEqual(panelWarnings(local),[],'a page with local signals, no panel');
+  const ticketed=spec('ticketed',{nodes:{a:{title:'A',tickets:['AA-1'],telemetry:{kind:'service',signals:{up:{grafana:'up'}}}}},rows:[['a']]});
+  assert.deepEqual(panelWarnings(ticketed),[PANEL],'tickets still ask for the panel');
+  const tracked=spec('tracked',{nodes:{a:{title:'A'}},rows:[['a']]},{tracking:{jira:{site:'https://acme.atlassian.net'},telemetry:{window:'24h'}}});
+  assert.deepEqual(panelWarnings(tracked),[PANEL],'ticket tracking settings still ask for the panel');
+  const importTickets=spec('consumer',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{tickets:['AA-2']}}}]});
+  assert.deepEqual(panelWarnings(importTickets),[PANEL],'import-local tickets still ask for it');
+  const withPanel=structured('provider');diagramOf(withPanel).panels=[{id:'status',type:'live-status'}];
+  assert.deepEqual(panelWarnings(withPanel),[],'signals keep a panel from reading empty');
+  const settingsOnly=spec('settings',{nodes:{a:{title:'A'}},rows:[['a']],panels:[{id:'status',type:'live-status'}]},{tracking:{telemetry:{window:'24h'}}});
+  assert.deepEqual(panelWarnings(settingsOnly),[],'a tracking block still keeps a panel from reading empty, as before');
+});
+
+test('#1345 X12 a source patch that leaves out part of the provider query warns, naming the signal, the carrier and the part',()=>{
+  const provider=structured(),patch=(node,edge)=>{const imp={spec:'provider',export:'core',as:'shared'};if(node)imp.nodeTracking=node;if(edge)imp.edgeTracking=edge;return imp;};
+  const run=imp=>{const consumer=consumerOf([imp]);return findings(consumer,{version:1,id:'consumer',specs:[provider,consumer]});};
+  const at='sections[0].diagram.topologyImports[0]';
+  let f=run(patch({api:{telemetry:{extends:true,signals:{received:{honeycomb:{dataset:'orders',filters:[{column:'feature',op:'=',value:'fc'}]}}}}}}));
+  assert.deepEqual(f.warnings,[at+'.nodeTracking.api.telemetry.signals.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query and leaves out calculations, filters and breakdowns, so the signal no longer reads what the provider defined; to replace the query, write all of it']);
+  assert.deepEqual(f.notes,[]);
+  const some=HC();some.filters=[some.filters[0],{column:'feature',op:'=',value:'fc'}];
+  f=run(patch({api:{telemetry:{extends:true,signals:{received:{honeycomb:some}}}}}));
+  assert.deepEqual(f.warnings,[at+'.nodeTracking.api.telemetry.signals.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query and leaves out 1 of its filters, so the signal no longer reads what the provider defined; to replace the query, write all of it']);
+  const dims=CW();delete dims.dimensions.Region;
+  const logs=CWL();logs.logGroups=['g1'];
+  f=run(patch({store:{telemetry:{extends:true,signals:{failures:{cloudwatchLogs:logs}}}}},{'api->store':{telemetry:{extends:true,signals:{published:{cloudwatch:dims}}}}}));
+  assert.deepEqual(f.warnings,[
+    at+'.nodeTracking.store.telemetry.signals.failures.cloudwatchLogs: signal failures on node store: this CloudWatch Logs patch replaces the provider\'s whole query and leaves out 1 of its logGroups, so the signal no longer reads what the provider defined; to replace the query, write all of it',
+    at+'.edgeTracking.api->store.telemetry.signals.published.cloudwatch: signal published on connection api->store: this CloudWatch patch replaces the provider\'s whole query and leaves out dimension Region, so the signal no longer reads what the provider defined; to replace the query, write all of it']);
+});
+
+test('#1345 X13 a restatement, a string query or a source switch is a note; field patches and local bindings give nothing',()=>{
+  const provider=structured(),at='sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.signals';
+  const more=HC();more.filters.push({column:'feature',op:'=',value:'fc'});
+  const consumer=consumerOf([{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{telemetry:{extends:true,signals:{received:{honeycomb:more},errors:{grafana:'sum(rate(errors[5m]))',loki:null}}}}}}],
+    {nodes:{local:{title:'Local',telemetry:{kind:'service',signals:{up:{grafana:'up'}}}}}});
+  let f=findings(consumer,{version:1,id:'consumer',specs:[provider,consumer]});
+  assert.deepEqual(f.warnings,[]);
+  assert.deepEqual(f.notes,[
+    at+'.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query; later provider changes to it no longer reach this board',
+    at+'.errors.grafana: signal errors on node api: this switches its source from Loki to Grafana; later provider changes to its query no longer reach this board']);
+  const text=consumerOf([{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{telemetry:{extends:true,signals:{errors:{loki:'sum(count_over_time({app="api",feature="fc"}[5m]))'},received:{unit:'events'}}}}}}]);
+  f=findings(text,{version:1,id:'consumer',specs:[provider,text]});
+  assert.deepEqual(f,{warnings:[],notes:[at+'.errors.loki: signal errors on node api: this Loki patch replaces the provider\'s whole query; later provider changes to it no longer reach this board']},'a string query is a note; a unit patch gives nothing');
+  const replace=consumerOf([{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{telemetry:{kind:'service',signals:{x:{grafana:'x'}}}}}}]);
+  assert.deepEqual(findings(replace,{version:1,id:'consumer',specs:[provider,replace]}),{warnings:[],notes:[]},'a replacing binding (no extends) keeps its old meaning and gives nothing');
+  const build=C.validate(C.normalize(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]})));
+  assert.deepEqual(plain(build.warnings),[],'notes never count as warnings');
+});
+
+test('#1345 X14 nested and twice-imported carriers: findings stay with their own document and import',()=>{
+  const provider=structured();
+  const drop={extends:true,signals:{received:{honeycomb:{dataset:'orders'}}}};
+  const middle=spec('middle',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'inner',nodeTracking:{api:{telemetry:drop}}}],
+    topologyExports:{nested:{nodes:['inner::api','inner::store'],edges:['inner::api->inner::store']}}});
+  const consumer=consumerOf([{spec:'middle',export:'nested',as:'outer',edgeTracking:{'inner::api->inner::store':{telemetry:{extends:true,signals:{published:{cloudwatch:{...CW(),dimensions:{}}}}}}}}]);
+  const context={version:1,id:'consumer',specs:[provider,middle,consumer]};
+  assert.deepEqual(findings(middle,{version:1,id:'middle',specs:[provider,middle]}).warnings,
+    ['sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.signals.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query and leaves out calculations, filters and breakdowns, so the signal no longer reads what the provider defined; to replace the query, write all of it'],'the middle diagram reports its own patch');
+  assert.deepEqual(findings(consumer,context).warnings,
+    ['sections[0].diagram.topologyImports[0].edgeTracking.inner::api->inner::store.telemetry.signals.published.cloudwatch: signal published on connection inner::api->inner::store: this CloudWatch patch replaces the provider\'s whole query and leaves out dimensions TopicName, Region, so the signal no longer reads what the provider defined; to replace the query, write all of it'],
+    'the consumer reports only its own patch on the nested carrier');
+  // The consumer patches the nested carrier the middle already patched: compared with what it inherits (the middle's result).
+  const again=consumerOf([{spec:'middle',export:'nested',as:'outer',nodeTracking:{'inner::api':{telemetry:{extends:true,signals:{received:{honeycomb:{dataset:'orders',filters:[]}}}}}}}]);
+  assert.deepEqual(findings(again,{version:1,id:'consumer',specs:[provider,middle,again]}),{warnings:[],notes:['sections[0].diagram.topologyImports[0].nodeTracking.inner::api.telemetry.signals.received.honeycomb: signal received on node inner::api: this Honeycomb patch replaces the provider\'s whole query; later provider changes to it no longer reach this board']},
+    'against the middle\'s query nothing is left out');
+  const twice=consumerOf([
+    {spec:'provider',export:'core',as:'fc',nodeTracking:{api:{telemetry:{extends:true,signals:{received:{honeycomb:{...HC(),calculations:undefined}}}}}}},
+    {spec:'provider',export:'core',as:'et',position:{x:40,y:400},nodeTracking:{api:{telemetry:{extends:true,signals:{received:{honeycomb:HC()}}}}}}]);
+  const both=JSON.parse(JSON.stringify(twice));
+  assert.deepEqual(findings(both,{version:1,id:'consumer',specs:[provider,both]}),{
+    warnings:['sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.signals.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query and leaves out calculations, so the signal no longer reads what the provider defined; to replace the query, write all of it'],
+    notes:['sections[0].diagram.topologyImports[1].nodeTracking.api.telemetry.signals.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query; later provider changes to it no longer reach this board']});
 });

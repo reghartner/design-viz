@@ -11,7 +11,7 @@
 | T7 | kind must be call/queue/service/log-event/device, and at least one signal must survive; otherwise the carrier is unbound (null) with a warning. |
 | T8 | No `telemetry` → null, no warning; nothing is inferred from ids, titles or service-like fields. Text boxes never bind. |
 | T9 | `use` expands a page template by pure `$param`/`${param}` substitution (only declared params; Grafana `$__…` untouched); carrier kind/signals/proof/links/card lay over the template per name. Unknown templates, missing params and undeclared keys warn. |
-| T10 | Validator: page and carrier telemetry problems are warnings at full spec paths, never errors; a valid page has no telemetry warnings. |
+| T10 | Validator: page and carrier telemetry problems are warnings at full spec paths, never errors; a valid page has no telemetry warnings; telemetry alone never asks for a live-status panel (#1345), and a panel on a telemetry-only board is not empty. |
 | T11 | Compatibility: `flow.telemetry` (0.2.0) is declared for page `tracking.telemetry`, node/edge `telemetry`, and nodeTracking/edgeTracking overlays; absent otherwise. |
 | T12 | Imported topology: nodeTracking/edgeTracking accept `telemetry`, the overlay replaces the provider binding, provider `use` expands with provider templates, Workbench ticket edits keep it, snapshot edits are tracking. |
 | T13 | Export round-trip: stamped export text keeps every authored telemetry field and declares `flow.telemetry`. |
@@ -222,7 +222,7 @@ test('T10 validator reports telemetry problems as warnings at spec paths, never 
   assert.deepEqual(overlay.warnings.filter(w=>/telemetry/.test(w)).map(w=>w.split(': ')[0]),[
     'sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.signals','sections[0].diagram.topologyImports[0].edgeTracking.api->store.telemetry.use']);
   const telemetryOnly=plain(C.validate(C.normalize({nodes:{a:{telemetry:QUEUE()}},rows:[['a']]})));
-  assert.ok(telemetryOnly.warnings.some(w=>/no live-status panel/.test(w)),'telemetry bindings need the live-status panel that holds the Metrics button');
+  assert.ok(!telemetryOnly.warnings.some(w=>/no live-status panel/.test(w)),'telemetry bindings alone never ask for a live-status panel (#1345, Chuck 2026-11-11)');
   const withPanel=plain(C.validate(C.normalize({nodes:{a:{telemetry:QUEUE()}},rows:[['a']],panels:[{id:'s',type:'live-status'}]})));
   assert.ok(!withPanel.warnings.some(w=>/no ticket references/.test(w)),'a telemetry-only board panel is not empty');
 });

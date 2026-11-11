@@ -324,6 +324,24 @@ class PageBuildTest(unittest.TestCase):
         self.assertIn("PAGE_BUILD OK", r.stdout)
         self.assertTrue((self.root / "older" / "lanes.html").is_file())
 
+    def test_canon_page_with_signals_builds_without_allow_warnings(self):
+        # #1345 (Chuck 2026-11-11): metric signals and telemetry datasource settings never ask
+        # for a live-status panel, so a canon page that declares signals builds as is.
+        raw = json.loads(clean_spec_text())
+        page = raw["page"]
+        page["canon"] = {"version": 1, "id": "signals-canon", "kind": "canonical", "owner": "group:default/test"}
+        page["tracking"] = {"telemetry": {"window": "24h", "honeycomb": {"environment": "prod", "dataset": "orders"}}}
+        diagram = page["blocks"][0]["diagram"]
+        node = next(iter(diagram["nodes"]))
+        diagram["nodes"][node]["telemetry"] = {"kind": "service", "signals": {
+            "received": {"honeycomb": {"calculations": [{"op": "COUNT"}]}, "unit": "events"}}}
+        self.assertFalse(any(p.get("type") == "live-status" for p in diagram.get("panels", [])))
+        self.spec.write_text(json.dumps(raw))
+        r = run_tool(str(self.spec), "canon/signals", "--root", str(self.root))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("PAGE_BUILD OK", r.stdout)
+        self.assertTrue((self.root / "canon" / "signals.html").is_file())
+
     def test_warning_gate_cannot_be_spoofed_by_the_path(self):
         # a spec path containing the literal text "0 warnings" must not slip
         # a warning-bearing spec past the gate (the gate parses the summary

@@ -13,6 +13,7 @@
 | E8 E9 | A receiver without process spans says so and offers Declare receive span here; attribute values have a type. |
 | E10 | A name the provider declares is taken even while hidden here: rename and Add span are refused beside the name (provider title, else id); the note is a role=status region; the hide is kept. |
 | E11 | A refused attribute type change is explained beside that type select. |
+| E12 | Note slots stay in the page as status regions; a refusal clears then sets its note, so a repeated identical refusal is announced. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -223,7 +224,14 @@ test('E8 E9 a receiver without process spans says so and still offers a receive 
 test('E10 a span name the provider declares is taken even while hidden here: rename and add are refused beside the name',()=>{
   const f=imported();f.provider.page.title='Order platform';const ui=harness(f.consumer,f.context),INODE={kind:'node',section:0,id:'shared::worker'};
   const overlay=()=>plain(diagramOf(ui.raw).topologyImports[0].nodeTracking.worker.trace);
-  ui.select(INODE);ui.check('find hidden for this document',true);
+  ui.select(INODE);
+  // Every string in the editor names the provider by its title.
+  assert.equal(ui.texts('.trace-span-origin')[0],'Inherited from Order platform');
+  assert.match(ui.h.guide.querySelector('details.trace-spans-editor').textContent,/imported from Order platform\. Changes here are stored in this document; everything else keeps following Order platform\./);
+  assert.equal(ui.control('process name').title,'Inherited span names come from Order platform. To rename one, hide it and add a new span.');
+  assert.match(ui.control('process hidden for this document').title,/Order platform keeps it/);
+  assert.doesNotMatch(ui.h.guide.querySelector('details.trace-spans-editor').textContent+ui.h.guide.querySelectorAll('input,button').map(c=>c.title || '').join(' '),/\bprovider\b(?! declares| Order)/,'the spec id is not used where the title exists');
+  ui.check('find hidden for this document',true);
   addSpan(ui,{name:'audit',service:'order-worker',value:'audit write',role:'database'});ui.select(INODE);
   const kept={spans:{audit:{serviceName:'order-worker',operation:'audit write',role:'database'}},hide:['find']};
   assert.deepEqual(overlay(),kept);
@@ -246,4 +254,18 @@ test('E11 a refused attribute type change says why beside the type it changed',(
   assert.match(ui.beside('process attribute http.response.status_code type'),/true or false/,'the message sits beside the type select');
   assert.equal(ui.beside('process new attribute name'),'','not beside the new attribute name');
   assert.equal(ui.control('process attribute http.response.status_code type').value,'number','the select goes back to the stored type');
+});
+
+test('E12 note slots stay in the page; each refusal clears its note and sets it again, so a repeated refusal is announced',()=>{
+  const ui=harness(board()).select(NODE);addSpan(ui,{name:'process',service:'s',value:'handle',role:'process'});ui.select(NODE);
+  const value=ui.control('process value'),note=()=>ui.h.guide.querySelectorAll('p').find(p=>p.classList.contains('trace-span-note') && p.id===value.getAttribute('aria-describedby'));
+  assert.ok(ui.h.guide.querySelectorAll('p').filter(p=>p.classList.contains('trace-span-note')).length>0,'note slots exist before any refusal');
+  assert.ok(ui.h.guide.querySelectorAll('p').filter(p=>p.classList.contains('trace-span-note')).every(p=>!p.hidden && p.getAttribute('role')==='status'),'note slots are status regions in the page, not hidden');
+  ui.control('process match').value='prefix';ui.control('process match').fire('change');ui.h.flush();
+  value.value='x';value.fire('change');
+  assert.equal(note().textContent,'','the refusal first clears the note');
+  ui.h.flush();assert.match(note().textContent,/A prefix needs at least 2 characters/,'then sets it');
+  value.value='y';value.fire('change');
+  assert.equal(note().textContent,'','a repeated refusal clears it again');
+  ui.h.flush();assert.match(note().textContent,/A prefix needs at least 2 characters/,'and sets it again');
 });

@@ -134,6 +134,11 @@ test('P5 declarations a board owns, on carriers its flow lights, are checked aga
     'sections[0].diagram.topologyImports[0].nodeTracking.worker.trace.spans.audit: order-worker audit write'+NOT_SEEN,
     'sections[0].diagram.edges[0].trace.spans.retry: shop-web POST /orders retry'+NOT_SEEN]);
   assert.ok(warnings(board).every(w=>!/imported from/.test(w)),'no warning sends the author to the provider');
+  // A patch that only narrows an inherited span (namespace) leaves the provider's operation to the provider.
+  const narrow=(p,b)=>{variant(p,b);b.steps.find(x=>x.id==='work').traceScope={};b.topologyImports[0].nodeTracking.worker.trace.spans.find={namespace:'eu'};};
+  const n=orders(narrow),nRef=diagramOf(T.approveReference(n.resolved,ORDER(),{reason:'r'})).referenceTrace,nAuthored=orders(narrow);diagramOf(nAuthored.board).referenceTrace=nRef;
+  const narrowed=C.materializeTopology([nAuthored.platform,nAuthored.board]).find(s=>s.page.canon.id==='orders-board');
+  assert.ok(!warnings(narrowed).some(w=>/spans\.find/.test(w)),'a namespace-only patch on find is not checked: '+warnings(narrowed).join(' | '));
   // Without an approved reference trace nothing is checked.
   assert.deepEqual(warnings(orders().resolved),[]);
 });

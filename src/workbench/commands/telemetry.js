@@ -655,3 +655,217 @@ function telemetrySummary(binding){
   var signals=telemetryObject(binding.signals)?binding.signals:{};
   return (binding.kind || 'no kind')+' · '+(Object.keys(signals).map(function(name){var source=telemetrySignalSource(signals[name]);return name+' ('+(source || 'no source')+(telemetryText(signals[name] && signals[name].unit)?', '+signals[name].unit:'')+')';}).join(', ') || 'no signals');
 }
+
+/* #1290 PR 6: trace spans declared on a node or connection (trace.spans), edited in Inspect.
+   traceSpansEdit works on the effective spans map and returns {value} (null when none are
+   left) or {error} in plain words; imported carriers store only the difference from the
+   provider (traceSpansOverlayEdit) in the consumer overlay. Each edit is one source change. */
+var TRACE_SPAN_ROLE_LIST={node:['process','database','cache','call','work'],edge:['send','receive']};
+var TRACE_SPAN_MODES={operation:'Operation',operationPrefix:'Prefix',attributes:'Attributes only'};
+function traceSpanMode(span){return telemetryObject(span) && telemetryOwn(span,'operation')?'operation':telemetryObject(span) && telemetryOwn(span,'operationPrefix')?'operationPrefix':'attributes';}
+function traceSpanMatchValue(mode,value){
+  var v=typeof value==='string'?value:'';
+  if(mode==='operation'){if(!v.trim())return {error:'Enter the operation, exactly as the trace shows it.'};return {value:v.trim()};}
+  if(mode==='operationPrefix'){if(v.trim().length<2)return {error:'A prefix needs at least 2 characters.'};return {value:v.replace(/^\s+/,'')};}
+  return {value:null};
+}
+function traceSpansEdit(spans,edit,kind,allowed){
+  var out=telemetryObject(spans)?telemetryClone(spans):{},op=edit && edit.op,name=edit && typeof edit.name==='string'?edit.name.trim():'',roles=TRACE_SPAN_ROLE_LIST[kind==='edge'?'edge':'node'];
+  function done(){return {value:Object.keys(out).length?out:null};}
+  // Attributes this board can match: the built-in list plus its trace connections' allowedAttributes.
+  function unsupported(attr,field){
+    if(!Array.isArray(allowed) || allowed.indexOf(attr)>=0)return null;
+    return {error:'Attribute '+attr+' is not one this board can match. Use a supported attribute such as db.system, or list it in a trace connection\'s allowedAttributes.',field:field};
+  }
+  if(op==='rename'){
+    var to=typeof edit.to==='string'?edit.to.trim():'';
+    if(!telemetryOwn(out,name))return {error:'This span is no longer here. Render and select the node or connection again.',field:'name'};
+    if(to===name)return {value:out};
+    if(!/^[A-Za-z][A-Za-z0-9_-]*$/.test(to))return {error:'A span name starts with a letter and uses only letters, digits, - and _.',field:'name'};
+    if(telemetryOwn(out,to))return {error:'A span named '+to+' already exists here; choose another name.',field:'name'};
+    var renamed={};Object.keys(out).forEach(function(k){renamed[k===name?to:k]=out[k];});out=renamed;return done();
+  }
+  if(op==='add'){
+    if(!/^[A-Za-z][A-Za-z0-9_-]*$/.test(name))return {error:'A span name starts with a letter and uses only letters, digits, - and _.',field:'name'};
+    if(telemetryOwn(out,name))return {error:'A span named '+name+' already exists here; choose another name.',field:'name'};
+    var service=typeof edit.serviceName==='string'?edit.serviceName.trim():'';if(!service)return {error:'Enter the service name, exactly as the trace shows it.',field:'serviceName'};
+    if(roles.indexOf(edit.role)<0)return {error:'Choose a role: '+roles.join(', ')+'.',field:'role'};
+    var mode=TRACE_SPAN_MODES[edit.mode]?edit.mode:'operation',entry={serviceName:service};
+    if(mode==='attributes'){
+      var pair=typeof edit.value==='string'?edit.value.split('='):[];
+      if(pair.length<2 || !pair[0].trim())return {error:'Attributes-only matching needs an attribute: enter it as name=value, for example db.system=redis.',field:'value'};
+      var bad=unsupported(pair[0].trim(),'value');if(bad)return bad;
+      entry.attributes={};entry.attributes[pair[0].trim()]=pair.slice(1).join('=').trim();
+    }else{var matched=traceSpanMatchValue(mode,edit.value);if(matched.error)return {error:matched.error,field:'value'};entry[mode]=matched.value;}
+    entry.role=edit.role;out[name]=entry;return done();
+  }
+  if(!telemetryOwn(out,name) || !telemetryObject(out[name]))return {error:'This span is no longer here. Render and select the node or connection again.'};
+  var span=out[name];
+  if(op==='remove'){delete out[name];return done();}
+  if(op==='set'){
+    var field=edit.field,v=typeof edit.value==='string'?edit.value.trim():edit.value;
+    if(field==='serviceName'){if(!v)return {error:'A span needs its service name. To delete the span, use Remove span.',field:'serviceName'};span.serviceName=v;return done();}
+    if(field==='role'){if(roles.indexOf(v)<0)return {error:'Choose a role: '+roles.join(', ')+'.',field:'role'};span.role=v;return done();}
+    if(field==='namespace'){if(v)span.namespace=v;else delete span.namespace;return done();}
+    if(field==='match'){
+      var m=TRACE_SPAN_MODES[edit.mode]?edit.mode:traceSpanMode(span);
+      if(m==='attributes'){
+        if(!telemetryObject(span.attributes) || !Object.keys(span.attributes).length)return {error:'Add an attribute first; attributes-only matching needs at least one.',field:'match'};
+        delete span.operation;delete span.operationPrefix;return done();
+      }
+      var value=edit.value!=null?edit.value:span.operation!=null?span.operation:span.operationPrefix;
+      var r=traceSpanMatchValue(m,value);if(r.error)return {error:r.error,field:'value'};
+      delete span.operation;delete span.operationPrefix;span[m]=r.value;return done();
+    }
+    return {error:'Unknown span field '+field+'.'};
+  }
+  if(op==='attribute'){
+    var attrs=telemetryObject(span.attributes)?span.attributes:{},key=edit.key==null?null:String(edit.key),attr=edit.attrName==null?'':String(edit.attrName).trim();
+    if(!attr){
+      if(key==null)return {error:'Enter an attribute name, such as deployment.environment.name.'};
+      if(traceSpanMode(span)==='attributes' && Object.keys(attrs).length===1)return {error:'Attributes-only matching needs at least one attribute. Choose another match first, or remove the span.'};
+      delete attrs[key];
+    }else{
+      if(attr!==key && telemetryOwn(attrs,attr))return {error:'Attribute '+attr+' is already on this span.',field:'attribute'};
+      var notAllowed=attr!==key?unsupported(attr,'attribute'):null;if(notAllowed)return notAllowed;
+      var type=edit.type || (key!=null?typeof attrs[key]:'string'),parsed=traceMatchAttributeValue(edit.value!==undefined?edit.value:key!=null?String(attrs[key]):'',type,attr);
+      if(parsed.error)return {error:parsed.error,field:'attribute'};
+      var next={};
+      if(key==null){Object.keys(attrs).forEach(function(k){next[k]=attrs[k];});next[attr]=parsed.value;}
+      else Object.keys(attrs).forEach(function(k){if(k===key)next[attr]=parsed.value;else next[k]=attrs[k];});
+      attrs=next;
+    }
+    if(Object.keys(attrs).length)span.attributes=attrs;else delete span.attributes;
+    return done();
+  }
+  return {error:'Unknown trace span edit.'};
+}
+/* The consumer overlay after one edit: the previous overlay with only the spans this edit changed
+   rewritten (the smallest field patch against the provider), a removed inherited span hidden, a
+   shown one unhidden. Untouched entries, also ones that cannot merge, stay exactly as written. */
+function traceSpansOverlayEdit(inherited,before,after,previous){
+  inherited=telemetryObject(inherited)?inherited:{};before=telemetryObject(before)?before:{};after=telemetryObject(after)?after:{};
+  var o=telemetryObject(previous)?telemetryClone(previous):{},spans=telemetryObject(o.spans)?o.spans:{},hide=Array.isArray(o.hide)?o.hide.slice():[];
+  function write(k){
+    var d=telemetryOwn(inherited,k)?telemetryFieldDiff(inherited[k],after[k]):telemetryClone(after[k]);
+    if(d)spans[k]=d;else delete spans[k];
+  }
+  var keys=Object.keys(before).concat(Object.keys(after)).filter(function(k,i,all){return all.indexOf(k)===i;});
+  keys.forEach(function(k){
+    var was=telemetryOwn(before,k),is=telemetryOwn(after,k);
+    if(was && is){if(JSON.stringify(before[k])!==JSON.stringify(after[k]))write(k);}
+    else if(was){delete spans[k];if(telemetryOwn(inherited,k) && hide.indexOf(k)<0)hide.push(k);}
+    else{hide=hide.filter(function(h){return h!==k;});write(k);}
+  });
+  // A rename keeps the order of entries: a key moved in `after` takes its place.
+  var ordered={};Object.keys(after).forEach(function(k){if(telemetryOwn(spans,k))ordered[k]=spans[k];});Object.keys(spans).forEach(function(k){if(!telemetryOwn(ordered,k))ordered[k]=spans[k];});
+  var out={};if(Object.keys(ordered).length)out.spans=ordered;if(hide.length)out.hide=hide;
+  return Object.keys(out).length?out:null;
+}
+/* The selected carrier's trace spans: local, or for an imported carrier the provider's (inherited),
+   the consumer overlay and the merged result, with each span's validator messages. */
+function traceSpansState(raw,target,context){
+  var text=JSON.stringify(raw),t=telemetryCarrierTarget(text,raw,target,context);if(t.error)return t;
+  var kind=target.kind==='edge'?'edge':'node',merged=telemetryObject(t.resolved.trace) && telemetryObject(t.resolved.trace.spans)?telemetryClone(t.resolved.trace.spans):{};
+  // The provider is named by its page title in every message, its spec id when it has none.
+  var providerSpec=t.owner && context && Array.isArray(context.specs)?context.specs.find(function(x){return x && x.page && x.page.canon && x.page.canon.id===t.owner.spec;}):null;
+  var providerTitle=providerSpec && typeof providerSpec.page.title==='string' && providerSpec.page.title.trim()?providerSpec.page.title.trim():t.owner?t.owner.spec:null;
+  var out={id:t.id,kind:kind,imported:!!t.owner,provider:t.owner?t.owner.spec:null,providerTitle:providerTitle,spans:merged,inherited:{},overlay:null,messages:{},roles:TRACE_SPAN_ROLE_LIST[kind]};
+  if(t.owner){
+    var imp=t.got.d.topologyImports.find(function(i){return i && i.as===t.owner.as;}),rel=t.id.split('->').map(function(part){return part.slice(t.owner.as.length+2);}).join('->');
+    var entry=telemetryObject(imp[t.field])?imp[t.field][rel]:null;out.overlay=telemetryObject(entry) && telemetryObject(entry.trace)?telemetryClone(entry.trace):null;
+    // The provider's spans: resolve with this consumer's trace overlay left out.
+    var base=builderClone(raw),bi=specValueAt(base,t.got.path).topologyImports.find(function(i){return i && i.as===t.owner.as;});
+    if(bi && telemetryObject(bi[t.field]) && telemetryObject(bi[t.field][rel]))delete bi[t.field][rel].trace;
+    try{
+      var r=FlowTopology.resolveSource(base,context),rec=specSectionPaths(r)[target.section],d=specValueAt(r,rec.diagram);
+      var carrier=kind==='node'?d.nodes[t.id]:(d.edges || []).find(function(e){return builderEdgeKey(e)===t.id;});
+      if(carrier && telemetryObject(carrier.trace) && telemetryObject(carrier.trace.spans))out.inherited=telemetryClone(carrier.trace.spans);
+    }catch(ex){}
+    // Hidden means hidden by this document: a hide or a null entry. A span the resolver left out
+    // because this document's patch broke it is shown, built from the provider span and the patch,
+    // so its error sits beside the field and no edit turns it into a hide.
+    var ospans=out.overlay && telemetryObject(out.overlay.spans)?out.overlay.spans:{},ohide=out.overlay && Array.isArray(out.overlay.hide)?out.overlay.hide:[];
+    out.hidden=ohide.concat(Object.keys(ospans).filter(function(k){return ospans[k]===null;})).filter(function(k,i,all){return all.indexOf(k)===i;});
+    out.broken=[];
+    Object.keys(out.inherited).concat(Object.keys(ospans)).forEach(function(k){
+      if(telemetryOwn(merged,k) || out.hidden.indexOf(k)>=0 || out.broken.indexOf(k)>=0 || ospans[k]===null)return;
+      var built=telemetryObject(ospans[k])?FlowTopology.mergeTrace(telemetryOwn(out.inherited,k)?{spans:(function(){var x={};x[k]=out.inherited[k];return x;})()}:{},{spans:(function(){var x={};x[k]=ospans[k];return x;})()}):{spans:{}};
+      if(telemetryObject(built.spans) && telemetryObject(built.spans[k])){merged[k]=built.spans[k];out.broken.push(k);}
+    });
+    out.rel=rel;out.field=t.field;
+  }
+  out.allowed=FlowCanon.traceAttributeNames(t.resolvedDoc);
+  // Broken overlay entries already carry the resolver's overlay message; the rest are checked here.
+  if(Object.keys(merged).length)FlowCanon.traceDeclarationErrors({spans:merged},kind,t.resolvedDoc).forEach(function(x){if(x.key!=null && (out.broken || []).indexOf(x.key)<0)(out.messages[x.key]=out.messages[x.key] || []).push(x.message);});
+  // Spans this board does not use (provider drops) and overlay findings, by span name.
+  if(typeof FlowTopology!=='undefined' && FlowTopology.traceFindings){
+    var findings=FlowTopology.traceFindings(t.diagram,''),f=findings.errors.concat(findings.warnings),mark=kind==='node'?'.nodes.'+t.id+'.trace.spans.':null;
+    f.forEach(function(text){
+      var m=/\.trace\.spans\.([A-Za-z][A-Za-z0-9_-]*): (.*)$/.exec(text);if(!m)return;
+      var forThis=mark?text.indexOf(mark)>=0:out.rel!=null && text.indexOf('.edgeTracking.'+out.rel+'.trace')>=0;
+      if(!forThis && out.rel!=null && kind==='node')forThis=text.indexOf('.nodeTracking.'+out.rel+'.trace')>=0;
+      if(forThis)(out.messages[m[1]]=out.messages[m[1]] || []).push(m[2]);
+    });
+  }
+  if(kind==='edge'){
+    var e=t.resolved,to=t.diagram.nodes && t.diagram.nodes[e.to],own=Object.keys(merged).some(function(k){return merged[k] && merged[k].role==='receive';});
+    // Valid process declarations only: an invalid one times nothing.
+    var invalid=to && telemetryObject(to.trace)?FlowCanon.traceDeclarationErrors(to.trace,'node',t.resolvedDoc).map(function(x){return x.key;}):[];
+    var procs=to && telemetryObject(to.trace) && telemetryObject(to.trace.spans)?Object.keys(to.trace.spans).filter(function(k){return telemetryObject(to.trace.spans[k]) && to.trace.spans[k].role==='process' && invalid.indexOf(k)<0 && invalid.indexOf(null)<0;}):[];
+    out.receiver={declared:own,node:e.to,title:to && to.title || e.to,process:procs.map(function(k){return {key:k,span:telemetryClone(to.trace.spans[k])};})};
+  }
+  return out;
+}
+function planCarrierTraceSpans(text,raw,target,edit,context){
+  var t=telemetryCarrierTarget(text,raw,target,context);if(t.error)return t;
+  var state=traceSpansState(raw,target,context);if(state.error)return state;
+  var op=edit && edit.op;
+  if(op==='rename' && t.owner && telemetryOwn(state.inherited,edit.name))return {error:'Inherited span names come from '+state.providerTitle+'. To rename one, hide it and add a new span.',field:'name'};
+  // A provider name hidden here is still taken: reusing it would drop the hide and patch the provider's span.
+  var claimed=op==='rename'?edit.to:op==='add'?edit.name:null;claimed=typeof claimed==='string'?claimed.trim():claimed;
+  if(t.owner && claimed && telemetryOwn(state.inherited,claimed) && !telemetryOwn(state.spans,claimed)){
+    return {error:'The provider '+state.providerTitle+' declares a span named '+claimed+', hidden in this document; pick another name, or show '+claimed+' and change it instead.',field:'name'};
+  }
+  var plan;
+  if(!t.owner){
+    if(op==='hide' || op==='revert' || op==='revertAll')return {error:'Only spans inherited from an imported node or connection can be hidden or reverted.'};
+    var local=traceSpansEdit(state.spans,edit,state.kind,state.allowed);if(local.error)return local;
+    if(JSON.stringify(local.value)===JSON.stringify(Object.keys(state.spans).length?state.spans:null))return {text:text};
+    plan=planSetField(text,raw,t.path,'trace',local.value==null?null:JSON.stringify({spans:local.value},null,2));
+  }else{
+    var overlay,previous=state.overlay?telemetryClone(state.overlay):null;
+    if(op==='revertAll')overlay=null;
+    else if(op==='hide' || op==='revert'){
+      var hiddenNow=state.hidden.indexOf(edit.name)>=0;
+      if(!telemetryOwn(state.inherited,edit.name) && !(op==='hide' && !edit.value && hiddenNow))return {error:'Span '+edit.name+' is not inherited from '+state.provider+'.'};
+      var after=telemetryClone(state.spans);
+      if(op==='hide' && edit.value)delete after[edit.name];
+      else if(telemetryOwn(state.inherited,edit.name))after[edit.name]=telemetryClone(state.inherited[edit.name]);
+      // Showing again drops the hide and any null entry; a stale hide (the provider no longer declares it) only that.
+      if(op==='hide' && !edit.value && previous){
+        if(Array.isArray(previous.hide))previous.hide=previous.hide.filter(function(k){return k!==edit.name;});
+        if(telemetryObject(previous.spans) && previous.spans[edit.name]===null)delete previous.spans[edit.name];
+      }
+      overlay=traceSpansOverlayEdit(state.inherited,state.spans,after,previous);
+    }else{
+      var next=traceSpansEdit(state.spans,edit,state.kind,state.allowed);if(next.error)return next;
+      overlay=traceSpansOverlayEdit(state.inherited,state.spans,next.value,previous);
+    }
+    if(overlay){if(telemetryObject(overlay.spans) && !Object.keys(overlay.spans).length)delete overlay.spans;if(Array.isArray(overlay.hide) && !overlay.hide.length)delete overlay.hide;if(!Object.keys(overlay).length)overlay=null;}
+    if(JSON.stringify(overlay)===JSON.stringify(state.overlay))return {text:text};
+    plan=planTopologyTracking(text,raw,target.section,target.kind,t.id,'trace',overlay,overlay==null,context,target.index);
+  }
+  // A rename also renames traceScope.skip entries on this board that name the span, in the same edit.
+  if(op==='rename' && !plan.error){
+    var to=String(edit.to).trim(),from=edit.name,next=plan.text,parsedNext=JSON.parse(next),got=builderDiagram(next,parsedNext,target.section);
+    if(!got.error)(Array.isArray(got.d.steps)?got.d.steps:[]).forEach(function(st,i){
+      var skip=telemetryObject(st) && telemetryObject(st.traceScope) && telemetryObject(st.traceScope.skip) && Array.isArray(st.traceScope.skip[t.id])?st.traceScope.skip:null;
+      if(!skip || skip[t.id].indexOf(from)<0)return;
+      var scope=telemetryClone(st.traceScope);scope.skip[t.id]=scope.skip[t.id].map(function(x){return x===from?to:x;});
+      var r=jsonSetField(next,got.path.concat(['steps',i]),'traceScope',JSON.stringify(scope));if(r)next=r.text;
+    });
+    plan={text:next};
+  }
+  return plan;
+}

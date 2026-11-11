@@ -236,8 +236,11 @@ var FlowTopology = (function(){
     });
     // #1290 (D19): the spans this board's overlay adds or overrides are its own declarations; on a
     // carrier its reference flow lights they are checked against its approved reference trace.
+    // A patch that only narrows (namespace, attributes) or relabels an inherited span leaves the
+    // provider's strings, which are the provider's to check.
     if(reference && addition && object(addition.spans))Object.keys(addition.spans).forEach(function(key){
-      var miss=object(addition.spans[key]) && object(value.trace.spans[key])?FlowCanon.traceReferenceMiss(value.trace.spans[key],reference):null;
+      var patch=addition.spans[key],owns=object(patch) && (!own(provided,key) || ['serviceName','operation','operationPrefix'].some(function(f){return own(patch,f);}));
+      var miss=owns && object(value.trace.spans[key])?FlowCanon.traceReferenceMiss(value.trace.spans[key],reference):null;
       if(miss)note('warning','.spans.'+key,miss);
     });
     if(!Object.keys(value.trace.spans).length)delete value.trace;

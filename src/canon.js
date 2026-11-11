@@ -292,6 +292,23 @@ var FlowCanon = (function(){
     });
     return errors;
   }
+  /* #1290: a step's traceScope narrows the spans it inherits from the carriers it lights. */
+  var TRACE_SCOPE_FIELDS=['root','parentStepId','attributes','skip','optional','maxDurationMs','maxQueueDepth'];
+  function traceScopeErrors(st,ids,listed){
+    if(!Object.prototype.hasOwnProperty.call(st,'traceScope'))return [];
+    var sc=st.traceScope,e=[];
+    if(!object(sc))return ['traceScope: expected an object'];
+    if(st.traceMatch!=null)e.push('traceScope: use traceMatch or traceScope on a step, not both');
+    if(!st.id)e.push('traceScope: stable step ID required');
+    Object.keys(sc).forEach(function(k){if(TRACE_SCOPE_FIELDS.indexOf(k)<0)e.push('traceScope: unknown field '+k);});
+    if(sc.root!=null && (!object(sc.root) || Object.keys(sc.root).some(function(k){return k!=='serviceName' && k!=='operation';}) || typeof sc.root.serviceName!=='string' || !sc.root.serviceName.trim() || typeof sc.root.operation!=='string' || !sc.root.operation.trim()))e.push('traceScope.root: expected {serviceName, operation}');
+    if(sc.parentStepId!=null && (typeof sc.parentStepId!=='string' || !ids.has(sc.parentStepId) || sc.parentStepId===st.id))e.push('traceScope: unknown or self parentStepId');
+    if(sc.attributes!=null && (!object(sc.attributes) || Object.keys(sc.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !['string','number','boolean'].includes(typeof sc.attributes[k]);})))e.push('traceScope.attributes: use supported operational attributes only');
+    if(sc.skip!=null && (!object(sc.skip) || Object.keys(sc.skip).some(function(k){return !Array.isArray(sc.skip[k]) || sc.skip[k].some(function(x){return typeof x!=='string' || !x.trim();});})))e.push('traceScope.skip: expected {<node or connection id>: [<span name or role:<role>>, …]}');
+    if(sc.optional!==undefined && typeof sc.optional!=='boolean')e.push('traceScope.optional: expected true or false');
+    ['maxDurationMs','maxQueueDepth'].forEach(function(k){if(sc[k]!=null && (typeof sc[k]!=='number' || !Number.isFinite(sc[k]) || sc[k]<0))e.push('traceScope.'+k+': nonnegative number required');});
+    return e;
+  }
   function validate(raw){
     var errors=[], p=pageOf(raw);
     if (!object(p)) return errors;
@@ -325,7 +342,8 @@ var FlowCanon = (function(){
       if(d.referenceTrace!=null){var r=d.referenceTrace;if(!object(r) || r.version!==1 || !object(r.trace) || !object(r.trace.context) || !Array.isArray(r.trace.spans) || typeof r.trace.traceId!=='string' || !object(r.approval) || typeof r.approval.reason!=='string' || typeof r.contract!=='string')errors.push('referenceTrace: expected an approved version-1 trace mapping');}
       if(d.incidents!=null && (!Array.isArray(d.incidents) || d.incidents.some(function(i){return !object(i) || typeof i.pathId!=='string' || typeof i.traceId!=='string' || typeof i.firstDivergence!=='string';})))errors.push('incidents: expected comparison provenance objects');
       // Every alternative's parentStepId is an edge; a cycle through any of them fails.
-      var parents=new Map(steps.filter(function(s){return s && s.traceMatch;}).map(function(s){return [s.id,[].concat(s.traceMatch).map(function(m){return m && m.parentStepId;}).filter(Boolean)];})),acyclic=new Set();
+      // #1290: traceScope.parentStepId joins the same cycle check.
+      var parents=new Map(steps.filter(function(s){return s && (s.traceMatch || object(s.traceScope));}).map(function(s){return [s.id,[].concat(s.traceMatch || []).map(function(m){return m && m.parentStepId;}).concat(object(s.traceScope) && s.traceScope.parentStepId?[s.traceScope.parentStepId]:[]).filter(Boolean)];})),acyclic=new Set();
       var cyclic=function(id,path){if(acyclic.has(id))return false;if(path.has(id))return true;path.add(id);var hit=(parents.get(id) || []).some(function(p){return cyclic(p,path);});path.delete(id);if(!hit)acyclic.add(id);return hit;};
       parents.forEach(function(_,id){if(cyclic(id,new Set()))errors.push('traceMatch: cyclic parentStepId');});
       steps.forEach(function(st){
@@ -354,6 +372,7 @@ var FlowCanon = (function(){
         });
         // #1175: a step with alternatives is optional only when every alternative says so.
         if(many && list.some(function(m){return object(m) && m.optional===true;}) && list.some(function(m){return !object(m) || m.optional!==true;}))errors.push('traceMatch: set optional on every alternative or on none');
+        traceScopeErrors(st,ids,listed).forEach(function(e){errors.push(e);});
         if(st.conditions!=null){
           if(!Array.isArray(st.conditions))errors.push('conditions: expected an array');
           else st.conditions.forEach(function(c){

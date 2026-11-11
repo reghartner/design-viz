@@ -132,7 +132,10 @@ function createBoardEditor(options){
   // `restore` {at, item}: an add that undoes a pending remove puts the removed entry back where it was (#1253).
   function splice(source,t,op,ticket,match,restore){
     // #1180: a replacement swaps serviceName and operation and keeps the step's other traceMatch fields.
-    if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation},typeof match.nodeId==='string' && match.nodeId?{nodeId:match.nodeId}:{}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));return set?set.text:null;}
+    if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation},typeof match.nodeId==='string' && match.nodeId?{nodeId:match.nodeId}:{}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));
+      // #1290: a step has traceMatch or traceScope, never both: the mapping replaces the scope.
+      if(set && t.local && Object.prototype.hasOwnProperty.call(t.local,'traceScope'))set=jsonSetField(set.text,t.path,'traceScope',null);
+      return set?set.text:null;}
     if(op==='clear-missing-work'){
       if(t.imported){var cleared=planTopologyTracking(source,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,'missingWork',true,true,context,t.index);return cleared.error?null:cleared.text;}
       var removed=jsonSetField(source,t.path,'missingWork',null);
@@ -188,6 +191,8 @@ function createBoardEditor(options){
     if(inverse>=0 && carrierTickets(next,t.path)===ops[inverse].tickets){ops.splice(inverse,1);ops.slice(inverse).forEach(function(o){o.before=undefined;});}
     else{
       var made={entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,previous:op==='trace-match'?t.previous:undefined,before:op==='trace-match'?before:undefined};
+      // #1290: the traceScope a mapping replaced, so its Undo can put it back in any edit order.
+      if(op==='trace-match' && t.local && Object.prototype.hasOwnProperty.call(t.local,'traceScope'))made.scope=JSON.parse(JSON.stringify(t.local.traceScope));
       if(op==='add' || op==='remove')made.tickets=carrierTickets(text,t.path);
       if(op==='remove' && !t.imported){var list=Array.isArray(t.local.tickets)?t.local.tickets:[],at=list.findIndex(function(item){return (trackingTicket(item) || {}).key===ticket;});if(at>=0)made.removed={at:at,item:list[at]};}
       ops.push(made);
@@ -204,7 +209,7 @@ function createBoardEditor(options){
     text=next;return true;
   }
   // The text from before a mapping (for its Undo) stays out of the stash.
-  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops.map(function(o){return {entry:o.entry,chain:o.chain,replayable:o.replayable,kind:o.kind,previous:o.previous};})}));}catch(ex){}}
+  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops.map(function(o){return {entry:o.entry,chain:o.chain,replayable:o.replayable,kind:o.kind,previous:o.previous,scope:o.scope};})}));}catch(ex){}}
   function unstash(){try{win.sessionStorage.removeItem(stashKey);}catch(ex){}}
   function history(source,entry){
     var raw=parsed(source),owner=raw && raw.page?['page']:[],page=specValueAt(raw,owner),list=page && page.editHistory,itemText=JSON.stringify(entry,null,2);
@@ -279,7 +284,11 @@ function createBoardEditor(options){
   function undoMap(){
     if(!active || saving || readOnly)return false;var at=lastMapping();if(at<0)return false;
     var op=ops[at],next=at===ops.length-1 && op.before!=null?op.before:null;
-    if(next==null){var set=jsonSetField(text,op.entry.path,'traceMatch',op.previous?JSON.stringify(op.previous):null);next=set && set.text;}
+    if(next==null){
+      var set=jsonSetField(text,op.entry.path,'traceMatch',op.previous?JSON.stringify(op.previous):null);
+      if(set && op.scope!==undefined)set=jsonSetField(set.text,op.entry.path,'traceScope',JSON.stringify(op.scope));
+      next=set && set.text;
+    }
     if(next==null || !render(next))return false;
     ops.splice(at,1);question=null;changed();return true;
   }

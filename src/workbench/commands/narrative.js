@@ -560,5 +560,7 @@ function planStepTraceMatch(text,raw,sectionIdx,stepIdx,edit){
   if(!got)return {error:'Step not found. Reselect it and try again.'};
   var r=traceMatchFormEdit(got.st.traceMatch,edit);
   if(r.error || r.noop)return r;
+  // #1290: a step has traceMatch or traceScope, never both: writing a trace match replaces the scope.
+  if(r.value!=null && Object.prototype.hasOwnProperty.call(got.st,'traceScope'))return planSetFields(text,raw,got.path,[['traceMatch',JSON.stringify(r.value)],['traceScope',null]]);
   return planSetField(text,raw,got.path,'traceMatch',r.value==null?null:JSON.stringify(r.value));
 }

@@ -50,6 +50,11 @@ test('H1 H2 the connection reads the hand-off; the receiver\'s own work stays on
   assert.equal(plain(V.telemetryTraceLabel(m.nodes.worker)).text,'40 ms','the worker node keeps its 40 ms');
   assert.deepEqual(plain(m.edges['api->worker'][0].spanIds),['pub','proc']);
   assert.equal(m.edges['api->worker'][0].edgeIndex,0);
+  // A failed send or receive span is named in the title, not only shown as the error tone.
+  const failed=ASYNC();failed[2].error=true;failed[2].attributes={'http.response.status_code':503};
+  m=model(board(),failed);
+  assert.equal(m.edges['api->worker'][0].tone,'error');
+  assert.match(edgeLabel(m,'api->worker').title,/ Service error: worker process orders · HTTP 503\./);
   // Sync: the server span starts inside the client span.
   const sync=board({send:{spans:{send:{serviceName:'api',operation:'GET /stock',role:'send'}}},worker:{spans:{process:{serviceName:'worker',operation:'GET /stock',role:'process'}}}});
   m=model(sync,[span('client',null,'api','GET /stock',0,30),span('server','client','worker','GET /stock',5,20)]);

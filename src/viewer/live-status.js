@@ -1139,7 +1139,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var holds=function(p){return p.indices.indexOf(i)>=0;},path=paths.find(function(p){return p.id===shown && holds(p);}) || paths.find(holds);
       // An alternatives array (#1100) is edited in Inspect; a mapping never replaces it (#1180).
       var m=step.traceMatch && typeof step.traceMatch==='object'?step.traceMatch:null,alternatives=Array.isArray(m);
-      return {id:step.id,index:i,caption:caption,label:path?'Step '+(path.indices.indexOf(i)+1)+': '+caption+' · '+path.label:caption,mapped:!!m,alternatives:alternatives,traceMatch:m && !alternatives?{serviceName:m.serviceName,operation:m.operation}:null};
+      return {id:step.id,index:i,caption:caption,label:(path?'Step '+(path.indices.indexOf(i)+1)+': '+caption+' · '+path.label:caption)+traceMapStepNote(step),scoped:!!traceMapStepNote(step),mapped:!!m,alternatives:alternatives,traceMatch:m && !alternatives?{serviceName:m.serviceName,operation:m.operation}:null};
     }).filter(Boolean);
   }
   /* An edit re-renders the page (#828): the next controller reopens this Trace view with the loaded trace
@@ -1267,7 +1267,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{errorNote:traceErrorNote(errorTarget),key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:traceMapsDiagram(selected.binding.section.diagram),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:canOpenOver()}),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,
       // #1177: the step chooser of a span drop, and the latest pending mapping with its Undo.
-      mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,span:traceChooser.span,spanId:traceChooser.spanId,drop:traceChooser.drop,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,disabled:step.alternatives,label:step.caption+(step.alternatives?' · has alternatives; edit in Inspect':step.mapped?' · mapped, replaces':'')};})}:null,
+      mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,span:traceChooser.span,spanId:traceChooser.spanId,drop:traceChooser.drop,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,disabled:step.alternatives,label:step.caption+(step.alternatives?' · has alternatives; edit in Inspect':step.mapped?' · mapped, replaces':step.scoped?' · replaces this step\'s trace scope':'')};})}:null,
       mapped:mappedNote(selected,model),enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   /* #1163: metric cards are placed against the trace labels' boxes at paint time. Text is laid

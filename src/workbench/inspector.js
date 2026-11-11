@@ -1293,7 +1293,8 @@ function traceMatchEditor(val,ctx,t){
       });
       function create(){var ok=commit({op:'create',serviceName:drafts.serviceName.value,operation:drafts.operation.value});if(ok!==false)dropDrafts('create:');return ok;}
       Object.keys(drafts).forEach(function(k){listen(drafts[k],'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();create();}});});
-      var createActs=actionGroup('Trace match actions','trace-match-actions'),createButton=actionButton('Add trace match',create);
+      var scoped=val.traceScope && typeof val.traceScope==='object' && !Array.isArray(val.traceScope);
+      var createActs=actionGroup('Trace match actions','trace-match-actions'),createButton=actionButton(scoped?'Add trace match (replaces this step\'s trace scope)':'Add trace match',create);
       createButton.title='Write this step’s trace match from the service name and operation (Enter in either field also adds it).';
       createActs.appendChild(createButton);box.appendChild(createActs);general();
       return box;

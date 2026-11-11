@@ -1912,8 +1912,8 @@ test('H12 Chuck 2026-10-30: history renders on a page without tracking, tickets 
    Nothing paints on the canvas in this PR; canvas cues follow in PR 2.
 | M1 | `ctl.telemetry` exists on every page with apply, clear, snapshot, onChange, setEnabled, status and bindings; without a provider or demo it reports `absent`, ignores setEnabled and the panel has no Metrics button or metrics connector text. |
 | M2 | `bindings()` and the provider's first argument list every bound carrier once, in page order, as `{id, kind, signals, proof, links, card}` from carrierTelemetry: local nodes and edges (template `use` expanded), imported topology nodes and edges (consumer overlay and provider-authored bindings), and loaded detail pages; unbound carriers and text boxes are absent; a repeated id keeps its first binding. |
-| M3 | Metrics is off by default (no call, no timer after first paint); setEnabled(true) calls the provider at once, then every max(refreshMs, 60000) ms while visible; hidden pauses and visible catches up once; a rejection sets `error` with the message and keeps the last map; setEnabled(false) aborts the signal, retires the timer, clears the map and returns to `idle`; a late answer after off is dropped; destroy aborts and stays off. |
-| M4 | Refresh cadence: the host `refreshMs` wins, else the page `tracking.telemetry.refreshMs`, else one minute; never below 60000. |
+| M3 | Metrics is off by default (no call, no timer after first paint); setEnabled(true) calls the provider at once, then every max(refreshMs, 300000) ms while visible; hidden pauses, and visible catches up once only when 5 minutes have passed since the last call (#1287); a rejection sets `error` with the message and keeps the last map; setEnabled(false) aborts the signal, retires the timer, clears the map and returns to `idle`; a late answer after off is dropped; destroy aborts and stays off. |
+| M4 | Refresh cadence: the host `refreshMs` wins, else the page `tracking.telemetry.refreshMs`, else five minutes; never below 300000 (#1287). |
 | M5 | `apply(map)` keeps the provider result contract `{id: {signals: {name: {value, series, unit}}, observedAt, markers, links}}`, dropping malformed entries; snapshots are copies; `clear()` empties; onChange reports both and unsubscribes. |
 | M6 | The panel header shows a Metrics button after Live and its counts, before the Jira connector, off by default; clicking it turns the provider on, the metrics connector text moves from "Metrics: not connected" to "Metrics: connecting" to "Metrics: connected, refreshed <time>" ("Metrics: did not answer · <message>" on error); clicking again clears; Jira Live is untouched. |
 | M7 | A page with a telemetry provider and no Jira evidence still shows the header with Metrics while Live stays hidden. |
@@ -1980,7 +1980,7 @@ test('M2 bindings cover bound local, imported and loaded detail carriers once, i
  h.ctl.liveStatus.destroy();
 });
 
-test('M3 Metrics is off by default; on starts the provider loop with a 60 s floor, pauses hidden, catches up, keeps the last map on error; off and destroy abort',async()=>{
+test('M3 Metrics is off by default; on starts the provider loop with a 5-minute floor, pauses hidden, catches up after 5 minutes, keeps the last map on error; off and destroy abort',async()=>{
  let calls=0,fail=false,hold=null;const signals=[];
  const sample={a:{signals:{lag:{value:12,series:[[1,10],[2,12]],unit:'msgs'}},observedAt:'2026-11-03T10:00:00.000Z',markers:[],links:{}}};
  const h=harness(telemetryPage(),{},{telemetry:{provider:(b,s)=>{calls++;signals.push(s);if(hold)return hold;return fail?Promise.reject(Error('Grafana timeout')):Promise.resolve(sample);},refreshMs:1}}),t=h.ctl.telemetry;
@@ -1992,9 +1992,13 @@ test('M3 Metrics is off by default; on starts the provider loop with a 60 s floo
  await settle();assert.equal(calls,1,'M3 on calls the provider at once');
  const ok=plain(t.status());assert.equal(ok.state,'ok');assert.equal(ok.busy,false);assert.ok(isFinite(Date.parse(ok.refreshedAt)),'M3 refreshedAt is a timestamp');assert.equal(ok.note,'');
  assert.deepEqual(plain(t.snapshot().map),sample);
- assert.deepEqual([...h.timers.values()].map(x=>x.ms),[60000],'M3 refreshMs below a minute uses the 60 s floor');
+ assert.deepEqual([...h.timers.values()].map(x=>x.ms),[300000],'M3 refreshMs below five minutes uses the 5-minute floor');
+ // #1287: a fake clock; the poller reads Date.now from the page's global Date.
+ const now={at:Date.now()};h.C.Date=class extends Date{constructor(...a){super(...(a.length?a:[now.at]));}static now(){return now.at;}};
  h.doc.hidden=true;h.doc.visibilityState='hidden';h.doc.dispatchEvent({type:'visibilitychange'});assert.equal(h.timers.size,0,'M3 a hidden document pauses refresh');
- h.doc.hidden=false;h.doc.visibilityState='visible';h.doc.dispatchEvent({type:'visibilitychange'});await settle();assert.equal(calls,2,'M3 one catch-up call on return');
+ h.doc.hidden=false;h.doc.visibilityState='visible';h.doc.dispatchEvent({type:'visibilitychange'});await settle();assert.equal(calls,1,'M3 visible again within 5 minutes: no call');assert.equal(h.timers.size,1,'M3 the refresh waits out the 5 minutes');
+ h.doc.hidden=true;h.doc.visibilityState='hidden';h.doc.dispatchEvent({type:'visibilitychange'});now.at+=300000;
+ h.doc.hidden=false;h.doc.visibilityState='visible';h.doc.dispatchEvent({type:'visibilitychange'});await settle();assert.equal(calls,2,'M3 one catch-up call on return after 5 minutes');
  fail=true;let next=[...h.timers.values()][0];h.timers.clear();next.fn();assert.equal(t.status().busy,true,'M3 busy during a refresh');await settle();
  assert.equal(t.status().state,'error');assert.equal(t.status().note,'Grafana timeout');assert.equal(t.status().busy,false);
  assert.deepEqual(plain(t.snapshot().map),sample,'M3 the last map survives a failed refresh');
@@ -2003,6 +2007,8 @@ test('M3 Metrics is off by default; on starts the provider loop with a 60 s floo
  assert.equal(signals[signals.length-1].aborted,true,'M3 off aborts the signal');assert.equal(h.timers.size,0,'M3 off retires the timer');
  assert.deepEqual(plain(t.snapshot().map),{},'M3 off clears the map');assert.deepEqual(plain(t.status()),IDLE,'M3 off returns to idle');
  const before=calls;h.doc.dispatchEvent({type:'visibilitychange'});await settle();assert.equal(calls,before,'M3 visibility never calls while off');
+ // #1289: within 5 minutes on again reuses the last clean answer; past them it calls.
+ t.setEnabled(true);await settle();assert.equal(calls,before,'M3 on again within 5 minutes reuses the answer');assert.deepEqual(plain(t.snapshot().map),sample);t.setEnabled(false);now.at+=300000;
  let release;hold=new Promise(r=>release=r);t.setEnabled(true);await settle();assert.equal(calls,before+1);t.setEnabled(false);release(sample);await settle();
  assert.deepEqual(plain(t.snapshot().map),{},'M3 a late answer after off is dropped');assert.deepEqual(plain(t.status()),IDLE);
  hold=null;t.setEnabled(true);await settle();assert.equal(t.status().state,'ok');const live=signals[signals.length-1];assert.equal(live.aborted,false,'M3 on again gets a fresh signal');
@@ -2010,8 +2016,8 @@ test('M3 Metrics is off by default; on starts the provider loop with a 60 s floo
  const after=calls;t.setEnabled(true);await settle();assert.equal(t.snapshot().enabled,false,'M3 a destroyed controller stays off');assert.equal(calls,after);
 });
 
-test('M4 refresh cadence: host refreshMs wins, else the page tracking.telemetry.refreshMs, else one minute, never below it',async()=>{
- for(const [pageMs,hostMs,want] of [[undefined,undefined,60000],[300000,undefined,300000],[300000,120000,120000],[undefined,30000,60000],[undefined,'soon',60000],[90000,0,90000]]){
+test('M4 refresh cadence: host refreshMs wins, else the page tracking.telemetry.refreshMs, else five minutes, never below it',async()=>{
+ for(const [pageMs,hostMs,want] of [[undefined,undefined,300000],[300000,undefined,300000],[300000,120000,300000],[600000,420000,420000],[undefined,30000,300000],[undefined,'soon',300000],[90000,0,300000],[600000,0,600000]]){
   const h=harness(telemetryPage(pageMs),{},{telemetry:{provider:()=>Promise.resolve({}),refreshMs:hostMs}});
   assert.ok(h.ctl.telemetry,'M4 ctl.telemetry');h.ctl.telemetry.setEnabled(true);await settle();
   assert.deepEqual([...h.timers.values()].map(x=>x.ms),[want],JSON.stringify({pageMs,hostMs}));h.ctl.liveStatus.destroy();
@@ -2064,7 +2070,7 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
  const at=h.ctl.telemetry.status().refreshedAt;
  assert.equal(conn.getAttribute('data-state'),'connected');assert.equal(conn.getAttribute('data-busy'),'false');assert.equal(text(),'Metrics: connected, refreshed '+metricsClock(at));
  assert.equal(h.ctl.liveStatus.snapshot().metrics.enabled,true,'M6 the panel snapshot carries the Metrics state');
- fail=true;const tick=[...h.timers.values()].find(x=>x.ms===60000);assert.ok(tick,'M6 metrics refresh is armed');for(const [id,x] of h.timers)if(x===tick)h.timers.delete(id);tick.fn();await settle();
+ fail=true;const tick=[...h.timers.values()].find(x=>x.ms===300000);assert.ok(tick,'M6 metrics refresh is armed');for(const [id,x] of h.timers)if(x===tick)h.timers.delete(id);tick.fn();await settle();
  assert.equal(conn.getAttribute('data-state'),'error');assert.equal(text(),'Metrics: did not answer · Grafana timeout');
  assert.equal(live.getAttribute('aria-pressed'),livePressed,'M6 Jira Live is untouched');assert.equal(h.ctl.liveStatus.enabled(),true);
  metrics.dispatchEvent({type:'click'});
@@ -2321,7 +2327,7 @@ test('M9 a named telemetry source reads "<source> connected · <window> window �
  const clock=()=>metricsClock(h.ctl.telemetry.status().refreshedAt);
  assert.equal(conn.getAttribute('data-state'),'connected');assert.equal(text(),'Grafana connected · 24h window · refreshed '+clock());
  const snap=h.ctl.liveStatus.snapshot().metrics;assert.equal(snap.source,'Grafana');assert.equal(snap.window,'24h');
- const tick=()=>{const entry=[...h.timers].find(([,x])=>x.ms===60000);assert.ok(entry,'M9 refresh armed');h.timers.delete(entry[0]);entry[1].fn();};
+ const tick=()=>{const entry=[...h.timers].find(([,x])=>x.ms===300000);assert.ok(entry,'M9 refresh armed');h.timers.delete(entry[0]);entry[1].fn();};
  mode='note';tick();await settle();
  assert.equal(h.ctl.telemetry.status().state,'ok');assert.equal(h.ctl.telemetry.status().note,'1 Grafana query failed: a lag: boom','M9 a reported note rides a good answer');
  assert.equal(text(),'Grafana connected · 24h window · refreshed '+clock()+' · 1 Grafana query failed: a lag: boom');

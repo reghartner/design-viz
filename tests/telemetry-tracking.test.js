@@ -3,7 +3,7 @@
 | row | rule |
 |---|---|
 | T1 | `trackingTelemetry(page)` always returns `{grafana, honeycomb, window, refreshMs, templates}`; absent → `{}`/`{}`/`'24h'`/`null`/`{}` (window default 24h, Chuck 2026-11-04). |
-| T2 | Page config keeps Grafana datasource UIDs (prometheus/loki/tempo/sql), Honeycomb environment+dataset, a duration `window`, `refreshMs` (floor 60000), named templates. |
+| T2 | Page config keeps Grafana datasource UIDs (prometheus/loki/tempo/sql), Honeycomb environment+dataset, a duration `window`, `refreshMs` (floor 300000, #1287), named templates. |
 | T3 | Malformed page fields warn once per entry through `invalid(path, message)` and are dropped; nothing throws; the source is not modified. |
 | T4 | `carrierTelemetry(obj, templates)` parses a raw binding into `{kind, signals:{name:{source,query,unit}}, proof:{name:{min?,max?,maxRatioOf?}}, links, card}`. |
 | T5 | Each signal has exactly one source key: grafana/loki/tempo/sql strings, honeycomb a query object (cloned). Zero or two sources, empty queries and bad names drop that signal only. |
@@ -79,7 +79,7 @@ test('T3 malformed page telemetry warns per entry, drops it, keeps the rest and 
   const before=JSON.stringify(page),seen=recorder(),parsed=plain(trackingTelemetry(page,seen.fn));
   assert.equal(JSON.stringify(page),before);
   assert.deepEqual(parsed.grafana,{prometheus:'prom-main'});assert.deepEqual(parsed.honeycomb,{});
-  assert.equal(parsed.window,'24h');assert.equal(parsed.refreshMs,60000,'refresh below one minute uses the one-minute floor');
+  assert.equal(parsed.window,'24h');assert.equal(parsed.refreshMs,300000,'refresh below five minutes uses the 5-minute floor (#1287)');
   assert.deepEqual(Object.keys(parsed.templates).sort(),['good','withCard']);assert.equal(parsed.templates.withCard.card,undefined);
   assert.deepEqual(seen.paths.sort(),['.grafana.loki','.grafana.mimir','.grafana.tempo','.honeycomb','.provider','.refreshMs',
     '.templates.bad name','.templates.badKind.kind','.templates.badParams.params','.templates.dupe.params[1]','.templates.noSignals.signals',

@@ -226,7 +226,7 @@ function trackingExistsWhen(value){
      {grafana: {prometheus?, loki?, tempo?, cloudwatch?, accountId?, sql?: <datasource UID>},
       honeycomb: {environment?, dataset?},
       window: <duration such as '1h'; default '24h', the previous 24 hours>,
-      refreshMs: <number of ms, at least 60000>|null,
+      refreshMs: <number of ms, at least 300000>|null,
       templates: {<name>: {kind?, params: [<name>], signals, proof?, links?}},
       lookups?: {<id>: {label, query, values?, datasource?, fields: {traceId, spanId}}}}
    Templates keep their authored form so `use` can expand them by pure string
@@ -238,7 +238,7 @@ var TELEMETRY_CARD_SIDES=['right','left','above','below'];
 var TELEMETRY_LINKS=['dashboard','query'];
 var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card'];
 var TELEMETRY_RESERVED=TELEMETRY_BINDING_FIELDS.concat(['use','params']);
-var TELEMETRY_DEFAULT_WINDOW='24h',TELEMETRY_MIN_REFRESH_MS=60000,TELEMETRY_CARD_OFFSET_MAX=1000,TELEMETRY_CARD_WIDTH_MIN=140,TELEMETRY_CARD_WIDTH_MAX=480;
+var TELEMETRY_DEFAULT_WINDOW='24h',TELEMETRY_MIN_REFRESH_MS=300000,TELEMETRY_CARD_OFFSET_MAX=1000,TELEMETRY_CARD_WIDTH_MIN=140,TELEMETRY_CARD_WIDTH_MAX=480;
 var telemetryNamePattern=/^[A-Za-z][A-Za-z0-9_-]*$/;
 var telemetryParamPattern=/^[A-Za-z][A-Za-z0-9_]*$/;
 var telemetryWindowPattern=/^(?:now-|-)?([1-9][0-9]*[smhdw])$/;
@@ -652,7 +652,7 @@ function trackingTelemetry(page,invalid){
   if(telemetryOwn(value,'refreshMs')){
     var ms=value.refreshMs;
     if(!telemetryNumber(ms) || ms<=0)warn('.refreshMs','must be a positive number of milliseconds — using the connector default');
-    else if(ms<TELEMETRY_MIN_REFRESH_MS){out.refreshMs=TELEMETRY_MIN_REFRESH_MS;warn('.refreshMs','below one minute — using 60000');}
+    else if(ms<TELEMETRY_MIN_REFRESH_MS){out.refreshMs=TELEMETRY_MIN_REFRESH_MS;warn('.refreshMs','below five minutes — using 300000');}
     else out.refreshMs=ms;
   }
   if(telemetryOwn(value,'templates')){

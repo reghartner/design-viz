@@ -50,10 +50,14 @@ test('mapper requires observations before statistics and never substitutes zero 
 });
 test('qa/stg/prd switches clear and rebind imported/local account and env; explicit accounts stay literal',async t=>{
  const h=await setup();t.after(()=>h.close());h.api.setEnabled(true);await settle();
- for(const [env,account] of [['qa','111111111111'],['prd','333333333333'],['stg','646998985045']]){
+ assert.equal(h.calls.length,12);assert.ok(h.calls.every(c=>c.input.accountId==='646998985045'));assert.equal(h.calls[0].input.dimensions.RuleName,'camera_message_camera_stats_stg');
+ const stg=plain(h.api.snapshot().map);
+ for(const [env,account] of [['qa','111111111111'],['prd','333333333333']]){
   const before=h.calls.length;h.api.setEnvironment(env);assert.deepEqual(plain(h.api.snapshot().map),{});await settle();
   assert.equal(h.calls.length-before,12);assert.ok(h.calls.slice(before).every(c=>c.input.accountId===account));assert.equal(h.calls[before].input.dimensions.RuleName,'camera_message_camera_stats_'+env);
  }
+ // #1289: back to stg within 5 minutes, its own answer shows again and nothing is called (like Jira's reuse).
+ {const before=h.calls.length;h.api.setEnvironment('stg');await settle();assert.equal(h.calls.length,before);assert.deepEqual(plain(h.api.snapshot().map),stg);}
  assert.equal(h.p.tracking.telemetry.environment,'stg');
  const literal=await setup({literal:'444444444444'});t.after(()=>literal.close());literal.api.setEnabled(true);await settle();assert.ok(literal.calls.some(c=>c.input.accountId==='444444444444'));literal.api.setEnvironment('prd');await settle();assert.equal(literal.calls.at(-12).input.accountId,'444444444444');
 });

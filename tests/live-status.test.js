@@ -2055,8 +2055,9 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
  assert.ok(!metrics.classList.contains('tbtn'),'#1131 a switch, not a button that looks like a third view');
  assert.equal(metrics.getAttribute('aria-checked'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
  const top=header.querySelector('.dv-status-top'),controls=head.querySelector('.dv-live-controls');
- const style=top.querySelector('.dv-live-metrics-style');
- assert.ok(top.children.at(-2)===metrics && top.children.at(-1)===style,'#1131 the switch ends the top row, followed only by its #1294 Metrics style choice');assert.ok(style.hidden===true,'#1294 the style choice is hidden while the overlay is off');assert.ok(header.children.indexOf(top)<header.children.indexOf(live.parentElement),'#1131 Live | Over time is the row below');
+ const style=top.querySelector('.dv-live-metrics-style'),refresh=top.querySelector('.dv-live-metrics-refresh');
+ assert.ok(top.children.at(-3)===metrics && top.children.at(-2)===refresh && top.children.at(-1)===style,'#1131 the switch ends the top row, followed only by its #1293 Refresh now and its #1294 Metrics style choice');
+ assert.ok(top.children.filter(c=>!c.hidden).at(-1)===metrics,'#1131 the switch ends the visible top row while the overlay is off');assert.ok(refresh.hidden===true,'#1293 Refresh now is hidden while Metrics is off');assert.ok(style.hidden===true,'#1294 the style choice is hidden while the overlay is off');assert.ok(header.children.indexOf(top)<header.children.indexOf(live.parentElement),'#1131 Live | Over time is the row below');
  assert.ok(head.children.indexOf(controls)<head.children.indexOf(head.querySelector('.dv-live-status')),'M6 controls precede status text');
  assert.ok(conn,'M6 metrics connector text');assert.ok(!conn.classList.contains('dv-live-connection'),'M6 distinct connector');
  assert.equal(head.querySelectorAll('.dv-live-connection').length,1);
@@ -3314,6 +3315,221 @@ async function paintedCard(nodes){
  h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
  return {h,card:h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]')};
 }
+/* Follow-up to #1294 (Outline review c4): a Tab after a touch shows the carrier's card on focus again,
+   and the visible board an Outline card is placed in is also cut to the window. */
+/* #1324: an Outline repaint (refresh, host poll, Refresh now) keeps keyboard focus on the same carrier's
+   outline and keeps its open card open with the new values; a carrier gone after the repaint moves focus to
+   its remaining button, else to its board, never to the page. Local and imported carriers. */
+async function outlineBoard(raw,samples,tickets){
+ const state={samples};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve(JSON.parse(JSON.stringify(state.samples)))}}),matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ // Focus is tracked on the document, as a browser does; a removed element keeps it until something else takes it.
+ const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;},focus(){h.doc.activeElement=this;h.view.dispatchEvent({type:'focusin',target:this});}});
+ for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+ for(const el of h.view.querySelectorAll('section')){
+  el.focus=function(){h.doc.activeElement=this;};
+  // The engine wraps each diagram in a focusable, named .board region (engine.js); the harness adds one per section.
+  const board=el.appendChild(new h.view.constructor('div',{'class':'board',tabindex:'0',role:'region','aria-label':'Diagram diagram'}));board.ownerDocument=h.doc;board.focus=function(){h.doc.activeElement=this;};
+ }
+ for(const el of h.view.querySelectorAll('text.lbl'))el.focus=function(){h.doc.activeElement=this;};
+ if(tickets)h.ctl.liveStatus.apply(tickets);
+ h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+ h.ctl.liveStatus.setMetricsStyle('outline');h.flush();await settle();h.flush();
+ h.state=state;return h;
+}
+const outlineOf=(h,id)=>h.view.querySelector('.dv-metrics-outline[data-metrics-carrier="'+id+'"]');
+const cardText=card=>card.querySelectorAll('text,tspan').map(t=>t.textContent||'').join(' ');
+async function repaintKeepsFocus(h,id,next){
+ const before=outlineOf(h,id);assert.ok(!!before,id+' outline painted');
+ before.focus();assert.ok(before._metricsCard.classList.contains('dv-metrics-peek')===true,id+' focus shows its card');
+ h.ctl.telemetry.apply(next);h.flush();await settle();h.flush();
+ const now=h.doc.activeElement,after=outlineOf(h,id);
+ assert.ok(!!after && after.isConnected!==false,id+' outline repainted');
+ assert.ok(now===after,id+' keyboard focus stays on the same carrier outline after the repaint');
+ assert.ok(after._metricsCard.classList.contains('dv-metrics-peek')===true,id+' its card stays open');
+ return cardText(after._metricsCard);
+}
+test('#1324 an Outline repaint keeps focus and the open card on a local carrier, with the new value',async()=>{
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
+ const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
+ const text=await repaintKeepsFocus(h,'a->b',{'a->b':{signals:{rate:{value:777},errors:{value:0}}}});
+ assert.ok(/777/.test(text),'the open card shows the new value, got: '+text);
+ h.ctl.liveStatus.destroy();
+});
+test('#1324 an Outline repaint keeps focus and the open card on an imported carrier',async()=>{
+ const seed=harness();
+ const spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
+ const provider=spec('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+ const consumer=spec('consumer',{nodes:{local:{title:'Local'}},rows:[['local']],topologyImports:[{spec:'provider',export:'core',as:'shared',edgeTracking:{'api->store':{telemetry:TCALL()}}}]});
+ consumer.page.tracking={telemetry:{}};
+ const resolved=seed.C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]});seed.ctl.liveStatus.destroy();
+ const id='shared::api->shared::store',h=await outlineBoard(resolved,{[id]:{signals:{rate:{value:100},errors:{value:0}}}});
+ const text=await repaintKeepsFocus(h,id,{[id]:{signals:{rate:{value:4321},errors:{value:0}}}});
+ assert.ok(/4,321|4321/.test(text),'the open imported card shows the new value, got: '+text);
+ h.ctl.liveStatus.destroy();
+});
+test('#1324 a card opened by hover stays open through an Outline repaint, with the new value',async()=>{
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
+ const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
+ const halo=outlineOf(h,'a->b');h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',target:halo});
+ assert.ok(halo._metricsCard.classList.contains('dv-metrics-peek')===true,'hover shows the card');
+ h.ctl.telemetry.apply({'a->b':{signals:{rate:{value:555},errors:{value:0}}}});h.flush();await settle();h.flush();
+ const after=outlineOf(h,'a->b');
+ assert.ok(after._metricsCard.classList.contains('dv-metrics-peek')===true,'the hovered card stays open after the repaint');
+ assert.ok(/555/.test(cardText(after._metricsCard)),'it shows the new value');
+ h.ctl.liveStatus.destroy();
+});
+test('#1324 focus on a link inside an open Outline card returns to the same link after a repaint',async()=>{
+ const call=TCALL();call.signals.rate.links={query:'https://grafana.test/explore?q=rate'};
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:call}]}}]}};
+ const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
+ const halo=outlineOf(h,'a->b');halo.focus();
+ const link=halo._metricsCard.querySelector('a.dv-metrics-query-link');assert.ok(!!link,'the card has a query link');link.focus();
+ h.ctl.telemetry.apply({'a->b':{signals:{rate:{value:222},errors:{value:0}}}});h.flush();await settle();h.flush();
+ const after=outlineOf(h,'a->b'),now=h.doc.activeElement;
+ assert.ok(after._metricsCard.classList.contains('dv-metrics-peek')===true,'the card stays open');
+ assert.ok(!!now && now.isConnected!==false && after._metricsCard.contains(now) && now.getAttribute('data-signal')==='rate','focus is on the same link in the repainted card');
+ h.ctl.liveStatus.destroy();
+});
+test('#1324 a Refresh now repaint keeps the hovered card open',async()=>{
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
+ const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
+ assert.ok(typeof h.ctl.liveStatus.refreshMetricsNow==='function','Refresh now is on main');
+ // Hover only: no focus on the halo, so main's focus restore cannot reopen the card.
+ const halo=outlineOf(h,'a->b');h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',target:halo});
+ h.state.samples={'a->b':{signals:{rate:{value:888},errors:{value:0}}}};
+ // Past the Refresh now cooldown in the viewer's clock.
+ vm.runInContext('(function(){var real=Date.now;Date.now=function(){return real()+120000;};globalThis.__restoreNow=function(){Date.now=real;};})()',h.C);
+ try{
+  assert.ok(h.ctl.liveStatus.refreshMetricsNow()===true,'Refresh now starts a call');
+  for(let i=0;i<6;i++)await settle();h.flush();
+ }finally{vm.runInContext('__restoreNow()',h.C);}
+ const after=outlineOf(h,'a->b');
+ assert.ok(after._metricsCard.classList.contains('dv-metrics-peek')===true,'the hovered card stays open');
+ assert.ok(/888/.test(cardText(after._metricsCard)),'it shows the refreshed value');
+ h.ctl.liveStatus.destroy();
+});
+test('#1324 a carrier gone after an Outline repaint moves focus to its remaining button, else its board, never the page',async()=>{
+ const raw=tickets=>({page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',...(tickets?{tickets:['AA-1']}:{}),telemetry:TCALL()}]}}]}});
+ // A ticketed connection keeps its Jira label button when the overlay goes away.
+ let h=await outlineBoard(raw(true),{'a->b':{signals:{rate:{value:100},errors:{value:0}}}},{'AA-1':{state:'active'}});
+ let before=outlineOf(h,'a->b');before.focus();
+ h.ctl.liveStatus.setMetricsEnabled(false);h.flush();await settle();h.flush();
+ let now=h.doc.activeElement;
+ assert.ok(outlineOf(h,'a->b')===null,'the outline is gone');
+ assert.ok(!!now && now!==before && h.view.contains(now),'focus left the removed outline for an element on the board');
+ assert.ok(now.getAttribute('data-live-carrier')==='a->b','focus is on the same carrier\'s remaining button');
+ h.ctl.liveStatus.destroy();
+ // A connection with no other button: focus goes to its board, not the page.
+ h=await outlineBoard(raw(false),{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
+ before=outlineOf(h,'a->b');before.focus();
+ h.ctl.liveStatus.setMetricsEnabled(false);h.flush();await settle();h.flush();
+ now=h.doc.activeElement;
+ assert.ok(!!now && now!==before && h.view.contains(now),'focus left the removed outline for an element on the board');
+ assert.ok(now.classList.contains('board'),'focus is on the carrier\'s named .board region, got '+(now && now.tagName));
+ assert.ok(!!now.getAttribute('aria-label'),'the board focus lands on is named');
+ const section=h.view.querySelector('section');
+ assert.ok(section.getAttribute('tabindex')===null && section.getAttribute('aria-label')===null,'the section gets no tabindex or name of its own');
+ h.ctl.liveStatus.destroy();
+ // The realistic route: a step change hides the focused carrier, and the next repaint drops its outline.
+ h=await outlineBoard(raw(false),{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
+ before=outlineOf(h,'a->b');before.focus();
+ for(const el of h.view.querySelectorAll('[data-dv-edge="0"]'))el.classList.add('view-step-hidden');
+ h.ctl.sections[0].sectionEl.dispatchEvent({type:'dv:pathchange'});h.flush();await settle();h.flush();
+ now=h.doc.activeElement;
+ assert.ok(outlineOf(h,'a->b')===null,'the step hid the carrier, so its outline is gone');
+ assert.ok(!!now && now.classList.contains('board'),'focus moves to the named board, not the page');
+ h.ctl.liveStatus.destroy();
+});
+test('#1324 a repaint shows exactly the card that was shown before it: focus on B wins over the pointer resting on A',async()=>{
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{},c:{}},rows:[['a','b','c']],edges:[{from:'a',to:'b',label:'Place',telemetry:TCALL()},{from:'b',to:'c',label:'Ship',telemetry:TCALL()}]}}]}};
+ const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}},'b->c':{signals:{rate:{value:200},errors:{value:0}}}});
+ const A=outlineOf(h,'a->b'),B=outlineOf(h,'b->c');
+ // The pointer rests on A (hover), then keyboard focus moves to B, whose card replaces A's.
+ h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',clientX:40,clientY:40,target:A});
+ h.view.dispatchEvent({type:'pointermove',pointerType:'mouse',clientX:40,clientY:40,target:A});
+ B.focus();
+ assert.ok(B._metricsCard.classList.contains('dv-metrics-peek')===true && A._metricsCard.classList.contains('dv-metrics-peek')===false,'before the repaint B\'s card is the one shown');
+ h.ctl.telemetry.apply({'a->b':{signals:{rate:{value:101},errors:{value:0}}},'b->c':{signals:{rate:{value:202},errors:{value:0}}}});h.flush();await settle();h.flush();
+ // A browser re-fires pointerover on the new element under a pointer that has not moved.
+ const A2=outlineOf(h,'a->b'),B2=outlineOf(h,'b->c');
+ h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',clientX:40.4,clientY:39.7,target:A2});
+ assert.ok(h.doc.activeElement===B2,'focus stays on B');
+ assert.ok(B2._metricsCard.classList.contains('dv-metrics-peek')===true,'B\'s card is still the one shown');
+ assert.ok(A2._metricsCard.classList.contains('dv-metrics-peek')===false,'A\'s card is not reopened just because the pointer rests on it');
+ // A real move of the pointer onto A afterwards shows A's card again.
+ h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',clientX:44,clientY:41,target:A2});
+ h.view.dispatchEvent({type:'pointermove',pointerType:'mouse',clientX:44,clientY:41,target:A2});
+ assert.ok(A2._metricsCard.classList.contains('dv-metrics-peek')===true,'after the pointer moves, hover works again');
+ h.ctl.liveStatus.destroy();
+});
+test('#1324 the hover hold covers only the carrier under the pointer: another carrier sliding under it opens its card',async()=>{
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{},c:{}},rows:[['a','b','c']],edges:[{from:'a',to:'b',label:'Place',telemetry:TCALL()},{from:'b',to:'c',label:'Ship',telemetry:TCALL()}]}}]}};
+ const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}},'b->c':{signals:{rate:{value:200},errors:{value:0}}}});
+ const A=outlineOf(h,'a->b');
+ h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',clientX:40,clientY:40,target:A});
+ h.view.dispatchEvent({type:'pointermove',pointerType:'mouse',clientX:40,clientY:40,target:A});
+ h.ctl.telemetry.apply({'a->b':{signals:{rate:{value:101},errors:{value:0}}},'b->c':{signals:{rate:{value:202},errors:{value:0}}}});h.flush();await settle();h.flush();
+ // The board scrolls under a still pointer: a different carrier arrives at the held spot.
+ const B2=outlineOf(h,'b->c');assert.ok(B2._metricsCard.classList.contains('dv-metrics-peek')===false,'B\'s card is closed before it reaches the pointer');
+ h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',clientX:40,clientY:40,target:B2});
+ assert.ok(B2._metricsCard.classList.contains('dv-metrics-peek')===true,'the carrier now under the pointer shows its card');
+ // A wheel scroll clears the hold, so the held carrier opens again when it slides back under the pointer.
+ const A2=outlineOf(h,'a->b');h.view.dispatchEvent({type:'wheel',target:A2});
+ h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',clientX:40,clientY:40,target:A2});
+ assert.ok(A2._metricsCard.classList.contains('dv-metrics-peek')===true,'after a wheel scroll the hold is gone');
+ h.ctl.liveStatus.destroy();
+});
+test('#1324 focus fallback: when the carrier and its own board are gone, focus lands on the section\'s first board',async()=>{
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
+ const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
+ const section=h.view.querySelector('section'),first=section.querySelector('.board'),svg=section.querySelector('svg');
+ // The carrier sits on a second board of the section; that board then goes away with it.
+ const own=section.appendChild(new h.view.constructor('div',{'class':'board',tabindex:'0',role:'region','aria-label':'Second diagram'}));own.ownerDocument=h.doc;own.focus=function(){h.doc.activeElement=this;};own.appendChild(svg);
+ const before=outlineOf(h,'a->b');before.focus();
+ own.isConnected=false;for(const el of h.view.querySelectorAll('[data-dv-edge="0"]'))el.classList.add('view-step-hidden');
+ h.ctl.sections[0].sectionEl.dispatchEvent({type:'dv:pathchange'});h.flush();await settle();h.flush();
+ assert.ok(h.doc.activeElement===first,'focus is on the section\'s first board, got '+(h.doc.activeElement && h.doc.activeElement.getAttribute('aria-label')));
+ h.ctl.liveStatus.destroy();
+});
+test('#1324 a card closing when the repaint comes still closes after it',async()=>{
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
+ const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
+ const halo=outlineOf(h,'a->b');h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',target:halo});
+ // The pointer leaves for blank canvas: the card is due to close in 200 ms, and a repaint lands first.
+ h.view.dispatchEvent({type:'pointerout',pointerType:'mouse',target:halo,relatedTarget:null});
+ h.ctl.telemetry.apply({'a->b':{signals:{rate:{value:101},errors:{value:0}}}});h.flush();await settle();h.flush();
+ for(const [id,t] of [...h.timers])if(t.ms===200){h.timers.delete(id);t.fn();}
+ const after=outlineOf(h,'a->b');
+ assert.ok(after._metricsCard.classList.contains('dv-metrics-peek')===false,'the pending close still closes the card after the repaint');
+ h.ctl.liveStatus.destroy();
+});
+test('#1294 follow-up: after a touch, Tab onto an Outline carrier shows its card on focus',async()=>{
+ const {h}=await paintedCard({a:{},b:{}});
+ h.ctl.liveStatus.setMetricsStyle('outline');h.flush();await settle();h.flush();
+ const halo=h.view.querySelector('path.dv-metrics-outline'),card=halo && halo._metricsCard;
+ assert.ok(!!halo && !!card,'the Outline halo and its hidden card are painted');
+ const ev=(type,extra)=>Object.assign({type,target:halo,preventDefault(){},stopPropagation(){}},extra);
+ h.view.dispatchEvent(ev('pointerdown',{pointerType:'touch'}));
+ h.view.dispatchEvent(ev('focusin'));
+ assert.ok(card.classList.contains('dv-metrics-peek')===false,'a focus right after a touch does not open the card over the board');
+ h.view.dispatchEvent(ev('keydown',{key:'Tab',shiftKey:false,altKey:false,ctrlKey:false,metaKey:false}));
+ h.view.dispatchEvent(ev('focusin'));
+ assert.ok(card.classList.contains('dv-metrics-peek')===true,'Tab is keyboard navigation: focus shows the card again');
+ h.ctl.liveStatus.destroy();
+});
+test('#1294 follow-up: the visible board for an Outline card is cut to the window',()=>{
+ const h=harness();
+ h.C.DOMPoint=class{constructor(x,y){this.x=x;this.y=y;}matrixTransform(m){return {x:m.a*this.x+m.c*this.y+m.e,y:m.b*this.x+m.d*this.y+m.f};}};
+ const identity={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;}};
+ const svg={viewBox:{baseVal:{x:0,y:0,width:1000,height:1000}},getScreenCTM:()=>identity,getBoundingClientRect:()=>({left:0,top:0,right:1000,bottom:1000}),parentElement:null,
+  ownerDocument:{defaultView:{innerWidth:400,innerHeight:300,getComputedStyle:()=>({overflowX:'visible',overflowY:'visible'})}}};
+ const rect=h.C.telemetryFrameBoxes(svg).rect;
+ assert.ok(rect.x===0 && rect.y===0,'starts at the board origin, got '+rect.x+','+rect.y);
+ assert.ok(rect.width===400 && rect.height===300,'cut to the 400x300 window, got '+rect.width+'x'+rect.height);
+ h.ctl.liveStatus.destroy();
+});
 function workPresentation(h,card){
  h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});
  const pop=h.view.querySelector('.dv-live-popover');
@@ -5051,6 +5267,41 @@ test('#1280 the reveal ends the opened detail itself at the window edge less 8px
   itemBottom=1000;scroller.scrollTop=0;const t2=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t2.context,spanId:t2.exemplar.spans[54].id}),true);h.flush();
   assert.equal(scroller.scrollTop,108,'last item: the detail still ends at the edge less 8 px');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
+});
+
+/* #1293: the Metrics line says "· Refreshing…" while a refresh runs over a shown answer, and while Refresh now cools
+   down it says when it is available again (visible text, not only the button's tooltip). */
+test('M14 the Metrics line shows Refreshing… over a shown answer and the Refresh now cooldown as text',async()=>{
+ let release=null,calls=0;const sample={a:{signals:{lag:{value:3}}}};
+ const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:()=>{calls++;return new Promise(r=>{release=()=>r(sample);});}}});
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const text=()=>textOf(h.view.querySelector('.dv-live-metrics-connection')),refresh=()=>h.view.querySelector('.dv-live-metrics-refresh');
+ h.ctl.liveStatus.setMetricsEnabled(true);await settle();release();await settle();h.flush();
+ assert.ok(refresh() && !refresh().hidden,'Refresh now shows while Metrics is on');assert.doesNotMatch(text(),/Refreshing…/);
+ const tick=[...h.timers].find(([,x])=>x.ms===300000);assert.ok(tick,'the refresh is armed');h.timers.delete(tick[0]);tick[1].fn();await settle();h.flush();
+ assert.match(text(),/ · Refreshing…/,'a refresh over the shown answer says so: '+text());assert.equal(refresh().getAttribute('aria-busy'),'true');
+ release();await settle();h.flush();assert.doesNotMatch(text(),/Refreshing…/);
+ assert.equal(h.ctl.liveStatus.refreshMetricsNow(),false,'within 60 s of that refresh');await settle();h.flush();assert.equal(calls,2);
+ assert.match(text(),/ · Refresh now available at .+/,'the cooldown is visible text: '+text());assert.equal(refresh().getAttribute('aria-disabled'),'true');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});
+
+/* #1313 review c2: after an answer that names a failed query, off/on waits up to 60 s. Meanwhile the answered signals
+   stay on screen and the Metrics line says what is true: the last refresh failed, and when the next try is. */
+test('M15 during the wait after a failed answer, the answered values stay and the line names the failure and the next try',async()=>{
+ let calls=0;const sample={a:{signals:{lag:{value:3}}}};
+ const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:(b,s,report)=>{calls++;report.note('a->b rate: boom');return Promise.resolve(sample);}}});
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const text=()=>textOf(h.view.querySelector('.dv-live-metrics-connection'));
+ h.ctl.liveStatus.setMetricsEnabled(true);await settle();h.flush();assert.equal(calls,1);assert.match(text(),/a->b rate: boom/);
+ h.ctl.liveStatus.setMetricsEnabled(false);h.ctl.liveStatus.setMetricsEnabled(true);await settle();h.flush();
+ assert.equal(calls,1,'no call during the wait');
+ assert.equal(plain(h.ctl.telemetry.snapshot().map).a?.signals?.lag?.value,3,'the signal that answered stays');
+ assert.equal(h.ctl.telemetry.status().busy,false,'no call is running');assert.notEqual(h.ctl.telemetry.status().state,'loading','never loading while nothing runs');
+ assert.doesNotMatch(text(),/connecting/,'never "connecting" while no call runs: '+text());
+ assert.match(text(),/last refresh failed at .+ · next try at .+/,'the line names the failure and the next try: '+text());
+ assert.match(text(),/a->b rate: boom/,'and the failed query');
+ panel.destroy();h.ctl.liveStatus.destroy();
 });
 /* Follow-up to #1280 (review c9 minor 1): the page's top edge is the reader's bar where it is now (sticky in a native mount,
    fixed in the published reader), read live from the view's .explore-navigation. --flowview-navigation-bottom is measured

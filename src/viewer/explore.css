@@ -422,17 +422,21 @@ body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display
  /* Numbered rail of top-level parts, shown while Contents is closed on desktop. */
  .reader-rail{position:fixed;z-index:104;width:44px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;padding:14px 0 12px;background:var(--reader-sidebar,var(--explore-bg));border-right:1px solid var(--explore-border);}
  .reader-rail[hidden]{display:none;}
- .reader-rail-list{position:relative;align-self:stretch;flex:0 1 auto;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;align-items:center;gap:10px;margin:0;padding:3px 0;list-style:none;}
+ .reader-rail-list{position:relative;align-self:stretch;flex:0 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--explore-border) transparent;display:flex;flex-direction:column;align-items:center;gap:10px;margin:0;padding:3px 0;list-style:none;}
  .reader-rail-list>li{position:relative;flex:none;}
  .reader-rail-list>li+li:before{content:'';position:absolute;bottom:100%;left:50%;width:2px;height:10px;margin-left:-1px;background:var(--explore-border);}
- .reader-rail-list>li:has(.reader-rail-past)+li:before{background:color-mix(in srgb,var(--navigation-accent) 55%,transparent);}
+ .reader-rail-list>.reader-rail-past-item+li:before{background:color-mix(in srgb,var(--navigation-accent) 55%,transparent);}
  body .reader-navigation .reader-rail-mark{display:grid;place-items:center;width:26px;height:26px;min-height:0;padding:0;border-radius:50%;border:1.5px solid var(--explore-border);background:var(--reader-paper,var(--explore-bg));color:var(--dfaint);font:600 11.5px/1 'IBM Plex Sans',sans-serif;font-variant-numeric:tabular-nums;text-align:center;}
  body .reader-navigation .reader-rail-mark.reader-rail-past{border-color:color-mix(in srgb,var(--navigation-accent) 55%,transparent);color:var(--navigation-accent);}
  body .reader-navigation .reader-rail-mark:hover{border-color:var(--navigation-accent);color:var(--navigation-accent);background:var(--reader-paper,var(--explore-bg));}
  body .reader-navigation .reader-rail-mark[aria-current=page],body .reader-navigation .reader-rail-mark[aria-current=page]:hover{background:var(--navigation-accent);border-color:var(--navigation-accent);color:var(--reader-paper,var(--explore-bg));box-shadow:0 0 0 3px color-mix(in srgb,var(--navigation-accent) 22%,transparent);}
  .reader-rail-count{flex:none;margin-top:12px;font-size:10.5px;font-weight:500;color:var(--dfaint);font-variant-numeric:tabular-nums;}
- .reader-part-number{display:inline-block;min-width:16px;margin-right:9px;color:var(--dfaint);font-weight:500;font-variant-numeric:tabular-nums;}
- body .reader-navigation .reader-tree-tab[data-current-part],.reader-tree-tab[data-current-part] .reader-part-number{color:var(--navigation-accent);}
+ body .reader-navigation .reader-tree-tab[data-current-part]{color:var(--navigation-accent);}
+/* #1305: tree page rows carry the rail's page number (data-page-index). Tab rows without one keep an
+   empty slot of the same width, so the columns stay aligned. */
+.reader-tree-numbered .reader-tree-tab::before,.reader-tree-numbered .reader-tree-view::before,.reader-tree-numbered .reader-tree-section::before{content:attr(data-page-index);display:inline-block;min-width:16px;margin-right:9px;color:var(--dfaint);font-weight:500;font-variant-numeric:tabular-nums;}
+.reader-tree-numbered [data-page-index][aria-current=page]::before{color:var(--navigation-accent);}
+.reader-tree-numbered .reader-tree-section::before{margin-right:0;}
  .reader-contents-tree{flex:1;overflow:auto;min-height:0;padding:8px 10px 24px;overscroll-behavior:contain;}
  .reader-contents-tab+.reader-contents-tab{margin-top:16px;padding-top:14px;border-top:1px solid var(--explore-border);}
  body .reader-navigation .reader-tree-tab{font-weight:600;display:block;width:100%;padding:9px 10px;}
@@ -443,7 +447,6 @@ body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display
  body .reader-navigation .reader-tree-view{flex:1;min-width:0;padding:10px 8px;overflow-wrap:anywhere;}
  .reader-tree-sections{margin:4px 0 12px 14px;padding:0 0 0 8px;border-left:1px solid var(--explore-border);list-style:none;}
  body .reader-navigation .reader-tree-section{display:flex;gap:12px;width:100%;padding:10px 8px;font-size:12px;line-height:1.5;overflow-wrap:anywhere;}
- .reader-tree-section[data-page-number]:before{content:attr(data-page-number);min-width:12px;font-variant-numeric:tabular-nums;}
  .reader-tree-details{margin:2px 0 4px 32px;padding:0;list-style:none;font-size:12px;line-height:1.5;}
  .reader-tree-detail{padding:4px 8px;color:var(--dfaint);overflow-wrap:anywhere;}
  .reader-tree-detail:before{content:'↳ ';}

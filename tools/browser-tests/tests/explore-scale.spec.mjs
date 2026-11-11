@@ -16,6 +16,8 @@ function fixture(scale){
   d.steps[1].panelVisibility={clip:false};d.steps[2].panelVisibility={clip:true};
   return spec;
 }
+// The closed Contents rail is 44px wide; a change there fails here as a rail failure, not as a scale failure.
+async function railWidth(page){const rail=page.locator('.reader-rail');await expect(rail).toBeVisible();const width=(await rail.boundingBox()).width;expect(width,'closed Contents rail width').toBe(44);return width;}
 function pristineFixture(){const spec=fixture();spec.page.sections[0].diagram.layouts[1].exploreLayout={};return spec;}
 async function build(server,spec,name='scale'){
   const input=path.join(server.root,name+'.json'),out=path.join(server.root,name+'.html');await writeFile(input,JSON.stringify(spec));
@@ -53,8 +55,10 @@ test('pristine layouts respond to stage width while reset and first geometry sav
   const spec=pristineFixture();await page.setViewportSize({width:1280,height:800});await page.goto(await build(server,spec,'responsive-scale'));await page.locator('.reader-top>button').click();await page.evaluate(()=>document.fonts.ready);
   await panelsOptions(page);let readout=page.locator('.explore-overlay-value').filter({visible:true});await expect(readout).toHaveText('80%');
   expect((await size(panel(page))).w).toBeCloseTo(240,0);
-  await page.setViewportSize({width:1360,height:800});await expect(readout).toHaveText('90%');expect((await size(panel(page))).w).toBeCloseTo(270,0);
-  await page.setViewportSize({width:1440,height:900});await expect(readout).toHaveText('100%');expect((await size(panel(page))).w).toBeCloseTo(300,0);
+  // #1305: this board has two pages (two Views), so closed Contents shows its rail; the stage is the viewport minus the rail.
+  const rail=await railWidth(page);
+  await page.setViewportSize({width:1360+rail,height:800});await expect(readout).toHaveText('90%');expect((await size(panel(page))).w).toBeCloseTo(270,0);
+  await page.setViewportSize({width:1440+rail,height:900});await expect(readout).toHaveText('100%');expect((await size(panel(page))).w).toBeCloseTo(300,0);
   await page.setViewportSize({width:390,height:800});await expect(readout).toHaveText('100%');await expect(player(page).locator('.stepline')).toBeInViewport();
   await page.setViewportSize({width:1280,height:800});await expect(readout).toHaveText('80%');
   await readout.click();await expect(readout).toHaveText('100%');expect((await size(panel(page))).w).toBeCloseTo(300,0);

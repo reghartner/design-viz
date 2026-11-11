@@ -1,0 +1,89 @@
+{
+ "page": {
+  "title": "Text view platform provider",
+  "canon": {
+   "version": 1,
+   "id": "tv-platform",
+   "kind": "canonical",
+   "owner": "group:default/platform"
+  },
+  "sections": [
+   {
+    "id": "services",
+    "heading": "Platform services",
+    "diagram": {
+     "nodes": {
+      "api": {
+       "title": "Orders API",
+       "tickets": [
+        "PLAT-5"
+       ],
+       "binding": {
+        "entityRef": "component:default/orders-api",
+        "label": "Orders API"
+       },
+       "telemetry": {
+        "kind": "service",
+        "signals": {
+         "rate": {
+          "grafana": "sum(rate(http_server_requests_total{service=\"orders-api\",route=\"/v1/orders\"}[5m]))*3600",
+          "unit": "req/h"
+         }
+        },
+        "proof": {
+         "rate": {
+          "min": 5
+         }
+        }
+       }
+      },
+      "store": {
+       "title": "Order store"
+      }
+     },
+     "rows": [
+      [
+       "api",
+       "store"
+      ]
+     ],
+     "edges": [
+      {
+       "from": "api",
+       "to": "store",
+       "kind": "https",
+       "label": "Persist",
+       "telemetry": {
+        "kind": "call",
+        "signals": {
+         "writes": {
+          "grafana": "sum(rate(db_client_operations_total{db_system=\"postgresql\",service=\"orders-api\",op=\"insert\"}[5m]))*3600",
+          "unit": "writes/h"
+         }
+        }
+       }
+      }
+     ],
+     "topologyExports": {
+      "core": {
+       "nodes": [
+        "api",
+        "store"
+       ],
+       "edges": [
+        "api->store"
+       ]
+      }
+     },
+     "panels": [
+      {
+       "id": "proof",
+       "type": "live-status",
+       "title": "Live evidence"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

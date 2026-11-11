@@ -1,0 +1,35 @@
+/* Reader Text window (#1322). Theme-owned paper, ink and accent, as document
+   search uses. Long lines scroll inside the text block; the window never does. */
+.text-view-launch{display:inline-flex;flex:none;align-items:center;}
+/* A compact labelled button; hidden on a narrow bar together with Search. */
+body .reader-navigation .text-view-launch .reader-button{display:inline-flex;align-items:center;height:32px;min-height:32px;padding:0 8px;border-color:var(--explore-border);background:var(--reader-paper,var(--explore-bg));color:var(--dtext);font-size:13px;font-weight:600;white-space:nowrap;}
+body .reader-navigation .text-view-launch .reader-button[aria-expanded=true]{color:var(--navigation-accent);border-color:var(--navigation-accent);background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 10%,var(--explore-bg)));}
+.reader-narrow .text-view-launch{display:none;}
+.text-view-launch[hidden],.text-view-menu-item[hidden]{display:none!important;}
+body .reader-navigation .text-view-menu-item{display:block;width:100%;white-space:nowrap;}
+.text-view{position:fixed;z-index:115;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;overflow:hidden;padding:12px 14px 14px;border:1px solid var(--explore-border);border-radius:10px;background:var(--reader-paper,var(--explore-bg));color:var(--dtext);box-shadow:0 8px 30px color-mix(in srgb,var(--dtext) 18%,transparent);font:13px/1.5 'IBM Plex Sans',sans-serif;text-align:left;}
+.text-view[hidden],.text-view [hidden]{display:none!important;}
+.text-view-heading,.text-view-controls,.text-view-tabs,.text-view-queries,.text-view-path{display:flex;align-items:center;gap:6px;min-width:0;}
+.text-view-heading{justify-content:space-between;font-size:14px;}
+.text-view-controls{flex-wrap:wrap;gap:8px 12px;}
+.text-view-tabs{flex-wrap:wrap;}
+.text-view-group-label,.text-view-path>span{font-size:12px;color:var(--dmuted,var(--dtext));}
+.text-view-path select{max-width:220px;padding:4px 6px;border:1px solid var(--explore-border);border-radius:5px;background:var(--explore-bg);color:var(--dtext);font:inherit;}
+.text-view-copy{margin-left:auto;}
+.text-view :is(button,select,pre,textarea):focus-visible{outline:2px solid var(--navigation-accent);outline-offset:2px;}
+body .text-view .reader-button{border-color:var(--explore-border);white-space:nowrap;}
+body .text-view .text-view-heading .reader-button{border-color:transparent;font-size:18px;line-height:1;padding:2px 8px;}
+body .text-view .text-view-queries .reader-button{min-height:28px;padding:3px 8px;}
+body .text-view .reader-button:is([aria-selected=true],[aria-pressed=true],[aria-checked=true]){background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 12%,var(--explore-bg)));color:var(--navigation-accent);border-color:var(--navigation-accent);font-weight:600;}
+body .text-view :is(button,select):disabled{opacity:.5;cursor:default;}
+.text-view-status{margin:0;font-size:12px;color:var(--dmuted,var(--dtext));}
+.text-view-status:empty{display:none;}
+.text-view-manual textarea{box-sizing:border-box;width:100%;max-width:100%;resize:vertical;padding:6px;border:1px solid var(--explore-border);border-radius:5px;background:var(--explore-bg);color:var(--dtext);font:12px/1.45 'IBM Plex Mono',ui-monospace,monospace;}
+.text-view-panel{display:flex;flex:1;min-height:0;min-width:0;}
+.text-view-text{flex:1;min-width:0;min-height:0;box-sizing:border-box;margin:0;padding:10px 12px;overflow:auto;white-space:pre;overflow-wrap:normal;tab-size:4;border:1px solid var(--explore-border);border-radius:6px;background:var(--explore-bg);color:var(--dtext);font:12px/1.5 'IBM Plex Mono',ui-monospace,monospace;}
+.text-view-wrapped .text-view-text{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:hidden;}
+@media print{.text-view,.text-view-launch,.reader-text-view-entry{display:none!important;}}
+/* The Contents panel row (always present): the panel's own border and paper. */
+.reader-text-view-entry{flex:none;padding:8px 12px;border-top:1px solid var(--explore-border);}
+.reader-text-view-entry:empty{display:none;}
+body .reader-navigation .reader-text-view-entry .reader-button{display:block;width:100%;text-align:left;}

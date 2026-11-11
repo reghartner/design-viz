@@ -15,6 +15,7 @@
 | S10 | Only the exact declaration messages are set aside during resolution: a span name with a colon still only warns for consumers; any other error still fails. |
 | S11 | Overlay findings name the overlay: a hide or null entry for a span the provider lacks warns; a patch key the provider lacks says so; hide plus patch warns and the hide wins; an allowlist drop names the attribute and this board's allowedAttributes; a nested patch that cannot restore a dropped span still warns; Honeycomb number/boolean attribute values warn; a snapshot edit gets the full declaration check. |
 | S8 | The example pair examples/canon/topology/orders-platform.json + orders-board.json resolves to the documented spans. |
+| S9 | (#1290 PR 10) The example board has a step that inherits through a traceScope: it is valid, needs flow.trace-scope, inherits the worker (shared or not) and skips the span it names. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const loader=require('../tools/source-loader.cjs');
@@ -313,4 +314,18 @@ test('S11 overlay findings name the overlay and say what happened',()=>{
     const after=JSON.parse(JSON.stringify(before));diagramOf(after).nodes['shared::worker'].trace=bad;
     assert.match(C.FlowTopology.editError(before,after) || '',/snapshot node shared::worker tracking: trace/,JSON.stringify(bad));
   }
+});
+
+test('S9 the example board shows a step that inherits through a traceScope',()=>{
+  const read=id=>JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/canon/topology/'+id+'.json'),'utf8'));
+  const board=read('orders-board'),platform=read('orders-platform');
+  const work=diagramOf(board).steps.find(s=>s.traceScope);
+  assert.ok(work,'a step with a traceScope');
+  assert.deepEqual(plain(work),{id:'work',text:'The worker handles the order',nodes:['orders::worker'],traceScope:{skip:{'orders::worker':['audit']},maxDurationMs:250}});
+  const page=C.FlowTopology.resolveSource(board,{version:1,id:'orders-board',specs:[platform,board]});
+  assert.deepEqual(plain(C.validate(C.normalize(page)).errors),[]);assert.deepEqual(plain(C.validate(C.normalize(page)).warnings),[]);
+  assert.ok(plain(C.FlowviewCompatibility.detect(board)).includes('flow.trace-scope'),'the page needs flow.trace-scope');
+  const d=diagramOf(page),eff=C.FlowTraceMatch.effectiveSelector(d,d.steps.find(s=>s.id==='work'),d.steps);
+  assert.deepEqual(plain(eff.inherits),['orders::worker']);
+  assert.deepEqual(plain(eff.traceScope.skip),{'orders::worker':['audit']});
 });

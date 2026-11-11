@@ -321,6 +321,11 @@ test('each attachment kind appears in each layout that shows it', () => {
     ['environment profile override', 'page tracking.telemetry.environments.prd.grafana.prometheus prom-prd', ['happy', '- tracking.telemetry.environments.prd.grafana.prometheus: `prom-prd`'], null],
     ['template definition', 'page tracking.telemetry.templates.kafka-topic.params group', null, '- tracking.telemetry.templates.kafka-topic.params: `topic`'],
     ['log search', 'page logsearch.camera-model.value[1] DB-300', ['happy', '  - query: `{app="device-gateway",env="${env}"} |= "camera_model" | json | camera_model="$value"`'], '  - fields.traceId: trace_id'],
+    ['page title', 'page title Doorbell delivery as text', ['happy', '# Doorbell delivery as text — steps'], '# Doorbell delivery as text — elements'],
+    ['section heading', 'section delivery heading Press to notification', ['happy', '## Press to notification (section delivery)'], '## Press to notification (section delivery)'],
+    ['path label', 'path delivery/happy label Connected', ['happy', 'Path: Connected (`happy`)'], null],
+    ['log search fields', 'page logsearch.camera-model.fields.spanId span_id', ['happy', '  - fields.spanId: span_id'], '  - fields.spanId: span_id'],
+    ['page settings heading', null, ['happy', '\n## Page settings\n\n- '], '\n## Page settings\n\n- '],
     ['section tab', 'section ops tab Ops', ['happy', '## On-call check (section ops, tab Ops)'], '## On-call check (section ops, tab Ops)'],
     ['path basedOn', 'path delivery/refused basedOn happy', ['refused', 'Path: Refused publish (`refused`) · based on `happy` · other paths: Connected (`happy`)'], null],
     ['panel visibility', 'step delivery/refused/2 panelVisibility.proof false', ['refused', '- panel proof visibility: `false`'], null],
@@ -420,9 +425,10 @@ test('page settings are printed only when the spec sets them', () => {
 
 test('markdown keeps its block shape: headings and tables stand apart, no doubled blank lines', () => {
   const model = C.textViewModel(resolvedPage());
-  const empty = C.textViewModel({sections: [{id: 'a', diagram: {nodes: {n: {title: 'N'}}, rows: [['n']]}}, {id: 'b', diagram: {nodes: {}, rows: [[]]}}]});
+  const empty = C.textViewModel({sections: [{id: 'a', diagram: {nodes: {n: {title: 'N'}}, rows: [['n']], edges: [null]}}, {id: 'b', diagram: {nodes: {}, rows: [[]]}}]});
   const texts = [C.textViewSteps(model), C.textViewSteps(model, {queries: 'full', pathId: 'refused'}), C.textViewElements(model), C.textViewSteps(empty), C.textViewElements(empty)];
   assert.ok(texts[3].includes('_No steps._') && texts[4].includes('_No elements._'));
+  assert.ok(texts[3].includes('- problem: edges[0]: expected an object with from and to null\n\n'), 'a blank line follows the problems');
   for (const text of texts){
     const rows = text.split('\n');
     rows.forEach((row, i) => {
@@ -436,7 +442,7 @@ test('markdown keeps its block shape: headings and tables stand apart, no double
       if (row === '_No steps._' || row === '_No elements._' || /^(Path|Imports): /.test(row)) assert.equal(rows[i + 1], '', 'blank after: ' + row);
       if (/^\S/.test(row) && !/^(#|\||- |_|Path: |Imports: )/.test(row) && rows[i - 1] !== undefined) assert.ok(rows[i - 1] === '' || /^\S/.test(rows[i - 1]) && !/^(- |#|\|)/.test(rows[i - 1]), 'prose stands apart: ' + row);
     });
-    assert.ok(text.endsWith('\n') || text.endsWith(''), 'ends cleanly');
+    assert.ok(text.endsWith('\n') && !text.endsWith('\n\n'), 'ends with one newline');
   }
 });
 

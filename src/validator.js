@@ -782,18 +782,22 @@ function traceScopeWarnings(d,DP,warnings){
       });
     });
     if(st.traceScope!=null || !carriers.length || warned[i])return;
-    // Shared on any path that holds this step.
-    var others=null,shared=null;
-    paths.forEach(function(path){
-      if(others || path.indices.indexOf(i)<0)return;
+    // The first path that holds this step where every declared carrier it lights is shared; the
+    // warning names that path when the diagram has authored paths.
+    var named=Array.isArray(d.paths) && d.paths.length;
+    paths.some(function(path){
+      if(path.indices.indexOf(i)<0)return false;
+      var shared=null,others=null;
       var free=carriers.filter(function(c){
         var with_=path.indices.filter(function(j){return j!==i && specObject(steps[j]) && lit(steps[j]).some(function(o){return o.kind===c.kind && o.id===c.id;});});
         if(with_.length && !shared){shared=c;others=with_.map(function(j){return steps[j].id || String(j);});}
         return !with_.length;
       });
-      if(free.length){others=null;shared=null;}
+      if(free.length || !shared)return false;
+      warned[i]=true;
+      warnings.push(at+': '+(named?'on path '+path.label+', ':'')+'step '+(st.id || i)+' inherits no trace spans because '+shared.id+' is also lit by '+(others.length>1?'steps ':'step ')+others.join(', ')+'; add a traceScope to this step to choose its spans');
+      return true;
     });
-    if(shared){warned[i]=true;warnings.push(at+': step '+(st.id || i)+' inherits no trace spans because '+shared.id+' is also lit by '+(others.length>1?'steps ':'step ')+others.join(', ')+'; add a traceScope to this step to choose its spans');}
   });
 }
 function validate(page){

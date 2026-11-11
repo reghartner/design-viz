@@ -98,11 +98,13 @@ function mapTrace(d,trace,pathId){
     const others=x=>(litBy.get(x.kind+':'+x.id) || []).filter(id=>id!==step.id),notes=[];
     if(!scope){
       const shared=used.filter(x=>others(x).length);used=used.filter(x=>!others(x).length);
-      if(!used.length){const o=others(shared[0]);return Object.assign(base,{status:'unmapped',nodeId:null,hint:shared[0].id+' is also lit by '+(o.length>1?'steps ':'step ')+o.join(', ')+'; add a trace scope to this step to choose its spans.'});}
+      if(!used.length){const o=others(shared[0]);return Object.assign(base,{status:'unmapped',nodeId:null,shared:{kind:shared[0].kind,id:shared[0].id,steps:o},hint:shared[0].id+' is also lit by '+(o.length>1?'steps ':'step ')+o.join(', ')+'; add a trace scope to this step to choose its spans.'});}
       if(shared.length)notes.push(shared.map(x=>x.id).join(', ')+(shared.length>1?' are':' is')+' also lit by other steps; add a trace scope to inherit '+(shared.length>1?'their':'its')+' spans.');
     }
     const skip=scope && object(scope.skip)?scope.skip:{},roles=[];let spans=[];
-    used.forEach(x=>{const list=Array.isArray(skip[x.id])?skip[x.id]:[];x.list.forEach(dc=>{if(list.includes(dc.key) || list.includes('role:'+dc.role))return;roles.push(dc.role);dc.spans.forEach(sp=>{if(!spans.includes(sp))spans.push(sp);});});});
+    // An edge step owns only its edge's send spans; a declared receive, like the receiving
+    // node's process spans, only times the hand-off (so it never collides with that node's step).
+    used.forEach(x=>{const list=Array.isArray(skip[x.id])?skip[x.id]:[];x.list.forEach(dc=>{if(x.kind==='edge' && dc.role!=='send' || list.includes(dc.key) || list.includes('role:'+dc.role))return;roles.push(dc.role);dc.spans.forEach(sp=>{if(!spans.includes(sp))spans.push(sp);});});});
     if(scope && object(scope.attributes))spans=spans.filter(sp=>Object.keys(scope.attributes).every(k=>(sp.attributes || {})[k]===scope.attributes[k]));
     if(scope && object(scope.root)){
       const roots=trace.spans.filter(sp=>!sp.parentId && !(sp.links || []).some(id=>byId.has(id))).sort((a,b)=>a.startMs-b.startMs);

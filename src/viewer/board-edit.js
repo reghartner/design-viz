@@ -132,7 +132,10 @@ function createBoardEditor(options){
   // `restore` {at, item}: an add that undoes a pending remove puts the removed entry back where it was (#1253).
   function splice(source,t,op,ticket,match,restore){
     // #1180: a replacement swaps serviceName and operation and keeps the step's other traceMatch fields.
-    if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation},typeof match.nodeId==='string' && match.nodeId?{nodeId:match.nodeId}:{}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));return set?set.text:null;}
+    if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation},typeof match.nodeId==='string' && match.nodeId?{nodeId:match.nodeId}:{}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));
+      // #1290: a step has traceMatch or traceScope, never both: the mapping replaces the scope.
+      if(set && t.local && Object.prototype.hasOwnProperty.call(t.local,'traceScope'))set=jsonSetField(set.text,t.path,'traceScope',null);
+      return set?set.text:null;}
     if(op==='clear-missing-work'){
       if(t.imported){var cleared=planTopologyTracking(source,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,'missingWork',true,true,context,t.index);return cleared.error?null:cleared.text;}
       var removed=jsonSetField(source,t.path,'missingWork',null);

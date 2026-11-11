@@ -58,7 +58,7 @@ function telemetryTraceModel(diagram,pathId,exemplar){
     var others=Array.isArray(step.traceMatch)?step.traceMatch.filter(function(a,i){return a && i!==match.alternative;}).map(function(a){
       return {name:a.serviceName+' '+a.operation,seen:normalized.spans.some(function(s){return s.serviceName===a.serviceName && s.operation===a.operation && (!a.namespace || s.attributes['service.namespace']===a.namespace) && Object.keys(a.attributes || {}).every(function(k){return s.attributes[k]===a.attributes[k];});})};
     }):[];
-    var row={id:match.stepId,nodeId:match.nodeId,edgeIndex:exact.length===1?diagram.edges.indexOf(exact[0]):null,status:match.status,tone:tone,duration:duration,budget:selector.maxDurationMs,label:label,operation:selector.operation || step.text || step.id,service:selector.serviceName,alternative:match.alternative,optional:!!match.optional,notThisFlow:!!match.notThisFlow,inherited:!!match.inherited,hint:match.hint || null,otherAlternatives:others,detail:match.detail,conditions:match.conditions,spanIds:match.spans.map(function(s){return s.id;}),
+    var row={id:match.stepId,nodeId:match.nodeId,edgeIndex:exact.length===1?diagram.edges.indexOf(exact[0]):null,status:match.status,tone:tone,duration:duration,budget:selector.maxDurationMs,label:label,operation:selector.operation || step.text || step.id,service:selector.serviceName,alternative:match.alternative,optional:!!match.optional,notThisFlow:!!match.notThisFlow,inherited:!!match.inherited,hint:match.hint || null,readerHint:match.shared?telemetryTraceReaderHint(diagram,step,match.shared):null,otherAlternatives:others,detail:match.detail,conditions:match.conditions,spanIds:match.spans.map(function(s){return s.id;}),
       intervals:match.spans.map(function(s){return {id:s.id,startMs:s.startMs,durationMs:s.durationMs};})};rows.push(row);
     // Only explicit stable node IDs and a uniquely delivered edge may annotate
     // the canvas. A service name or display title is never a join key.
@@ -281,6 +281,15 @@ function telemetryTraceRowTitle(r){
 /* #1290: the counts behind the Selected request coverage line. Optional steps missing from the
    trace, steps of another flow and steps without a mapping are not counted as to-match; timed
    carriers are the nodes and connections with a matched declared-span row. */
+/* #1290: the note a Map this span control shows for a step: mapping a span onto a step that
+   inherits through a traceScope replaces that scope. */
+function traceMapStepNote(step){return step && step.traceScope && typeof step.traceScope==='object' && !Array.isArray(step.traceScope)?' · replaces this step\'s trace scope':'';}
+function telemetryTraceReaderHint(diagram,step,shared){
+  function stepTitle(id){var st=(diagram.steps || []).find(function(x){return x && x.id===id;});return '“'+String(st && st.text || id).replace(/\s+/g,' ').trim()+'”';}
+  var nodeTitle=function(id){var n=(diagram.nodes || {})[id];return n && n.title || id;},parts=shared.id.split('->');
+  var carrier=shared.kind==='node'?nodeTitle(shared.id):nodeTitle(parts[0])+' → '+nodeTitle(parts[1]);
+  return 'Step '+stepTitle(step.id)+': '+carrier+' is also part of '+(shared.steps.length>1?'steps ':'step ')+shared.steps.map(stepTitle).join(', ')+', so this step shows no trace spans of its own.';
+}
 function telemetryTraceCounts(model){
   var rows=model.rows || [],n=function(f){return rows.filter(f).length;};
   var optional=n(function(r){return r.optional;}),other=n(function(r){return r.notThisFlow;}),unmapped=n(function(r){return r.status==='unmapped';});
@@ -295,8 +304,11 @@ function telemetryTraceCoverage(model){
   return c.matched+'/'+c.total+' steps matched · '+(c.optional?c.optional+' optional not in this trace · ':'')+(c.notThisFlow?c.notThisFlow+' not this flow · ':'')+
     (c.unmapped?c.unmapped+(c.unmapped===1?' step':' steps')+' without a trace mapping · ':'')+c.unmatched+' spans unmatched'+(timed?' · '+timed+' timed':'');
 }
-// Plain hints for steps left without a mapping because their carriers are shared.
-function telemetryTraceHints(model){return (model.rows || []).filter(function(r){return r.hint;}).map(function(r){return 'Step '+r.id+': '+r.hint;});}
+/* Plain hints for steps left without a mapping because their carriers are shared, in node and
+   step titles (the Workbench validator says the same to authors with ids and field names). */
+function telemetryTraceHints(model){return (model.rows || []).filter(function(r){return r.readerHint;}).map(function(r){return r.readerHint;});}
+// The rows a node or edge mark counts: a missing optional step and a step of another flow paint nothing.
+function telemetryTraceCountedRows(rows){return rows.filter(function(r){return !r.optional && !r.notThisFlow;});}
 function telemetryTraceLabel(listed){
   // #1175: an optional step missing from this trace is left out of the label; the title lists it.
   var rows=listed.filter(function(r){return !r.optional && !r.notThisFlow;}),time=telemetryTraceSpanTime(rows),one=rows.length===1 && rows[0],steps=rows.filter(function(r){return r.kind!=='carrier';});
@@ -316,7 +328,7 @@ function telemetryPaintTrace(binding,model,focus){
   function obstacles(svg){var hit=obstacleSets.find(function(o){return o.svg===svg;});if(!hit){hit={svg:svg,value:telemetryTraceObstacles(svg)};obstacleSets.push(hit);}return hit.value;}
   // Node labels: down first (up to 32), then sideways (up to 72 each way).
   var nodeMoves=[];for(var k=1;k<=8;k++)nodeMoves.push({dx:0,dy:k*4});[1,-1].forEach(function(side){for(var k=1;k<=6;k++)nodeMoves.push({dx:side*k*12,dy:0});});
-  function counted(rows){return rows.filter(function(r){return !r.optional;});}
+  var counted=telemetryTraceCountedRows;
   function mark(target,rows,x,y,level){
     var ranks={unknown:0,observed:1,warning:2,error:3},tone=counted(rows).reduce(function(a,r){return ranks[r.tone]>ranks[a]?r.tone:a;},'unknown');
     target.setAttribute('data-trace-tone',tone);target.setAttribute('data-trace-status',counted(rows).map(function(r){return r.status;}).join(' '));

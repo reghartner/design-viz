@@ -481,7 +481,7 @@
             el(pick,'option','','','Choose a step…').value='';mapSteps.forEach(function(step){el(pick,'option',step.id,'',step.label).value=step.id;});
             if(!mapSteps.some(function(step){return step.id===pick.value;}))pick.value='';
             var apply=button(mapper,'apply','reader-button dv-trace-map-apply','Map to step','mapTraceSpan');pick._mapApply=apply;pick._mapSteps=mapSteps;
-            pick._mapShow=function(){var chosen=pick._mapSteps.find(function(step){return step.id===pick.value;});pick._mapApply.textContent=chosen?'Map to step: '+chosen.caption:'Map to step';pick._mapApply.disabled=!chosen;if(pick._mapApply._liveArgument)pick._mapApply._liveArgument.stepId=pick.value;};
+            pick._mapShow=function(){var chosen=pick._mapSteps.find(function(step){return step.id===pick.value;});pick._mapApply.textContent=chosen?'Map to step: '+chosen.caption+(chosen.scoped?' (replaces this step\'s trace scope)':''):'Map to step';pick._mapApply.disabled=!chosen;if(pick._mapApply._liveArgument)pick._mapApply._liveArgument.stepId=pick.value;};
             apply._liveArgument={context:selected.context,spanId:focusedSpan.id,stepId:pick.value};pick._mapShow();
             if(!pick._mapChange){pick._mapChange=function(){if(pick._mapShow)pick._mapShow();};pick.addEventListener('change',pick._mapChange);}
           }else el(mapper,'p','none','dv-trace-map-none','Every step of this diagram already has a traceMatch.');

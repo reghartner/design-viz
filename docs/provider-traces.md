@@ -450,10 +450,13 @@ receiving span: its own `receive` declaration, or else the receiving node's `pro
 
 **Steps inherit declared spans (`traceScope`).** A step without `traceMatch` inherits the
 spans declared on the carriers it lights directly: its nodes, and its delivered connections'
-own `send` and `receive` spans (never an endpoint node's). Without a `traceScope` it inherits
+own `send` spans (never an endpoint node's; a declared `receive`, like the receiving node's
+`process` spans, only times the hand-off). Without a `traceScope` it inherits
 only from carriers no other step on the same path lights; when every declared carrier it
-lights is shared, it stays unmapped and the reader and the validator say which carrier and
-which other step, and ask for a `traceScope`. A step has `traceMatch` or `traceScope`, never
+lights is shared, it stays unmapped: the validator names the carrier, the other step and the
+path and asks for a `traceScope`; the reader names them by title. A step lighting one node
+(and no connection) annotates that node; a step lighting two or more nodes annotates none of
+them and shows only in the Status list and the coverage line. A step has `traceMatch` or `traceScope`, never
 both. `traceScope` (all fields optional; `{}` inherits from shared carriers too):
 
 ```json

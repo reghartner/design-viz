@@ -2461,8 +2461,11 @@ Steps that inherit declared spans (`traceScope`, see
 in the coverage line like `traceMatch` steps. A step of another flow reads `Not this flow` and
 is left out, like a missing optional step; the line ends with the carriers timed from their
 declarations (`· 3 nodes and 2 connections timed`). A step left without a mapping because its
-declared carriers are shared gets a plain hint below the line, for example `Step work: worker
-is also lit by step reply; add a trace scope to this step to choose its spans.`
+declared carriers are shared gets a plain hint below the line, for example `Step “Worker”:
+Worker is also part of step “Reply”, so this step shows no trace spans of its own.` A step of
+another flow paints nothing on the board. **Map this span** onto a step with a `traceScope`
+replaces the scope, and the chooser and the button say so before the click; so does the
+Workbench **Add trace match** button.
 
 A step that may be absent from a trace (for example, its operation runs in a different
 trace) can carry `traceMatch.optional: true`; with alternatives, set it on every

@@ -1016,7 +1016,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
      moves the view there (Live for today); a view change to another day clears the trace with one note. */
   var traceDayNote='',overTarget=null,overParked=null,traceLoads=0;
   // #1177: a picked example trace carried across an Edit-mode re-render, and the step chooser a span drop opened.
-  var carriedExample=null,traceChooser=null,traceReturnSpan=null;
+  var carriedExample=null,traceChooser=null,traceReturnSpan=null,traceDeclareOffer=null;
   function localDayKey(ms){var d=new Date(ms);return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())).toISOString().slice(0,10);}
   function traceDayOf(e){
     var at=Math.min.apply(null,(e && e.spans || []).map(function(s){return Date.parse(s.time);}).filter(function(t){return isFinite(t);}));if(!isFinite(at))return null;
@@ -1198,9 +1198,15 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // Chuck 2026-11-09: a drop on a node also writes its id as traceMatch.nodeId when the step names exactly
     // that node, so the node lights up at once (a node lights only through nodeId, #1078).
     var nodeId=hit.ref.kind==='node'?hit.ref.id:null;
-    if(named.length===1 && !named[0].mapped){api.mapTraceSpan({context:payload.context,spanId:payload.spanId,stepId:named[0].id,nodeId:nodeId});return;}
-    var dragged=entry.exemplar.spans.find(function(item){return item.id===payload.spanId;});
-    traceChooser={context:payload.context,spanId:payload.spanId,nodeId:nodeId,span:dragged?dragged.service+' · '+dragged.name:'this span',label:carrierLabel(entry.binding,hit.ref),steps:named,drop:(traceChooser && traceChooser.drop || 0)+1};paint();notify();
+    var dragged=entry.exemplar.spans.find(function(item){return item.id===payload.spanId;}),label=carrierLabel(entry.binding,hit.ref);
+    // #1290 PR 9: what "Declare on <title>" would write for this drop: the carrier and the span's exact names.
+    var offer=dragged && dragged.service && dragged.name?{context:payload.context,spanId:payload.spanId,ref:hit.ref,label:label,kind:hit.ref.kind,span:{serviceName:dragged.service,operation:dragged.name}}:null;
+    if(named.length===1 && !named[0].mapped){
+      // The #1177 immediate mapping stays (team-lead ruling); its note offers "Declare on <title> instead".
+      if(api.mapTraceSpan({context:payload.context,spanId:payload.spanId,stepId:named[0].id,nodeId:nodeId}) && offer)traceDeclareOffer=Object.assign(offer,{step:named[0].id});
+      return;
+    }
+    traceChooser={context:payload.context,spanId:payload.spanId,nodeId:nodeId,span:dragged?dragged.service+' · '+dragged.name:'this span',label:label,steps:named,declare:offer,drop:(traceChooser && traceChooser.drop || 0)+1};paint();notify();
   }
   function traceFocusSnapshot(entry,context){
     if(!traceFocus)return null;
@@ -1241,6 +1247,16 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(row && row.status==='missing' && kept && !Array.isArray(kept) && (kept.parentStepId || kept.attributes || kept.namespace || kept.occurrence!=null))out.unmatched=true;
     return out;
   }
+  /* #1290 PR 9: the roles a declaration on a node or connection can take, default first. */
+  var DECLARE_ROLES={node:['process','database','cache','call','work'],edge:['send','receive']};
+  // "Declare on <title> instead" beside the note of the mapping a carrier drop just made.
+  function declareOfferNote(context){
+    var o=traceDeclareOffer,st=editing() && editor.state(),m=st && st.mapped;
+    if(!o || !m || o.context!==context || m.step!==o.step || st.lastTrace==='declare' || !editor.declareInstead)return null;
+    return {label:o.label,kind:o.kind,roles:DECLARE_ROLES[o.kind]};
+  }
+  // The latest pending declaration, when it is the newest trace change, with its Undo.
+  function declaredNote(){var st=editing() && editor.state();return st && st.lastTrace==='declare' && st.declared?st.declared:null;}
   // A diagram maps a loaded trace through step traceMatch or (#1290) spans declared on its nodes and edges.
   function traceMapsDiagram(d){
     return (d.steps || []).some(function(step){return !!step.traceMatch;}) ||
@@ -1267,8 +1283,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{errorNote:traceErrorNote(errorTarget),key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:traceMapsDiagram(selected.binding.section.diagram),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:canOpenOver()}),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,
       // #1177: the step chooser of a span drop, and the latest pending mapping with its Undo.
-      mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,span:traceChooser.span,spanId:traceChooser.spanId,drop:traceChooser.drop,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,disabled:step.alternatives,label:step.caption+(step.alternatives?' · has alternatives; edit in Inspect':step.mapped?' · mapped, replaces':step.scoped?' · replaces this step\'s trace scope':'')};})}:null,
-      mapped:mappedNote(selected,model),enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
+      mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,span:traceChooser.span,spanId:traceChooser.spanId,drop:traceChooser.drop,declare:traceChooser.declare && editor && editor.declareSpan?{label:traceChooser.declare.label,kind:traceChooser.declare.kind,roles:DECLARE_ROLES[traceChooser.declare.kind]}:null,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,disabled:step.alternatives,label:step.caption+(step.alternatives?' · has alternatives; edit in Inspect':step.mapped?' · mapped, replaces':step.scoped?' · replaces this step\'s trace scope':'')};})}:null,
+      mapped:mappedNote(selected,model),declareOffer:declareOfferNote(context),declared:declaredNote(),enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   /* #1163: metric cards are placed against the trace labels' boxes at paint time. Text is laid
      out again at each board scale, so a label's box can change without a paint: the Auto view
@@ -2294,6 +2310,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // #1078: write the focused span's exact service and operation as the chosen step's traceMatch.
     mapTraceSpan:function(action){
       if(retired || !editing() || statusMode!=='trace' || !action || typeof action.stepId!=='string')return false;
+      traceDeclareOffer=null;
       var selected=traceSnapshot().selected;if(!selected || action.context!==selected.context)return false;
       var entry=traceSources().entries.find(function(e){return e.key===selected.key;}),span=entry && entry.exemplar.spans.find(function(s){return s.id===action.spanId;});
       var steps=entry && traceMapSteps(entry.binding),step=steps && steps.find(function(item){return item.id===action.stepId;});
@@ -2310,6 +2327,19 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(retired || !traceChooser || !action)return false;var c=traceChooser,step=c.steps.find(function(item){return item.id===action.stepId;});if(!step)return false;
       return api.mapTraceSpan({context:c.context,spanId:c.spanId,stepId:step.id,replace:step.mapped,nodeId:c.nodeId});
     },
+    /* #1290 PR 9: declare the dropped span on the carrier: from the chooser (declareSpan), or in place of
+       the mapping a carrier drop just made (declareInstead, one pending change). */
+    declareTraceSpan:function(action){
+      if(retired || !editing() || !traceChooser || !traceChooser.declare || !editor.declareSpan)return false;
+      var o=traceChooser.declare,role=action && action.role || DECLARE_ROLES[o.kind][0];if(DECLARE_ROLES[o.kind].indexOf(role)<0)return false;
+      traceChooser=null;traceReturnSpan=o.spanId;setTimeout(function(){if(!retired && !editor.declareSpan(o.ref,{serviceName:o.span.serviceName,operation:o.span.operation,role:role}))traceReturnSpan=null;},0);paint();notify();return true;
+    },
+    declareTraceSpanInstead:function(action){
+      if(retired || !editing() || !traceDeclareOffer || !editor.declareInstead)return false;
+      var o=traceDeclareOffer,role=action && action.role || DECLARE_ROLES[o.kind][0];if(DECLARE_ROLES[o.kind].indexOf(role)<0)return false;
+      traceDeclareOffer=null;traceReturnSpan=o.spanId;setTimeout(function(){if(!retired && !editor.declareInstead(o.ref,{serviceName:o.span.serviceName,operation:o.span.operation,role:role}))traceReturnSpan=null;},0);return true;
+    },
+    undoTraceDeclare:function(){if(retired || !editor || !editor.undoDeclare)return false;setTimeout(function(){if(!retired)editor.undoDeclare();},0);return true;},
     cancelTraceMapChooser:function(){if(retired || !traceChooser)return;traceChooser=null;traceReturnSpan=null;paint();notify();},
     // #1177: take back the latest pending span mapping (board-edit.js undoMap); it re-renders the board.
     undoTraceMap:function(){if(retired || !editor || !editor.undoMap)return false;setTimeout(function(){if(!retired)editor.undoMap();},0);return true;},

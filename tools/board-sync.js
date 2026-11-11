@@ -7,7 +7,8 @@
      node tools/board-sync.js pull <local.json> <live.json> [--resolve KEY=live|local ...]
      node tools/board-sync.js log  <local.json> <live.json> --by <name> [--id <user id>]
                                    [--summary <one line>] [--confirm KEY ...]
-   KEY is a Jira key, or step:<step id> for a step's traceMatch.
+   KEY is a Jira key, step:<step id> for a step's traceMatch, or span:<span key> for a span
+   declared on a node or connection (#1290).
 
    <live.json> is the board's current flowspec.json, read from the artifact. <local.json> is
    the agent's copy; both commands rewrite it in place and never touch <live.json>.
@@ -25,6 +26,10 @@
    else, or a deleted step, is a conflict. nodeId merges the same way on its own (#1192),
    and a nodeId whose node the local copy lacks is a conflict. Every other line of the local file stays
    as written.
+
+   A span declared on a node or connection (#1290, "Declare on this node") reaches the same carrier
+   in the local copy (the consumer overlay for an imported one); a local span already under that key
+   is kept when it names the same service and operation, and is a conflict otherwise.
 
    `log` appends one agent entry ({source: "agent", summary, changes}) describing the change
    from the live file to the local copy, after the local copy holds every live entry.
@@ -170,6 +175,8 @@ function describe(entry){
   (Array.isArray(entry.changes)?entry.changes:[]).forEach(change=>{
     if(!isObject(change))return;
     if(change.op==='clear-missing-work'){lines.push({text:'Missing work cleared from '+changeLabel(change)});return;}
+    // #1290: Edit mode declared a trace span on a node or connection; it moves no ticket.
+    if(change.op==='trace-span' && isObject(change.span)){lines.push({text:change.span.key+' ('+spanText(change.span)+') declared on '+changeLabel(change)});return;}
     // #1078: Edit mode mapped a trace span to a step; it moves no ticket.
     if(change.op==='trace-match'){const m=isObject(change.traceMatch)?change.traceMatch:{};lines.push({text:m.serviceName+' · '+m.operation+' mapped to step '+(typeof change.label==='string' && change.label?change.label:change.step)+(isObject(change.replaces)?' (replaced '+spanText(change.replaces)+')':'')});return;}
     if(typeof change.ticket!=='string')return;
@@ -237,7 +244,7 @@ function pull(localText,liveText,options){
   const touched=new Map(),unplaced=[];
   sortedByTime(fresh).reverse().forEach(entry=>{
     (Array.isArray(entry.changes)?entry.changes:[]).slice().reverse().forEach(change=>{
-      if(!isObject(change) || change.op==='trace-match')return;
+      if(!isObject(change) || change.op==='trace-match' || change.op==='trace-span')return;
       const key=changeKey(liveRaw,live.map,change);
       if(key===null){unplaced.push(who(entry)+' '+when(entry.at)+': '+describe({changes:[change]}).join('; '));return;}
       if(!base.has(key)){const chain=JSON.parse(key);base.set(key,{key,chain,path:change.path,kind:isOverlayChain(chain)?'overlay':'unknown',label:changeLabel(change),tickets:[],missingWork:false});}
@@ -317,6 +324,26 @@ function pull(localText,liveText,options){
     if(takeNode){if(wantNode===undefined)delete value.nodeId;else value.nodeId=wantNode;}
     stepWrites.push({path:mineStep.path,value});
   });
+  /* #1290: spans the board declared on a node or connection. Absent locally: write it there; the same
+     service and operation under that key: keep; anything else asks (--resolve span:<key>=live|local). */
+  const spanWrites=[];
+  sortedByTime(fresh).forEach(entry=>(Array.isArray(entry.changes)?entry.changes:[]).forEach(change=>{
+    if(!isObject(change) || change.op!=='trace-span' || !isObject(change.span) || typeof change.span.key!=='string')return;
+    const key=changeKey(liveRaw,live.map,change),sp=change.span,choice=resolve['span:'+sp.key];
+    if(key===null){unplaced.push(who(entry)+' '+when(entry.at)+': '+describe({changes:[change]}).join('; '));return;}
+    const told='span '+sp.key+': on the board '+who(entry)+' declared '+spanText(sp)+' on '+changeLabel(change)+' on '+when(entry.at);
+    if(choice==='local')return;
+    const chain=JSON.parse(key),paths=C.boardEditResolveChain(localRaw,chain),overlay=isOverlayChain(chain);
+    if(paths.length!==1 && !overlay){conflicts.push({kind:'carrier-missing',span:sp.key,message:told+', but your local copy no longer has '+changeLabel(change)+'. Ask the author where it goes, then rerun with --resolve span:'+sp.key+'=local.'});return;}
+    const value=paths.length===1?C.specValueAt(localRaw,paths[0]):undefined;
+    const mineSpan=isObject(value) && isObject(value.trace) && isObject(value.trace.spans)?value.trace.spans[sp.key]:undefined;
+    if(sameSpan(mineSpan,sp))return;
+    if(mineSpan!==undefined && choice!=='live'){
+      conflicts.push({kind:'span-changed',span:sp.key,message:told+'; your local copy declares '+(isObject(mineSpan)?spanText(mineSpan):'something else')+' under that key. Ask the author which to keep, then rerun with --resolve span:'+sp.key+'=live or --resolve span:'+sp.key+'=local.'});
+      return;
+    }
+    spanWrites.push({chain,span:{serviceName:sp.serviceName,operation:sp.operation,role:sp.role},key:sp.key});
+  }));
   if(conflicts.length)return {status:'conflict',text:localText,edits,conflicts,unplaced};
 
   const targets=new Map();
@@ -340,6 +367,21 @@ function pull(localText,liveText,options){
   });
   let text=applyTargets(localText,localRaw,[...targets.values()]);
   stepWrites.forEach(write=>{text=setField(text,write.path,'traceMatch',JSON.stringify(write.value));});
+  spanWrites.forEach(write=>{
+    // Re-read: ticket and overlay writes above may have created or moved the carrier's entry.
+    const raw=JSON.parse(text),paths=C.boardEditResolveChain(raw,write.chain);
+    if(paths.length===1 && isObject(C.specValueAt(raw,paths[0]))){
+      const value=C.specValueAt(raw,paths[0]),trace=isObject(value.trace)?JSON.parse(JSON.stringify(value.trace)):{};
+      trace.spans=Object.assign(isObject(trace.spans)?trace.spans:{},{[write.key]:write.span});
+      text=setField(text,paths[0],'trace',JSON.stringify(trace));return;
+    }
+    // A consumer overlay entry the local copy does not have yet: [... 'topologyImports', i, field, rel].
+    const at=write.chain.findIndex((part,i)=>part==='topologyImports' && (write.chain[i+2]==='nodeTracking' || write.chain[i+2]==='edgeTracking'));
+    const importPath=C.boardEditResolveChain(raw,write.chain.slice(0,at+2))[0],field=write.chain[at+2],rel=write.chain[at+3];
+    const map=isObject(C.specValueAt(raw,importPath.concat([field])))?JSON.parse(JSON.stringify(C.specValueAt(raw,importPath.concat([field])))):{};
+    map[rel]={trace:{spans:{[write.key]:write.span}}};
+    text=setField(text,importPath,field,JSON.stringify(map));
+  });
   text=appendHistory(text,fresh);
   return {status:'merged',text,edits,conflicts:[],unplaced};
 }

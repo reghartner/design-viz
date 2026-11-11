@@ -182,7 +182,9 @@ def infer(raw):
                     if key in ('revealAt', 'hideAt'): features.add('reveals')
                     if key == 'panelVisibility' or key == 'visible': features.add('visibility')
                     if key in ('audio', 'spotlight', 'alarm'): features.add('audio')
-                    if key in ('traceMatch', 'traceConnections'): features.add('traces')
+                    if key in ('traceMatch', 'traceConnections', 'traceScope'): features.add('traces')
+                    # #1290: spans declared on a node or edge, or a consumer overlay's trace patch.
+                    if key == 'trace' and isinstance(item, dict) and ('spans' in item or 'hide' in item): features.add('traces')
                     if key == 'delta': features.add('delta')
                     if key == 'detailOnly': features.add('drilldowns')
                     visit(item)

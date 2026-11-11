@@ -1,0 +1,86 @@
+{
+  "page": {
+    "title": "Trace-ready request with declared spans \u00b7 fictional fixture",
+    "sections": [
+      {
+        "id": "request",
+        "diagram": {
+          "nodes": {
+            "client": {
+              "title": "Client"
+            },
+            "api": {
+              "title": "Request API",
+              "trace": {
+                "spans": {
+                  "process": {
+                    "serviceName": "request-api",
+                    "operation": "POST /records",
+                    "role": "process"
+                  }
+                }
+              }
+            },
+            "store": {
+              "title": "Record store",
+              "trace": {
+                "spans": {
+                  "write": {
+                    "serviceName": "record-store",
+                    "operation": "INSERT record",
+                    "role": "database",
+                    "attributes": {
+                      "db.system": "postgresql"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "rows": [
+            [
+              "client",
+              "api",
+              "store"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "client",
+              "to": "api"
+            },
+            {
+              "from": "api",
+              "to": "store"
+            }
+          ],
+          "panels": [
+            {
+              "id": "status",
+              "type": "live-status"
+            }
+          ],
+          "steps": [
+            {
+              "id": "receive",
+              "text": "Receive request",
+              "nodes": [
+                "api"
+              ]
+            },
+            {
+              "id": "persist",
+              "text": "Write record",
+              "nodes": [
+                "store"
+              ],
+              "traceScope": {
+                "parentStepId": "receive"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

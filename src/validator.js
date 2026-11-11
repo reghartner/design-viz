@@ -122,7 +122,7 @@ function carrierTraceMatchWarning(value, d, kind, id, path, warnings){
   if(!value || typeof value!=='object' || !Object.prototype.hasOwnProperty.call(value,'traceMatch'))return;
   var imports=(d.topologyProvenance && Array.isArray(d.topologyProvenance.imports))?d.topologyProvenance.imports:[];
   if(imports.some(function(imp){return imp && Array.isArray(imp[kind+'s']) && imp[kind+'s'].indexOf(id)>=0;}))return;
-  warnings.push(path+'.traceMatch: traceMatch is read only from steps; this value on '+kind+' '+id+' is ignored. Put it on the step that lights this '+kind+'.');
+  warnings.push(path+'.traceMatch: traceMatch is read only from steps; this value on '+kind+' '+id+' is ignored. Put it on the step that lights this '+kind+', or declare it under trace.spans.');
 }
 function trackingWarnings(value, path, warnings){
   if(value && Object.prototype.hasOwnProperty.call(value,'missingWork') && typeof value.missingWork!=='boolean')

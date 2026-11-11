@@ -236,6 +236,16 @@ class ValidateCliTest(unittest.TestCase):
                 with self.subTest(remedy=remedy):
                     self.assertIn(remedy, error_line)
 
+    def test_trace_scope_example(self):
+        # #1290 PR 10: orders-scoped lights the imported worker from two steps; the one with a
+        # traceScope inherits it. It validates with the provider; the step without a scope gets the
+        # documented shared-carrier warning.
+        scoped, platform = TOPOLOGY / "orders-scoped.json", TOPOLOGY / "orders-platform.json"
+        r = run_cli(str(scoped), str(platform))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(f"{scoped}: 0 errors, 1 warnings", r.stdout)
+        self.assertIn("step receive inherits no trace spans because orders::worker is also lit by step work", r.stdout)
+
     def test_trace_span_example_pair_and_invalid_provider_declaration(self):
         # #1290: examples/canon/topology orders-platform (declares trace spans) and
         # orders-board (changes one, adds one, hides one) validate cleanly together.

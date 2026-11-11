@@ -10,7 +10,7 @@
 | R6 | the same boards, like Jira's 5-minute answer reuse | Metrics off then on 60 s after an answer: no call; the answer shows again with its own refreshed time; the next refresh comes 5 minutes after that answer | a toggle that refetches |
 | R7 | a board with environments qa and stg | qa → stg → qa within 5 minutes: one call for stg, none for the second qa, which shows qa's answer and time | an environment flip that refetches |
 | R8 | the same boards with a failing query | Retry after the failed answer calls at once; once a Retry answers cleanly, off/on reuses that answer | Retry that is held back after an error |
-| R10 | the same boards with a failing query | an answer that names a failure is not reused: off/on calls again at once | a failed answer held for 5 minutes with no way to try again |
+| R10 | the same boards with a failing query | an answer that names a failure is not reused: off/on a minute later calls again at once | a failed answer held for 5 minutes with no way to try again |
 | R11 | the same boards | after clear() (a host account signal), setAvailable(false) then true, both together (an account change), retractSources, or a refresh that failed outright, Metrics off/on within 5 minutes calls again | a reused answer that outlives an account change, a revoked source or a failure |
 | R9 | the reviewer's exp8 toggles | five off/on toggles in 3 s after the first answer make no call | a reader toggle as a fast poll |
 */
@@ -166,12 +166,13 @@ for(const kind of ['grafana','honeycomb']){
   }finally{h.close();}
  });
 }
-for(const kind of ['grafana','honeycomb'])test('R10 '+kind+': an answer that names a failure is not reused; off/on calls again at once',async()=>{
+for(const kind of ['grafana','honeycomb'])test('R10 '+kind+': an answer that names a failure is not reused; off/on a minute later calls again at once',async()=>{
  const h=await setup(kind,{fail:()=>true});
  try{
   h.api.setEnabled(true);await settle();assert.equal(h.data(),1);assert.match(h.api.status().note,/boom/);
-  h.advance(5000);h.api.setEnabled(false);h.api.setEnabled(true);await settle();
-  assert.equal(h.data(),2,'off/on after a failed answer tries again at once');assert.deepEqual(h.armed(),[FIVE]);
+  // #1313: within 60 s of the failed call it waits (R16); after that it calls at once, since a failed answer is never reused.
+  h.advance(61000);h.api.setEnabled(false);h.api.setEnabled(true);await settle();
+  assert.equal(h.data(),2,'off/on after a failed answer tries again');assert.deepEqual(h.armed(),[FIVE]);
  }finally{h.close();}
 });
 for(const kind of ['grafana','honeycomb'])for(const [label,drop] of [
@@ -205,6 +206,8 @@ for(const kind of ['grafana','honeycomb'])test('R11 '+kind+': after a refresh th
 | R13 | the same boards | Refresh now calls once at once and re-arms the refresh timer at 5 minutes from its answer; a second Refresh now while it runs makes no call; after the answer a Refresh now within 60 s makes no call and reports the cooldown until 60 s after the first; once the cooldown ends it calls again | a Refresh now that is ignored, queues, or can exceed one call a minute |
 | R14 | the same boards | a Refresh now within 60 s of an automatic call makes no call; the click shows the cooldown until 60 s after that call, and its end repaints | two refreshes inside a minute |
 | R15 | the same boards | with Metrics off, or Over time open, Refresh now is off and makes no call | a hidden way to call |
+| R16 | the same boards with a failing query | off/on 5 s after a failed answer makes no call yet: it shows the cooldown until 60 s after that call, and the call runs then; a first Metrics on in another environment calls at once | off/on during provider errors as a fast poll |
+| R17 | the same boards | a refresh held past 61 s still ignores Refresh now until it answers | a second call while one runs |
 */
 for(const kind of ['grafana','honeycomb']){
  test('R12 '+kind+': off/on after 5 minutes shows the cached answer at once, then refreshes it with exactly one background call',async()=>{
@@ -222,6 +225,7 @@ for(const kind of ['grafana','honeycomb']){
  test('R13 '+kind+': Refresh now calls once at once, re-arms the timer, ignores clicks while running and keeps a 60 s cooldown',async()=>{
   const h=await setup(kind);
   try{
+   assert.equal(typeof h.api.refreshNow,'function','refreshNow exists');assert.equal(typeof h.api.refreshNowState,'function','refreshNowState exists');
    h.api.setEnabled(true);await settle();assert.equal(h.data(),1);
    h.advance(120000);assert.equal(h.api.refreshNowState().state,'ready');assert.equal(h.api.refreshNowState().refreshedAt,h.api.status().refreshedAt,'it names the last update');
    h.value.hold=true;h.value.n=55;assert.equal(h.api.refreshNow(),true,'Refresh now calls');await settle();assert.equal(h.data(),2,'at once');
@@ -236,6 +240,7 @@ for(const kind of ['grafana','honeycomb']){
  test('R14 '+kind+': Refresh now within 60 s of an automatic refresh makes no call',async()=>{
   const h=await setup(kind);
   try{
+   assert.equal(typeof h.api.refreshNow,'function','refreshNow exists');assert.equal(typeof h.api.refreshNowState,'function','refreshNowState exists');
    h.api.setEnabled(true);await settle();h.advance(FIVE);await h.fireMs(FIVE);assert.equal(h.data(),2,'the automatic refresh');
    h.advance(20000);assert.equal(h.api.refreshNow(),false,'within 60 s of that call');await settle();assert.equal(h.data(),2,'no call');
    const state=h.api.refreshNowState();assert.equal(state.state,'cooldown','the click shows the cooldown');assert.equal(state.until,new Date(START+FIVE+60000).toISOString(),'until 60 s after the automatic call');
@@ -245,9 +250,33 @@ for(const kind of ['grafana','honeycomb']){
  test('R15 '+kind+': Refresh now is off while Metrics is off or Over time is open',async()=>{
   const h=await setup(kind);
   try{
+   assert.equal(typeof h.api.refreshNow,'function','refreshNow exists');assert.equal(typeof h.api.refreshNowState,'function','refreshNowState exists');
    assert.equal(h.api.refreshNowState().state,'off');assert.equal(h.api.refreshNow(),false);await settle();assert.equal(h.data(),0);
    h.api.setEnabled(true);await settle();h.advance(120000);h.api.openHistory([{at:new Date(START).toISOString(),key:'2026-11-10'}],0);await settle();const before=h.data();
    assert.equal(h.api.refreshNowState().state,'off');assert.equal(h.api.refreshNow(),false);await settle();assert.equal(h.data(),before);
+  }finally{h.close();}
+ });
+}
+for(const kind of ['grafana','honeycomb']){
+ test('R16 '+kind+': off/on after a failed answer waits out 60 s from that call; a new environment calls at once',async()=>{
+  let failing=true;const h=await setup(kind,{fail:()=>failing,environments:true});
+  try{
+   h.api.setEnabled(true);await settle();assert.equal(h.data(),1);assert.match(h.api.status().note,/boom/);
+   h.advance(5000);h.api.setEnabled(false);h.api.setEnabled(true);await settle();
+   assert.equal(h.data(),1,'off/on 5 s after a call: no call yet');
+   const state=h.api.refreshNowState();assert.equal(state.state,'cooldown','the wait shows as the Refresh now cooldown');assert.equal(state.until,new Date(START+60000).toISOString());
+   assert.ok(h.armed().includes(55000),'the call is scheduled for 60 s after the last one: '+JSON.stringify(h.armed()));
+   failing=false;h.advance(55000);while([...h.timers.values()].some(x=>x.ms===55000))await h.fireMs(55000);assert.equal(h.data(),2,'it calls then (the call and the cooldown repaint end together)');
+   h.advance(1000);assert.equal(h.api.setEnvironment('stg'),true);await settle();assert.equal(h.data(),3,'a first look at another environment calls at once');
+  }finally{h.close();}
+ });
+ test('R17 '+kind+': a refresh held past 61 s still ignores Refresh now until it answers',async()=>{
+  const h=await setup(kind);
+  try{
+   assert.equal(typeof h.api.refreshNow,'function','refreshNow exists');
+   h.api.setEnabled(true);await settle();h.advance(120000);h.value.hold=true;assert.equal(h.api.refreshNow(),true);await settle();assert.equal(h.data(),2);
+   h.advance(62000);assert.equal(h.api.refreshNowState().state,'busy');assert.equal(h.api.refreshNow(),false,'busy, though the cooldown has passed');await settle();assert.equal(h.data(),2);
+   await h.release();assert.equal(h.api.refreshNowState().state,'ready');assert.equal(h.api.refreshNow(),true);await settle();assert.equal(h.data(),3);
   }finally{h.close();}
  });
 }

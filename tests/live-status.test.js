@@ -5048,3 +5048,20 @@ test('#1280 the reveal ends the opened detail itself at the window edge less 8px
   assert.equal(scroller.scrollTop,108,'last item: the detail still ends at the edge less 8 px');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;api.destroy();}
 });
+
+/* #1293: the Metrics line says "· Refreshing…" while a refresh runs over a shown answer, and while Refresh now cools
+   down it says when it is available again (visible text, not only the button's tooltip). */
+test('M14 the Metrics line shows Refreshing… over a shown answer and the Refresh now cooldown as text',async()=>{
+ let release=null,calls=0;const sample={a:{signals:{lag:{value:3}}}};
+ const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:()=>{calls++;return new Promise(r=>{release=()=>r(sample);});}}});
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const text=()=>textOf(h.view.querySelector('.dv-live-metrics-connection')),refresh=()=>h.view.querySelector('.dv-live-metrics-refresh');
+ h.ctl.liveStatus.setMetricsEnabled(true);await settle();release();await settle();h.flush();
+ assert.ok(refresh() && !refresh().hidden,'Refresh now shows while Metrics is on');assert.doesNotMatch(text(),/Refreshing…/);
+ const tick=[...h.timers].find(([,x])=>x.ms===300000);assert.ok(tick,'the refresh is armed');h.timers.delete(tick[0]);tick[1].fn();await settle();h.flush();
+ assert.match(text(),/ · Refreshing…/,'a refresh over the shown answer says so: '+text());assert.equal(refresh().getAttribute('aria-busy'),'true');
+ release();await settle();h.flush();assert.doesNotMatch(text(),/Refreshing…/);
+ assert.equal(h.ctl.liveStatus.refreshMetricsNow(),false,'within 60 s of that refresh');await settle();h.flush();assert.equal(calls,2);
+ assert.match(text(),/ · Refresh now available at .+/,'the cooldown is visible text: '+text());assert.equal(refresh().getAttribute('aria-disabled'),'true');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});

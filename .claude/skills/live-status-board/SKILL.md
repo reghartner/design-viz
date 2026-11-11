@@ -380,7 +380,10 @@ and carry on. Every time you change a published board:
    and your change puts that ticket somewhere else, removes it, puts it back,
    or deletes its node or edge; or a board edit mapped a span to a step and your
    change maps another span, removes the `traceMatch` or deletes the step
-   (`--confirm step:<step id>`). This is the one case
+   (`--confirm step:<step id>`); or a board edit declared a span on a node or
+   connection and your change removes or changes that span, or deletes that node
+   or connection (`--confirm 'span:<carrier>/<span key>'`, quoted: an edge
+   carrier's `->` is a shell redirection unquoted). This is the one case
    to stop and ask the author, quoting the printed line. Rerun with
    `--confirm KEY` once they agree; if they do not, put that ticket back where
    the board has it and rerun. Do not ask about board edits older than the

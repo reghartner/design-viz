@@ -29,6 +29,11 @@
 - A `traceMatch` on a node or edge now warns "…, or declare it under trace.spans". The
   authoring packet routes the traces docs for declarations and scopes too, with examples in
   `examples/canon/topology/orders-*.json` and `examples/trace-ready/declared.spec.json`.
+- `tools/canon/trace-cli.mjs compare` on a board with `topologyImports` still runs without
+  `--resolve-imports` (#1123), except when a reference step without `traceMatch` lights an
+  imported node or connection: that step can inherit the provider's declared spans, which
+  only resolution shows, so compare stops and names the option. Such boards compared
+  without the option before; add `--resolve-imports`.
 - Published boards pick this up when they are republished.
 
 ## Live status header without a GitHub connector (2026-11-04)

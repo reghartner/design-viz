@@ -67,6 +67,12 @@ function boardEditSameSpan(a,b){
   var attrs=function(x){var v=x.attributes && typeof x.attributes==='object'?x.attributes:{};return JSON.stringify(Object.keys(v).sort().map(function(k){return [k,v[k]];}));};
   return ['serviceName','operation','operationPrefix','role','namespace'].every(function(k){return (a[k]===undefined?null:a[k])===(b[k]===undefined?null:b[k]);}) && attrs(a)===attrs(b);
 }
+// Key-order-independent JSON for comparing authored values (arrays keep their order).
+function boardEditCanonical(v){
+  if(Array.isArray(v))return '['+v.map(boardEditCanonical).join(',')+']';
+  if(v && typeof v==='object')return '{'+Object.keys(v).sort().map(function(k){return JSON.stringify(k)+':'+boardEditCanonical(v[k]);}).join(',')+'}';
+  return JSON.stringify(v===undefined?null:v);
+}
 function boardEditSamePrefix(path,prefix){return prefix.every(function(part,i){return path[i]===part;});}
 
 function createBoardEditor(options){
@@ -278,7 +284,7 @@ function createBoardEditor(options){
       // A mapping removes the step's traceScope: never one their version added or changed (#1290 review M2).
       if(entry.op==='trace-match'){
         var at_=specValueAt(parsed(text),paths[0]),theirScope=at_ && typeof at_==='object'?at_.traceScope:undefined;
-        if(theirScope!==undefined && (!op.hadScope || JSON.stringify(theirScope)!==JSON.stringify(op.scope))){
+        if(theirScope!==undefined && (!op.hadScope || boardEditCanonical(theirScope)!==boardEditCanonical(op.scope))){
           refuse(op.hadScope?'their version changed that step\'s trace scope; edit it in Inspect':'their version gives that step a trace scope; edit it in Inspect');return;}
       }
       if(!apply(entry.op,ref,entry.ticket,null,entry.traceMatch,op.previous) && text===before){

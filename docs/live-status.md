@@ -2391,7 +2391,8 @@ carrier (and the optional `path` and `label`), never a `ticket`. A `"trace-match
 change records a span mapped to a step in Edit mode (#1078): it carries `step` (the
 step id) and `traceMatch` (`serviceName` and `operation` strings, plus the resulting `nodeId` when the step has one after the mapping), the optional
 `path` and `label` (the step text), `replaces` (the `serviceName`, `operation` and any `nodeId` it
-replaced, #1180) when it replaced a mapping, and no `ticket`, `node` or `edge`; the panel
+replaced, #1180) when it replaced a mapping, `replacesScope` (the step's `traceScope` object the
+mapping removed, #1290) when it replaced a trace scope, and no `ticket`, `node` or `edge`; the panel
 reads it as "payment · grpc.msdemo.PaymentService/Charge mapped to step Charge the
 card", with "(replaced <service> · <operation>)" after a replacement. `board-sync pull`
 sets a step's newest board mapping where the local step still equals the `replaces` of

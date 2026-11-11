@@ -29,3 +29,7 @@ body .text-view :is(button,select):disabled{opacity:.5;cursor:default;}
 .text-view-text{flex:1;min-width:0;min-height:0;box-sizing:border-box;margin:0;padding:10px 12px;overflow:auto;white-space:pre;overflow-wrap:normal;tab-size:4;border:1px solid var(--explore-border);border-radius:6px;background:var(--explore-bg);color:var(--dtext);font:12px/1.5 'IBM Plex Mono',ui-monospace,monospace;}
 .text-view-wrapped .text-view-text{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:hidden;}
 @media print{.text-view,.text-view-launch{display:none!important;}}
+/* The Contents panel row (always present): the panel's own border and paper. */
+.reader-text-view-entry{flex:none;padding:8px 12px;border-top:1px solid var(--explore-border);}
+.reader-text-view-entry:empty{display:none;}
+body .reader-navigation .reader-text-view-entry .reader-button{display:block;width:100%;text-align:left;}

@@ -9,8 +9,10 @@
    scroll position; the chosen path is kept while the same document is shown.
    Opening it closes Search and the reverse ('reader-window-open' on the view).
    Placement is decided by the bar's fitting pass (contents.js fitText): the
-   launcher is the lowest-priority control, shown inline, as a "Text view" item
-   in "More page actions", or not at all; place() applies that decision. */
+   launcher is the lowest-priority control and never moves another one: shown
+   inline, as a "Text view" item in "More page actions", or not in the bar;
+   place() applies that decision. A "Text view" entry in the Contents panel
+   always opens the window, so it is reachable at every width. */
 var TEXT_VIEW_TABS=[{id:'steps',label:'Steps'},{id:'elements',label:'Elements'},{id:'flat',label:'Flat lines'}];
 var textViewSession={tab:'steps',queries:'names',wrap:false};
 var textViewSequence=0;
@@ -49,12 +51,16 @@ function createReaderTextView(ctl,nav,actions,currentRecord,host){
   function button(label,text,parent,fn){var node=el('button','reader-button',text,parent);node.type='button';node.setAttribute('aria-label',label);node.title=label;node.addEventListener('click',fn);return node;}
   var launch=el('span','text-view-launch'),searchLaunch=actions.querySelector(':scope > .document-search-launch');
   if(searchLaunch)searchLaunch.after(launch);else actions.prepend(launch);
-  var toggle=button('Text view','Text',launch,function(){setOpen(!opened,{focus:true});});
+  var toggle=button('Text view','Text',launch,function(){opener=toggle;setOpen(!opened,{focus:true});});
   toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-haspopup','dialog');toggle.title='Text view: read this document as text';
   // The same action as an item of the bar's "More page actions" menu.
-  var menuItem=button('Text view','Text view',null,function(){if(host.closeMenu)host.closeMenu();setOpen(true,{focus:true});});
+  var opener=null;
+  var menuItem=button('Text view','Text view',null,function(){if(host.closeMenu)host.closeMenu();opener=menuItem;setOpen(true,{focus:true});});
   menuItem.classList.add('text-view-menu-item');menuItem.setAttribute('aria-haspopup','dialog');menuItem.hidden=true;
   var placement='none',refocus=null;launch.hidden=true;
+  // Always reachable: a "Text view" entry in the Contents panel (host.entry).
+  var entry=host.entry?button('Text view','Text view',host.entry,function(){if(host.closeContents)host.closeContents();opener=entry;setOpen(true,{focus:true});}):null;
+  if(entry){entry.classList.add('reader-text-view-entry-button');entry.setAttribute('aria-haspopup','dialog');entry.setAttribute('aria-controls',id);}
 
   var panel=el('section','text-view',null,nav);panel.id=id;panel.hidden=true;panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','false');
   toggle.setAttribute('aria-controls',id);
@@ -123,12 +129,13 @@ function createReaderTextView(ctl,nav,actions,currentRecord,host){
   }
   function shown(node){return !!node.getClientRects().length;}
   function activeElement(){var a=view.getRootNode().activeElement || doc.activeElement;while(a && a.shadowRoot && a.shadowRoot.activeElement)a=a.shadowRoot.activeElement;return a;}
-  // Focus the launcher, or the first visible bar control when the bar hides it.
+  // The bar's first visible control, the last resort so focus never drops to the page.
+  function firstBarControl(){return Array.from(nav.querySelectorAll('.reader-top :is(button,summary,select)')).find(function(node){return !panel.contains(node) && !node.disabled && shown(node);}) || null;}
+  // After the window closes: the control that opened it if visible, else the bar's
+  // Text button or ⋯, else the Contents button, else the bar's first visible control.
   function focusBar(){
-    if(shown(toggle)){toggle.focus();return;}
-    if(placement==='menu' && host.menuSummary && shown(host.menuSummary)){host.menuSummary.focus();return;}
-    var target=Array.from(nav.querySelectorAll('.reader-top :is(button,summary,select)')).find(function(node){return !panel.contains(node) && !node.disabled && shown(node);});
-    if(target)target.focus();
+    var target=[opener,toggle,placement==='menu'?host.menuSummary:null,host.contentsButton].find(function(node){return node && shown(node);}) || firstBarControl();
+    if(target)target.focus({preventScroll:true});
   }
   function setOpen(value,options){
     if(retired)return;options=options || {};opened=!!value;panel.hidden=!opened;toggle.setAttribute('aria-expanded',String(opened));clearManual();status.textContent='';
@@ -186,10 +193,6 @@ function createReaderTextView(ctl,nav,actions,currentRecord,host){
   function otherWindow(ev){if(opened && ev.detail && ev.detail.window!==panel)setOpen(false);}
   view.addEventListener('reader-window-open',otherWindow);
   win.addEventListener('resize',position);win.addEventListener('scroll',position,true);
-  // A narrow bar hides the launcher (with Search, .reader-narrow); an open
-  // window then closes and focus moves to a visible bar control.
-  function barChanged(){if(retired || !opened || !nav.classList.contains('reader-narrow') || shown(toggle))return;var inside=panel.contains(activeElement());setOpen(false);if(inside)focusBar();}
-  var bar=typeof MutationObserver==='function'?new MutationObserver(barChanged):null;if(bar)bar.observe(nav,{attributes:true,attributeFilter:['class']});
   render();
   // Reopen only for the same document in the same host.
   if(memory.open && memory.docKey!==docKey)memory.open=false;
@@ -198,12 +201,11 @@ function createReaderTextView(ctl,nav,actions,currentRecord,host){
     setOpen(true,{scroll:reopen.tab===textViewSession.tab?reopen.scroll:null,focus:reopen.focus});
     if(reopen.scroll && reopen.tab===textViewSession.tab)requestAnimationFrame(function(){if(!opened || retired)return;var pre=panels[textViewSession.tab].pre;pre.scrollTop=reopen.scroll.top;pre.scrollLeft=reopen.scroll.left;});
   }
-  // A reader built on an already narrow bar never sees the class change.
-  barChanged();
   return {
     isOpen:function(){return opened;},
     // 'inline' | 'menu' | 'none' from the bar's fitting pass; 'measure' hides the
-    // launcher for the pass without touching an open window.
+    // launcher for the pass. The window stays open at every placement: the
+    // Contents entry reaches it at every width.
     place:function(mode,trial){
       if(retired)return;
       // Measuring removes the launcher from the bar for one synchronous pass. Focus
@@ -217,16 +219,15 @@ function createReaderTextView(ctl,nav,actions,currentRecord,host){
       placement=mode;
       if(refocus){
         var from=refocus,order=from===menuItem?[menuItem,toggle,host.menuSummary]:from===toggle?[toggle,menuItem,host.menuSummary]:[host.menuSummary,toggle];refocus=null;
-        var target=order.find(function(node){return node && shown(node);});if(target && activeElement()!==target)target.focus({preventScroll:true});
+        var target=order.find(function(node){return node && shown(node);}) || firstBarControl();if(target && activeElement()!==target)target.focus({preventScroll:true});
       }
-      if(mode==='none' && opened){var inside=panel.contains(activeElement());setOpen(false);if(inside)focusBar();}
     },
     // The reader's document can change while the window is open: rebuild from ctl.page.
     refresh:function(){if(opened && !retired)render(build());},
     destroy:function(){
       if(opened){var pre=panels[textViewSession.tab].pre;memory.open=true;memory.tab=textViewSession.tab;memory.scroll={top:pre.scrollTop,left:pre.scrollLeft};memory.focus=panel.contains(activeElement());}
       memory.path=chosenPath;memory.docKey=docKey;
-      retired=true;opened=false;if(bar)bar.disconnect();view.removeEventListener('keydown',keydown,true);view.removeEventListener('dv:pathchange',pathChanged);view.removeEventListener('reader-window-open',otherWindow);win.removeEventListener('resize',position);win.removeEventListener('scroll',position,true);panel.remove();launch.remove();menuItem.remove();
+      retired=true;opened=false;view.removeEventListener('keydown',keydown,true);view.removeEventListener('dv:pathchange',pathChanged);view.removeEventListener('reader-window-open',otherWindow);win.removeEventListener('resize',position);win.removeEventListener('scroll',position,true);panel.remove();launch.remove();menuItem.remove();if(entry)entry.remove();
     }
   };
 }

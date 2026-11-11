@@ -7,19 +7,19 @@ to them. Use it to read a step diagram as a list, to check node → metric, log 
 connection links, or to copy the text into a review or a diff. Nothing in the
 window edits the document.
 
-The button can appear wherever the reader top bar appears: the standalone page,
-the Workbench preview, the library reader, each compare pane and the Backstage
-native viewer. The Confluence (Forge) viewer has no top bar and no Text button.
+The text view is available wherever the reader top bar and its Contents panel
+appear: the standalone page, the Workbench preview, the library reader, each
+compare pane and the Backstage native viewer. The Confluence (Forge) viewer has
+neither, so it has no text view.
 
-Text is the lowest-priority control in the bar. When the bar has room, the
-**Text** button sits next to Search. When the bar is full, Text is the last item,
-**Text view**, of the **More page actions** (⋯) menu; if the bar shows no such
-menu, a ⋯ menu holding only **Text view** appears, and if there is no room even
-for that, the page's own actions (Panels, Legend, Expand) move into the ⋯ menu
-as they would on a slightly narrower window, with Text placed in the room that
-frees. Text is hidden only on a narrow bar (670 px or less), together with
-Search. An open window stays open when Text moves between the bar and the menu,
-and closes when Text is hidden.
+Where to find it: the **Text** button in the top bar, next to Search, when the bar
+has room; otherwise **Text view**, the last item of the **More page actions** (⋯)
+menu (a ⋯ menu holding only **Text view** appears when the bar shows none and has
+room for it); and always **Text view** at the foot of the **Contents** panel, at
+every window width. The bar button is the lowest-priority control: it never moves
+another control, so on a full or narrow bar it may not be in the bar at all. The
+window stays open at any width and fits inside a narrow window; closing it returns
+focus to the control that opened it, or to the Contents button.
 
 The text is built from the page the reader shows, with shared-topology imports
 already resolved, when the window opens. Imported nodes and connections carry an

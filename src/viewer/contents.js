@@ -54,6 +54,9 @@ function createReaderContents(ctl,nav,actions,options){
     var copy=button('Copy '+(item.kind==='claude'?'Claude link':'internal site link'),'Copy',row,function(){});bindCopyControl(window,copy,function(){return item.url;});
   });
   destinations.hidden=!destinations.children.length;
+  // #1322: a "Text view" row of its own, outside the tree and the document links,
+  // so the text view is reachable at every bar width (filled by createReaderTextView).
+  var textEntry=element('div','reader-text-view-entry',null,sidebar);
   var footer=element('div','reader-theme-footer',null,sidebar);element('span','reader-theme-label','Theme',footer);
   var themeMenu=element('details','reader-theme-menu',null,footer),themeSummary=element('summary','reader-button',null,themeMenu);themeSummary.setAttribute('aria-label','Choose theme');
   var themeOptions=element('div','reader-theme-options',null,themeMenu);themeOptions.setAttribute('role','menu');themeOptions.setAttribute('aria-label','Themes');
@@ -119,34 +122,29 @@ function createReaderContents(ctl,nav,actions,options){
       if(restore){reopenNestedMenus(entry.node);restore.focus({preventScroll:true});}else if(summaryFocused && !pageUtilitySummary.checkVisibility({visibilityProperty:true})){var target=Array.from(entry.node.querySelectorAll('summary,button,[href],select')).find(function(control){return !control.disabled && control.checkVisibility({visibilityProperty:true});});if(target)target.focus({preventScroll:true});}
     }
   }
-  // #1322 Text launcher: lowest priority in the bar. Every pass fits the bar
-  // without it (exactly as before it existed), then shows it inline only if
-  // nothing else would move. Otherwise it is a "Text view" item in "More page
-  // actions": added last when the base shows that menu, or in that menu shown for
-  // Text alone when the ⋯ button fits without moving anything. When even the ⋯
-  // button has no room, the page actions overflow early through the bar's own
-  // overflow path (as at a slightly narrower width) and Text is placed in the
-  // room that frees. Text is absent only on a narrow bar. An early overflow is
-  // kept at that width and retried on the next width change, as the base does.
+  // #1322 Text launcher: lowest priority in the bar; no other control ever moves.
+  // Every pass fits the bar without it (exactly as before it existed), then:
+  // inline if it fits; else the last item of "More page actions" when the base
+  // shows that menu; else a ⋯ menu for Text alone if that fits; else nothing in
+  // the bar. The Contents panel always has a "Text view" entry. The decision
+  // never feeds back into the base fit, so it cannot oscillate.
   var textPlace='none',textMenuOnly=false;
   function measureText(){
     if(!textView)return;textView.place('measure');
     if(textMenuOnly){textMenuOnly=false;if(!overflowActions)pageUtilities.hidden=true;}
   }
-  function fitText(fits,overflowEarly){
+  function fitText(fits){
     if(!textView)return;
-    if(narrow){textPlace='none';textView.place('none');return;}
-    textView.place('inline',true);if(fits()){textPlace='inline';textView.place('inline');return;}
-    if(overflowActions && !pageUtilities.hidden){textPlace='menu';textView.place('menu');return;}
-    pageUtilities.hidden=false;textView.place('menu',true);
-    if(fits()){textMenuOnly=true;textPlace='menu';textView.place('menu');return;}
-    pageUtilities.hidden=true;
-    if(overflowEarly && overflowEarly()){
-      textView.place('inline',true);if(fits()){textPlace='inline';textView.place('inline');return;}
-      textPlace='menu';textView.place('menu');return;
+    if(narrow)textPlace='none';
+    else{
+      textView.place('inline',true);
+      if(fits())textPlace='inline';
+      else if(overflowActions && !pageUtilities.hidden)textPlace='menu';
+      else{pageUtilities.hidden=false;textView.place('menu',true);if(fits()){textMenuOnly=true;textPlace='menu';}else{pageUtilities.hidden=true;textPlace='none';}}
     }
-    // Nothing to overflow: the ⋯ menu for Text alone is the last resort.
-    pageUtilities.hidden=false;textMenuOnly=true;textPlace='menu';textView.place('menu');
+    // A ⋯ that is hidden is closed, so it never reappears already open.
+    if(pageUtilities.hidden)pageUtilities.open=false;
+    textView.place(textPlace);
   }
   function fitToggle(width){
     measureText();
@@ -171,10 +169,7 @@ function createReaderContents(ctl,nav,actions,options){
       if(!overflowActions && width>900 && (top.scrollWidth>top.clientWidth+1 || overlapsCenter(actions))){overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();}
       // The base's own overlap test (overlapsCenter), so Text takes exactly the room
       // the base leaves and never more.
-      fitText(function(){return !overlapsCenter(actions) && top.scrollWidth<=top.clientWidth+1;},function(){
-        if(overflowActions || !actions.querySelector(':scope > .viewport-actions'))return false;
-        overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();return !!overflowActions;
-      });
+      fitText(function(){return !overlapsCenter(actions) && top.scrollWidth<=top.clientWidth+1;});
       if(needsPicker && (focusedView || focusedPicker))viewPicker.focus({preventScroll:true});
       else if(focusedPicker){var selected=viewStrip.querySelector('[aria-selected="true"]');if(selected)selected.focus({preventScroll:true});}
       return;
@@ -398,7 +393,10 @@ function createReaderContents(ctl,nav,actions,options){
     if(themeMenu.open && ['ArrowDown','ArrowUp','Home','End'].indexOf(ev.key)>=0 && themeMenu.contains(ev.target)){ev.preventDefault();var nodes=Array.from(themeOptions.querySelectorAll('button')),index=nodes.indexOf(ev.target);index=ev.key==='Home'?0:ev.key==='End'?nodes.length-1:(index+(ev.key==='ArrowDown'?1:-1)+nodes.length)%nodes.length;nodes[index].focus();}
   }
   search=createDocumentSearch(ctl,nav,top,actions,documentPages,choose,function(){if(search){drawParts();drawTree();geometry();}});
-  textView=typeof createReaderTextView==='function'?createReaderTextView(ctl,nav,actions,function(){return current;},{menu:pageUtilityBody,closeMenu:function(){pageUtilities.open=false;},menuSummary:pageUtilitySummary}):null;
+  textView=typeof createReaderTextView==='function'?createReaderTextView(ctl,nav,actions,function(){return current;},{menu:pageUtilityBody,closeMenu:function(){pageUtilities.open=false;},menuSummary:pageUtilitySummary,
+    entry:textEntry,contentsButton:toggle,
+    // A narrow Contents panel is a modal overlay with a focus trap: close it before the window opens.
+    closeContents:function(){if(narrow && opened)setOpen(false,false,true);}}):null;
   if(textView){toggleFit=null;geometry();}
   if(opened!==null)setOpen(opened,false,false);
   var initialFrame=requestAnimationFrame(function(){if(retired)return;(ctl.views?ctl.views.owners:[]).forEach(function(item){expandedTabs.add(item.path);});drawTree();});

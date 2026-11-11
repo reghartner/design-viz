@@ -1508,9 +1508,16 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
           whole='Inherits from '+from+'.'+(shared.length?' '+clauses+'; add a trace scope to inherit '+(shared.length>1?'their':'its')+' spans.':'');
           brief='inherits from '+from+(shared.length?' ('+clauses+')':'');
         }
-        return {label:route.label,whole:whole,brief:brief};
+        return {label:route.label,whole:whole,brief:brief,shared:shared};
       });
-      status=per.every(function(x){return x.whole===per[0].whole;})?per[0].whole:per.map(function(x){return 'On '+x.label+': '+x.brief+'.';}).join(' ');
+      if(per.every(function(x){return x.whole===per[0].whole;}))status=per[0].whole;
+      else{
+        // Paths that agree are named together; the advice comes once, at the end.
+        var groups=[];per.forEach(function(x){var g=groups.find(function(y){return y.brief===x.brief;});if(g)g.labels.push(x.label);else groups.push({brief:x.brief,labels:[x.label]});});
+        var names=function(list){return list.length>1?list.slice(0,-1).join(', ')+' and '+list[list.length-1]:list[0];};
+        var sharedAll=[];per.forEach(function(x){x.shared.forEach(function(c){if(sharedAll.indexOf(c)<0)sharedAll.push(c);});});
+        status=groups.map(function(g){return 'On '+names(g.labels)+': '+g.brief+'.';}).join(' ')+(sharedAll.length?' Add a trace scope to choose '+(sharedAll.length>1?'their':'its')+' spans.':'');
+      }
     }else{
       var counted=owning.map(function(c){return {c:c,n:c.owned.filter(function(x){return !skipped(c,x);}).length};}).filter(function(x){return x.n;});
       status=counted.length?'Inherits from '+counted.map(function(x){return x.c.title+' ('+x.n+' of '+plural(x.c.owned.length)+')';}).join(' and ')+'.':owning.length?'Inherits nothing: every declared span is skipped.':'Inherits nothing: its nodes and connections declare no spans this step can own.';
@@ -1546,7 +1553,7 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
         var by=[];routes.forEach(function(route){others(c,route).forEach(function(s){var hit=by.find(function(x){return x.s===s;});if(!hit)by.push(hit={s:s,routes:[]});hit.routes.push(route.label);});});
         if(by.length){
           var everywhere=by.every(function(x){return x.routes.length===routes.length;});
-          el('p','fnote trace-scope-also','Also lit by '+(everywhere?stepList(by.map(function(x){return x.s;})):by.map(function(x){return 'step '+stepTitle(x.s)+(x.routes.length===routes.length?'':' on '+x.routes.join(' and '));}).join(', '))+'.',group);
+          el('p','fnote trace-scope-also','Also lit by '+(everywhere?stepList(by.map(function(x){return x.s;})):by.map(function(x){return 'step '+stepTitle(x.s)+(x.routes.length===routes.length?'':' on '+(x.routes.length>1?x.routes.slice(0,-1).join(', ')+' and '+x.routes[x.routes.length-1]:x.routes[0]));}).join(', '))+'.',group);
         }
       }
     });

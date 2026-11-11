@@ -87,6 +87,7 @@
     "workbench/commands/links.js",
     "workbench/commands/links-trace.js",
     "workbench/commands/links-logs.js",
+    "workbench/commands/links-metrics.js",
     "workbench/persistence.js",
     "workbench/working-file.js",
     "workbench/cloud-session.js",

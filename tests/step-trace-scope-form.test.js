@@ -14,6 +14,10 @@
 | S7 | A step without an ID cannot take a scope: the refusal sits beside Add trace scope and Go to Step ID focuses the existing Step ID field. |
 | S8 | Validator messages for the step's traceScope sit beside the field they name, in status notes; the fold summary counts them. |
 | S9 | Renaming a step ID rewrites traceMatch.parentStepId and traceScope.parentStepId references to it in the same edit (one Undo step). |
+| S10 | (whole-branch review) Deleting a step removes traceScope.parentStepId and traceMatch parentStepId references to it in the same edit (one Undo step); the board stays valid, also when it imports topology, and the delete message names the steps that lost their parent. A materialized-spec refusal lists each message once. |
+| S12 | (whole-branch review) Parent step lists only steps on a path with this step; a parent on no shared path is shown as not on this step's path and the validator warns that the step always reads missing. |
+| S13 | (whole-branch review) Use its nodes and connections on a step that has both traceMatch and traceScope removes the trace match (one Undo step). |
+| S11 | (whole-branch review) Renaming a node or changing a connection endpoint carries traceScope.skip entries to the new key (lists merged when the key is already there); deleting a node or connection removes its skip entries. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -252,4 +256,96 @@ test('S9 renaming a step ID rewrites the trace match and trace scope parent refe
   assert.deepEqual(plain(steps[1].traceMatch).map(m=>m.parentStepId),['labor','request']);
   assert.equal(steps[6].traceMatch.parentStepId,'labor');
   assert.deepEqual(plain(ui.e.C.FlowCanon.validate(ui.raw)).filter(m=>/parentStepId/.test(m)),[]);
+});
+
+function commit(ui,plan){
+  assert.ok(!plan.error,plan.error);
+  assert.equal(ui.h.session.accept(plan,{snapshot:ui.h.session.snapshot()}),true,'the importing board accepts the edit');
+}
+
+test('S10 deleting a step removes trace parent references to it in one Undo step and says so',()=>{
+  const ui=harness(d=>{d.steps[3].traceScope={parentStepId:'work',skip:{worker:['find']}};
+    d.steps[1].traceMatch=[{serviceName:'order-api',operation:'publish orders',parentStepId:'work'},{serviceName:'order-api',operation:'publish',parentStepId:'request'}];
+    d.steps[6].traceMatch={serviceName:'x',operation:'y',parentStepId:'work'};}).select(2);
+  const C=ui.e.C,before=ui.text;
+  const plan=C.planDeleteStep(ui.text,ui.raw,0,2);
+  assert.equal(plan.message,'Step deleted. Steps “publish”, “again”, “bare” used it as their trace parent step; those parents are removed.');
+  commit(ui,plan);
+  const steps=diagramOf(ui.raw).steps;
+  assert.deepEqual(steps.map(st=>st.id||null),['request','publish','again','store',null,'bare']);
+  assert.deepEqual(plain(steps[2].traceScope),{skip:{worker:['find']}});
+  assert.deepEqual(plain(steps[1].traceMatch).map(m=>m.parentStepId||null),[null,'request']);
+  assert.equal(steps[5].traceMatch.parentStepId,undefined);
+  assert.deepEqual(plain(ui.h.session.validate(ui.raw).errors),[]);
+  assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'one Undo brings the step and its references back');
+  const one=harness(d=>{d.steps[3].traceScope={parentStepId:'work'};});
+  assert.equal(one.e.C.planDeleteStep(one.text,one.raw,0,2).message,'Step deleted. Step “again” used it as its trace parent step; that parent is removed.');
+  const none=harness();
+  assert.equal(none.e.C.planDeleteStep(none.text,none.raw,0,2).message,undefined,'no message when nothing named the step');
+});
+
+test('S10 a refused materialized spec lists each message once',()=>{
+  const ui=harness(d=>{d.steps[3].traceScope={parentStepId:'gone'};});
+  let message='';
+  try{ui.e.C.FlowTopology.resolveSource(ui.raw,ui.f.context);}catch(ex){message=ex.message;}
+  const parts=message.replace(/^.*invalid materialized spec: /,'').split('; ');
+  assert.ok(parts.length>0 && parts[0],message);
+  assert.deepEqual(parts,Array.from(new Set(parts)),message);
+});
+
+test('S11 renaming a node or an endpoint carries skip entries; deleting a carrier removes them',()=>{
+  const C=()=>ui.e.C;
+  const ui=harness(d=>{d.steps[1].traceScope={skip:{'api->worker':['publish']}};
+    d.steps[2].traceScope={skip:{worker:['find']}};d.steps[4].traceScope={skip:{'shared::store':['write']}};
+    d.steps[3].traceScope={skip:{worker:['cache']}};});
+  const before=ui.text;
+  commit(ui,C().planRenameNode(ui.text,ui.raw,0,'worker','w2'));
+  let steps=diagramOf(ui.raw).steps;
+  assert.deepEqual(plain(steps[1].traceScope),{skip:{'api->w2':['publish']}});
+  assert.deepEqual(plain(steps[2].traceScope),{skip:{w2:['find']}});
+  assert.deepEqual(plain(steps[4].traceScope),{skip:{'shared::store':['write']}},'an imported carrier is untouched');
+  assert.deepEqual(plain(steps[3].traceScope),{skip:{w2:['cache']}});
+  {const w=plain(ui.h.session.validate(ui.raw).warnings).filter(w=>/traceScope/.test(w));assert.ok(w.length===0,w.join('\n'));}
+  assert.equal(ui.h.session.undo(),true);assert.equal(ui.text,before,'one Undo step');
+  commit(ui,C().planSetEdgeEndpoint(ui.text,ui.raw,0,0,'to','plain',ui.h.session.resolve(ui.raw)));
+  assert.deepEqual(plain(diagramOf(ui.raw).steps[1].traceScope),{skip:{'api->plain':['publish']}});
+  ui.h.session.undo();
+  commit(ui,C().planDeleteEdge(ui.text,ui.raw,0,0,ui.h.session.resolve));
+  assert.deepEqual(plain(diagramOf(ui.raw).steps[1].traceScope),{},'the scope stays; only the skip of the gone connection goes');
+  ui.h.session.undo();
+  commit(ui,C().planDeleteNode(ui.text,ui.raw,0,'worker',ui.h.session.resolve));
+  steps=diagramOf(ui.raw).steps;
+  assert.deepEqual(plain(steps[2].traceScope),{});
+  assert.deepEqual(plain(steps[3].traceScope),{});
+  assert.deepEqual(plain(steps[4].traceScope),{skip:{'shared::store':['write']}});
+  const merge=harness(d=>{d.steps[2].traceScope={skip:{worker:['find'],plain:['x','find']}};});
+  const out=merge.e.C.planRenameNode(merge.text,merge.raw,0,'plain','worker');
+  assert.ok(out.error,'a taken id is still refused');
+  const st={traceScope:{skip:{a:['x'],b:['y','x']}}};
+  merge.e.C.builderRetargetStepKeys([st],'a','b');
+  assert.deepEqual(plain(st.traceScope.skip),{b:['x','y']},'lists merge without repeats');
+});
+
+test('S12 Parent step offers only steps on a path with this step; one elsewhere is marked and warned',()=>{
+  const paths=d=>{d.paths=[{id:'main',label:'Main',steps:['request','publish','work','again','store']},{id:'side',label:'Side',steps:['request','bare']}];};
+  const ui=harness(d=>{paths(d);d.steps[3].traceScope={};}).select(3);
+  const options=()=>ui.control('Parent step').options.map(o=>o.textContent);
+  assert.deepEqual(options(),['None','“Request” (request)','“Publish” (publish)','“Work” (work)','“Store it” (store)']);
+  const off=harness(d=>{paths(d);d.steps[3].traceScope={parentStepId:'bare'};}).select(3);
+  assert.equal(off.control('Parent step').value,'bare');
+  assert.equal(off.control('Parent step').options.at(-1).textContent,'bare (not on this step’s path)');
+  const w=plain(off.h.session.validate(off.raw).warnings).filter(m=>/parentStepId/.test(m));
+  assert.ok(w.includes('sections[0].diagram.steps[3].traceScope.parentStepId: parent step bare is on no path with step again, so this step always reads missing'),w.join('\n'));
+  const fine=harness(d=>{paths(d);d.steps[3].traceScope={parentStepId:'work'};});
+  assert.ok(plain(fine.h.session.validate(fine.raw).warnings).every(m=>!/parentStepId/.test(m)),'a parent on the same path does not warn');
+});
+
+test('S13 Use its nodes and connections removes a trace match that sits beside a trace scope',()=>{
+  const ui=harness(d=>{d.steps[2].traceMatch={serviceName:'order-worker',operation:'process orders'};d.steps[2].traceScope={skip:{worker:['find']}};});
+  const plan=ui.e.C.planStepTraceScope(ui.text,ui.raw,0,2,{op:'create'});
+  assert.ok(!plan.noop && !plan.error,'the button does something');
+  commit(ui,plan);
+  const st=diagramOf(ui.raw).steps[2];
+  assert.equal(st.traceMatch,undefined);
+  assert.deepEqual(plain(st.traceScope),{skip:{worker:['find']}},'the scope is kept as written');
 });

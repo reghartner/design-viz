@@ -13,7 +13,7 @@
 | I8 | optional makes a missing inheriting step neutral. |
 | I9 | An explicit traceMatch and an inheriting step on one span are both ambiguous. Explicit traceMatch steps, and their parentStepId on an inheriting step, keep working. |
 | I10 | Imported carriers through consumer overlays: added, hidden and overridden spans change what a step inherits; skip names the imported carrier id. |
-| I11 | canon validate: traceMatch with traceScope, root, skip, parentStepId (unknown, self, cyclic), optional, budgets and attributes are checked. Validator warnings in plain words: a skip of a span the carrier does not declare, a skip of a carrier the step does not light, a step that inherits nothing because its carriers are shared. |
+| I11 | canon validate: traceMatch with traceScope, root, skip, parentStepId (unknown, self, cyclic; a loop closed by a traceScope parent is reported under traceScope), optional, budgets and attributes are checked. Validator warnings in plain words: a skip of a span the carrier does not declare, a skip of a carrier the step does not light, a step that inherits nothing because its carriers are shared. |
 | I12 | Compatibility declares flow.trace-scope. |
 | I13 | Reader: inheriting step rows (a node step on its node), "Not this flow" and the coverage line with timed nodes and connections and the plain unmapped hint, in node and step titles. A "not this flow" row paints nothing on the canvas. |
 | I14 | An edge step owns only its edge's send spans; a declared receive is timing only, so it never collides with the receiving node's step. |
@@ -174,7 +174,9 @@ test('I11 validation: shape errors, and plain-word warnings for skips and shared
   assert.deepEqual(errors(withStep({traceScope:{attributes:{'not.listed':'x'}}})),['traceScope.attributes: use supported operational attributes only']);
   assert.deepEqual(errors(withStep({traceScope:{extra:1}})),['traceScope: unknown field extra']);
   const cyclic=board([{id:'a',text:'A',nodes:['api'],traceScope:{parentStepId:'b'}},{id:'b',text:'B',nodes:['worker'],traceScope:{parentStepId:'a'}}]);
-  assert.ok(plain(T.FlowCanon.validate(spec('b',cyclic))).includes('traceMatch: cyclic parentStepId'),'traceScope parents join the one cycle check');
+  assert.deepEqual(plain(T.FlowCanon.validate(spec('b',cyclic))).filter(m=>/cyclic/.test(m)),['traceScope: cyclic parentStepId','traceScope: cyclic parentStepId'],'traceScope parents join the one cycle check, named by the field that closes the loop');
+  const mixed=board([{id:'a',text:'A',nodes:['api'],traceMatch:{serviceName:'s',operation:'o',parentStepId:'b'}},{id:'b',text:'B',nodes:['worker'],traceScope:{parentStepId:'a'}}]);
+  assert.deepEqual(plain(T.FlowCanon.validate(spec('b',mixed))).filter(m=>/cyclic/.test(m)),['traceScope: cyclic parentStepId','traceScope: cyclic parentStepId']);
   // Validator warnings, in plain words.
   const warnings=d=>plain(T.validate(T.normalize(spec('b',d))).warnings).filter(w=>/traceScope|trace spans/.test(w));
   assert.deepEqual(warnings(withStep({traceScope:{skip:{worker:['gone','role:send'],api:['process']}}})),[

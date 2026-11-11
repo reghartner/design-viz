@@ -561,10 +561,11 @@ function initWorkbenchLinksView(opts){
   }
   function traceDropText(d){
     var to=d.target.element,has=to.matches && to.matches.length;
-    if(!d.from)return 'Drop to give '+to.label+' '+d.key+(has?' as an alternative (it already has '+to.matches.map(function(u){return u.key;}).join(', ')+')':'')+'.';
-    return 'Drop to '+(d.copy?'copy ':'move ')+d.key+(d.copy?'':' from '+d.from.label)+' to '+to.label+(has?'; you choose Replace or Add as alternative next':'')+(d.copy?'':' · hold ⌥ to copy')+'.';
+    var scope=to.scoped?' · replaces this step\'s trace scope':'';
+    if(!d.from)return 'Drop to give '+to.label+' '+d.key+(has?' as an alternative (it already has '+to.matches.map(function(u){return u.key;}).join(', ')+')':'')+scope+'.';
+    return 'Drop to '+(d.copy?'copy ':'move ')+d.key+(d.copy?'':' from '+d.from.label)+' to '+to.label+(has?'; you choose Replace or Add as alternative next':'')+scope+(d.copy?'':' · hold ⌥ to copy')+'.';
   }
-  function assignText(to,key){return 'Gave '+to.label+' '+key+(to.matches && to.matches.length?' as an alternative':'')+'. Undo restores it.';}
+  function assignText(to,key){return 'Gave '+to.label+' '+key+(to.matches && to.matches.length?' as an alternative':'')+(to.scoped?'; its trace scope was removed':'')+'. Undo restores it.';}
   function traceDrop(d){
     var to=d.target.element;
     if(!d.from){var g=traceGroup(d.key);if(g)commit(function(text,raw,ctx){return planLinksTraceAssign(text,raw,g,stepRef(to),false,ctx);},{ok:assignText(to,d.key)});return;}
@@ -717,25 +718,44 @@ function initWorkbenchLinksView(opts){
     box.appendChild(service);box.appendChild(operation);box.appendChild(create);
     return box;
   }
+  /* #1290 PR 8: a span declared on a node or connection, read only. Edit in Inspect opens the
+     Trace spans fold on that carrier, which also handles imported overlays. */
+  function declarationRow(x,text,withSteps){
+    var line=el('div','links-declaration-row');line.setAttribute('role','listitem');
+    line.appendChild(el('span','links-declaration',text));
+    if(x.imported)line.appendChild(el('span','links-chip-note','imported'));
+    if(withSteps)x.inherited.forEach(function(i){
+      var st=element('step:'+i.section+':'+i.index),b=button('links-assign links-inherited',i.text,'Highlight '+i.label,'This step inherits the span from '+x.carrierLabel+(i.paths?' on '+i.paths.join(', '):'')+'.');
+      rowsLife.listen(b,'click',function(){if(st)setHighlight({type:'element',id:linksElementId(st)},true);});line.appendChild(b);
+    });
+    var edit=button('bbtn links-declaration-edit','Edit in Inspect','Edit '+x.spanKey+' on '+x.carrierLabel+' in Inspect','Declared spans are edited in Inspect → Tracking → Trace spans');
+    rowsLife.listen(edit,'click',function(){if(opts.inspectCarrier)opts.inspectCarrier(x.carrier.kind==='node'?{kind:'node',section:x.carrier.section,id:x.carrier.id}:{kind:'edge',section:x.carrier.section,index:x.carrier.index});});
+    line.appendChild(edit);
+    return line;
+  }
   function renderTraceByMatch(){
     var shown=0;
     traceModel.groups.forEach(function(g){
-      var text=[g.key].concat(g.uses.map(function(u){return u.label+' '+(u.nodeLabel || '');})).join(' ');
+      var text=[g.key].concat(g.uses.map(function(u){return u.label+' '+(u.nodeLabel || '');})).concat(g.declarations.map(function(x){return x.label;})).join(' ');
       if(!matches(text))return;shown++;
       var row=el('div','links-row links-ticket-row links-trace-row');row.setAttribute('role','listitem');row.setAttribute('data-links-trace',g.key);
       var head=el('div','links-row-head');row.appendChild(head);
-      var handle=button('links-handle','⠿','Drag '+g.key+' to a step','Drag onto a step (a Steps row, a step coin or a By element row) to give it this match. Enter opens Assign.');
-      rowsLife.listen(handle,'pointerdown',function(ev){startDrag(ev,handle,g.key,null);});
-      rowsLife.listen(handle,'keydown',function(ev){if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();openPopover({type:'trace-assign',key:g.key,opener:'trace-assign:'+g.key},row.querySelector('.links-assign'));}});
-      head.appendChild(handle);
+      if(g.assignable){
+        var handle=button('links-handle','⠿','Drag '+g.key+' to a step','Drag onto a step (a Steps row, a step coin or a By element row) to give it this match. Enter opens Assign.');
+        rowsLife.listen(handle,'pointerdown',function(ev){startDrag(ev,handle,g.key,null);});
+        rowsLife.listen(handle,'keydown',function(ev){if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();openPopover({type:'trace-assign',key:g.key,opener:'trace-assign:'+g.key},row.querySelector('.links-assign'));}});
+        head.appendChild(handle);
+      }
       var key=button('links-key',g.key,'Highlight '+g.key,'Highlight the steps that use this match, their connections and its node');
       key.setAttribute('aria-pressed',String(!!state.highlight && state.highlight.type==='trace' && state.highlight.key===g.key));
       rowsLife.listen(key,'click',function(){setHighlight(state.highlight && state.highlight.type==='trace' && state.highlight.key===g.key?null:{type:'trace',key:g.key},true);});
       head.appendChild(key);
-      var count=linksTraceRenameCount(g);head.appendChild(el('span','links-count',count+(count===1?' step':' steps')));
-      var rename=button('bbtn links-edit','Rename','Rename '+g.key,'Change the service name or operation on every step that uses it (one Undo step)');
-      rowsLife.listen(rename,'click',function(){state.traceRename=g.key;state.traceRenameDraft=null;render();var f=list.querySelector('[data-links-field="'+cssEscape('rename|'+g.key+'|serviceName')+'"]');if(f)f.focus();});
-      head.appendChild(rename);
+      var count=linksTraceRenameCount(g);head.appendChild(el('span','links-count',count+(count===1?' step':' steps')+(g.declarations.length?' · '+g.declarations.length+' declared':'')));
+      if(count){
+        var rename=button('bbtn links-edit','Rename','Rename '+g.key,'Change the service name or operation on every step that uses it (one Undo step). Declared spans are not changed.');
+        rowsLife.listen(rename,'click',function(){state.traceRename=g.key;state.traceRenameDraft=null;render();var f=list.querySelector('[data-links-field="'+cssEscape('rename|'+g.key+'|serviceName')+'"]');if(f)f.focus();});
+        head.appendChild(rename);
+      }
       if(state.traceRename===g.key){
         var form=el('div','links-merge links-trace-rename');form.setAttribute('role','group');form.setAttribute('aria-label','Rename '+g.key);
         var typed=state.traceRenameDraft && state.traceRenameDraft.key===g.key?state.traceRenameDraft:{serviceName:g.serviceName,operation:g.operation};
@@ -744,7 +764,8 @@ function initWorkbenchLinksView(opts){
           if(!state.traceRenameDraft || state.traceRenameDraft.key!==g.key)state.traceRenameDraft={key:g.key,serviceName:g.serviceName,operation:g.operation};state.traceRenameDraft[pair[0]]=ev.target.value;});});
         // The fields save only through the Rename button, so each change field edits nothing on its own.
         form.appendChild(sv);form.appendChild(op);
-        form.appendChild(el('p','links-merge-text','Renames on '+count+(count===1?' step':' steps')+': '+g.uses.map(function(u){return u.label;}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(', ')+'. One Undo step restores all of them.'));
+        form.appendChild(el('p','links-merge-text','Renames on '+count+(count===1?' step':' steps')+': '+g.uses.map(function(u){return u.label;}).filter(function(v,i,a){return a.indexOf(v)===i;}).join(', ')+'. One Undo step restores all of them.'+
+          (g.declarations.length?' This changes the steps\' trace matches only, not the spans declared on nodes and connections.':'')));
         var go=button('bbtn links-merge-confirm','Rename on '+count+(count===1?' step':' steps')),no=button('bbtn links-merge-cancel','Cancel');
         function doRename(){
           var next={serviceName:sv.querySelector('input').value,operation:op.querySelector('input').value},nk=next.serviceName.trim()+' · '+next.operation.trim();
@@ -768,7 +789,11 @@ function initWorkbenchLinksView(opts){
       var chips=el('div','links-chips');chips.setAttribute('role','list');chips.setAttribute('aria-label',g.key+' links');row.appendChild(chips);
       g.uses.forEach(function(u){chips.appendChild(traceChip(u,null,true));});
       var nodes=[];g.uses.forEach(function(u){if(u.nodeId && nodes.indexOf(u.section+':'+u.nodeId)<0){nodes.push(u.section+':'+u.nodeId);var n=element('node:'+u.section+':'+u.nodeId);if(n)chips.appendChild(nodeChip(n));}});
-      chips.appendChild(assignButton('+ Assign step','Assign '+g.key+' to steps',{type:'trace-assign',key:g.key,opener:'trace-assign:'+g.key}));
+      if(g.assignable)chips.appendChild(assignButton('+ Assign step','Assign '+g.key+' to steps',{type:'trace-assign',key:g.key,opener:'trace-assign:'+g.key}));
+      if(g.declarations.length){
+        var decls=el('div','links-declarations');decls.setAttribute('role','list');decls.setAttribute('aria-label',g.key+' declared on nodes and connections');
+        g.declarations.forEach(function(x){decls.appendChild(declarationRow(x,x.label,true));});row.appendChild(decls);
+      }
       if(state.highlight && state.highlight.type==='trace' && state.highlight.key===g.key)row.classList.add('links-row-active');
       list.appendChild(row);
     });
@@ -779,10 +804,10 @@ function initWorkbenchLinksView(opts){
     [['step','Steps'],['node','Nodes'],['edge','Connections']].forEach(function(group){
       if(state.show!=='all' && state.show!==group[0])return;
       var items=traceModel.elements.filter(function(e){return e.kind===group[0];});if(!items.length)return;
-      var title=group[0]==='step'?group[1]+' · '+items.filter(function(e){return e.matches.length;}).length+' of '+items.length+' have a match':group[1]+' · shown through their steps';
+      var title=group[0]==='step'?group[1]+' · '+items.filter(function(e){return e.matches.length;}).length+' of '+items.length+' have a match':group[1]+' · shown through their steps and their declared spans';
       var t=el('p','links-group',title);t.setAttribute('role','presentation');list.appendChild(t);
       items.forEach(function(e){
-        var keys=e.kind==='step'?e.matches.map(function(u){return u.key || '';}):e.via.map(function(u){return u.key || '';});
+        var keys=e.kind==='step'?e.matches.map(function(u){return u.key || '';}):e.via.map(function(u){return u.key || '';}).concat((e.declarations || []).map(function(x){return x.text;}));
         if(!matches([kindName(e),e.label,e.caption || ''].concat(keys).join(' ')))return;shown++;
         var row=el('div','links-row links-element-row');row.setAttribute('role','listitem');row.setAttribute('data-links-element',linksElementId(e));
         var tag=el('span','links-kind',e.kind==='edge'?'EDGE':e.kind.toUpperCase());tag.setAttribute('aria-hidden','true');row.appendChild(tag);
@@ -807,6 +832,10 @@ function initWorkbenchLinksView(opts){
           });
         }
         row.appendChild(chips);
+        if(e.kind!=='step' && e.declarations && e.declarations.length){
+          var own=el('div','links-declarations');own.setAttribute('role','list');own.setAttribute('aria-label','Spans declared on '+describe(e));
+          e.declarations.forEach(function(x){own.appendChild(declarationRow(x,x.text,false));});row.appendChild(own);
+        }
         if(e.kind==='step' && state.traceEdit && state.traceEdit.section===e.section && state.traceEdit.index===e.index){
           // Undo, or a drag that took this alternative away, closes the editor.
           if(e.matches[state.traceEdit.alternative])row.appendChild(traceEditor(e,state.traceEdit.alternative));else state.traceEdit=null;
@@ -868,16 +897,16 @@ function initWorkbenchLinksView(opts){
       var id=linksElementId(x),note=x.matches.length?x.matches.map(function(u){return u.key;}).join(', '):'';
       if(spec.type==='trace-assign'){
         var on=x.matches.some(function(u){return u.key===spec.key;}),needsId=!on && !x.stepId?x.label+LINKS_TRACE_NEEDS_ID:null;
-        var assignNote=!on && x.matches.length?'adds an alternative to '+note:note;
+        var assignNote=!on && x.scoped?'replaces this step\'s trace scope':!on && x.matches.length?'adds an alternative to '+note:note;
         body.appendChild(option(id,sectionPrefix(x)+x.label,on,x.form?needsId:x.reason,function(checked){
           if(!g)return false;return commit(function(text,raw,ctx){return planLinksTraceAssign(text,raw,g,stepRef(x),!checked,ctx);},{ok:checked?assignText(x,spec.key):'Removed '+spec.key+' from '+x.label+'. Undo restores it.'});
         },assignNote));
       }else{
-        body.appendChild(pickTarget(sectionPrefix(x)+x.label,id,why[id],function(){
+        body.appendChild(pickTarget(sectionPrefix(x)+x.label+(x.scoped?' (has a trace scope)':''),id,why[id],function(){
           var f=spec.from,c=spec.copy,src=spec.opener;
           if(x.matches.length){traceChoose(f,x,spec.key,c,src);return;}
           closePopover(false);traceMove(f,x,spec.key,null,c);
-        },note,spec.copy));
+        },x.scoped?'replaces this step\'s trace scope':note,spec.copy));
       }
     });
     popover.appendChild(el('p','links-pop-hint',spec.type==='trace-move'?'↑↓ move · Enter picks · a step with a match asks Replace or Add as alternative · Esc closes':'↑↓ move · Space ticks or unticks · Esc closes · each tick is one Undo step'));

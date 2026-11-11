@@ -3,7 +3,7 @@
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null,invalidateAlignment=null,invalidateEdgeEndpoints=null;
-  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),TRACE_MATCH_DRAFTS=new Map(),TRACE_SPAN_DRAFTS=new Map(),TRACE_SCOPE_VIEW=new Map(),TRACE_MATCH_REVEALED=new Set(),traceMatchCache=null,OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false,BOARD_READY_TEXT=null;
+  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),TRACE_MATCH_DRAFTS=new Map(),TRACE_SPAN_DRAFTS=new Map(),TRACE_SCOPE_VIEW=new Map(),REVEAL_TRACE_SPANS=null,TRACE_MATCH_REVEALED=new Set(),traceMatchCache=null,OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false,BOARD_READY_TEXT=null;
   // #1255: unsaved Metrics editor New … fields for the current selection.
   var METRICS_DRAFTS=new Map();
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
@@ -44,6 +44,9 @@ function createBuilderInspector(opts){
   function beginForm(identity){
     var same=identity===inspectorScrollKey;
     var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0,sizes:same?captureTextareaSizes():null,disclosures:same?captureDisclosures():null};
+    // A Links "Edit in Inspect" request is for the very next render of that carrier (#1290 PR 8):
+    // rendering anything else first drops it, so a later ordinary click opens nothing.
+    if(REVEAL_TRACE_SPANS && REVEAL_TRACE_SPANS!==revealKey(session.target))REVEAL_TRACE_SPANS=null;
     if(!same){
       OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_SPAN_DRAFTS.clear();TRACE_SCOPE_VIEW.clear();TRACE_MATCH_REVEALED.clear();
       OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;
@@ -65,7 +68,10 @@ function createBuilderInspector(opts){
       else if(!previous.disclosures)fold.open=fold.hasAttribute('data-inspector-open');
     });
     assignControlKeys();restoreTextareaSizes(previous.sizes);restoreFocus(previous.focus);guide.scrollTop=previous.scroll;
+    if(REVEAL_TRACE_SPANS && REVEAL_TRACE_SPANS===revealKey(session.target))REVEAL_TRACE_SPANS=null;
   }
+  // The carrier a Links "Edit in Inspect" asked for (#1290 PR 8); another selection's render leaves the request.
+  function revealKey(t){return t?JSON.stringify([t.kind,t.section,t.kind==='node'?t.id:t.index]):'';}
   function disclosureNodes(){
     /* Omit changing patch summaries and collection counts from the identity. */
     var counts=Object.create(null),folds=Array.from(guide.querySelectorAll('details'));
@@ -777,6 +783,9 @@ function traceSpansControls(){
     if(state.error)return null;
     if(target.kind==='edge')target.key=state.id;
     var fold=document.createElement('details');fold.className='trace-spans-editor';
+    // Links "Edit in Inspect" (#1290 PR 8): open this fold, and any fold around it, for this selection only.
+    if(REVEAL_TRACE_SPANS && REVEAL_TRACE_SPANS===revealKey(session.target)){fold.setAttribute('data-inspector-reveal','');
+      opts.schedule(function(){if(!fold.isConnected && fold.isConnected!==undefined)return;for(var f=fold;f;f=f.parentNode && f.parentNode.closest?f.parentNode.closest('details'):null)f.open=true;var s=fold.querySelector('summary');if(s && s.focus)s.focus();if(fold.scrollIntoView)fold.scrollIntoView({block:'nearest'});},0);}
     var keys=Object.keys(state.spans),summary=document.createElement('summary');summary.textContent='Trace spans'+(keys.length?' · '+keys.length:'');fold.appendChild(summary);
     var serial=0,where=state.kind==='edge'?'connection':'node';
     function el(tag,cls,text,parent){var x=document.createElement(tag);if(cls)x.className=cls;if(text!=null)x.textContent=text;(parent || fold).appendChild(x);return x;}
@@ -1381,30 +1390,6 @@ function traceMatchPlaced(messages,many){
 /* #1290 PR 7: how a loaded trace maps this step. Own span (traceMatch, the #1238 form) or the
    spans declared on the nodes and connections it lights (traceScope). The radios change only the
    view; a write is a labelled button or a field, one Undo step each. */
-function traceScopeCarriers(d,st){
-    var keys=[],failures=st && st.failures && typeof st.failures==='object' && !Array.isArray(st.failures)?st.failures:{};
-    if(st && typeof st.edge==='string')keys.push(st.edge);
-    if(st && Array.isArray(st.edges))st.edges.forEach(function(k){if(typeof k==='string' && keys.indexOf(k)<0)keys.push(k);});
-    var nodes=d && d.nodes && typeof d.nodes==='object'?d.nodes:{},edges=d && Array.isArray(d.edges)?d.edges:[];
-    function spansOf(v){var sp=v && v.trace && typeof v.trace==='object' && v.trace.spans && typeof v.trace.spans==='object' && !Array.isArray(v.trace.spans)?v.trace.spans:{};
-      return Object.keys(sp).filter(function(k){return sp[k] && typeof sp[k]==='object' && !Array.isArray(sp[k]);}).map(function(k){return {key:k,span:sp[k],role:sp[k].role};});}
-    var out=keys.filter(function(k){return failures[k]!=='dropped' && failures[k]!=='blocked';}).map(function(k){
-      var e=edges.find(function(x){return x && x.from+'->'+x.to===k;}),from=e && nodes[e.from],to=e && nodes[e.to];
-      var title=e?(from && from.title || e.from)+' → '+(to && to.title || e.to):k;
-      return {kind:'edge',id:k,title:title,spans:e?spansOf(e):[]};
-    });
-    (st && Array.isArray(st.nodes)?st.nodes:[]).forEach(function(n){if(typeof n!=='string')return;var v=nodes[n];out.push({kind:'node',id:n,title:v && v.title || n,spans:v?spansOf(v):[]});});
-    // An edge step owns its connection's send spans; a receive span only times the hand-off.
-    out.forEach(function(c){c.owned=c.kind==='edge'?c.spans.filter(function(x){return x.role==='send';}):c.spans;c.handoff=c.kind==='edge'?c.spans.filter(function(x){return x.role!=='send';}):[];});
-    return out;
-  }
-function traceScopeSpanText(x){
-    var m=x.span,svc=String(m.serviceName || '');
-    if(typeof m.operation==='string')return x.key+' · '+svc+' '+m.operation;
-    if(typeof m.operationPrefix==='string')return x.key+' · '+svc+' '+m.operationPrefix+'… (prefix)';
-    var attrs=m.attributes && typeof m.attributes==='object'?m.attributes:{};
-    return x.key+' · '+svc+' where '+Object.keys(attrs).map(function(k){return k+'='+String(attrs[k]);}).join(', ');
-  }
 function traceScopeMessages(val){
     if(val.traceScope===undefined || !session.validate)return [];
     var parsed=parseEditor();if(parsed.error)return [];
@@ -1508,9 +1493,16 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
           whole='Inherits from '+from+'.'+(shared.length?' '+clauses+'; add a trace scope to inherit '+(shared.length>1?'their':'its')+' spans.':'');
           brief='inherits from '+from+(shared.length?' ('+clauses+')':'');
         }
-        return {label:route.label,whole:whole,brief:brief};
+        return {label:route.label,whole:whole,brief:brief,shared:shared};
       });
-      status=per.every(function(x){return x.whole===per[0].whole;})?per[0].whole:per.map(function(x){return 'On '+x.label+': '+x.brief+'.';}).join(' ');
+      if(per.every(function(x){return x.whole===per[0].whole;}))status=per[0].whole;
+      else{
+        // Paths that agree are named together; the advice comes once, at the end.
+        var groups=[];per.forEach(function(x){var g=groups.find(function(y){return y.brief===x.brief;});if(g)g.labels.push(x.label);else groups.push({brief:x.brief,labels:[x.label]});});
+        var names=function(list){return list.length>1?list.slice(0,-1).join(', ')+' and '+list[list.length-1]:list[0];};
+        var sharedAll=[];per.forEach(function(x){x.shared.forEach(function(c){if(sharedAll.indexOf(c)<0)sharedAll.push(c);});});
+        status=groups.map(function(g){return 'On '+names(g.labels)+': '+g.brief+'.';}).join(' ')+(sharedAll.length?' Add a trace scope to choose '+(sharedAll.length>1?'their':'its')+' spans.':'');
+      }
     }else{
       var counted=owning.map(function(c){return {c:c,n:c.owned.filter(function(x){return !skipped(c,x);}).length};}).filter(function(x){return x.n;});
       status=counted.length?'Inherits from '+counted.map(function(x){return x.c.title+' ('+x.n+' of '+plural(x.c.owned.length)+')';}).join(' and ')+'.':owning.length?'Inherits nothing: every declared span is skipped.':'Inherits nothing: its nodes and connections declare no spans this step can own.';
@@ -1546,7 +1538,7 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
         var by=[];routes.forEach(function(route){others(c,route).forEach(function(s){var hit=by.find(function(x){return x.s===s;});if(!hit)by.push(hit={s:s,routes:[]});hit.routes.push(route.label);});});
         if(by.length){
           var everywhere=by.every(function(x){return x.routes.length===routes.length;});
-          el('p','fnote trace-scope-also','Also lit by '+(everywhere?stepList(by.map(function(x){return x.s;})):by.map(function(x){return 'step '+stepTitle(x.s)+(x.routes.length===routes.length?'':' on '+x.routes.join(' and '));}).join(', '))+'.',group);
+          el('p','fnote trace-scope-also','Also lit by '+(everywhere?stepList(by.map(function(x){return x.s;})):by.map(function(x){return 'step '+stepTitle(x.s)+(x.routes.length===routes.length?'':' on '+(x.routes.length>1?x.routes.slice(0,-1).join(', ')+' and '+x.routes[x.routes.length-1]:x.routes[0]));}).join(', '))+'.',group);
         }
       }
     });
@@ -4055,6 +4047,7 @@ function renderInspector(){
     render:renderInspector,renderMulti:renderMultiInspector,refresh:refreshFormSoon,refreshCatalog:refreshCatalog,retire:function(){if(!disposed)retire();},
     sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();if(invalidateExtraction)invalidateExtraction();if(invalidateTopologyExport)invalidateTopologyExport();if(invalidateAlignment)invalidateAlignment();if(invalidateEdgeEndpoints)invalidateEdgeEndpoints();},
     message:inspectorMessage,error:formError,commit:commitSimple,transact:commitCascade,focusProse:focusProse,
+    revealTraceSpans:function(t){REVEAL_TRACE_SPANS=revealKey(t || session.target);},
     panel:panelEditor,panelForTarget:panelEditorForTarget,panelForCard:panelEditorForCard,
     busy:function(view){return !disposed && Object.keys(panelEditors).some(function(type){var editor=panelEditors[type].value;return editor.busy && editor.busy(view,guide);});},
     destroy:function(){if(disposed)return;disposed=true;try{retire();}finally{formLife.destroy();panelEditors=Object.create(null);if(guide)guide.innerHTML='';}}

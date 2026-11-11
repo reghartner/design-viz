@@ -15,6 +15,7 @@
 | E11 | A refused attribute type change is explained beside that type select. |
 | E12 | Note slots stay in the page as status regions; a refusal clears then sets its note, so a repeated identical refusal is announced. |
 | E13 | Hide or revert of a span the provider does not declare names the provider by its title. |
+| E14 | revealTraceSpans (Links Edit in Inspect) opens the Trace spans fold for that carrier, once; another selection first drops the request. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -280,4 +281,17 @@ test('E13 a hide or revert of a span the provider does not declare names the pro
     const plan=ui.e.C.planCarrierTraceSpans(ui.text,ui.raw,INODE,{op,name:'nope',value:true},f.context);
     assert.equal(plan.error,'Span nope is not inherited from Order platform.');
   });
+});
+
+test('E14 Links "Edit in Inspect" asks Inspect to open the Trace spans fold for the next selection only',()=>{
+  const d=board();diagramOf(d).nodes.worker.trace={spans:{process:{serviceName:'order-worker',operation:'process orders',role:'process'}}};
+  const ui=harness(d);
+  assert.equal(typeof ui.h.inspector.revealTraceSpans,'function','the Inspector offers revealTraceSpans');
+  ui.select(EDGE);assert.equal(ui.editor().open,false,'closed by default');
+  ui.h.inspector.revealTraceSpans(NODE);ui.select(NODE);
+  assert.equal(ui.editor().open,true,'open for the carrier Links asked for');
+  ui.select(EDGE);assert.equal(ui.editor().open,false,'only once');
+  // A request the next selection does not use is dropped: a later ordinary click opens nothing.
+  ui.h.inspector.revealTraceSpans(NODE);ui.select(EDGE);ui.select(NODE);
+  assert.equal(ui.editor().open,false,'a selection change drops an unused request');
 });

@@ -5,7 +5,7 @@
    tools/browser-tests/tests/step-trace-scope-form.spec.mjs.
 | row | rule |
 |---|---|
-| S1 | Without a scope the form says what the step inherits, naming a shared node or connection and the other step by title, per path when paths differ (as the core D9 rule counts); a receive-only connection gets a hint; a step whose carriers declare nothing opens on its own span as before, and its scope view says so; the spans are listed read only. |
+| S1 | Without a scope the form says what the step inherits, naming a shared node or connection and the other step by title, per path when paths differ (as the core D9 rule counts; agreeing paths named together, the advice once at the end); a receive-only connection gets a hint; a step whose carriers declare nothing opens on its own span as before, and its scope view says so; the spans are listed read only. |
 | S2 | Mode switch: the radios change only the view; "Use its nodes and connections (removes this step's trace match)", Add trace scope, Remove trace scope and Add trace match (replaces the scope) are one Undo step each. |
 | S3 | Skip checkboxes name the span, its service and its operation; checked means the span counts; unchecking writes skip, checking again removes it (no empty skip left); role checkboxes write role:<role>; a connection lists only its send spans and says a receive span times the hand-off. |
 | S4 | An imported node lists its merged spans (consumer overlay added and hidden spans included); skip uses the namespaced id; the import is untouched. |
@@ -95,8 +95,12 @@ test('S1 without a scope: what the step inherits, the shared carrier and the oth
   assert.ok(ui.h.guide.querySelector('fieldset.trace-match-editor'),'the #1238 form is shown');
   // Sharing is per path, as the core and the validator count it: Work again is only on Path A.
   const two=harness(d=>{d.paths=[{id:'a',label:'Path A',steps:['request','publish','work','again']},{id:'b',label:'Path B',steps:['request','work','store']}];}).select(2);
-  assert.deepEqual(two.texts('.trace-scope-status'),['On Path A: inherits nothing (Worker is also lit by step “Work again”). On Path B: inherits from Worker (3 spans).']);
+  assert.deepEqual(two.texts('.trace-scope-status'),['On Path A: inherits nothing (Worker is also lit by step “Work again”). On Path B: inherits from Worker (3 spans). Add a trace scope to choose its spans.'],'the advice comes once, at the end');
   assert.deepEqual(two.texts('.trace-scope-also'),['Also lit by step “Work again” on Path A.']);
+  // Paths that agree are named together.
+  const three=harness(d=>{d.paths=[{id:'a',label:'Path A',steps:['request','publish','work','again']},{id:'b',label:'Path B',steps:['request','work','store']},{id:'c',label:'Path C',steps:['work','again']}];}).select(2);
+  assert.deepEqual(three.texts('.trace-scope-status'),['On Path A and Path C: inherits nothing (Worker is also lit by step “Work again”). On Path B: inherits from Worker (3 spans). Add a trace scope to choose its spans.']);
+  assert.deepEqual(three.texts('.trace-scope-also'),['Also lit by step “Work again” on Path A and Path C.']);
   two.select(4);
   assert.deepEqual(two.texts('.trace-scope-status'),['Inherits from Store (2 spans).'],'one path: the plain line');
   // A connection that declares only a receive span gives an edge step nothing of its own.

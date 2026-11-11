@@ -2452,7 +2452,7 @@ label reads `send only · 2 ms` (the send span's own time); a connection that de
 `receive` and has no send in the trace reads `receive seen · send not in trace`. A queue node
 in the middle is not crossed: each connection is timed on its own. On a declared connection a
 step `traceMatch` row moves into the label's title with its time, budget and conditions
-(`Step charge, grpc.msdemo.PaymentService/Charge: 23.6 ms`), and the label keeps the step's
+(`Step charge, grpc.msdemo.PaymentService/Charge: 23.559238 ms`, the step's raw duration), and the label keeps the step's
 warning or error colour; undeclared connections keep the step time. A receiver that starts
 before its send (clock skew) counts as 0 ms and the title says so.
 

@@ -133,7 +133,9 @@ function telemetryTraceHandoffRows(diagram,trace,carriers,rows,edges){
     }else return;
     // The step rows that timed this connection keep their time, budget and conditions in the title,
     // and their worst tone on the label: a declared send never hides a step's warning or error.
-    var ranks={unknown:0,observed:1,warning:2,error:3},all=sends.concat(receivers),tone=all.some(function(s){return ids.indexOf(s.id)>=0 && s.error;})?'error':'observed',conditions=[];
+    var ranks={unknown:0,observed:1,warning:2,error:3},all=sends.concat(receivers),failed=all.filter(function(s){return ids.indexOf(s.id)>=0 && s.error;}),tone=failed.length?'error':'observed',conditions=[];
+    // A failed send or receive span is named, as step titles say "Service error".
+    failed.forEach(function(s){title+=' Service error: '+name(s)+(s.statusCode?' · HTTP '+s.statusCode:'')+'.';});
     rows.filter(function(r){return r.edgeIndex===index && r.status==='matched';}).forEach(function(r){
       title+=' Step '+r.id+', '+telemetryTraceRowTitle(r)+'.';
       if(ranks[r.tone]>ranks[tone])tone=r.tone;conditions=conditions.concat(r.conditions || []);

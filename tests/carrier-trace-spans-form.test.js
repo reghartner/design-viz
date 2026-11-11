@@ -11,7 +11,7 @@
 | E6 | A broken override is shown with its error, never as hidden; unrelated edits keep it as written; unsupported attributes are refused. |
 | E7 | Rename a local or added span in one Undo, keeping its fields and traceScope.skip names; inherited names are read only. |
 | E8 E9 | A receiver without process spans says so and offers Declare receive span here; attribute values have a type. |
-| E10 | A name the provider declares is taken even while hidden here: rename and Add span are refused beside the name; the hide is kept. |
+| E10 | A name the provider declares is taken even while hidden here: rename and Add span are refused beside the name (provider title, else id); the note is a role=status region; the hide is kept. |
 | E11 | A refused attribute type change is explained beside that type select. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
@@ -221,7 +221,7 @@ test('E8 E9 a receiver without process spans says so and still offers a receive 
 });
 
 test('E10 a span name the provider declares is taken even while hidden here: rename and add are refused beside the name',()=>{
-  const f=imported(),ui=harness(f.consumer,f.context),INODE={kind:'node',section:0,id:'shared::worker'};
+  const f=imported();f.provider.page.title='Order platform';const ui=harness(f.consumer,f.context),INODE={kind:'node',section:0,id:'shared::worker'};
   const overlay=()=>plain(diagramOf(ui.raw).topologyImports[0].nodeTracking.worker.trace);
   ui.select(INODE);ui.check('find hidden for this document',true);
   addSpan(ui,{name:'audit',service:'order-worker',value:'audit write',role:'database'});ui.select(INODE);
@@ -229,10 +229,12 @@ test('E10 a span name the provider declares is taken even while hidden here: ren
   assert.deepEqual(overlay(),kept);
   let held=ui.text;ui.set('audit name','find');
   assert.equal(ui.text,held,'the rename changes nothing');
-  assert.match(ui.beside('audit name'),/^find is a span provider declares \(hidden here\); pick another name, or show it and change it instead\.$/);
+  const note=ui.h.guide.querySelectorAll('p').find(p=>p.id===ui.control('audit name').getAttribute('aria-describedby'));
+  assert.equal(note.getAttribute('role'),'status','the note is announced when a refusal appears');
+  assert.match(ui.beside('audit name'),/^The provider Order platform declares a span named find, hidden in this document; pick another name, or show find and change it instead\.$/);
   ui.select(INODE);held=ui.text;addSpan(ui,{name:'find',service:'other',value:'get',role:'cache'});
   assert.equal(ui.text,held,'the add changes nothing');
-  assert.match(ui.beside('New span name'),/^find is a span provider declares \(hidden here\); pick another name, or show it and change it instead\.$/);
+  assert.match(ui.beside('New span name'),/^The provider Order platform declares a span named find, hidden in this document; pick another name, or show find and change it instead\.$/);
   assert.deepEqual(overlay(),kept,'the hide is kept');
 });
 

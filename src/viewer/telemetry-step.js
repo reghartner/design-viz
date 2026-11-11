@@ -107,7 +107,7 @@ function telemetryTraceHandoffRows(diagram,trace,carriers,rows,edges){
     if((diagram.edges || []).filter(function(e){return e.from+'->'+e.to===key;}).length!==1)return;
     var own=spansOf(list,'receive'),declaresReceive=list.some(function(x){return x.role==='receive';});
     var sends=spansOf(list,'send'),receivers=declaresReceive?own:spansOf(carriers.nodes[edge.to],'process');
-    var pairs=FlowTraceMatch.handoffs(trace,sends,receivers),paired=pairs.filter(function(p){return p.receive;}),text='',title='',ids=[];
+    var pairs=FlowTraceMatch.handoffs(trace,sends,receivers),paired=pairs.filter(function(p){return p.receive;}),text='',title='',ids=[],untimed=false;
     if(paired.length){
       var intervals=paired.map(function(p){return {id:p.send.id+'>'+p.receive.id,startMs:p.send.startMs,durationMs:Math.max(0,p.receive.startMs-p.send.startMs)};});
       var time=telemetryTraceSpanTime([{status:'matched',intervals:intervals}]).replace(/ across (\d+) spans$/,' across $1 hand-offs');
@@ -128,7 +128,8 @@ function telemetryTraceHandoffRows(diagram,trace,carriers,rows,edges){
       title='No receiver found in this trace; showing the send span\'s own time ('+own_+').';
       ids=sends.map(function(s){return s.id;});
     }else if(declaresReceive && own.length){
-      text='receive seen · send not in trace';
+      // No send in the trace: a label, but no hand-off time, so it is not counted as timed (review M3).
+      untimed=true;text='receive seen · send not in trace';
       title='The receiving span ('+names(own)+') is in this trace but no send span is, so there is no hand-off time.';
       ids=own.map(function(s){return s.id;});
     }else return;
@@ -142,7 +143,7 @@ function telemetryTraceHandoffRows(diagram,trace,carriers,rows,edges){
       if(ranks[r.tone]>ranks[tone])tone=r.tone;conditions=conditions.concat(r.conditions || []);
     });
     edges[key]=[{id:'carrier:'+key,kind:'carrier',nodeId:null,edgeIndex:index,status:'matched',duration:null,label:text,text:text,titleText:title,operation:'',service:'',alternative:null,optional:false,otherAlternatives:[],conditions:conditions,
-      tone:tone,spanIds:ids,intervals:[]}];
+      tone:tone,spanIds:ids,intervals:[],timed:!untimed}];
   });
 }
 /* #1185: each trace carrier's highlight level against the focused span: "current" (the focused
@@ -294,7 +295,7 @@ function telemetryTraceCounts(model){
   var rows=model.rows || [],n=function(f){return rows.filter(f).length;};
   var optional=n(function(r){return r.optional;}),other=n(function(r){return r.notThisFlow;}),unmapped=n(function(r){return r.status==='unmapped';});
   // Timed carriers are those timed from their declared spans (#1290), so boards without declarations read as before.
-  function timed(map){return Object.keys(map || {}).filter(function(k){return map[k].some(function(r){return r.kind==='carrier' && r.status==='matched';});}).length;}
+  function timed(map){return Object.keys(map || {}).filter(function(k){return map[k].some(function(r){return r.kind==='carrier' && r.status==='matched' && r.timed!==false;});}).length;}
   return {matched:n(function(r){return r.status==='matched';}),total:rows.length-optional-other-unmapped,optional:optional,notThisFlow:other,unmapped:unmapped,
     unmatched:model.mapping?model.mapping.unmatched.length:0,nodes:timed(model.nodes),edges:timed(model.edges)};
 }

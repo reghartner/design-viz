@@ -7,7 +7,8 @@
   (process, database, cache, call, work; send or receive on a connection). A loaded trace
   times a node from its spans and a connection by its hand-off (receive start minus send
   start). The receiving span is the connection's own receive span, else the receiving
-  node's process spans; a send span that no receiving span pairs with reads "send only".
+  node's process spans; a connection whose send spans no receiving span pairs with reads
+  "send only".
 - Declarations travel with topology imports. An importing board changes, adds or hides one
   span through its `nodeTracking` / `edgeTracking` `trace` overlay; the rest keeps
   following the provider. An invalid provider declaration fails the provider's build and is
@@ -17,8 +18,8 @@
   `traceScope` narrows them (root, parent step, attributes, skip by name or role) and holds
   the optional flag and budgets. A carrier that several steps on a path light needs a scope;
   a span two steps claim is ambiguous. Pages need `flow.trace-spans` / `flow.trace-scope`.
-  Reference approvals digest each step's effective selector, so a provider span edit asks
-  for a new approval, and a declared operation or prefix that the approved reference trace
+  Reference approvals digest each step's effective selector, so a provider edit to a span a
+  step inherits asks for a new approval, and a declared operation or prefix that the approved reference trace
   never shows warns on the board that owns the declaration.
 - Workbench (desktop): Inspect → Tracking → Trace spans on a node or connection, local and
   imported; a trace scope mode in a step's Code and trace evidence; declared spans in the

@@ -195,7 +195,9 @@ function createBoardEditor(options){
     // The pending list changes before the render, so the re-rendered board shows the new count at once (#1253);
     // a refused render puts it back.
     var entry=record(t,op,ticket,match),chain=boardEditChain(t.raw,t.path),kept=ops.slice(),befores=ops.map(function(o){return o.before;});
-    if(inverse>=0 && carrierTickets(next,t.path)===ops[inverse].tickets){ops.splice(inverse,1);ops.slice(inverse).forEach(function(o){o.before=undefined;});}
+    // Every exact-text snapshot taken after the cancelled op still holds it: drop them all, so no Undo brings it
+    // back (#1290 whole-branch review M1: a swap's restore text and its swapped mapping's before).
+    if(inverse>=0 && carrierTickets(next,t.path)===ops[inverse].tickets){ops.splice(inverse,1);ops.slice(inverse).forEach(function(o){o.before=undefined;o.restore=undefined;if(o.swapped)o.swapped.before=undefined;});}
     else{
       var made={entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,previous:op==='trace-match'?t.previous:undefined,before:op==='trace-match'?before:undefined};
       // #1290: the traceScope a mapping replaced, so its Undo can put it back in any edit order.
@@ -217,7 +219,9 @@ function createBoardEditor(options){
   }
   // The text from before a mapping (for its Undo) stays out of the stash, and so does a replaced
   // traceScope: replaying a mapping reads it again from the step it is applied to.
-  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops.map(function(o){return {entry:o.entry,chain:o.chain,replayable:o.replayable,kind:o.kind,previous:o.previous};})}));}catch(ex){}}
+  // A mapping also stashes the traceScope it replaced (or that there was none), so a replay can refuse when
+  // their version gave the step a scope or changed that one (#1290 whole-branch review M2).
+  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops.map(function(o){var s={entry:o.entry,chain:o.chain,replayable:o.replayable,kind:o.kind,previous:o.previous};if(o.entry.op==='trace-match'){s.hadScope=o.scope!==undefined;if(s.hadScope)s.scope=o.scope;}return s;})}));}catch(ex){}}
   function unstash(){try{win.sessionStorage.removeItem(stashKey);}catch(ex){}}
   function history(source,entry){
     var raw=parsed(source),owner=raw && raw.page?['page']:[],page=specValueAt(raw,owner),list=page && page.editHistory,itemText=JSON.stringify(entry,null,2);
@@ -268,6 +272,12 @@ function createBoardEditor(options){
         if(why && why.error)refuse(/^Already declared as /.test(why.error)?'their version already declares it as '+why.error.replace(/^Already declared as /,'').replace(/ on .*$/,''):why.error.replace(/\.$/,'').replace(/^./,function(c){return c.toLowerCase();}));
         else dropped.push(describe);
         return;
+      }
+      // A mapping removes the step's traceScope: never one their version added or changed (#1290 review M2).
+      if(entry.op==='trace-match'){
+        var at_=specValueAt(parsed(text),paths[0]),theirScope=at_ && typeof at_==='object'?at_.traceScope:undefined;
+        if(theirScope!==undefined && (!op.hadScope || JSON.stringify(theirScope)!==JSON.stringify(op.scope))){
+          refuse(op.hadScope?'their version changed that step\'s trace scope; edit it in Inspect':'their version gives that step a trace scope; edit it in Inspect');return;}
       }
       if(!apply(entry.op,ref,entry.ticket,null,entry.traceMatch,op.previous) && text===before){
         // A clear with no marker of this board's left to clear is dropped (#855), saying why.
@@ -444,7 +454,7 @@ function createBoardEditor(options){
   function declared(){var at=lastDeclaration();if(at<0 || readOnly)return null;var e=ops[at].entry;return {key:e.span.key,label:e.label,span:{serviceName:e.span.serviceName,operation:e.span.operation,role:e.span.role}};}
 
   // The latest pending span mapping, for the result note and its Undo (#1177).
-  function mapped(){var at=lastMapping();if(at<0 || readOnly)return null;var e=ops[at].entry;return {step:e.step,label:e.label,traceMatch:{serviceName:e.traceMatch.serviceName,operation:e.traceMatch.operation}};}
+  function mapped(){var at=lastMapping();if(at<0 || readOnly)return null;var e=ops[at].entry,out={step:e.step,label:e.label,traceMatch:{serviceName:e.traceMatch.serviceName,operation:e.traceMatch.operation}};if(ops[at].scope!==undefined)out.replacedScope=true;return out;}
   var api={
     state:function(){
       return {editable:canEdit && !!artifact && !readOnly,blocked:fallback?"Editing is off: this board couldn't load its latest version, so saving would overwrite newer changes.":'',

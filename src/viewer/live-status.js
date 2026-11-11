@@ -1244,7 +1244,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
   /* #1180: the latest pending mapping for its note. When the step keeps a parentStepId, attributes, namespace
      or occurrence that exclude the mapped span, the selected trace shows nothing for it; the note says so. */
   function mappedNote(selected,model){
-    var m=editing() && editor.state().mapped;if(!m)return null;var out={step:m.step,label:m.label,traceMatch:m.traceMatch,unmatched:false};
+    var m=editing() && editor.state().mapped;if(!m)return null;var out={step:m.step,label:m.label,traceMatch:m.traceMatch,unmatched:false,replacedScope:!!m.replacedScope};
     var row=selected && model && model.mapping && model.mapping.steps.find(function(r){return r.stepId===m.step;}),step=selected && (selected.binding.section.diagram.steps || []).find(function(x){return x.id===m.step;}),kept=step && step.traceMatch;
     // Only fields that filter spans can exclude one; nodeId only picks the node to annotate (#1180 c3).
     if(row && row.status==='missing' && kept && !Array.isArray(kept) && (kept.parentStepId || kept.attributes || kept.namespace || kept.occurrence!=null))out.unmatched=true;

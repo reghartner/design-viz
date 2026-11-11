@@ -389,26 +389,27 @@
       var message=trace.direct && trace.direct.profiles.length?(!trace.hasMappings?'Diagram mapping is not configured. Loaded traces still show a waterfall.':''):!trace.hasMappings?'No traceMatch steps on this board':!trace.hasBindings && !trace.entries.length?'No trace bindings on this board':trace.historical?'Traces are unavailable in Over time. Return to Live to inspect a request.':trace.status.busy?'Loading trace evidence…':!trace.available?(trace.entries.length?'Host-provided trace evidence; live retrieval unavailable.':'Trace evidence unavailable. Check page bindings and connector permissions.'):!trace.enabled?(trace.entries.length?'Host-provided trace evidence. Turn on Metrics overlay to refresh explicit bindings.':'Turn on Metrics overlay to retrieve the explicitly bound request samples.'):!trace.entries.length?'No trace evidence returned. Check explicit trace bindings and provider availability.':'';
       var status=el(body,'p','status','dv-trace-mode-status',[message,trace.hasMappings?trace.status.note:'',trace.hasMappings?trace.notice:''].filter(Boolean).join(' '));status.setAttribute('role','status');
       // #1177: the latest span mapping with its Undo, and the step chooser of a drop on a carrier with several steps.
-      /* #1290 PR 9: a role select for a declaration on a node or connection, default first; the button
-         beside it carries the chosen role. */
-      function declareRole(parent,info,go){
+      /* #1290 PR 9: a role select for a declaration on a node or connection, default first, then the button
+         that carries the chosen role. Both are placed in call order by el(), never moved afterwards: moving a
+         focused control blurs it (#1290 whole-branch review m1). */
+      function declareControls(parent,info,key,cls,text,method){
         var sel=el(parent,'select','declare-role','reader-button tbtn dv-trace-declare-role');sel.setAttribute('aria-label','Role for the span declared on '+info.label);
         info.roles.forEach(function(r){el(sel,'option',r,'',r).value=r;});
         if(sel._declareKind!==info.kind || info.roles.indexOf(sel.value)<0){sel.value=info.roles[0];sel._declareKind=info.kind;}
+        var go=button(parent,key,cls,text,method);
         sel._declareGo=go;go._liveArgument={role:sel.value};
         // A refused declaration says why beside its button ("Already declared as … on …").
         if(info.error){var why=el(parent,'p','declare-error','dv-trace-declare-error',info.error);why.setAttribute('role','status');why.id=why.id || 'dv-trace-declare-error-'+Math.random().toString(36).slice(2,10);go.setAttribute('aria-describedby',why.id);}
         else go.removeAttribute('aria-describedby');
         if(!sel._declareChange){sel._declareChange=function(){if(sel._declareGo)sel._declareGo._liveArgument={role:sel.value};};sel.addEventListener('change',sel._declareChange);}
-        return sel;
+        return go;
       }
       if(trace.mapped && !trace.declared){var note=el(body,'div','map-note','dv-trace-map-note');note.setAttribute('role','status');
-        el(note,'span','text','dv-trace-map-note-text','Mapped '+trace.mapped.traceMatch.serviceName+' · '+trace.mapped.traceMatch.operation+' to step '+trace.mapped.label+(trace.mapped.unmatched?'; this step\'s parent, attributes, namespace or occurrence do not match this span, so nothing lights.':'.'));
+        el(note,'span','text','dv-trace-map-note-text','Mapped '+trace.mapped.traceMatch.serviceName+' · '+trace.mapped.traceMatch.operation+' to step '+trace.mapped.label+(trace.mapped.replacedScope?'; its trace scope was replaced':'')+(trace.mapped.unmatched?'; this step\'s parent, attributes, namespace or occurrence do not match this span, so nothing lights.':'.'));
         button(note,'undo','reader-button dv-trace-map-undo','Undo','undoTraceMap');
         // The mapping a drop on a node or connection made can become a declaration on it instead (one pending change).
-        if(trace.declareOffer){var instead=button(note,'declare','reader-button dv-trace-declare-instead','Declare on '+trace.declareOffer.label+' instead','declareTraceSpanInstead');
-          instead.title='Take this mapping back and declare the span on '+trace.declareOffer.label+' with the role chosen beside it.';
-          note.insertBefore(declareRole(note,trace.declareOffer,instead),instead);}}
+        if(trace.declareOffer){var instead=declareControls(note,trace.declareOffer,'declare','reader-button dv-trace-declare-instead','Declare on '+trace.declareOffer.label+' instead','declareTraceSpanInstead');
+          instead.title='Take this mapping back and declare the span on '+trace.declareOffer.label+' with the role chosen beside it.';}}
       if(trace.declared){var dn=el(body,'div','declare-note','dv-trace-declare-note');dn.setAttribute('role','status');
         el(dn,'span','text','dv-trace-declare-note-text','Declared '+trace.declared.key+' ('+trace.declared.span.serviceName+' · '+trace.declared.span.operation+') on '+trace.declared.label+'.');
         button(dn,'undo','reader-button dv-trace-declare-undo','Undo','undoTraceDeclare');}
@@ -419,8 +420,8 @@
         var back=function(){var row=host.querySelector('.dv-trace-span[data-span-id="'+mc.spanId+'"]');if(row && row.focus)row.focus({preventScroll:true});else if(host.focus)host.focus({preventScroll:true});};
         mc.steps.forEach(function(step){var choice=button(chooser,'step-'+step.id,'reader-button dv-trace-map-choice',step.label,'chooseTraceMapStep');choice._liveArgument={stepId:step.id};choice.disabled=!!step.disabled;choice._mapBack=back;});
         // #1290 PR 9: or declare the span on the carrier it was dropped on.
-        if(mc.declare){var dec=button(chooser,'declare','reader-button dv-trace-map-declare','Declare on '+mc.declare.label,'declareTraceSpan');dec._mapBack=back;
-          dec.title='Declare '+mc.span+' on '+mc.declare.label+' with the role chosen beside it, instead of mapping it to a step.';chooser.insertBefore(declareRole(chooser,mc.declare,dec),dec);}
+        if(mc.declare){var dec=declareControls(chooser,mc.declare,'declare','reader-button dv-trace-map-declare','Declare on '+mc.declare.label,'declareTraceSpan');dec._mapBack=back;
+          dec.title='Declare '+mc.span+' on '+mc.declare.label+' with the role chosen beside it, instead of mapping it to a step.';}
         var cancel=button(chooser,'cancel','reader-button dv-trace-map-cancel','Cancel','cancelTraceMapChooser');cancel._mapBack=back;
         chooser._mapBack=back;
         if(!chooser._mapKey){chooser._mapKey=function(ev){if(ev.key!=='Escape')return;ev.preventDefault();ev.stopPropagation();var owner=host._livePanelApi;if(owner)owner.cancelTraceMapChooser();if(chooser._mapBack)chooser._mapBack();};chooser.addEventListener('keydown',chooser._mapKey);}

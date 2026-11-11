@@ -25,15 +25,18 @@ test('Contents uses one plain row for singleton Views and named subrows for mult
  await expect(intro.locator('..').locator('.reader-tree-view')).toHaveCount(0);
  const tab=contents.locator('.reader-tree-tab'),storyHeading=contents.locator('.reader-tree-section[data-reader-section="story"]'),story=storyHeading.locator('..').locator('..');
  const views=story.locator('.reader-tree-view');await expect(views).toHaveText(['Business','Data']);
- expect(await pseudo(tab)).toBe('none');expect(await pseudo(tab,'::after')).toContain('⌄');expect(await pseudo(intro)).toBe('none');expect(await pseudo(storyHeading)).toBe('none');expect(await pseudo(views.first())).toBe('none');expect(await pseudo(views.last())).toBe('none');
+ // #1305: three pages (Introduction, Shared story · Business, Shared story · Data), so Contents numbers its page rows;
+ // rows holding several pages (the Tab, the story heading) keep an empty number slot.
+ expect(await pseudo(tab)).toBe('""');expect(await pseudo(tab,'::after')).toContain('⌄');expect(await pseudo(intro)).toBe('"1"');expect(await pseudo(storyHeading)).toBe('""');expect(await pseudo(views.first())).toBe('"2"');expect(await pseudo(views.last())).toBe('"3"');
+ await expect(intro).toHaveAttribute('aria-description','Page 1 of 3');await expect(views.last()).toHaveAttribute('aria-description','Page 3 of 3. Explore: pan and zoom the graph.');
  await story.locator('.reader-tree-view[data-tab-view="data"]').click();await intro.focus();await page.keyboard.press('Enter');
  await expect(intro).toBeFocused();await expect(intro).toHaveAttribute('aria-current','page');await expect(page).toHaveURL(/d=intro.*v=standard/);
  await info.attach('singleton-standard-and-multi-view-contents',{body:await page.screenshot(),contentType:'image/png'});
 
  const exploreRaw=fixture();exploreRaw.page.blocks[0].tabs[0].sections[0].views[0].presentation='explore';
  await standalone(page,server,exploreRaw);const explore=nav(root).locator('.reader-tree-single-view[data-reader-section="intro"]');
- await expect(explore).toHaveAttribute('data-explore-view','true');await expect(explore).toHaveAttribute('aria-description','Explore: pan and zoom the graph.');
- expect(await pseudo(explore)).toBe('none');
+ await expect(explore).toHaveAttribute('data-explore-view','true');await expect(explore).toHaveAttribute('aria-description','Page 1 of 3. Explore: pan and zoom the graph.');
+ expect(await pseudo(explore)).toBe('"1"');
  await expect(explore.locator('..').locator('.reader-tree-view')).toHaveCount(0);
  await info.attach('singleton-explore-contents',{body:await page.screenshot(),contentType:'image/png'});
 });

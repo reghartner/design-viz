@@ -14,7 +14,7 @@
 | D5 | Save records {op:"trace-span", path, label, node|edge, span:{key, serviceName, operation, role}}; the validator accepts the history entry. |
 | D6 | A conflict replay re-applies the declaration on the winner's text, or counts it as already there. |
 | D8 | A conflict replay compares the whole declared span: a winner with the same key and another role is not "already there"; the change is dropped (not written under a new key) and the notice names it, its span and the true reason. With two declarations on one carrier, only the clashing one is dropped. |
-| D10 | Every replay-drop reason is true for its case: a mapping whose step the winner maps differently names that mapping; a clear with no marker left says so; a gone carrier keeps "carrier moved, removed or ambiguous"; a ticket add whose provider now carries the ticket says so. Each refusal is its own sentence; "1 … was"; no "0 could not be" clause. |
+| D10 | Every replay-drop reason is true for its case: a mapping whose step the winner maps differently names that mapping; a clear with no marker left says so; a gone carrier keeps "carrier moved, removed or ambiguous"; a ticket add whose provider now carries the ticket says so, naming the provider by its title. Each refusal is its own sentence; "1 … was"; no "0 could not be" clause. |
 | D11 | A replayed declaration whose whole span the winner already declares under another key counts as already there and writes nothing. |
 | D9 | A span the carrier already declares under another key (same service, operation and role) is refused: "Already declared as <key> on <title>." |
 | D7 | Declare on <title> instead (team-lead ruling: the immediate mapping stays): declareInstead swaps the pending mapping for the declaration, one pending change; its Undo restores the mapping as it was; Save records only the trace-span. |
@@ -176,10 +176,10 @@ test('D10 every replay-drop reason is true for its case',async()=>{
   next=await editor(local(),{store,start:false});
   assert.equal(next.e.state().notice.text,'Another editor saved first. 1 of your changes was re-applied. Save again.');
   // A ticket add on an imported node whose provider now carries that ticket: present carrier, true reason.
-  const f=imported(),later=imported();later.provider.page.sections[0].diagram.nodes.store.tickets=['ST-9'];
+  const f=imported(),later=imported();later.provider.page.sections[0].diagram.nodes.store.tickets=['ST-9'];later.provider.page.title='Order platform';
   store=new Map();first=await editor(f.consumer,{context:f.context,store,reject:'conflict'});first.e.add(STORE,'ST-9');first.e.save();await settle();
   next=await editor(later.consumer,{context:later.context,store,start:false});
-  assert.equal(next.e.state().notice.text,'Another editor saved first. 0 of your changes were re-applied. ST-9 on Store could not be re-applied: their version already gets ST-9 on Store from provider.');
+  assert.equal(next.e.state().notice.text,'Another editor saved first. 0 of your changes were re-applied. ST-9 on Store could not be re-applied: their version already gets ST-9 on Store from Order platform.');
 });
 
 test('D11 a replayed declaration the winner already has under another key (the whole span) is already there; nothing is written',async()=>{

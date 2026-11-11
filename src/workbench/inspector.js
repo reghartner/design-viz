@@ -1422,7 +1422,8 @@ function traceMappingEditor(val,ctx,t,stepIdInput){
     var d=ctx.diagram || {},resolvedStep=(d.steps || [])[t.index] || val,carriers=traceScopeCarriers(d,resolvedStep);
     var declared=carriers.filter(function(c){return c.spans.length;});
     var hasMatch=val.traceMatch!==undefined && val.traceMatch!==null,hasScope=val.traceScope!==undefined;
-    var viewKey=JSON.stringify([session.snapshot().project,t.section,t.index]);
+    // Keyed by step ID (position for a step without one), so a reorder never carries it to another step.
+    var viewKey=JSON.stringify([session.snapshot().project,t.section,typeof val.id==='string' && val.id?'id:'+val.id:'index:'+t.index]);
     var view=TRACE_SCOPE_VIEW.get(viewKey) || (hasMatch?'own':hasScope?'scope':declared.length?'scope':'own');
     var box=document.createElement('div');box.className='trace-mapping';
     var modes=document.createElement('div');modes.className='trace-mapping-modes';modes.setAttribute('role','radiogroup');modes.setAttribute('aria-label','How a loaded trace maps this step');
@@ -1474,9 +1475,17 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
       box.setAttribute('data-warning-count','0');return box;
     }
     // What the step inherits: by title, naming a shared node or connection and the other step.
+    // Sharing is per path, as the core D9 rule counts it (FlowTraceMatch.effectiveSelector over
+    // that path's steps); the form names a path only when paths disagree.
     var d=ctx.diagram || {},steps=Array.isArray(d.steps)?d.steps:[],routes=typeof diagramPathList==='function'?diagramPathList(d).filter(function(r){return r.indices.indexOf(t.index)>=0;}):[];
-    var peers=[];routes.forEach(function(r){r.indices.forEach(function(i){if(i!==t.index && peers.indexOf(i)<0)peers.push(i);});});
-    function others(c){return peers.filter(function(i){var lit=traceScopeCarriers(d,steps[i]);return lit.some(function(x){return x.kind===c.kind && x.id===c.id;});}).map(function(i){return steps[i];});}
+    if(!routes.length)routes=[{label:'',indices:steps.map(function(s,i){return i;})}];
+    var self=steps[t.index] || val;
+    function others(c,route){return route.indices.filter(function(i){if(i===t.index || !steps[i])return false;return traceScopeCarriers(d,steps[i]).some(function(x){return x.kind===c.kind && x.id===c.id;});}).map(function(i){return steps[i];});}
+    function inheritsOn(route){
+      var pathSteps=route.indices.map(function(i){return steps[i];}).filter(Boolean);
+      var eff=typeof FlowTraceMatch!=='undefined' && FlowTraceMatch.effectiveSelector?FlowTraceMatch.effectiveSelector(d,self,pathSteps):null;
+      return eff && Array.isArray(eff.inherits)?eff.inherits:null;
+    }
     function stepTitle(s){return '“'+String(s && s.text || s && s.id || '').replace(/\s+/g,' ').trim()+'”';}
     function stepList(list){return (list.length>1?'steps ':'step ')+list.map(stepTitle).join(', ');}
     var skip=scope && scope.skip && typeof scope.skip==='object' && !Array.isArray(scope.skip)?scope.skip:{};
@@ -1486,10 +1495,22 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
     if(!lit.length)status='This step lights no nodes or connections, so it inherits no spans.';
     else if(!carriers.some(function(c){return c.spans.length;}))status='Its nodes and connections declare no trace spans, so a loaded trace leaves this step unmapped. Declare spans in Inspect on a node or connection, or use a trace match.';
     else if(!scope){
-      var used=owning.filter(function(c){return !others(c).length;}),shared=owning.filter(function(c){return others(c).length;});
-      var clauses=shared.map(function(c){return c.title+' is also lit by '+stepList(others(c));}).join('; ');
-      if(!used.length)status=shared.length?'Inherits nothing: '+clauses+'; add a trace scope to choose '+(shared.length>1?'their':'its')+' spans.':'Inherits nothing: its nodes and connections declare no spans this step can own.';
-      else status='Inherits from '+used.map(function(c){return c.title+' ('+plural(c.owned.length)+')';}).join(' and ')+'.'+(shared.length?' '+clauses+'; add a trace scope to inherit '+(shared.length>1?'their':'its')+' spans.':'');
+      var per=routes.map(function(route){
+        var inherits=inheritsOn(route);
+        var used=owning.filter(function(c){return inherits?inherits.indexOf(c.id)>=0:!others(c,route).length;}),shared=owning.filter(function(c){return used.indexOf(c)<0;});
+        var clauses=shared.map(function(c){return c.title+' is also lit by '+stepList(others(c,route));}).join('; ');
+        var whole,brief;
+        if(!used.length){
+          whole=shared.length?'Inherits nothing: '+clauses+'; add a trace scope to choose '+(shared.length>1?'their':'its')+' spans.':'Inherits nothing: its nodes and connections declare no spans this step can own.';
+          brief=shared.length?'inherits nothing ('+clauses+')':'inherits nothing';
+        }else{
+          var from=used.map(function(c){return c.title+' ('+plural(c.owned.length)+')';}).join(' and ');
+          whole='Inherits from '+from+'.'+(shared.length?' '+clauses+'; add a trace scope to inherit '+(shared.length>1?'their':'its')+' spans.':'');
+          brief='inherits from '+from+(shared.length?' ('+clauses+')':'');
+        }
+        return {label:route.label,whole:whole,brief:brief};
+      });
+      status=per.every(function(x){return x.whole===per[0].whole;})?per[0].whole:per.map(function(x){return 'On '+x.label+': '+x.brief+'.';}).join(' ');
     }else{
       var counted=owning.map(function(c){return {c:c,n:c.owned.filter(function(x){return !skipped(c,x);}).length};}).filter(function(x){return x.n;});
       status=counted.length?'Inherits from '+counted.map(function(x){return x.c.title+' ('+x.n+' of '+plural(x.c.owned.length)+')';}).join(' and ')+'.':owning.length?'Inherits nothing: every declared span is skipped.':'Inherits nothing: its nodes and connections declare no spans this step can own.';
@@ -1519,7 +1540,15 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
         named(rb.firstChild,r+' spans on '+c.title+' count for this step','Clear to skip every '+r+' span on '+c.title+'.');
         row.appendChild(rb);el('span','trace-scope-role','All '+r+' spans',row);slot(group,rb.firstChild);
       });
-      if(!scope){var o=others(c);if(o.length && c.owned.length)el('p','fnote','Also lit by '+stepList(o)+'.',group);}
+      if(c.kind==='edge' && !c.owned.length && c.handoff.length)el('p','fnote trace-scope-hint','This connection declares only a receive span; declare a send span on it for this step to have spans of its own.',group);
+      if(!scope && c.owned.length){
+        // Who else lights it, per path; a path is named only when not every path agrees.
+        var by=[];routes.forEach(function(route){others(c,route).forEach(function(s){var hit=by.find(function(x){return x.s===s;});if(!hit)by.push(hit={s:s,routes:[]});hit.routes.push(route.label);});});
+        if(by.length){
+          var everywhere=by.every(function(x){return x.routes.length===routes.length;});
+          el('p','fnote trace-scope-also','Also lit by '+(everywhere?stepList(by.map(function(x){return x.s;})):by.map(function(x){return 'step '+stepTitle(x.s)+(x.routes.length===routes.length?'':' on '+x.routes.join(' and '));}).join(', '))+'.',group);
+        }
+      }
     });
     var placed={root:[],parent:[],attributes:[],optional:[],maxDurationMs:[],maxQueueDepth:[],general:[]},messages=traceScopeMessages(val);
     messages.forEach(function(m){

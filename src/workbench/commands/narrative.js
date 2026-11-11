@@ -41,6 +41,12 @@ function planRenameStep(text,raw,sectionIdx,stepIdx,newId){
     if(!oldId)return;
     (d.paths || []).forEach(function(path){path.steps=path.steps.map(function(id){return id===oldId?newId:id;});});
     (d.layouts || []).forEach(function(view){if(view.steps)view.steps=view.steps.map(function(id){return id===oldId?newId:id;});});
+    // #1290: trace match and trace scope parents that name the step follow it.
+    (d.steps || []).forEach(function(st){
+      if(!st || typeof st!=='object')return;
+      [].concat(st.traceMatch || []).forEach(function(m){if(m && typeof m==='object' && m.parentStepId===oldId)m.parentStepId=newId;});
+      if(st.traceScope && typeof st.traceScope==='object' && st.traceScope.parentStepId===oldId)st.traceScope.parentStepId=newId;
+    });
   });
   if(!oldId)return plan;
   return builderDetailCascade(plan,sectionIdx,function(detail,owner,target){

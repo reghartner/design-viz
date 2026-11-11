@@ -555,7 +555,9 @@ The same fold has two modes (desktop): **Own span (trace match)** is the form ab
 ([provider traces](provider-traces.md)). The radios change only the view; a step opens on its
 trace match when it has one, otherwise on its nodes and connections when they declare spans.
 A line says what the step inherits, naming a shared node or connection and the other step by
-title. **Use its nodes and connections (removes this step's trace match)**, **Add trace
+title; sharing counts one path at a time, and when the step's paths disagree the line names
+each path. A connection that declares only a `receive` span gets a hint to declare a `send`
+span. Renaming a step ID also renames the `parentStepId` references to it. **Use its nodes and connections (removes this step's trace match)**, **Add trace
 scope**, **Remove trace scope** and **Add trace match (replaces this step's trace scope)**
 are one Undo step each. With a scope, each span of each lit node or connection has a checkbox
 labelled with its name, service and operation: checked counts for the step, clearing it writes

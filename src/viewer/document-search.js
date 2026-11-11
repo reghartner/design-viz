@@ -42,7 +42,20 @@ function documentSearchIndex(pages,plain,visibleNodes){
 var documentSearchSequence=0;
 function createDocumentSearch(ctl,nav,top,actions,pages,choose,onQueryChange){
   var doc=ctl.view.ownerDocument,view=ctl.view,win=doc.defaultView,retired=false,frame=0,revealFrame=0,query='',hits=[],active=-1,mode='highlights',opened=false;
-  var name='flowview-search-'+(++documentSearchSequence),registry=win.CSS && win.CSS.highlights,highlight=registry && win.Highlight?new win.Highlight():null;
+  var registry=win.CSS && win.CSS.highlights;
+  /* #1318: one style element and one ::highlight name per view, kept outside the re-rendered view and reused by
+     the search each render creates. Inserting a style element (or a new highlight name) restyles the whole page. */
+  var shared=view._documentSearchShared;
+  if(!shared){
+    shared={users:0,name:'flowview-search-'+(++documentSearchSequence),highlight:null,style:null};
+    if(registry && win.Highlight){while(registry.has(shared.name))shared.name='flowview-search-'+(++documentSearchSequence);shared.highlight=new win.Highlight();registry.set(shared.name,shared.highlight);}
+    var styleRoot=view.getRootNode?view.getRootNode():doc,styleHome=styleRoot && styleRoot.nodeType===11?styleRoot:(doc.head || doc.documentElement);
+    shared.style=doc.createElement('style');shared.style.className='document-search-style';
+    if(shared.highlight)shared.style.textContent='::highlight('+shared.name+'){background-color:color-mix(in srgb,var(--dtext) 25%,transparent);color:var(--dink);text-decoration:underline;}';
+    styleHome.appendChild(shared.style);view._documentSearchShared=shared;
+  }
+  shared.users++;
+  var name=shared.name,highlight=shared.highlight;
   function el(tag,cls,text,parent){var node=doc.createElement(tag);node.className=cls;if(text)node.textContent=text;if(parent)parent.appendChild(node);return node;}
   function button(label,text,parent,fn){var node=el('button','reader-button',text,parent);node.type='button';node.setAttribute('aria-label',label);node.title=label;node.addEventListener('click',fn);return node;}
   var launch=el('span','document-search-launch');actions.prepend(launch);
@@ -57,8 +70,6 @@ function createDocumentSearch(ctl,nav,top,actions,pages,choose,onQueryChange){
   var status=el('p','document-search-status',null,panel);status.setAttribute('role','status');status.setAttribute('aria-live','polite');
   var hint=el('p','document-search-hint','Matching pages, nodes and steps are outlined. Choose a page or step to explore. Enter goes to the next result; Shift+Enter goes back.',panel);
   var results=el('ol','document-search-results',null,panel);results.setAttribute('aria-label','Search results');
-  var style=el('style','document-search-style',null,view);
-  if(highlight){while(registry.has(name))name='flowview-search-'+(++documentSearchSequence);registry.set(name,highlight);style.textContent='::highlight('+name+'){background-color:color-mix(in srgb,var(--dtext) 25%,transparent);color:var(--dink);text-decoration:underline;}';}
   function plain(text){var scratch=doc.createElement('div');scratch.innerHTML=proseMarkup(typeof text==='string'?text:'');return scratch.textContent;}
   panel.id=name;toggle.setAttribute('aria-controls',name);
   function visibleNodes(page,record){
@@ -109,5 +120,7 @@ function createDocumentSearch(ctl,nav,top,actions,pages,choose,onQueryChange){
   var events=['dv:stepchange','dv:pathrender','dv:pathchange','navigation-mounted','tab-view-change','diagram-view-change'];events.forEach(function(type){view.addEventListener(type,schedule);});
   var observer=new MutationObserver(function(changes){if(changes.some(function(change){var node=change.target.nodeType===3?change.target.parentElement:change.target;return node.closest && node.closest('.reader-rail-list,.reader-contents-tree,.reader-view-strip,.sec-prose,.sec-h,.step-text,.node,.doc-title');}))schedule();});observer.observe(view,{subtree:true,childList:true,characterData:true});
   window.addEventListener('resize',position);window.addEventListener('scroll',position,true);setMode(mode);search();
-  return {hasQuery:function(){return !!query;},refresh:schedule,mark:function(node,owner,rec,definition){node._documentSearchLocation={owner:owner,rec:rec,definition:definition};node.setAttribute('data-search-location','');},destroy:function(){retired=true;observer.disconnect();cancelAnimationFrame(frame);cancelAnimationFrame(revealFrame);if(highlight)registry.delete(name);events.forEach(function(type){view.removeEventListener(type,schedule);});view.removeEventListener('keydown',keydown,true);view.removeEventListener('reader-window-open',otherWindow);window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true);clearMarks();clearFocus();panel.remove();launch.remove();style.remove();}};
+  return {hasQuery:function(){return !!query;},refresh:schedule,mark:function(node,owner,rec,definition){node._documentSearchLocation={owner:owner,rec:rec,definition:definition};node.setAttribute('data-search-location','');},destroy:function(){retired=true;observer.disconnect();cancelAnimationFrame(frame);cancelAnimationFrame(revealFrame);if(highlight)highlight.clear();events.forEach(function(type){view.removeEventListener(type,schedule);});view.removeEventListener('keydown',keydown,true);view.removeEventListener('reader-window-open',otherWindow);window.removeEventListener('resize',position);window.removeEventListener('scroll',position,true);clearMarks();clearFocus();panel.remove();launch.remove();
+    // The last search on this view removes the shared style and highlight; a replacement (the next render) keeps them.
+    shared.users--;Promise.resolve().then(function(){if(shared.users || view._documentSearchShared!==shared)return;if(shared.highlight && registry.get(shared.name)===shared.highlight)registry.delete(shared.name);shared.style.remove();delete view._documentSearchShared;});}};
 }

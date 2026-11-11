@@ -7,8 +7,9 @@
      node tools/board-sync.js pull <local.json> <live.json> [--resolve KEY=live|local ...]
      node tools/board-sync.js log  <local.json> <live.json> --by <name> [--id <user id>]
                                    [--summary <one line>] [--confirm KEY ...]
-   KEY is a Jira key, step:<step id> for a step's traceMatch, or span:<span key> for a span
-   declared on a node or connection (#1290).
+   KEY is a Jira key, step:<step id> for a step's traceMatch, or span:<carrier>/<span key> for a
+   span declared on a node or connection (#1290; the carrier is the node id or from->to; plain
+   span:<span key> works while only one node or connection has a conflict under that key).
 
    <live.json> is the board's current flowspec.json, read from the artifact. <local.json> is
    the agent's copy; both commands rewrite it in place and never touch <live.json>.
@@ -326,24 +327,34 @@ function pull(localText,liveText,options){
   });
   /* #1290: spans the board declared on a node or connection. Absent locally: write it there; the same
      service and operation under that key: keep; anything else asks (--resolve span:<key>=live|local). */
-  const spanWrites=[];
+  const spanWrites=[],declared=[];
   sortedByTime(fresh).forEach(entry=>(Array.isArray(entry.changes)?entry.changes:[]).forEach(change=>{
-    if(!isObject(change) || change.op!=='trace-span' || !isObject(change.span) || typeof change.span.key!=='string')return;
-    const key=changeKey(liveRaw,live.map,change),sp=change.span,choice=resolve['span:'+sp.key];
+    if(isObject(change) && change.op==='trace-span' && isObject(change.span) && typeof change.span.key==='string')declared.push({entry,change});
+  }));
+  // A span is resolved per carrier (span:<carrier>/<key>); the bare span:<key> only while it names one carrier.
+  const carrierOf=change=>typeof change.node==='string'?change.node:Array.isArray(change.edge)?change.edge.join('->'):'';
+  Object.keys(resolve).filter(k=>/^span:[^/]+$/.test(k)).forEach(k=>{
+    const named=[...new Set(declared.filter(x=>'span:'+x.change.span.key===k).map(x=>carrierOf(x.change)))];
+    if(named.length>1)throw new Error('--resolve '+k+' names '+named.length+' nodes or connections ('+named.join(', ')+'); use '+named.map(c=>'span:'+c+'/'+k.slice(5)).join(' or ')+'.');
+  });
+  declared.forEach(({entry,change})=>{
+    const key=changeKey(liveRaw,live.map,change),sp=change.span,flag='span:'+carrierOf(change)+'/'+sp.key,choice=resolve[flag] || resolve['span:'+sp.key];
     if(key===null){unplaced.push(who(entry)+' '+when(entry.at)+': '+describe({changes:[change]}).join('; '));return;}
-    const told='span '+sp.key+': on the board '+who(entry)+' declared '+spanText(sp)+' on '+changeLabel(change)+' on '+when(entry.at);
+    const told='span '+sp.key+' on '+carrierOf(change)+': on the board '+who(entry)+' declared '+spanText(sp)+' on '+changeLabel(change)+' on '+when(entry.at);
     if(choice==='local')return;
     const chain=JSON.parse(key),paths=C.boardEditResolveChain(localRaw,chain),overlay=isOverlayChain(chain);
-    if(paths.length!==1 && !overlay){conflicts.push({kind:'carrier-missing',span:sp.key,message:told+', but your local copy no longer has '+changeLabel(change)+'. Ask the author where it goes, then rerun with --resolve span:'+sp.key+'=local.'});return;}
+    if(paths.length!==1 && !overlay){conflicts.push({kind:'carrier-missing',span:sp.key,carrier:carrierOf(change),message:told+', but your local copy no longer has '+changeLabel(change)+'. Ask the author where it goes, then rerun with --resolve '+flag+'=local.'});return;}
     const value=paths.length===1?C.specValueAt(localRaw,paths[0]):undefined;
     const mineSpan=isObject(value) && isObject(value.trace) && isObject(value.trace.spans)?value.trace.spans[sp.key]:undefined;
-    if(sameSpan(mineSpan,sp))return;
+    // The whole declared span is compared (service, operation or prefix, role, namespace, attributes).
+    const board={serviceName:sp.serviceName,operation:sp.operation,role:sp.role};
+    if(C.boardEditSameSpan(mineSpan,board))return;
     if(mineSpan!==undefined && choice!=='live'){
-      conflicts.push({kind:'span-changed',span:sp.key,message:told+'; your local copy declares '+(isObject(mineSpan)?spanText(mineSpan):'something else')+' under that key. Ask the author which to keep, then rerun with --resolve span:'+sp.key+'=live or --resolve span:'+sp.key+'=local.'});
+      conflicts.push({kind:'span-changed',span:sp.key,carrier:carrierOf(change),message:told+'; your local copy declares '+(isObject(mineSpan)?spanText(mineSpan)+(mineSpan.role?' ('+mineSpan.role+')':''):'something else')+' under that key. Ask the author which to keep, then rerun with --resolve '+flag+'=live or --resolve '+flag+'=local.'});
       return;
     }
     spanWrites.push({chain,span:{serviceName:sp.serviceName,operation:sp.operation,role:sp.role},key:sp.key});
-  }));
+  });
   if(conflicts.length)return {status:'conflict',text:localText,edits,conflicts,unplaced};
 
   const targets=new Map();
@@ -500,7 +511,7 @@ function args(argv){
   const out={positional:[],resolve:{},confirm:[]};
   for(let i=0;i<argv.length;i++){
     const arg=argv[i],value=()=>{const next=argv[++i];if(next===undefined || next.startsWith('--'))throw new Error(arg+' needs a value');return next;};
-    if(arg==='--resolve')value().split(',').forEach(item=>{const m=/^([A-Z][A-Z0-9_]+-[0-9]+|step:[^=\s]+)=(live|local)$/.exec(item.trim());if(!m)throw new Error('--resolve takes KEY=live or KEY=local, got '+item);out.resolve[m[1]]=m[2];});
+    if(arg==='--resolve')value().split(',').forEach(item=>{const m=/^([A-Z][A-Z0-9_]+-[0-9]+|step:[^=\s]+|span:[^=\s]+)=(live|local)$/.exec(item.trim());if(!m)throw new Error('--resolve takes KEY=live or KEY=local, got '+item);out.resolve[m[1]]=m[2];});
     else if(arg==='--confirm')value().split(',').forEach(item=>item.trim() && out.confirm.push(item.trim()));
     else if(arg==='--by')out.by=value();
     else if(arg==='--id')out.id=value();

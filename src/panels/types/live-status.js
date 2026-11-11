@@ -396,6 +396,9 @@
         info.roles.forEach(function(r){el(sel,'option',r,'',r).value=r;});
         if(sel._declareKind!==info.kind || info.roles.indexOf(sel.value)<0){sel.value=info.roles[0];sel._declareKind=info.kind;}
         sel._declareGo=go;go._liveArgument={role:sel.value};
+        // A refused declaration says why beside its button ("Already declared as … on …").
+        if(info.error){var why=el(parent,'p','declare-error','dv-trace-declare-error',info.error);why.setAttribute('role','status');why.id=why.id || 'dv-trace-declare-error-'+Math.random().toString(36).slice(2,10);go.setAttribute('aria-describedby',why.id);}
+        else go.removeAttribute('aria-describedby');
         if(!sel._declareChange){sel._declareChange=function(){if(sel._declareGo)sel._declareGo._liveArgument={role:sel.value};};sel.addEventListener('change',sel._declareChange);}
         return sel;
       }

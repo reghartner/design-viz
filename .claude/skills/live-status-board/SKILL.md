@@ -361,7 +361,7 @@ and carry on. Every time you change a published board:
      your local spec maps differently or deleted, or a board edit declared a span
      under a key your local node or connection uses for another span. Show the author the printed conflict, ask which placement
      to keep, then rerun with `--resolve KEY=live` or `--resolve KEY=local`
-     (KEY `step:<step id>` for a step, `span:<span key>` for a declared span).
+     (KEY `step:<step id>` for a step, `span:<node id or from->to>/<span key>` for a declared span).
    - Exit 3, nothing written: another agent republished the board from a
      different copy. Copy `live.json` over your local spec and redo the
      requested change on it. If your local spec has changes of its own that

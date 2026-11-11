@@ -1017,6 +1017,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   var traceDayNote='',overTarget=null,overParked=null,traceLoads=0;
   // #1177: a picked example trace carried across an Edit-mode re-render, and the step chooser a span drop opened.
   var carriedExample=null,traceChooser=null,traceReturnSpan=null,traceDeclareOffer=null;
+  // #1290 PR 9: why the last Declare was refused before the write ("Already declared as … on …").
+  var traceDeclareError='';
   function localDayKey(ms){var d=new Date(ms);return new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())).toISOString().slice(0,10);}
   function traceDayOf(e){
     var at=Math.min.apply(null,(e && e.spans || []).map(function(s){return Date.parse(s.time);}).filter(function(t){return isFinite(t);}));if(!isFinite(at))return null;
@@ -1198,7 +1200,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // Chuck 2026-11-09: a drop on a node also writes its id as traceMatch.nodeId when the step names exactly
     // that node, so the node lights up at once (a node lights only through nodeId, #1078).
     var nodeId=hit.ref.kind==='node'?hit.ref.id:null;
-    var dragged=entry.exemplar.spans.find(function(item){return item.id===payload.spanId;}),label=carrierLabel(entry.binding,hit.ref);
+    var dragged=entry.exemplar.spans.find(function(item){return item.id===payload.spanId;}),label=carrierLabel(entry.binding,hit.ref);traceDeclareError='';
     // #1290 PR 9: what "Declare on <title>" would write for this drop: the carrier and the span's exact names.
     var offer=dragged && dragged.service && dragged.name?{context:payload.context,spanId:payload.spanId,ref:hit.ref,label:label,kind:hit.ref.kind,span:{serviceName:dragged.service,operation:dragged.name}}:null;
     if(named.length===1 && !named[0].mapped){
@@ -1253,7 +1255,12 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function declareOfferNote(context){
     var o=traceDeclareOffer,st=editing() && editor.state(),m=st && st.mapped;
     if(!o || !m || o.context!==context || m.step!==o.step || st.lastTrace==='declare' || !editor.declareInstead)return null;
-    return {label:o.label,kind:o.kind,roles:DECLARE_ROLES[o.kind]};
+    return {label:o.label,kind:o.kind,roles:DECLARE_ROLES[o.kind],error:traceDeclareError};
+  }
+  // The board editor's reason a declaration would be refused, shown beside the button; nothing is written.
+  function refusedDeclare(o,role){
+    var p=editor.declarePreview?editor.declarePreview(o.ref,{serviceName:o.span.serviceName,operation:o.span.operation,role:role}):null;
+    traceDeclareError=p && p.error?p.error:'';if(traceDeclareError){paint();notify();}return !!traceDeclareError;
   }
   // The latest pending declaration, when it is the newest trace change, with its Undo.
   function declaredNote(){var st=editing() && editor.state();return st && st.lastTrace==='declare' && st.declared?st.declared:null;}
@@ -1283,7 +1290,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     return {entries:entries.map(function(e){return {key:e.key,carrier:e.carrier,label:e.label,exemplar:e.exemplar,candidates:e.exemplar.candidates.map(function(c){return Object.assign({},c,{available:c.traceId===e.exemplar.traceId || telemetry.canChooseExemplar(e.carrier,e.exemplar.selectionToken,c.traceId)});})};}),selected:selected?{errorNote:traceErrorNote(errorTarget),key:selected.key,day:traceDayOf(selected.exemplar),context:context,focus:focus,carrier:selected.carrier,manual:!!selected.manual,hasMappings:traceMapsDiagram(selected.binding.section.diagram),exemplar:selected.exemplar,model:model}:null,direct:Object.assign(directTrace.snapshot(),{logs:logLookup.snapshot(),dayNote:traceDayNote,movesDay:canOpenOver()}),
       hasMappings:hasMappings,hasBindings:hasBindings,historical:evidence.historical,
       // #1177: the step chooser of a span drop, and the latest pending mapping with its Undo.
-      mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,span:traceChooser.span,spanId:traceChooser.spanId,drop:traceChooser.drop,declare:traceChooser.declare && editor && editor.declareSpan?{label:traceChooser.declare.label,kind:traceChooser.declare.kind,roles:DECLARE_ROLES[traceChooser.declare.kind]}:null,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,disabled:step.alternatives,label:step.caption+(step.alternatives?' · has alternatives; edit in Inspect':step.mapped?' · mapped, replaces':step.scoped?' · replaces this step\'s trace scope':'')};})}:null,
+      mapChooser:traceChooser && selected && traceChooser.context===context?{label:traceChooser.label,span:traceChooser.span,spanId:traceChooser.spanId,drop:traceChooser.drop,declare:traceChooser.declare && editor && editor.declareSpan?{label:traceChooser.declare.label,kind:traceChooser.declare.kind,roles:DECLARE_ROLES[traceChooser.declare.kind],error:traceDeclareError}:null,steps:traceChooser.steps.map(function(step){return {id:step.id,mapped:step.mapped,disabled:step.alternatives,label:step.caption+(step.alternatives?' · has alternatives; edit in Inspect':step.mapped?' · mapped, replaces':step.scoped?' · replaces this step\'s trace scope':'')};})}:null,
       mapped:mappedNote(selected,model),declareOffer:declareOfferNote(context),declared:declaredNote(),enabled:evidence.enabled,available:traceStatus.available,status:{busy:hasBindings && evidence.status.busy,note:traceStatus.note},notice:[traceNotice,source.ambiguous?'Trace evidence with duplicate carrier IDs across source diagrams is excluded; use unique stable IDs.':''].filter(Boolean).join(' '),show:traceShow};
   }
   /* #1163: metric cards are placed against the trace labels' boxes at paint time. Text is laid
@@ -2310,7 +2317,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // #1078: write the focused span's exact service and operation as the chosen step's traceMatch.
     mapTraceSpan:function(action){
       if(retired || !editing() || statusMode!=='trace' || !action || typeof action.stepId!=='string')return false;
-      traceDeclareOffer=null;
+      traceDeclareOffer=null;traceDeclareError='';
       var selected=traceSnapshot().selected;if(!selected || action.context!==selected.context)return false;
       var entry=traceSources().entries.find(function(e){return e.key===selected.key;}),span=entry && entry.exemplar.spans.find(function(s){return s.id===action.spanId;});
       var steps=entry && traceMapSteps(entry.binding),step=steps && steps.find(function(item){return item.id===action.stepId;});
@@ -2332,11 +2339,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     declareTraceSpan:function(action){
       if(retired || !editing() || !traceChooser || !traceChooser.declare || !editor.declareSpan)return false;
       var o=traceChooser.declare,role=action && action.role || DECLARE_ROLES[o.kind][0];if(DECLARE_ROLES[o.kind].indexOf(role)<0)return false;
+      if(refusedDeclare(o,role))return false;
       traceChooser=null;traceReturnSpan=o.spanId;setTimeout(function(){if(!retired && !editor.declareSpan(o.ref,{serviceName:o.span.serviceName,operation:o.span.operation,role:role}))traceReturnSpan=null;},0);paint();notify();return true;
     },
     declareTraceSpanInstead:function(action){
       if(retired || !editing() || !traceDeclareOffer || !editor.declareInstead)return false;
       var o=traceDeclareOffer,role=action && action.role || DECLARE_ROLES[o.kind][0];if(DECLARE_ROLES[o.kind].indexOf(role)<0)return false;
+      if(refusedDeclare(o,role))return false;
       traceDeclareOffer=null;traceReturnSpan=o.spanId;setTimeout(function(){if(!retired && !editor.declareInstead(o.ref,{serviceName:o.span.serviceName,operation:o.span.operation,role:role}))traceReturnSpan=null;},0);return true;
     },
     undoTraceDeclare:function(){if(retired || !editor || !editor.undoDeclare)return false;setTimeout(function(){if(!retired)editor.undoDeclare();},0);return true;},

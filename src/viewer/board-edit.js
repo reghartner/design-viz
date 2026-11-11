@@ -60,6 +60,13 @@ function boardEditResolveChain(raw,chain){
   })(raw,0,[]);
   return found;
 }
+/* #1290 PR 9: two span declarations are the same when every selector and label field matches
+   (service, operation or prefix, role, namespace and attributes); the key is compared elsewhere. */
+function boardEditSameSpan(a,b){
+  if(!a || !b || typeof a!=='object' || typeof b!=='object')return false;
+  var attrs=function(x){var v=x.attributes && typeof x.attributes==='object'?x.attributes:{};return JSON.stringify(Object.keys(v).sort().map(function(k){return [k,v[k]];}));};
+  return ['serviceName','operation','operationPrefix','role','namespace'].every(function(k){return (a[k]===undefined?null:a[k])===(b[k]===undefined?null:b[k]);}) && attrs(a)===attrs(b);
+}
 function boardEditSamePrefix(path,prefix){return prefix.every(function(part,i){return path[i]===part;});}
 
 function createBoardEditor(options){
@@ -241,7 +248,8 @@ function createBoardEditor(options){
       // #1290 PR 9: a declaration the winner already has (same key, service and operation) needs nothing.
       if(entry.op==='trace-span'){
         var tt=null;try{tt=target(text,ref);}catch(ex){tt=null;}var have=tt && shownCarrier(tt),sp=have && have.trace && have.trace.spans && have.trace.spans[entry.span.key];
-        if(sp && sp.serviceName===entry.span.serviceName && sp.operation===entry.span.operation){already++;return;}
+        // The whole declared span is compared; another span under that key keeps the winner's, and this change is dropped.
+        if(sp){if(boardEditSameSpan(sp,entry.span))already++;else dropped.push(describe);return;}
         if(declare(ref,entry.span,entry.span.key,false))applied++;else dropped.push(describe);
         return;
       }
@@ -308,8 +316,12 @@ function createBoardEditor(options){
      consumer overlay of an imported one. The key is a slug of the operation, unique on the carrier;
      a provider name this board hides is still taken. */
   var DECLARE_ROLES={node:['process','database','cache','call','work'],edge:['send','receive']};
+  // The key: the operation's last meaningful segment (after the last "/", skipping {id}, :id and numbers;
+  // the whole operation when it has no "/"), slugged and starting with a letter.
   function slug(operation){
-    var s=String(operation).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+    var op=String(operation),parts=op.split('/').map(function(p){return p.trim();}).filter(function(p){return p && !/^\{.*\}$/.test(p) && !/^:/.test(p) && !/^\d+$/.test(p);});
+    if(op.indexOf('/')>=0 && parts.length)op=parts[parts.length-1];
+    var s=op.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
     if(!s)s='span';if(!/^[a-z]/.test(s))s='span-'+s;
     return s.slice(0,64).replace(/-+$/,"");
   }
@@ -330,6 +342,10 @@ function createBoardEditor(options){
     if(!span || typeof span.operation!=='string' || !span.operation.trim())return {error:'This span has no operation, so it cannot be declared.'};
     if(typeof span.serviceName!=='string' || !span.serviceName.trim())return {error:'This span has no service name, so it cannot be declared.'};
     if(DECLARE_ROLES[t.kind].indexOf(span.role)<0)return {error:t.kind==='node'?'A node\'s span role is one of process, database, cache, call or work.':'A connection\'s span role is send or receive.'};
+    // A span this carrier already declares (inherited or its own) under another key is not declared twice.
+    if(!key){var have=shownCarrier(t),hs=have && have.trace && have.trace.spans && typeof have.trace.spans==='object'?have.trace.spans:{};
+      var same=Object.keys(hs).find(function(k){var x=hs[k];return x && x.serviceName===span.serviceName && x.operation===span.operation && x.role===span.role;});
+      if(same)return {error:'Already declared as '+same+' on '+t.label+'.'};}
     var taken=takenKeys(t),base=key || slug(span.operation),next=base,n=2;
     while(taken.indexOf(next)>=0)next=base+'-'+(n++);
     return {key:next,span:{serviceName:span.serviceName,operation:span.operation,role:span.role}};

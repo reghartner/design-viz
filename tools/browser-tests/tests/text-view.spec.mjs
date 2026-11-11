@@ -93,8 +93,9 @@ test('Escape with a bar menu open closes the menu first even when focus is in th
 // Every other control stays inline or in a menu exactly as the bar puts it
 // without Text (the "base"). Text is inline when it fits; otherwise it is a
 // "Text view" item, last in "More page actions" when the base shows that menu,
-// or in that menu shown for Text alone. It is absent only on the narrow bar or
-// when even the ⋯ button would move something.
+// or in that menu shown for Text alone. When even the ⋯ button has no room, the
+// page actions overflow early into that menu (the bar's own overflow path) and
+// Text takes the freed room. Text is absent only on the narrow bar.
 function crowdedStory(){
   const raw=editorSpec(),section=raw.page.blocks[0];section.id='delivery';
   section.diagram.layouts[0].presentation='explore';section.diagram.layouts[0].name='Engineering';
@@ -113,8 +114,8 @@ async function barState(nav){
     const inline=Array.from(el.querySelectorAll('.reader-top :is(button,summary,select)')).filter(n=>vis(n) && !n.closest('.text-view-launch,.text-view,.reader-page-utility-options') && n.parentNode!==menu).map(n=>n.getAttribute('aria-label') || n.textContent.trim());
     const launch=el.querySelector('.text-view-launch'),item=el.querySelector('.text-view-menu-item');
     const body=menu?Array.from(menu.querySelector('.reader-page-utility-options').children).filter(c=>!c.hidden).map(c=>c===item?'Text view':c.className.split(' ')[0]):[];
-    const actions=el.querySelector('.reader-top').lastElementChild.getBoundingClientRect(),toolbar=el.querySelector('.reader-toolbar');
-    return {inline,pageMenu:vis(menu),menuBody:body,text:vis(launch)?'inline':item && !item.hidden && vis(menu)?'menu':'absent',spare:toolbar?Math.round(actions.left-toolbar.getBoundingClientRect().right):null};
+      const pageActions=Array.from(el.querySelectorAll('.viewport-actions :is(button,summary)')).filter(n=>vis(n)).map(n=>n.getAttribute('aria-label') || n.textContent.trim());
+    return {inline,pageActions,pageMenu:vis(menu),menuBody:body,text:vis(launch)?'inline':item && !item.hidden && vis(menu)?'menu':'absent'};
   });
 }
 async function refit(page,width){await page.setViewportSize({width:width-1,height:900});await page.setViewportSize({width,height:900});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));}
@@ -128,39 +129,40 @@ async function baseAndHead(page,nav,width){
   return {base,head};
 }
 function expectRule({base,head},label){
+  expect(['inline','menu'],label+': Text reachable, got '+head.text).toContain(head.text);
+  const early=!base.pageMenu && head.menuBody.includes('viewport-actions');
+  if(early){
+    // No room even for ⋯: the page actions overflowed early, all of them, into the menu.
+    expect(head.inline,label+': only the page actions left the bar').toEqual(base.inline.filter(name=>!base.pageActions.includes(name)));
+    expect(head.menuBody,label+': page actions then Text view').toEqual(head.text==='menu'?['viewport-actions','Text view']:['viewport-actions']);
+    return;
+  }
   expect(head.inline,label+': other controls as on the base').toEqual(base.inline);
   if(head.text==='inline'){expect(head.pageMenu,label).toBe(base.pageMenu);expect(head.menuBody,label).toEqual(base.menuBody);}
-  else if(head.text==='menu'){
-    expect(head.pageMenu,label).toBe(true);
-    expect(head.menuBody,label+': Text view last, after the base items').toEqual(base.pageMenu?[...base.menuBody,'Text view']:['Text view']);
-  }else{
-    // Absent only when even the ⋯ button (about 36px) would move something.
-    expect(base.pageMenu,label+': absent Text with the base menu shown').toBe(false);expect(head.pageMenu,label).toBe(false);
-    expect(base.spare,label+': absent Text with room for ⋯ ('+base.spare+'px)').toBeLessThan(52);
-  }
+  else{expect(head.pageMenu,label).toBe(true);expect(head.menuBody,label+': Text view last, after the base items').toEqual(base.pageMenu?[...base.menuBody,'Text view']:['Text view']);}
 }
 async function openMenuItem(page,nav){
   const utilities=nav.locator('.reader-page-utilities');if(!await utilities.evaluate(el=>el.open))await utilities.locator(':scope>summary').click();
   const item=nav.locator('.text-view-menu-item');await expect(item).toBeVisible();return item;
 }
-test('native crowded bar: Text never moves another control at 1024, 1280 and 1440',async({page,server})=>{
+test('native crowded bar: Text is reachable at 1024, 1280 and 1440 and moves other controls only by an early overflow',async({page,server})=>{
   await page.setViewportSize({width:1024,height:900});
   await writeFile(path.join(server.root,'text-fit-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
   await writeFile(path.join(server.root,'text-fit-native.html'),'<style>body{margin:0}#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./text-fit-native.js";window.mount=mountNativeViewer;</script>');
   await page.goto(server.origin+'/text-fit-native.html');await page.waitForFunction(()=>!!window.mount);
   await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw);},crowdedStory());await page.evaluate(()=>document.fonts.ready);
   const nav=page.locator('#host .reader-navigation');
-  for(const width of [1024,1280,1440])expectRule(await baseAndHead(page,nav,width),'native '+width);
-  await refit(page,1024);await pageActionsInline(nav);
+  for(const width of [1024,1200,1280,1440]){const state=await baseAndHead(page,nav,width);expectRule(state,'native '+width);
+    if(state.head.text==='menu'){const item=await openMenuItem(page,nav);await item.click();await expect(dialogOf(page.locator('#host'))).toBeVisible();await page.keyboard.press('Escape');}}
 });
 test('standalone crowded and board bars: Text never moves another control, is reachable at each width, and a wide bar shows it inline',async({page,server})=>{
   await page.setViewportSize({width:1280,height:900});const root=await open(page,server,crowdedStory(),'text-fit-crowded');await page.evaluate(()=>document.fonts.ready);
   const nav=root.locator('.reader-navigation');
-  for(const width of [1024,1280,1440]){const state=await baseAndHead(page,nav,width);expectRule(state,'crowded '+width);
+  for(const width of [1024,1200,1280,1440]){const state=await baseAndHead(page,nav,width);expectRule(state,'crowded '+width);
     if(state.head.text==='menu'){const item=await openMenuItem(page,nav);await item.click();await expect(dialogOf(root)).toBeVisible();await page.keyboard.press('Escape');await expect(dialogOf(root)).toBeHidden();}}
   await refit(page,1920);expect((await barState(nav)).text).toBe('inline');expect(await shown(launcher(root))).toBe('ok');
   const boardRoot=await open(page,server,board(),'text-fit-board'),boardNav=boardRoot.locator('.reader-navigation');await page.evaluate(()=>document.fonts.ready);
-  for(const width of [1024,1280,1440])expectRule(await baseAndHead(page,boardNav,width),'board '+width);
+  for(const width of [1024,1200,1280,1440])expectRule(await baseAndHead(page,boardNav,width),'board '+width);
 });
 test('a launcher without room joins the base menu last, or gets a menu of its own; the window stays open and focus stays on the bar',async({page,server})=>{
   await page.setViewportSize({width:1920,height:900});const root=await open(page,server,crowdedStory(),'text-fit-menu');await page.evaluate(()=>document.fonts.ready);

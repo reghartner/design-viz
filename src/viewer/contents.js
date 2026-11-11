@@ -123,22 +123,30 @@ function createReaderContents(ctl,nav,actions,options){
   // without it (exactly as before it existed), then shows it inline only if
   // nothing else would move. Otherwise it is a "Text view" item in "More page
   // actions": added last when the base shows that menu, or in that menu shown for
-  // Text alone when the ⋯ button fits without moving anything. Only when even
-  // that cannot fit (or on a narrow bar) is Text absent. The decision never feeds
-  // back into the base fit, so it cannot oscillate.
+  // Text alone when the ⋯ button fits without moving anything. When even the ⋯
+  // button has no room, the page actions overflow early through the bar's own
+  // overflow path (as at a slightly narrower width) and Text is placed in the
+  // room that frees. Text is absent only on a narrow bar. An early overflow is
+  // kept at that width and retried on the next width change, as the base does.
   var textPlace='none',textMenuOnly=false;
   function measureText(){
     if(!textView)return;textView.place('measure');
     if(textMenuOnly){textMenuOnly=false;if(!overflowActions)pageUtilities.hidden=true;}
   }
-  function fitText(fits){
+  function fitText(fits,overflowEarly){
     if(!textView)return;
     if(narrow){textPlace='none';textView.place('none');return;}
     textView.place('inline',true);if(fits()){textPlace='inline';textView.place('inline');return;}
     if(overflowActions && !pageUtilities.hidden){textPlace='menu';textView.place('menu');return;}
     pageUtilities.hidden=false;textView.place('menu',true);
     if(fits()){textMenuOnly=true;textPlace='menu';textView.place('menu');return;}
-    pageUtilities.hidden=true;pageUtilities.open=false;textPlace='none';textView.place('none');
+    pageUtilities.hidden=true;
+    if(overflowEarly && overflowEarly()){
+      textView.place('inline',true);if(fits()){textPlace='inline';textView.place('inline');return;}
+      textPlace='menu';textView.place('menu');return;
+    }
+    // Nothing to overflow: the ⋯ menu for Text alone is the last resort.
+    pageUtilities.hidden=false;textMenuOnly=true;textPlace='menu';textView.place('menu');
   }
   function fitToggle(width){
     measureText();
@@ -161,11 +169,14 @@ function createReaderContents(ctl,nav,actions,options){
       }
       var needsPicker=settle();
       if(!overflowActions && width>900 && (top.scrollWidth>top.clientWidth+1 || overlapsCenter(actions))){overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();}
-      if(needsPicker && (focusedView || focusedPicker))viewPicker.focus({preventScroll:true});
-      else if(focusedPicker){var selected=viewStrip.querySelector('[aria-selected="true"]');if(selected)selected.focus({preventScroll:true});}
       // The base's own overlap test (overlapsCenter), so Text takes exactly the room
       // the base leaves and never more.
-      fitText(function(){return !overlapsCenter(actions) && top.scrollWidth<=top.clientWidth+1;});
+      fitText(function(){return !overlapsCenter(actions) && top.scrollWidth<=top.clientWidth+1;},function(){
+        if(overflowActions || !actions.querySelector(':scope > .viewport-actions'))return false;
+        overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();return !!overflowActions;
+      });
+      if(needsPicker && (focusedView || focusedPicker))viewPicker.focus({preventScroll:true});
+      else if(focusedPicker){var selected=viewStrip.querySelector('[aria-selected="true"]');if(selected)selected.focus({preventScroll:true});}
       return;
     }
     var actionBounds=actions.getBoundingClientRect();

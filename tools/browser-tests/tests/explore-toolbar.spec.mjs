@@ -60,7 +60,7 @@ for(const host of ['standalone','embed','native inline','native canvas'])test(ho
 for(const host of ['standalone','native inline'])test(host+' reader preserves nested utility focus '+(host==='standalone'?'while controls move through More':'when controls stay inline'),async({page,server})=>{
  await page.setViewportSize({width:1440,height:1000});const root=await open(page,server,host,crowdedStory()),nav=root.locator('.reader-navigation'),utilities=nav.locator('.reader-page-utilities'),more=utilities.locator(':scope>summary'),panelMenu=nav.locator('.explore-panel-menu'),panelSummary=panelMenu.locator(':scope>summary'),shrink=panelMenu.getByRole('button',{name:'Shrink floating panels',exact:true});
  if(host.startsWith('native'))await expect(root.locator('flowview-root')).toHaveCount(1);
- await panelSummary.focus();await expect(panelSummary).toBeFocused();await page.setViewportSize({width:1024,height:1000});
+ await panelSummary.focus();await expect(panelSummary).toBeFocused();await page.setViewportSize({width:host.startsWith('native')?1280:1024,height:1000});
  if(host.startsWith('native')){await expect(utilities).toBeHidden();await expect(panelSummary).toBeFocused();await page.setViewportSize({width:1440,height:1000});await expect(panelSummary).toBeFocused();return;}
  await expect(utilities).toBeVisible();await expect(utilities).toHaveJSProperty('open',true);await expect(panelSummary).toBeFocused();
  await page.setViewportSize({width:1440,height:1000});await expect(utilities).toBeHidden();await expect(panelSummary).toBeFocused();

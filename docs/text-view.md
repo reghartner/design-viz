@@ -11,14 +11,15 @@ The button can appear wherever the reader top bar appears: the standalone page,
 the Workbench preview, the library reader, each compare pane and the Backstage
 native viewer. The Confluence (Forge) viewer has no top bar and no Text button.
 
-Text is the lowest-priority control in the bar; it never moves another control.
-When the bar has room, the **Text** button sits next to Search. When the bar is
-full, Text is the last item, **Text view**, of the **More page actions** (⋯) menu;
-if the bar shows no such menu, a ⋯ menu holding only **Text view** appears. Text is
-hidden only on a narrow bar (670 px or less, together with Search), and on the
-rare full bar with no room even for the ⋯ button (for example a crowded Backstage
-bar at 1024 px). An open window stays open when Text moves between the bar and the
-menu, and closes when Text is hidden.
+Text is the lowest-priority control in the bar. When the bar has room, the
+**Text** button sits next to Search. When the bar is full, Text is the last item,
+**Text view**, of the **More page actions** (⋯) menu; if the bar shows no such
+menu, a ⋯ menu holding only **Text view** appears, and if there is no room even
+for that, the page's own actions (Panels, Legend, Expand) move into the ⋯ menu
+as they would on a slightly narrower window, with Text placed in the room that
+frees. Text is hidden only on a narrow bar (670 px or less), together with
+Search. An open window stays open when Text moves between the bar and the menu,
+and closes when Text is hidden.
 
 The text is built from the page the reader shows, with shared-topology imports
 already resolved, when the window opens. Imported nodes and connections carry an

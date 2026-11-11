@@ -1977,6 +1977,11 @@ body.links-dragging,body.links-dragging *{cursor:grabbing !important;user-select
 .links-merge-text{flex:1 1 100%;font-size:12px;}
 /* #1243 part 2: Trace match tab inline editor and rename. */
 .links-chip-trace .links-chip-note{color:var(--sub);}
+.links-declarations{display:grid;gap:4px;margin-top:6px;}
+.links-declaration-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:24px;}
+.links-declaration{font:11px/1.4 'IBM Plex Mono',monospace;color:var(--sub);overflow-wrap:anywhere;}
+.links-declaration-row .links-inherited{border-style:solid;}
+.links-declaration-edit{min-height:24px;}
 .links-trace-editor{flex:1 1 100%;display:flex;flex-direction:column;gap:6px;margin:4px 0 0 40px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);}
 .links-trace-field{display:grid;grid-template-columns:110px minmax(0,1fr);align-items:center;gap:6px;font-size:12px;}
 .links-trace-label{color:var(--sub);font-size:11px;}

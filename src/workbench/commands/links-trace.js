@@ -38,6 +38,15 @@ function linksTraceSetPlan(text,raw,got,value){
 
 /* {error} or {sections, groups:[{key,serviceName,operation,uses:[...]}], elements, nodeOptions:{section:[{id,label,imported}]}}.
    A use is {kind:'step',section,index,alternative,nodeId,attributes,label}. */
+/* #1290 PR 8: the group a declared span joins. An exact operation joins the steps' trace match
+   group; a prefix or an attributes-only span gets its own group, which no step can be assigned. */
+function linksTraceDeclKey(m){
+  var svc=String(m.serviceName || '');
+  if(typeof m.operation==='string')return svc+' · '+m.operation;
+  if(typeof m.operationPrefix==='string')return svc+' · '+m.operationPrefix+'… (prefix)';
+  var attrs=m.attributes && typeof m.attributes==='object'?m.attributes:{};
+  return svc+' · where '+Object.keys(attrs).map(function(k){return k+'='+String(attrs[k]);}).join(', ');
+}
 function linksTraceModel(text,raw,context){
   var resolved;try{resolved=linksResolve(raw,context);}catch(ex){return {error:ex.message};}
   var paths=specSectionPaths(resolved),sections=[],elements=[],groups=Object.create(null),nodeOptions={};
@@ -71,17 +80,40 @@ function linksTraceModel(text,raw,context){
       Object.defineProperty(el,'model',{value:model,enumerable:false});
       stepEls.push(el);elements.push(el);
     });
+    /* #1290 PR 8: the spans a node or connection declares (merged for an imported one), read only,
+       with the steps that inherit each: the per-path D9 rule and skips the step trace scope form uses. */
+    function declarations(value,carrier,id,label,imported){
+      var sp=value && value.trace && typeof value.trace==='object' && value.trace.spans && typeof value.trace.spans==='object' && !Array.isArray(value.trace.spans)?value.trace.spans:{};
+      return Object.keys(sp).filter(function(k){return sp[k] && typeof sp[k]==='object' && !Array.isArray(sp[k]);}).map(function(k){
+        var x={key:k,span:sp[k],role:sp[k].role},inherited=[];
+        (Array.isArray(d.steps)?d.steps:[]).forEach(function(st,index){
+          var r=traceScopeInheritedOn(d,index,{kind:carrier.kind,id:id},x);if(!r.on.length)return;
+          var paths=r.on.length===r.all?null:r.on,stepLabel=linksStepLabel(st,index);
+          inherited.push({section:section,index:index,label:stepLabel,paths:paths,text:stepLabel+' (inherited'+(paths?' on '+traceScopeNames(paths):'')+')'});
+        });
+        var decl={kind:'declaration',section:section,carrier:carrier,carrierLabel:label,spanKey:k,role:sp[k].role,key:linksTraceDeclKey(sp[k]),
+          text:traceScopeSpanText(x),label:'declared on '+label+' ('+k+')',imported:imported,inherited:inherited};
+        var g=groups[decl.key] || (groups[decl.key]={key:decl.key,serviceName:sp[k].serviceName,operation:typeof sp[k].operation==='string'?sp[k].operation:undefined,uses:[]});
+        (g.declarations=g.declarations || []).push(decl);
+        return decl;
+      });
+    }
     nodes.forEach(function(id){
-      elements.push({kind:'node',section:section,id:id,label:title(id),imported:typeof FlowTopology!=='undefined' && !!FlowTopology.origin(d,'nodes',id),
-        via:uses.filter(function(u){return u.nodeId===id;})});
+      var imported=typeof FlowTopology!=='undefined' && !!FlowTopology.origin(d,'nodes',id);
+      elements.push({kind:'node',section:section,id:id,label:title(id),imported:imported,
+        via:uses.filter(function(u){return u.nodeId===id;}),declarations:declarations(d.nodes[id],{kind:'node',section:section,id:id},id,title(id),imported)});
     });
     (Array.isArray(d.edges)?d.edges:[]).forEach(function(edge,index){
       if(!edge || typeof edge!=='object')return;var key=builderEdgeKey(edge);
-      elements.push({kind:'edge',section:section,index:index,key:key,label:title(edge.from)+' → '+title(edge.to)+(typeof edge.label==='string' && edge.label?' · '+edge.label:''),
-        via:stepEls.filter(function(s){return s.edgeKeys.indexOf(key)>=0;}).reduce(function(all,s){return all.concat(s.matches);},[])});
+      var imported=typeof FlowTopology!=='undefined' && !!FlowTopology.origin(d,'edges',key);
+      elements.push({kind:'edge',section:section,index:index,key:key,label:title(edge.from)+' → '+title(edge.to)+(typeof edge.label==='string' && edge.label?' · '+edge.label:''),imported:imported,
+        via:stepEls.filter(function(s){return s.edgeKeys.indexOf(key)>=0;}).reduce(function(all,s){return all.concat(s.matches);},[]),
+        declarations:declarations(edge,{kind:'edge',section:section,index:index,key:key},edge.from+'->'+edge.to,title(edge.from)+' → '+title(edge.to),imported)});
     });
   });
-  model.groups=Object.keys(groups).sort().map(function(k){return groups[k];});
+  model.groups=Object.keys(groups).sort().map(function(k){var g=groups[k];if(!g.declarations)g.declarations=[];
+    // A step's trace match is an exact service and operation: only such a group can be assigned or renamed.
+    g.assignable=typeof g.serviceName==='string' && typeof g.operation==='string';return g;});
   return model;
 }
 /* Distinct steps a shared rename changes. */

@@ -578,6 +578,56 @@ function traceScopeLoops(steps,stepId,parentId){
   while(queue.length){var id=queue.shift();if(id===stepId)return true;if(seen[id])continue;seen[id]=true;queue=queue.concat(parents(id));}
   return false;
 }
+function traceScopeCarriers(d,st){
+  var keys=[],failures=st && st.failures && typeof st.failures==='object' && !Array.isArray(st.failures)?st.failures:{};
+  if(st && typeof st.edge==='string')keys.push(st.edge);
+  if(st && Array.isArray(st.edges))st.edges.forEach(function(k){if(typeof k==='string' && keys.indexOf(k)<0)keys.push(k);});
+  var nodes=d && d.nodes && typeof d.nodes==='object'?d.nodes:{},edges=d && Array.isArray(d.edges)?d.edges:[];
+  function spansOf(v){var sp=v && v.trace && typeof v.trace==='object' && v.trace.spans && typeof v.trace.spans==='object' && !Array.isArray(v.trace.spans)?v.trace.spans:{};
+    return Object.keys(sp).filter(function(k){return sp[k] && typeof sp[k]==='object' && !Array.isArray(sp[k]);}).map(function(k){return {key:k,span:sp[k],role:sp[k].role};});}
+  var out=keys.filter(function(k){return failures[k]!=='dropped' && failures[k]!=='blocked';}).map(function(k){
+    var e=edges.find(function(x){return x && x.from+'->'+x.to===k;}),from=e && nodes[e.from],to=e && nodes[e.to];
+    var title=e?(from && from.title || e.from)+' → '+(to && to.title || e.to):k;
+    return {kind:'edge',id:k,title:title,spans:e?spansOf(e):[]};
+  });
+  (st && Array.isArray(st.nodes)?st.nodes:[]).forEach(function(n){if(typeof n!=='string')return;var v=nodes[n];out.push({kind:'node',id:n,title:v && v.title || n,spans:v?spansOf(v):[]});});
+  // An edge step owns its connection's send spans; a receive span only times the hand-off.
+  out.forEach(function(c){c.owned=c.kind==='edge'?c.spans.filter(function(x){return x.role==='send';}):c.spans;c.handoff=c.kind==='edge'?c.spans.filter(function(x){return x.role!=='send';}):[];});
+  return out;
+  }
+function traceScopeSpanText(x){
+  var m=x.span,svc=String(m.serviceName || '');
+  if(typeof m.operation==='string')return x.key+' · '+svc+' '+m.operation;
+  if(typeof m.operationPrefix==='string')return x.key+' · '+svc+' '+m.operationPrefix+'… (prefix)';
+  var attrs=m.attributes && typeof m.attributes==='object'?m.attributes:{};
+  return x.key+' · '+svc+' where '+Object.keys(attrs).map(function(k){return k+'='+String(attrs[k]);}).join(', ');
+  }
+/* The paths a step is on (every step when the board has no paths), as the core maps them. */
+function traceScopeRoutes(d,index){
+  var steps=d && Array.isArray(d.steps)?d.steps:[];
+  var routes=typeof diagramPathList==='function'?diagramPathList(d).filter(function(r){return r.indices.indexOf(index)>=0;}):[];
+  return routes.length?routes:[{label:'',indices:steps.map(function(s,i){return i;})}];
+}
+/* Where step `index` inherits span x of carrier c ({kind, id}): the path labels, by the core D9
+   rule per path (FlowTraceMatch.effectiveSelector over that path's steps; a traceScope inherits
+   shared carriers too), less skips by name or role:<role>. An edge step owns only send spans.
+   Returns {on:[labels], all:<paths the step is on>}. */
+function traceScopeInheritedOn(d,index,c,x){
+  var steps=d && Array.isArray(d.steps)?d.steps:[],st=steps[index],none={on:[],all:0};
+  if(!st || typeof st!=='object' || st.traceMatch!=null)return none;
+  if(c.kind==='edge' && x.role!=='send')return none;
+  if(!traceScopeCarriers(d,st).some(function(y){return y.kind===c.kind && y.id===c.id;}))return none;
+  var scope=traceScopeObject(st.traceScope)?st.traceScope:null,skip=scope && traceScopeObject(scope.skip)?scope.skip:{},list=Array.isArray(skip[c.id])?skip[c.id]:[];
+  if(list.indexOf(x.key)>=0 || list.indexOf('role:'+x.role)>=0)return none;
+  var routes=traceScopeRoutes(d,index);
+  var on=routes.filter(function(route){
+    if(scope)return true;
+    var eff=typeof FlowTraceMatch!=='undefined' && FlowTraceMatch.effectiveSelector?FlowTraceMatch.effectiveSelector(d,st,route.indices.map(function(i){return steps[i];}).filter(Boolean)):null;
+    return !!(eff && Array.isArray(eff.inherits) && eff.inherits.indexOf(c.id)>=0);
+  }).map(function(r){return r.label;});
+  return {on:on,all:routes.length};
+}
+function traceScopeNames(list){return list.length>1?list.slice(0,-1).join(', ')+' and '+list[list.length-1]:list[0] || '';}
 function stepTraceScopeTitle(st){return '“'+String(st && st.text || st && st.id || '').replace(/\s+/g,' ').trim()+'”';}
 function planStepTraceScope(text,raw,sectionIdx,stepIdx,edit,opts){
   var got=builderStepAt(raw,sectionIdx,stepIdx);

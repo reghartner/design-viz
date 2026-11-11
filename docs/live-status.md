@@ -568,6 +568,19 @@ only times the hand-off. Then **Trace root** (service and operation together), *
 A step needs a Step ID before it can take a scope; **Go to Step ID** moves to that field.
 Imported nodes and connections list their merged spans. Refusals and validator messages show
 beside the field.
+
+### Declared spans in the Links window
+
+In the Workbench Links window (desktop), the **Trace match** tab lists spans declared on nodes
+and connections beside the steps' trace matches. **By trace match**: a declaration with an exact
+operation joins the group of the same `service · operation` and reads "declared on Worker
+(process)"; a prefix or attributes-only declaration has its own group, which no step can be
+assigned. Each declaration lists the steps that inherit it, by the same per-path rule and skips
+as the step trace scope form ("Step 3 · push (inherited on Path B)"). **By element**: a node or
+connection lists its own declarations. Declaration rows are read only; **Edit in Inspect** opens
+that node or connection's Trace spans fold. A group **Rename** changes the steps' trace matches
+only, never the declarations, and says so. Imported nodes and connections show their merged
+declarations.
 A value that is not selector objects keeps the **Trace match JSON** box.
 
 ### Query progress

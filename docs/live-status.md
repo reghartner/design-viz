@@ -331,7 +331,8 @@ Both parsers drop invalid entries and report each one through an optional
 validator reports the same problems as warnings, never errors: a malformed
 signal or limit is ignored on its own, and a binding without a valid `kind` or
 any valid signal leaves the carrier unbound. Text boxes never carry telemetry.
-A board with bindings needs a live-status panel, like a board with tickets.
+Bindings alone never ask for a live-status panel (#1345), so a canon page that declares
+signals builds without one; a board still needs the panel to show its metrics.
 
 Imported Canon topology accepts the same field in
 `topologyImports[].nodeTracking` and `edgeTracking`. A consumer binding marked
@@ -343,7 +344,11 @@ fields, and `kind` replaces the inherited kind when set. For example
 `{"extends": true, "signals": {"lag": {"grafana": "max(lag)"}}, "hide": ["errors"]}`.
 Later provider changes still reach the consumer unless hidden or changed there. A
 signal entry that names a source replaces the inherited source, so a signal always
-has one. Hiding every signal leaves the carrier unbound in this document. A hide for
+has one. The validator warns at the overlay when such an entry leaves out part of the
+provider's query (Honeycomb calculations, filters or breakdowns, CloudWatch dimensions,
+Logs logGroups), naming the signal, the carrier and what is left out; a full
+restatement, a string query or a source switch is a note, because later provider
+changes to that query no longer reach this board (#1345). Hiding every signal leaves the carrier unbound in this document. A hide for
 a signal the provider no longer has is kept in case it returns. A consumer binding
 without `extends` replaces the provider's binding as a whole, as before; the
 Workbench writes `extends` on every imported carrier, also before its provider has a
@@ -987,8 +992,8 @@ needs a host with a Jira connector (claude.ai).” and lists the page's authored
 links when the tracking site is set) with their PR links, and any other authored PRs, without a state (#1253). Print preserves the last
 paint, and reduced motion disables ring animation.
 
-Validation warns when tracking or carrier tickets exist without a `live-status`
-panel: `page.tracking: no live-status panel declared — add {"type": "live-status"}
+Validation warns when ticket tracking or carrier tickets exist without a `live-status`
+panel (metric signals and `tracking.telemetry` settings alone never do): `page.tracking: no live-status panel declared — add {"type": "live-status"}
 to a section's panels so viewers see the rollup`. A panel on an untracked page
 warns “this page has no ticket references — the panel will be empty”. These are
 warnings, never errors. Strongly prefer adding the panel on every tracked page.

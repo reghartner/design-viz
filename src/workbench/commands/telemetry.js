@@ -821,7 +821,10 @@ function planCarrierTraceSpans(text,raw,target,edit,context){
   if(op==='rename' && t.owner && telemetryOwn(state.inherited,edit.name))return {error:'Inherited span names come from '+state.provider+'. To rename one, hide it and add a new span.',field:'name'};
   // A provider name hidden here is still taken: reusing it would drop the hide and patch the provider's span.
   var claimed=op==='rename'?edit.to:op==='add'?edit.name:null;claimed=typeof claimed==='string'?claimed.trim():claimed;
-  if(t.owner && claimed && telemetryOwn(state.inherited,claimed) && !telemetryOwn(state.spans,claimed))return {error:claimed+' is a span '+state.provider+' declares (hidden here); pick another name, or show it and change it instead.',field:'name'};
+  if(t.owner && claimed && telemetryOwn(state.inherited,claimed) && !telemetryOwn(state.spans,claimed)){
+    var spec=(context && Array.isArray(context.specs)?context.specs:[]).find(function(x){return x && x.page && x.page.canon && x.page.canon.id===state.provider;}),title=spec && typeof spec.page.title==='string' && spec.page.title.trim()?spec.page.title.trim():state.provider;
+    return {error:'The provider '+title+' declares a span named '+claimed+', hidden in this document; pick another name, or show '+claimed+' and change it instead.',field:'name'};
+  }
   var plan;
   if(!t.owner){
     if(op==='hide' || op==='revert' || op==='revertAll')return {error:'Only spans inherited from an imported node or connection can be hidden or reverted.'};

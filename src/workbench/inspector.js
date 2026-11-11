@@ -784,7 +784,9 @@ function traceSpansControls(){
       'The spans that belong to this '+where+' in a loaded trace. Steps that light it inherit them.');
     // A note slot right after a control: validator messages and refusals, read by its aria-describedby.
     function slot(parent,control){
-      var p=el('p','fnote trace-span-note','',parent);p.id=prefix+'-trace-span-'+(serial++);p.hidden=true;
+      // role=status: a refusal is announced when its text appears. Text is set only by a refusal or a
+      // validator message, never cleared and rewritten on a plain re-render.
+      var p=el('p','fnote trace-span-note','',parent);p.id=prefix+'-trace-span-'+(serial++);p.hidden=true;p.setAttribute('role','status');
       control._spanNote=function(text){p.textContent=text || '';p.hidden=!text;if(text){control.setAttribute('aria-describedby',p.id);if(/^(INPUT|SELECT|TEXTAREA)$/i.test(control.tagName))control.setAttribute('aria-invalid','true');}};
       return p;
     }

@@ -3314,6 +3314,33 @@ async function paintedCard(nodes){
  h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
  return {h,card:h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]')};
 }
+/* Follow-up to #1294 (Outline review c4): a Tab after a touch shows the carrier's card on focus again,
+   and the visible board an Outline card is placed in is also cut to the window. */
+test('#1294 follow-up: after a touch, Tab onto an Outline carrier shows its card on focus',async()=>{
+ const {h}=await paintedCard({a:{},b:{}});
+ h.ctl.liveStatus.setMetricsStyle('outline');h.flush();await settle();h.flush();
+ const halo=h.view.querySelector('path.dv-metrics-outline'),card=halo && halo._metricsCard;
+ assert.ok(!!halo && !!card,'the Outline halo and its hidden card are painted');
+ const ev=(type,extra)=>Object.assign({type,target:halo,preventDefault(){},stopPropagation(){}},extra);
+ h.view.dispatchEvent(ev('pointerdown',{pointerType:'touch'}));
+ h.view.dispatchEvent(ev('focusin'));
+ assert.ok(card.classList.contains('dv-metrics-peek')===false,'a focus right after a touch does not open the card over the board');
+ h.view.dispatchEvent(ev('keydown',{key:'Tab',shiftKey:false,altKey:false,ctrlKey:false,metaKey:false}));
+ h.view.dispatchEvent(ev('focusin'));
+ assert.ok(card.classList.contains('dv-metrics-peek')===true,'Tab is keyboard navigation: focus shows the card again');
+ h.ctl.liveStatus.destroy();
+});
+test('#1294 follow-up: the visible board for an Outline card is cut to the window',()=>{
+ const h=harness();
+ h.C.DOMPoint=class{constructor(x,y){this.x=x;this.y=y;}matrixTransform(m){return {x:m.a*this.x+m.c*this.y+m.e,y:m.b*this.x+m.d*this.y+m.f};}};
+ const identity={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;}};
+ const svg={viewBox:{baseVal:{x:0,y:0,width:1000,height:1000}},getScreenCTM:()=>identity,getBoundingClientRect:()=>({left:0,top:0,right:1000,bottom:1000}),parentElement:null,
+  ownerDocument:{defaultView:{innerWidth:400,innerHeight:300,getComputedStyle:()=>({overflowX:'visible',overflowY:'visible'})}}};
+ const rect=h.C.telemetryFrameBoxes(svg).rect;
+ assert.ok(rect.x===0 && rect.y===0,'starts at the board origin, got '+rect.x+','+rect.y);
+ assert.ok(rect.width===400 && rect.height===300,'cut to the 400x300 window, got '+rect.width+'x'+rect.height);
+ h.ctl.liveStatus.destroy();
+});
 function workPresentation(h,card){
  h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});
  const pop=h.view.querySelector('.dv-live-popover');

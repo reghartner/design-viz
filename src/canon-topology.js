@@ -188,11 +188,20 @@ var FlowTopology = (function(){
   var TELEMETRY_ITEM_NAMES={filters:['filter','filters'],calculations:['calculation','calculations'],breakdowns:['breakdown','breakdowns'],logGroups:['log group','log groups'],orders:['order','orders'],havings:['having','havings']};
   function telemetryItem(key,x){
     if(typeof x==='string' || typeof x==='number')return String(x);
-    if(object(x) && key==='filters' && typeof x.column==='string')return x.column+(x.op!=null?' '+x.op:'')+(x.value!==undefined?' '+(Array.isArray(x.value)?x.value.join(', '):String(x.value)):'');
-    if(object(x) && typeof x.op==='string')return x.op+(typeof x.column==='string'?'('+x.column+')':'');
+    if(!object(x))return telemetryCanonical(x);
+    function shown(v){return Array.isArray(v)?'['+v.join(', ')+']':String(v);}
+    function calc(op,column){return op+(typeof column==='string'?'('+column+')':'');}
+    if(key==='filters' && typeof x.column==='string')return x.column+(x.op!=null?' '+x.op:'')+(x.value!==undefined?' '+shown(x.value):'');
+    if(key==='havings' && typeof x.calculate_op==='string')return calc(x.calculate_op,x.column)+(x.op!=null?' '+x.op:'')+(x.value!==undefined?' '+shown(x.value):'');
+    if(key==='orders' && (typeof x.op==='string' || typeof x.column==='string'))return (typeof x.op==='string'?calc(x.op,x.column):x.column)+(typeof x.order==='string'?' '+x.order:'');
+    if(typeof x.op==='string')return calc(x.op,x.column);
     return telemetryCanonical(x);
   }
-  function telemetryList(items){return items.length>1?items.slice(0,-1).join(', ')+' and '+items[items.length-1]:items[0];}
+  // More than three names read "a, b, c and N more".
+  function telemetryList(items){
+    if(items.length>3)return items.slice(0,3).join(', ')+' and '+(items.length-3)+' more';
+    return items.length>1?items.slice(0,-1).join(', ')+' and '+items[items.length-1]:items[0];
+  }
   function telemetryLeftOut(inherited,patch){
     var out={absent:[],changed:[]};
     Object.keys(inherited).forEach(function(key){

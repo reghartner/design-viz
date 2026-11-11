@@ -1257,7 +1257,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var o=traceDeclareOffer,st=editing() && editor.state(),m=st && st.mapped;
     // The offer belongs to the pending mapping it came with (its step), not to a trace context, which a
     // re-render may rename (a carried example).
-    if(!o || !m || m.step!==o.step || st.lastTrace==='declare' || !editor.declareInstead)return null;
+    if(!o)return null;
+    // The offer ends with its mapping: once that mapping has been pending and no longer is (Undo, Save, or
+    // replaced by another), it is dropped, so a later mapping of the same step never brings it back. Before
+    // the board editor has written the mapping (it does so on the next tick), the offer waits.
+    if(!m || m.step!==o.step){if(o.seen)traceDeclareOffer=null;return null;}
+    o.seen=true;
+    if(st.lastTrace==='declare' || !editor.declareInstead)return null;
     return {label:o.label,kind:o.kind,roles:DECLARE_ROLES[o.kind],error:traceDeclareError};
   }
   // The board editor's reason a declaration would be refused, shown beside the button; nothing is written.

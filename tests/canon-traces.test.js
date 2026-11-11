@@ -98,3 +98,13 @@ test('runtime badges clear between steps and labels remain text, including unkno
   context.renderRuntimeConditions(board,host,[{nodeId:'queue',kind:'unknown',label:'No telemetry'}]);assert.equal(node.children.length,1);assert.match(node.children[0].attrs.class,/runtime-unknown/);
   context.renderRuntimeConditions(board,host,[]);assert.equal(node.children.length,0);assert.equal(host.children.length,0);assert.equal(host.hidden,true);
 });
+test('#1290 whole-branch review: a trace of another flow is refused like another environment',async()=>{
+  const T=await load(),sp=(id,parent,service,name,startMs,ms,extra={})=>({'trace.trace_id':'t1','trace.span_id':id,'trace.parent_id':parent || '','service.name':service,name,startMs,duration_ms:ms,'deployment.environment.name':'demo',...extra});
+  const decl=(svc,op)=>({title:svc,trace:{spans:{p:{serviceName:svc,operation:op,role:'process'}}}}),root={serviceName:'a',operation:'POST /x'};
+  const d={nodes:{a:decl('a','POST /x'),w:decl('w','work')},rows:[['a','w']],edges:[{from:'a',to:'w'}],steps:[{id:'s1',nodes:['a'],traceScope:{root}},{id:'s2',nodes:['w'],traceScope:{root,maxDurationMs:50}}]};
+  const s={page:{title:'b',canon:{version:1,id:'b',kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}};
+  const approved=T.approveReference(s,{spans:[sp('r',null,'a','POST /x',0,100),sp('wk','r','w','work',30,40)]},{reason:'ok'});
+  assert.throws(()=>T.compareTrace(approved,{spans:[sp('r',null,'a','GET /other',0,100,{error:true}),sp('wk','r','w','work',30,400,{error:true})]}),
+    /^Error: This trace is another flow: 2 steps of the approved reference read Not this flow; select a comparable trace\.$/);
+  assert.equal(T.compareTrace(approved,{spans:[sp('r',null,'a','POST /x',0,100),sp('wk','r','w','work',30,40)]}).firstDivergence,null,'the same flow compares');
+});

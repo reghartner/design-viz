@@ -42,6 +42,11 @@
 | S19 (#1290 PR 9) a different local span under the same key stops the pull until resolved | local beta already declares cart-checkout as something else | conflict {kind span-changed, span cart-checkout, carrier beta}, message names Bo, the time and --resolve span:beta/cart-checkout; =live takes the board's, =local keeps the local; the old span:cart-checkout form still works while unambiguous | an impl that overwrites a local declaration silently |
 | S20 (#1290 PR 9 c1) the whole declared span is compared | the local span differs only in role (or namespace) | conflict span-changed | an impl comparing service and operation only |
 | S21 (#1290 PR 9 c1) --resolve is per carrier | Bo declared process on beta and on gamma; both differ locally | span:beta/process=live and span:gamma/process=local resolve each; span:process is refused as ambiguous, naming both; the CLI accepts span: keys | one flag shared by every carrier with that key |
+| S22 (#1290 whole-branch review M1) a board mapping on a scoped step removes the local scope it replaced; another local scope asks | local persist has traceScope {parentStepId: receive}; live maps it (replacesScope the same) | merged, traceMatch set, traceScope gone, valid; a changed local scope or a change without replacesScope conflicts; =live takes the mapping | an impl that leaves traceMatch beside traceScope |
+| S23 (review M2) a span on a locally relabeled edge lands on it | local edge 0 relabeled sync → push | merged onto edge 0 | an impl that reports the edge missing |
+| S24 (review M3) a span on an imported carrier whose import is gone or renamed | local import removed / as renamed | conflict carrier-missing, no crash | a crash |
+| S25 (review minors) same span under another key is kept; a hidden key asks; =live shows it | local declares it as again / hides retry | no second key; conflict span-hidden; =live writes it and drops the hide | silent duplicates or no-effect writes |
+| L14 (review minor) log counts span declarations and guards board ones | Bo declared after the newest agent entry; local removes it | conflict naming --confirm 'span:beta/cart-checkout'; with it, "Removed 1 span declaration" | a log that ignores declarations |
 | L9 (diff review c1) placing a ticket that a recent board edit took off the board is a conflict | agent entry 10:00; Bo removed CC-1 from edge 0 at 11:00; local assigns CC-1 to gamma | status conflict, conflicts[0] ticket CC-1, message names Bo; with confirm [CC-1] → logged | a check limited to the carriers the board edit named |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
@@ -562,7 +567,7 @@ test('S19 a different local span under the same key stops the pull until resolve
  const mine=LOCAL.replace('"beta": {"title": "Beta service", "missingWork": true}','"beta": {"title": "Beta service", "missingWork": true, "trace": {"spans": {"cart-checkout": {"serviceName": "frontend", "operation": "/cart", "role": "process"}}}}');
  let out=S().pull(mine,live);
  assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].kind,'span-changed');assert.equal(out.conflicts[0].span,'cart-checkout');
- assert.match(out.conflicts[0].message,/Bo/);assert.match(out.conflicts[0].message,/2026-11-11 09:00 UTC/);assert.equal(out.conflicts[0].carrier,'beta');assert.match(out.conflicts[0].message,/--resolve span:beta\/cart-checkout=live/);
+ assert.match(out.conflicts[0].message,/Bo/);assert.match(out.conflicts[0].message,/2026-11-11 09:00 UTC/);assert.equal(out.conflicts[0].carrier,'beta');assert.match(out.conflicts[0].message,/--resolve 'span:beta\/cart-checkout=live'/,'quoted, so a shell never reads -> or > as a redirection');
  out=S().pull(mine,live,{resolve:{'span:cart-checkout':'live'}});
  assert.equal(out.status,'merged');assert.deepEqual(d(JSON.parse(out.text)).nodes.beta.trace.spans['cart-checkout'],spanOf(CART));
  out=S().pull(mine,live,{resolve:{'span:cart-checkout':'local'}});
@@ -587,8 +592,74 @@ test('S21 --resolve for a declared span is per carrier; the bare key is refused 
  out=S().pull(mine,live,{resolve:{'span:beta/process':'live','span:gamma/process':'local'}});
  assert.equal(out.status,'merged');
  assert.equal(d(JSON.parse(out.text)).nodes.beta.trace.spans.process.operation,'work');assert.equal(d(JSON.parse(out.text)).nodes.gamma.trace.spans.process.operation,'other');
- assert.throws(()=>S().pull(mine,live,{resolve:{'span:process':'live'}}),/--resolve span:process names 2 nodes or connections \(beta, gamma\); use span:beta\/process or span:gamma\/process\./);
+ assert.throws(()=>S().pull(mine,live,{resolve:{'span:process':'live'}}),/--resolve span:process names 2 nodes or connections \(beta, gamma\); use 'span:beta\/process' or 'span:gamma\/process'\./);
  // The command line accepts span: keys.
  const dir=tmp({'local.json':mine,'live.json':live});const r=run(dir,['pull','local.json','live.json','--resolve','span:beta/process=live,span:gamma/process=local']);
  assert.equal(r.status,0,r.stderr);
+});
+
+/* #1290 whole-branch review (tools leg). */
+const scopedBoard=(persist)=>JSON.stringify({page:{title:'Scoped',editHistory:[],sections:[{id:'main',diagram:{
+  nodes:{api:{title:'API',trace:{spans:{process:{serviceName:'request-api',operation:'POST /records',role:'process'}}}},store:{title:'Store',trace:{spans:{write:{serviceName:'record-store',operation:'INSERT record',role:'database'}}}}},
+  rows:[['api','store']],edges:[{from:'api',to:'store'}],
+  steps:[{id:'receive',text:'Receive request',nodes:['api']},Object.assign({id:'persist',text:'Write record',nodes:['store']},persist)]}}]}},null,2)+'\n';
+const MAP={serviceName:'record-store',operation:'INSERT record'},STEP_PATH=['page','sections',0,'diagram','steps',1];
+const mapEntry=extra=>entry('2026-11-11T11:00:00.000Z','Bo',[{op:'trace-match',path:STEP_PATH,label:'Write record',step:'persist',traceMatch:MAP,...extra}]);
+function liveScoped(history){const raw=JSON.parse(scopedBoard({traceMatch:MAP}));raw.page.editHistory=history;return JSON.stringify(raw,null,2)+'\n';}
+test('S22 a board mapping on a scoped step removes the scope it replaced; a different local scope asks',()=>{
+  const scope={parentStepId:'receive'},bo=mapEntry({replacesScope:scope});
+  let out=S().pull(scopedBoard({traceScope:scope}),liveScoped([bo]));
+  assert.equal(out.status,'merged');
+  const step=d(JSON.parse(out.text)).steps[1];
+  assert.deepEqual(step.traceMatch,MAP);assert.equal(Object.hasOwn(step,'traceScope'),false,'the scope goes with the mapping, as in Edit mode');
+  assert.deepEqual(plain(V.validate(V.normalize(JSON.parse(out.text))).errors),[]);
+  // A local scope the board's mapping did not replace is the author's own change: ask.
+  out=S().pull(scopedBoard({traceScope:{maxDurationMs:5}}),liveScoped([bo]));
+  assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].kind,'trace-match-changed');assert.match(out.conflicts[0].message,/trace scope other than the one the mapping replaced/);
+  out=S().pull(scopedBoard({traceScope:scope}),liveScoped([mapEntry({})]));
+  assert.equal(out.status,'conflict','a mapping made on an unscoped step, against a local scope');assert.match(out.conflicts[0].message,/trace scope the board's step did not have/);
+  out=S().pull(scopedBoard({traceScope:{maxDurationMs:5}}),liveScoped([bo]),{resolve:{'step:persist':'live'}});
+  assert.equal(out.status,'merged');assert.equal(Object.hasOwn(d(JSON.parse(out.text)).steps[1],'traceScope'),false);
+});
+test('S23 a span declared on a locally relabeled edge lands on that edge',()=>{
+  const span={key:'sync-call',serviceName:'alpha',operation:'sync',role:'send'};
+  const bo=entry('2026-11-11T11:10:00.000Z','Bo',[{op:'trace-span',path:EDGE(0),edge:['alpha','beta'],label:'Alpha service → Beta service',span}]);
+  const live=liveText(s=>{d(s).edges[0].trace={spans:{'sync-call':{serviceName:'alpha',operation:'sync',role:'send'}}};},[bo]);
+  const out=S().pull(LOCAL.replace('"label": "sync"','"label": "push"'),live);
+  assert.equal(out.status,'merged',JSON.stringify(out.conflicts));
+  assert.deepEqual(d(JSON.parse(out.text)).edges[0].trace,{spans:{'sync-call':{serviceName:'alpha',operation:'sync',role:'send'}}});
+  assert.equal(d(JSON.parse(out.text)).edges[0].label,'push');
+});
+test('S24 a span declared on an imported carrier whose import is gone or renamed is a conflict, never a crash',()=>{
+  const imp=['page','sections',1,'diagram','topologyImports',0],span={key:'retry',serviceName:'api',operation:'retry',role:'work'};
+  const bo=entry('2026-11-11T11:20:00Z','Bo',[{op:'trace-span',path:imp.concat(['nodeTracking','api']),node:'shared::api',label:'API',span}]);
+  const live=liveText(s=>{d(s,1).topologyImports[0].nodeTracking={api:{trace:{spans:{retry:{serviceName:'api',operation:'retry',role:'work'}}}}};},[bo]);
+  for(const [what,local] of [['removed',LOCAL.replace(/"topologyImports": \[\{"spec": "provider", "export": "core", "as": "shared", "edgeTracking": \{"api->store": \{"tickets": \["SH-2"\]\}\}\}\]/,'"topologyImports": []')],
+    ['renamed',LOCAL.replace('"as": "shared"','"as": "core"')]]){
+    assert.notEqual(local,LOCAL,what);
+    const out=S().pull(local,live);
+    assert.equal(out.status,'conflict',what);assert.equal(out.conflicts[0].kind,'carrier-missing',what);assert.match(out.conflicts[0].message,/no longer has API/,what);
+  }
+});
+test('S25 the same span under another key is kept; a hidden key asks; =live shows it',()=>{
+  const imp=['page','sections',1,'diagram','topologyImports',0],span={key:'retry',serviceName:'api',operation:'retry',role:'work'},same={serviceName:'api',operation:'retry',role:'work'};
+  const bo=entry('2026-11-11T11:30:00Z','Bo',[{op:'trace-span',path:imp.concat(['nodeTracking','api']),node:'shared::api',label:'API',span}]);
+  const live=liveText(s=>{d(s,1).topologyImports[0].nodeTracking={api:{trace:{spans:{retry:same}}}};},[bo]);
+  const withLocal=trace=>LOCAL.replace('"as": "shared", ','"as": "shared", "nodeTracking": {"api": {"trace": '+JSON.stringify(trace)+'}}, ');
+  let out=S().pull(withLocal({spans:{again:same}}),live);
+  assert.equal(out.status,'merged');assert.deepEqual(d(JSON.parse(out.text),1).topologyImports[0].nodeTracking.api.trace,{spans:{again:same}},'no second key for the same span');
+  out=S().pull(withLocal({hide:['retry']}),live);
+  assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].kind,'span-hidden');assert.match(out.conflicts[0].message,/hides retry there/);
+  out=S().pull(withLocal({hide:['retry']}),live,{resolve:{'span:shared::api/retry':'live'}});
+  assert.equal(out.status,'merged');assert.deepEqual(d(JSON.parse(out.text),1).topologyImports[0].nodeTracking.api.trace,{spans:{retry:same}},'shown, the hide dropped');
+});
+test('L14 log counts span declarations and guards one a recent board edit declared',()=>{
+  const agent=agentEntry('2026-11-11T08:00:00.000Z','Earlier agent change');
+  const history=[agent,BO_DECLARE];
+  const live=liveText(s=>{d(s).nodes.beta.trace={spans:{'cart-checkout':spanOf(CART)}};},history);
+  const local=JSON.parse(live);delete d(local).nodes.beta.trace;
+  let out=S().log(JSON.stringify(local,null,2),live,{by:'Chuck',now:new Date('2026-11-11T12:00:00Z')});
+  assert.equal(out.status,'conflict');assert.match(out.conflicts[0].message,/rerun with --confirm 'span:beta\/cart-checkout' once they agree/);
+  out=S().log(JSON.stringify(local,null,2),live,{by:'Chuck',now:new Date('2026-11-11T12:00:00Z'),confirm:['span:beta/cart-checkout']});
+  assert.equal(out.status,'logged');assert.equal(out.entry.summary,'Removed 1 span declaration');
 });

@@ -16,6 +16,7 @@
 | E12 | Note slots stay in the page as status regions; a refusal clears then sets its note, so a repeated identical refusal is announced. |
 | E13 | Hide or revert of a span the provider does not declare names the provider by its title. |
 | E14 | revealTraceSpans (Links Edit in Inspect) opens the Trace spans fold for that carrier, once; another selection first drops the request. |
+| E15 | (whole-branch review) The new span's Role is a draft like its name, so Declare receive span here survives a re-render; on a changed inherited span the Hidden checkbox says hiding drops those changes. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -294,4 +295,20 @@ test('E14 Links "Edit in Inspect" asks Inspect to open the Trace spans fold for 
   // A request the next selection does not use is dropped: a later ordinary click opens nothing.
   ui.h.inspector.revealTraceSpans(NODE);ui.select(EDGE);ui.select(NODE);
   assert.equal(ui.editor().open,false,'a selection change drops an unused request');
+});
+
+test('E15 the new span role survives a re-render; hiding a changed inherited span says it drops the changes',()=>{
+  const ui=harness(board()).select(EDGE);
+  ui.click('Declare receive span here');
+  ui.select(EDGE);
+  assert.equal(ui.control('New span name').value,'receive');
+  assert.equal(ui.control('New span role').value,'receive','the role draft is kept');
+  ui.control('New span service').value='order-worker';ui.control('New span value').value='receive orders';ui.click('Add span');
+  assert.equal(diagramOf(ui.raw).edges[0].trace.spans.receive.role,'receive');
+  ui.select(EDGE);
+  assert.equal(ui.control('New span role').value,'send','Add span clears the role draft');
+  const f=imported(),c=harness(f.consumer,f.context),INODE={kind:'node',section:0,id:'shared::worker'};c.select(INODE);
+  assert.doesNotMatch(c.control('process hidden for this document').title,/drops/);
+  c.set('process value','process orders v2');c.select(INODE);
+  assert.match(c.control('process hidden for this document').title,/Hiding drops your changes to this span; Undo brings them back\.$/);
 });

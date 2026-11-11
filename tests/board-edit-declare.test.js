@@ -16,6 +16,10 @@
 | D8 | A conflict replay compares the whole declared span: a winner with the same key and another role is not "already there"; the change is dropped (not written under a new key) and the notice names it, its span and the true reason. With two declarations on one carrier, only the clashing one is dropped. |
 | D10 | Every replay-drop reason is true for its case: a mapping whose step the winner maps differently names that mapping; a clear with no marker left says so; a gone carrier keeps "carrier moved, removed or ambiguous"; a ticket add whose provider now carries the ticket says so, naming the provider by its title. Each refusal is its own sentence; "1 … was"; no "0 could not be" clause. |
 | D11 | A replayed declaration whose whole span the winner already declares under another key counts as already there and writes nothing. |
+| D12 | (whole-branch review M1) Undo of Declare instead never restores a ticket change the reader cancelled after the swap (add first or map first). |
+| D13 | (M2) A replayed mapping is refused, with the reason, when their version gave the step a trace scope or changed the one the mapping replaced; it replays when the scope is unchanged. |
+| D14 | (m2) state().mapped.replacedScope says whether the mapping replaced the step's trace scope. |
+| D15 | (whole-branch review m7) The replay refusal for a key their version uses tells the reader what to do in board Edit, where keys are automatic: "drop the span again to declare it; it gets a new name". |
 | D9 | A span the carrier already declares under another key (same service, operation and role) is refused: "Already declared as <key> on <title>." |
 | D7 | Declare on <title> instead (team-lead ruling: the immediate mapping stays): declareInstead swaps the pending mapping for the declaration, one pending change; its Undo restores the mapping as it was; Save records only the trace-span. |
 */
@@ -134,14 +138,14 @@ test('D8 a replay compares the whole declared span: the same key with another ro
   first.e.declareSpan(WEB,{serviceName:'frontend',operation:'/cart/checkout',role:'process'});first.e.save();await settle();
   const winner=local();winner.page.sections[0].diagram.nodes.web.trace={spans:{checkout:{serviceName:'frontend',operation:'/cart/checkout',role:'call'}}};
   const next=await editor(winner,{store,start:false});
-  assert.equal(next.e.state().notice.text,'Another editor saved first. 0 of your changes were re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/checkout, role call); declare yours again under another name.');
+  assert.equal(next.e.state().notice.text,'Another editor saved first. 0 of your changes were re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/checkout, role call); drop the span again to declare it; it gets a new name.');
   assert.deepEqual(plain(next.d().nodes.web.trace),{spans:{checkout:{serviceName:'frontend',operation:'/cart/checkout',role:'call'}}},'the winner\'s span stays; nothing under a new key');
   // Two declarations on one carrier: the one that clashes is named, the other is re-applied.
   const store2=new Map(),two=await editor(local(),{store:store2,reject:'conflict'});
   two.e.declareSpan(WEB,{serviceName:'frontend',operation:'/cart/checkout',role:'process'});two.e.declareSpan(WEB,{serviceName:'frontend',operation:'Refund',role:'process'});two.e.save();await settle();
   const w2=local();w2.page.sections[0].diagram.nodes.web.trace={spans:{checkout:{serviceName:'frontend',operation:'/cart/view',role:'process'}}};
   const again=await editor(w2,{store:store2,start:false});
-  assert.equal(again.e.state().notice.text,'Another editor saved first. 1 of your changes was re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/view); declare yours again under another name. Save again.');
+  assert.equal(again.e.state().notice.text,'Another editor saved first. 1 of your changes was re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/view); drop the span again to declare it; it gets a new name. Save again.');
   assert.deepEqual(Object.keys(again.d().nodes.web.trace.spans),['checkout','refund']);
 });
 
@@ -170,7 +174,7 @@ test('D10 every replay-drop reason is true for its case',async()=>{
   first.e.declareSpan(WEB,{serviceName:'frontend',operation:'/cart/checkout',role:'process'});first.e.clearMissingWork(WEB);first.e.save();await settle();
   winner=local();winner.page.sections[0].diagram.nodes.web.trace={spans:{checkout:{serviceName:'frontend',operation:'/cart/view',role:'process'}}};
   next=await editor(winner,{store,start:false});
-  assert.equal(next.e.state().notice.text,'Another editor saved first. 0 of your changes were re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/view); declare yours again under another name. Missing work cleared from Web could not be re-applied: their version has no Missing work marker on Web to clear.');
+  assert.equal(next.e.state().notice.text,'Another editor saved first. 0 of your changes were re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/view); drop the span again to declare it; it gets a new name. Missing work cleared from Web could not be re-applied: their version has no Missing work marker on Web to clear.');
   // With nothing dropped, no "0 could not be" clause; one change reads "was".
   store=new Map();first=await editor(local(),{store,reject:'conflict'});first.e.add(WEB,'WEB-1');first.e.save();await settle();
   next=await editor(local(),{store,start:false});
@@ -221,4 +225,58 @@ test('D7 Declare instead swaps the pending mapping for the declaration; its Undo
   assert.deepEqual(JSON.parse(c.published[0]).page.editHistory.at(-1).changes.map(x=>x.op),['trace-span']);
   // Nothing to swap: refused.
   const e=await editor(local());assert.equal(e.e.declareInstead(PAY,SPAN),false);assert.equal(e.e.state().pending,0);
+});
+
+/* #1290 whole-branch review (viewer leg). */
+test('D12 Undo of Declare instead never brings back a ticket change the reader cancelled',async()=>{
+  const STEP={section:0,kind:'step',id:'charge'},SPAN={serviceName:'payment',operation:'Charge card v2',role:'process'},MATCH={serviceName:'payment',operation:'Charge card v2'};
+  for(const order of ['add first','map first']){
+    const b=await editor(local());
+    if(order==='add first'){b.e.add(WEB,'ABC-1');b.e.mapSpan(STEP,MATCH);}else{b.e.mapSpan(STEP,MATCH);b.e.add(WEB,'ABC-1');}
+    assert.equal(b.e.declareInstead(PAY,SPAN),true,order);
+    assert.equal(b.e.remove(WEB,'ABC-1'),true,order+': the remove cancels the pending add');
+    assert.equal(b.e.state().pending,1,order);
+    assert.equal(b.e.undoDeclare(),true,order);
+    assert.equal(b.d().nodes.web.tickets,undefined,order+': the cancelled ticket does not come back');
+    assert.deepEqual(plain(b.d().steps[0].traceMatch),MATCH,order+': the mapping is back');
+    assert.equal(b.e.state().pending,1,order);
+    assert.equal(b.e.undoMap(),true,order);
+    assert.equal(b.e.state().pending,0,order);
+    // After a cancel the exact snapshots are gone, so Undo rewrites the values; the board is as it was.
+    assert.deepEqual(JSON.parse(b.e.text()),JSON.parse(b.text),order+': nothing is left changed');
+  }
+});
+
+test('D13 a replayed mapping never deletes a trace scope their version gave the step; it is refused with the reason',async()=>{
+  const STEP={section:0,kind:'step',id:'charge'},MATCH={serviceName:'payment',operation:'Charge'};
+  let store=new Map(),first=await editor(local(),{store,reject:'conflict'});
+  first.e.mapSpan(STEP,MATCH);first.e.save();await settle();
+  let winner=local();winner.page.sections[0].diagram.steps[0].traceScope={maxDurationMs:300};
+  let next=await editor(winner,{store,start:false});
+  assert.equal(next.e.state().notice.text,'Another editor saved first. 0 of your changes were re-applied. Span payment · Charge mapped to Charge the card could not be re-applied: their version gives that step a trace scope; edit it in Inspect.');
+  assert.deepEqual(plain(next.d().steps[0].traceScope),{maxDurationMs:300},'their scope stays');assert.equal(next.d().steps[0].traceMatch,undefined);
+  // A mapping that replaced a scope still replays when their version kept that same scope.
+  const scoped=local();scoped.page.sections[0].diagram.steps[0].traceScope={maxDurationMs:300};
+  store=new Map();first=await editor(scoped,{store,reject:'conflict'});
+  first.e.mapSpan(STEP,MATCH);first.e.save();await settle();
+  winner=local();winner.page.sections[0].diagram.steps[0].traceScope={maxDurationMs:300};winner.page.sections[0].diagram.nodes.web.tickets=['WEB-9'];
+  next=await editor(winner,{store,start:false});
+  assert.equal(next.e.state().notice.text,'Another editor saved first. 1 of your changes was re-applied. Save again.');
+  assert.deepEqual(plain(next.d().steps[0].traceMatch),MATCH);assert.equal(Object.hasOwn(next.d().steps[0],'traceScope'),false);
+  // ...and is refused when their version changed that scope.
+  store=new Map();first=await editor(scoped,{store,reject:'conflict'});
+  first.e.mapSpan(STEP,MATCH);first.e.save();await settle();
+  winner=local();winner.page.sections[0].diagram.steps[0].traceScope={maxDurationMs:500};
+  next=await editor(winner,{store,start:false});
+  assert.match(next.e.state().notice.text,/could not be re-applied: their version changed that step's trace scope; edit it in Inspect\.$/);
+  assert.deepEqual(plain(next.d().steps[0].traceScope),{maxDurationMs:500});
+});
+
+test('D14 the mapping note can say the mapping replaced the step\'s trace scope',async()=>{
+  const scoped=local();scoped.page.sections[0].diagram.steps[0].traceScope={maxDurationMs:300};
+  const b=await editor(scoped);
+  b.e.mapSpan({section:0,kind:'step',id:'charge'},{serviceName:'payment',operation:'Charge'});
+  assert.equal(b.e.state().mapped.replacedScope,true);
+  const c=await editor(local());c.e.mapSpan({section:0,kind:'step',id:'charge'},{serviceName:'payment',operation:'Charge'});
+  assert.equal(c.e.state().mapped.replacedScope,undefined,'only said when true, so the note of a plain mapping is as before');
 });

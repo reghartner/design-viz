@@ -15,6 +15,7 @@
 | M7 | Imported carriers: the resolved consumer's patch and hide change the node time and title; nested re-exports too. |
 | M8 | Focus levels include carrier rows; existing step rows, labels and edge timing are unchanged. |
 | M9 | A board whose only trace mapping is carrier declarations (local, imported, or an overlay alone) uses traces: company trace profiles apply and the Trace view does not say mapping is not configured. |
+| M10 | (whole-branch review m4) A node row in the error tone names each failed declared span in its title, as hand-off rows do: "Service error: <service> <operation> · HTTP n." |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const loader=require('../tools/source-loader.cjs');
@@ -159,4 +160,14 @@ test('M9 a board whose only trace mapping is carrier declarations uses traces',(
   const company={company:{...require('./fixtures/trace-connection-profile.json')}};
   assert.deepEqual(Object.keys(plain(V.FlowTraceConnections.resolve(page(board()),company))),['company']);
   assert.deepEqual(Object.keys(plain(V.FlowTraceConnections.resolve(page(none),company))),[]);
+});
+
+test('M10 a node row with a failed declared span names it in its title',()=>{
+  const spans=SPANS().map(x=>x.id==='f2'?{...x,error:true,attributes:{...x.attributes,'http.response.status_code':503}}:x);
+  const m=model(board(),exemplar(spans));
+  const row=m.nodes.worker[0];
+  assert.equal(row.tone,'error');
+  const t=label(m.nodes.worker);
+  assert.match(t.title,/^Declared spans: process 40 ms; find \(database\) 10 ms across 2 spans; cache 5 ms across 2 spans\. Service error: worker find users · HTTP 503\./);
+  assert.doesNotMatch(label(model(board()).nodes.worker).title,/Service error/,'no failure, no note');
 });

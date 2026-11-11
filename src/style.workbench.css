@@ -1516,7 +1516,8 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-diagram:not(.welcome-active) .workspace-active-section>.detail-notice:not(:empty){display:block;position:fixed;left:calc(var(--reader-host-inset,0px) + 84px);bottom:72px;z-index:95;max-width:calc(100vw - var(--reader-host-inset,0px) - 112px);padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
 .dv-connect-canvas-hint{position:fixed;top:var(--workspace-content-top);left:calc(var(--reader-host-inset,0px) + 84px);z-index:146;max-width:calc(100vw - var(--reader-host-inset,0px) - 112px);padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
 
-@media(max-width:700px){.workspace-canvas:has(.extraction-preview) .workspace-history,.workspace-canvas:has(.extraction-preview) .workspace-selection,.workspace-canvas:has(.extraction-preview) .workspace-canvas-controls{visibility:hidden;}}
+/* #1318: state classes set by script, not :has() on body (that restyled every button on each forced style read). */
+@media(max-width:700px){.workspace-canvas.workspace-extraction-preview .workspace-history,.workspace-canvas.workspace-extraction-preview .workspace-selection,.workspace-canvas.workspace-extraction-preview .workspace-canvas-controls{visibility:hidden;}}
 
 /* Workspace intent and local provenance remain separate from authored views. */
 .workspace-provenance{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px 'IBM Plex Sans',sans-serif;color:var(--sub);
@@ -1542,7 +1543,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 
 @media(max-height:520px){.workspace-canvas #workspace-window-agent{z-index:150!important;}.workspace-canvas #workspace-window-agent .workspace-window-header{min-height:26px;padding:2px 8px;}.workspace-canvas #workspace-window-agent #editor-agent[data-connected="true"] .folder-agent-header{max-height:26px;overflow:auto;}.workspace-canvas #workspace-window-agent .folder-agent-composer label[for="folder-agent-level"]{display:none;}.workspace-canvas #workspace-window-agent .folder-agent-compose-actions{flex-wrap:nowrap;}.workspace-canvas #workspace-window-agent .folder-agent-composer{padding:3px 8px;}}
 
-@media(max-height:520px){.workspace-canvas:has(#workspace-window-agent:not([hidden])) .workwrap #spec-editor{z-index:180;}}
+@media(max-height:520px){.workspace-canvas.workspace-agent-window-open .workwrap #spec-editor{z-index:180;}}
 
 /* Compact chrome has its own rows; fixed controls must not overlap the
    buttons in the header or the appearance disclosure. */
@@ -1638,7 +1639,7 @@ body.workspace-canvas{--workspace-header-bottom:56px;--workspace-content-top:112
 .workspace-canvas #docview .viewport-actions>.mbtn,.workspace-canvas #docview .viewport-status{display:none;}
 .workspace-canvas-controls .workspace-zoom-label{display:none;}
 .workspace-canvas-controls{padding:5px;}
-.workspace-canvas:has(#docview.has-reader-contents) .workspace-canvas-controls>:is(#workspace-zoom-out,#workspace-zoom,#workspace-zoom-in,#workspace-fit){display:none;}
+.workspace-canvas.workspace-docview-contents .workspace-canvas-controls>:is(#workspace-zoom-out,#workspace-zoom,#workspace-zoom-in,#workspace-fit){display:none;}
 .page-preview{width:calc(100vw - 32px);max-width:none;height:calc(100dvh - 32px);max-height:none;padding:0;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);}
 .page-preview[open]{display:flex;flex-direction:column;}
 .page-preview>header{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;padding:10px 16px;box-sizing:border-box;flex:none;}

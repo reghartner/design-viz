@@ -425,7 +425,7 @@ body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display
  .reader-rail-list{position:relative;align-self:stretch;flex:0 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--explore-border) transparent;display:flex;flex-direction:column;align-items:center;gap:10px;margin:0;padding:3px 0;list-style:none;}
  .reader-rail-list>li{position:relative;flex:none;}
  .reader-rail-list>li+li:before{content:'';position:absolute;bottom:100%;left:50%;width:2px;height:10px;margin-left:-1px;background:var(--explore-border);}
- .reader-rail-list>li:has(.reader-rail-past)+li:before{background:color-mix(in srgb,var(--navigation-accent) 55%,transparent);}
+ .reader-rail-list>.reader-rail-past-item+li:before{background:color-mix(in srgb,var(--navigation-accent) 55%,transparent);}
  body .reader-navigation .reader-rail-mark{display:grid;place-items:center;width:26px;height:26px;min-height:0;padding:0;border-radius:50%;border:1.5px solid var(--explore-border);background:var(--reader-paper,var(--explore-bg));color:var(--dfaint);font:600 11.5px/1 'IBM Plex Sans',sans-serif;font-variant-numeric:tabular-nums;text-align:center;}
  body .reader-navigation .reader-rail-mark.reader-rail-past{border-color:color-mix(in srgb,var(--navigation-accent) 55%,transparent);color:var(--navigation-accent);}
  body .reader-navigation .reader-rail-mark:hover{border-color:var(--navigation-accent);color:var(--navigation-accent);background:var(--reader-paper,var(--explore-bg));}

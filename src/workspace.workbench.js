@@ -204,6 +204,8 @@ function initWorkbenchWorkspace(){
     win.querySelector('.workspace-window-grip').disabled=isDocked;win.querySelector('.workspace-window-resize').hidden=isDocked;
     win.style.left=r.x+'px';win.style.top=r.y+'px';win.style.width=r.w+'px';win.style.height=r.h+'px';
     win.hidden=!open || hidden;panes[name].hidden=!open;
+    // #1318: a class instead of :has(#workspace-window-agent:not([hidden])) on <body>.
+    if(name==='agent')document.body.classList.toggle('workspace-agent-window-open',!win.hidden);
     document.dispatchEvent(new CustomEvent('workbench-tool-visibility',{detail:{name:name,open:open && !hidden}}));
     tabs[name].setAttribute('aria-pressed',String(open && !hidden));tabs[name].setAttribute('aria-expanded',String(open && !hidden));
     tabs[name].tabIndex=name===prefs.tool?0:-1;

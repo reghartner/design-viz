@@ -2969,6 +2969,9 @@ function renderExtractionPreview(multiSel){
     var identity=multiIdentity(selected),previous=beginForm('extraction:'+identity),lifetime=formLife;
     var draft=null,draftKey=null,downloadedKey=null,downloadReleases=[],stale=false;
     var panel=document.createElement('div');panel.className='extraction-preview';guide.appendChild(panel);
+    // #1318: a class on the Workbench canvas while the preview is mounted, instead of :has(.extraction-preview) on <body>.
+    var extractionCanvas=guide.closest && guide.closest('.workspace-canvas');
+    if(extractionCanvas && extractionCanvas.classList){extractionCanvas.classList.add('workspace-extraction-preview');formLife.own(function(){extractionCanvas.classList.remove('workspace-extraction-preview');});}
     var heading=document.createElement('h3');heading.textContent='Create an independent domain';panel.appendChild(heading);
     function paragraph(text,cls){var p=document.createElement('p');p.className=cls || '';p.textContent=text;panel.appendChild(p);return p;}
     paragraph('Move '+selected.length+' selected nodes into their own diagram. The child starts with no steps; author its sequence independently.','extraction-intro');

@@ -44,7 +44,7 @@ async function shown(locator){
 const focusInside=dialog=>dialog.evaluate(d=>{let a=d.getRootNode().activeElement;while(a && a.shadowRoot && a.shadowRoot.activeElement)a=a.shadowRoot.activeElement;return d.contains(a);});
 const isFocused=locator=>locator.evaluate(n=>n.getRootNode().activeElement===n);
 
-for(const width of [1440,1024])test('Text sits beside Search in the top bar at '+width+', opens a labelled window and closes with Escape and Close while Contents stays open',async({page,server})=>{
+for(const width of [1600])test('Text sits beside Search in the top bar at '+width+', opens a labelled window and closes with Escape and Close while Contents stays open',async({page,server})=>{
   await page.setViewportSize({width,height:900});const root=await open(page,server,board(),'text-view-'+width);const button=launcher(root);
   await expect(button).toBeVisible();await expect(button).toHaveText('Text');expect(await shown(button)).toBe('ok');
   expect(await button.evaluate(n=>!!n.closest('.reader-top') && !n.closest('.reader-utilities,.reader-utility-options,.reader-page-utilities'))).toBe(true);
@@ -63,7 +63,7 @@ test('arrow keys in the window do not step the diagram even in Present mode, whe
   // A plain Standard step diagram, where Present mode steps on arrow keys.
   const simple={page:{title:'Keys',sections:[{id:'flow',heading:'Flow',diagram:{view:'step',autoplay:false,nodes:{a:{title:'Source'},b:{title:'Destination'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],
     steps:[{id:'first',text:'First step',edge:'a->b'},{id:'second',text:'Second step',edge:'a->b'},{id:'third',text:'Third step',nodes:['b']}]}}]}};
-  await page.setViewportSize({width:1440,height:900});const root=await open(page,server,simple,'text-view-keys');
+  await page.setViewportSize({width:1600,height:900});const root=await open(page,server,simple,'text-view-keys');
   const stepState=()=>root.locator('#section-flow').evaluate(sec=>({current:Array.from(sec.querySelectorAll('.schip')).map(n=>n.getAttribute('aria-current')),text:Array.from(sec.querySelectorAll('.step-text')).map(n=>n.textContent)}));
   await launcher(root).click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();
   // Present mode: the document keydown handler steps on ArrowRight/ArrowLeft whatever the target.
@@ -80,7 +80,7 @@ test('arrow keys in the window do not step the diagram even in Present mode, whe
 });
 
 test('Escape with a bar menu open closes the menu first even when focus is in the window, then closes the window and leaves Contents open',async({page,server})=>{
-  await page.setViewportSize({width:1440,height:900});const root=await open(page,server,board(),'text-view-escape');
+  await page.setViewportSize({width:1600,height:900});const root=await open(page,server,board(),'text-view-escape');
   const contents=root.locator('.reader-contents');await expect(contents).toBeVisible();
   await launcher(root).click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();
   const zoom=root.locator('.reader-zoom-menu');await zoom.locator(':scope>summary').click();await expect(zoom).toHaveJSProperty('open',true);
@@ -102,26 +102,57 @@ function crowdedStory(){
   return raw;
 }
 const pageActionsInline=async nav=>{await expect(nav.locator('.reader-page-utilities')).toBeHidden();await expect(nav.getByRole('button',{name:'Expand diagram view',exact:true})).toBeVisible();};
-test('native crowded bar at 1024 keeps page actions inline and shows no Text launcher',async({page,server})=>{
+// The bar as it is without Text (the base) and as it is with Text. The base is
+// taken by hiding the launcher and its menu item with a style, which makes the
+// fitting pass see no launcher, then re-fitting at the same width.
+async function barState(nav){
+  return nav.evaluate(el=>{
+    const vis=n=>!!n && n.checkVisibility({visibilityProperty:true}),menu=el.querySelector('.reader-page-utilities');
+    const inline=Array.from(el.querySelectorAll('.reader-top :is(button,summary,select)')).filter(n=>vis(n) && !n.closest('.text-view-launch,.text-view,.reader-page-utility-options')).map(n=>n.getAttribute('aria-label') || n.textContent.trim());
+    const launch=el.querySelector('.text-view-launch'),item=el.querySelector('.text-view-menu-item');
+    return {inline,pageMenu:vis(menu),text:vis(launch)?'inline':item && !item.hidden && vis(menu)?'menu':'absent'};
+  });
+}
+async function refit(page,width){await page.setViewportSize({width:width-1,height:900});await page.setViewportSize({width,height:900});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));}
+async function baseAndHead(page,nav,width){
+  await refit(page,width);
+  await nav.evaluate(el=>{const root=el.getRootNode(),style=document.createElement('style');style.id='text-view-base';style.textContent='.text-view-launch,.text-view-menu-item{display:none!important}';(root.head || root).appendChild(style);});
+  await refit(page,width);const base=await barState(nav);
+  await nav.evaluate(el=>{const root=el.getRootNode();(root.getElementById?root.getElementById('text-view-base'):root.querySelector('#text-view-base')).remove();});
+  await refit(page,width);const head=await barState(nav);
+  return {base,head};
+}
+// The rule, at any font metrics: every other control stays inline or in a menu
+// exactly as on the base; Text is inline, or in "More page actions" only when the
+// base shows that menu, else absent. Never a new menu.
+function expectRule({base,head},label){
+  expect(head.inline,label+': other controls as on the base').toEqual(base.inline);
+  expect(head.pageMenu,label+': More page actions as on the base').toBe(base.pageMenu);
+  expect(base.pageMenu?['inline','menu']:['inline','absent'],label+': Text placement '+head.text).toContain(head.text);
+}
+test('native crowded bar: Text never moves another control; at 1024 page actions stay inline with no Text',async({page,server})=>{
   await page.setViewportSize({width:1024,height:900});
   await writeFile(path.join(server.root,'text-fit-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
   await writeFile(path.join(server.root,'text-fit-native.html'),'<style>body{margin:0}#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./text-fit-native.js";window.mount=mountNativeViewer;</script>');
   await page.goto(server.origin+'/text-fit-native.html');await page.waitForFunction(()=>!!window.mount);
   await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw);},crowdedStory());await page.evaluate(()=>document.fonts.ready);
-  const nav=page.locator('#host .reader-navigation');await pageActionsInline(nav);
-  await expect(launcher(page.locator('#host'))).toHaveCount(0);await expect(nav.locator('.text-view-launch')).toBeHidden();await expect(nav.locator('.text-view-menu-item')).toBeHidden();
-  await page.setViewportSize({width:1440,height:900});await expect(launcher(page.locator('#host'))).toBeVisible();await pageActionsInline(nav);
+  const nav=page.locator('#host .reader-navigation');
+  for(const width of [1024,1280,1440])expectRule(await baseAndHead(page,nav,width),'native '+width);
+  // The base keeps page actions inline at 1024 with about 13px to spare: no room for Text and no new menu.
+  await refit(page,1024);await pageActionsInline(nav);expect((await barState(nav)).text).toBe('absent');
 });
-test('standalone crowded bar keeps page actions inline at 1280 (no Text) and shows Text inline at 1440',async({page,server})=>{
+test('standalone crowded and board bars: Text never moves another control, and a wide bar shows it inline',async({page,server})=>{
   await page.setViewportSize({width:1280,height:900});const root=await open(page,server,crowdedStory(),'text-fit-crowded');await page.evaluate(()=>document.fonts.ready);
-  const nav=root.locator('.reader-navigation');await pageActionsInline(nav);await expect(nav.locator('.text-view-launch')).toBeHidden();
-  await page.setViewportSize({width:1440,height:900});await pageActionsInline(nav);await expect(launcher(root)).toBeVisible();expect(await shown(launcher(root))).toBe('ok');
-  await page.setViewportSize({width:1280,height:900});await pageActionsInline(nav);await expect(nav.locator('.text-view-launch')).toBeHidden();
+  const nav=root.locator('.reader-navigation');
+  for(const width of [1024,1280,1440])expectRule(await baseAndHead(page,nav,width),'crowded '+width);
+  await refit(page,1920);expect((await barState(nav)).text).toBe('inline');expect(await shown(launcher(root))).toBe('ok');
+  const boardRoot=await open(page,server,board(),'text-fit-board'),boardNav=boardRoot.locator('.reader-navigation');await page.evaluate(()=>document.fonts.ready);
+  for(const width of [1024,1280,1440])expectRule(await baseAndHead(page,boardNav,width),'board '+width);
 });
 test('where the base already shows More page actions, a Text launcher without room becomes a menu item that opens the window',async({page,server})=>{
   await page.setViewportSize({width:1024,height:900});const root=await open(page,server,crowdedStory(),'text-fit-menu');await page.evaluate(()=>document.fonts.ready);
   const nav=root.locator('.reader-navigation'),utilities=nav.locator('.reader-page-utilities');
-  await expect(utilities).toBeVisible();await expect(launcher(root)).toBeVisible();
+  await expect(utilities).toBeVisible();
   // Force a launcher too wide for the bar: the menu exists on the base, so Text moves into it.
   await page.addStyleTag({content:'body .reader-navigation .text-view-launch .reader-button{min-width:420px}'});
   await page.setViewportSize({width:1023,height:900});await page.setViewportSize({width:1024,height:900});
@@ -134,7 +165,7 @@ test('where the base already shows More page actions, a Text launcher without ro
 });
 
 test('Text and Search never overlap: opening one closes the other',async({page,server})=>{
-  await page.setViewportSize({width:1440,height:900});const root=await open(page,server,board(),'text-view-search');
+  await page.setViewportSize({width:1600,height:900});const root=await open(page,server,board(),'text-view-search');
   const search=root.locator('.document-search'),dialog=dialogOf(root);
   await root.getByRole('button',{name:'Search document',exact:true}).click();await expect(search).toBeVisible();
   await launcher(root).click();await expect(dialog).toBeVisible();await expect(search).toBeHidden();
@@ -143,7 +174,7 @@ test('Text and Search never overlap: opening one closes the other',async({page,s
 });
 
 test('a bar that turns narrow hides the launcher, closes the window and moves focus to a visible bar control',async({page,server})=>{
-  await page.setViewportSize({width:1440,height:900});const root=await open(page,server,board(),'text-view-narrow');
+  await page.setViewportSize({width:1600,height:900});const root=await open(page,server,board(),'text-view-narrow');
   await launcher(root).click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();expect(await focusInside(dialog)).toBe(true);
   await page.setViewportSize({width:600,height:900});
   await expect(dialog).toBeHidden();await expect(launcher(root)).toBeHidden();
@@ -151,7 +182,7 @@ test('a bar that turns narrow hides the launcher, closes the window and moves fo
 });
 
 test('three tabs switch content, Queries reaches Steps only, the path chooser follows the reader and choices are remembered',async({page,server})=>{
-  await page.setViewportSize({width:1440,height:900});const root=await open(page,server);
+  await page.setViewportSize({width:1600,height:900});const root=await open(page,server);
   await root.locator('[data-dv-path="refused"]').first().click();
   await launcher(root).click();const dialog=dialogOf(root),text=textOf(dialog);
   const tabs=dialog.getByRole('tab');await expect(tabs).toHaveText(['Steps','Elements','Flat lines']);
@@ -183,7 +214,7 @@ test('three tabs switch content, Queries reaches Steps only, the path chooser fo
 });
 
 test('with wrap off a long query scrolls sideways inside the text block only; wrap on folds it',async({page,server})=>{
-  await page.setViewportSize({width:1280,height:860});const root=await open(page,server,board(),'text-view-wrap');
+  await page.setViewportSize({width:1600,height:860});const root=await open(page,server,board(),'text-view-wrap');
   await launcher(root).click();const dialog=dialogOf(root),text=textOf(dialog);
   await dialog.getByRole('tab',{name:'Flat lines'}).click();
   const wrap=dialog.getByRole('switch',{name:'Wrap lines',exact:true});await expect(wrap).toHaveAttribute('aria-checked','false');
@@ -205,7 +236,7 @@ test('with wrap off a long query scrolls sideways inside the text block only; wr
 });
 
 test('Copy Markdown copies full queries even when Steps shows names, and a refused clipboard offers the text to copy by hand',async({page,server})=>{
-  await page.setViewportSize({width:1440,height:900});
+  await page.setViewportSize({width:1600,height:900});
   await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin:server.origin});
   const root=await open(page,server,board(),'text-view-copy');await launcher(root).click();const dialog=dialogOf(root),text=textOf(dialog);
   await expect(dialog.getByRole('button',{name:'Query names',exact:true})).toHaveAttribute('aria-pressed','true');
@@ -233,9 +264,9 @@ test('Copy Markdown copies full queries even when Steps shows names, and a refus
 });
 
 test('the Text window works inside the Backstage native ShadowRoot host',async({page,server})=>{
-  await page.setViewportSize({width:1440,height:900});
+  await page.setViewportSize({width:1700,height:900});
   await writeFile(path.join(server.root,'text-view-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
-  await writeFile(path.join(server.root,'text-view-native.html'),'<style>body{margin:0}.host{width:1200px;height:800px;overflow:auto;position:relative}</style><div id="one" class="host"></div><script type="module">import {mountNativeViewer} from "./text-view-native.js";window.mount=mountNativeViewer;</script>');
+  await writeFile(path.join(server.root,'text-view-native.html'),'<style>body{margin:0}.host{width:1600px;height:800px;overflow:auto;position:relative}</style><div id="one" class="host"></div><script type="module">import {mountNativeViewer} from "./text-view-native.js";window.mount=mountNativeViewer;</script>');
   await page.goto(server.origin+'/text-view-native.html');await page.waitForFunction(()=>!!window.mount);
   await page.evaluate(spec=>{window.one=mount(document.querySelector('#one'),spec);},board());
   const shadow=await page.evaluate(()=>{const r=document.querySelector('#one').shadowRoot;return {root:!!r,button:!!(r && r.querySelector('.reader-top .text-view-launch button')),light:!!document.querySelector('#one .text-view-launch')};});
@@ -251,7 +282,7 @@ test('the Text window works inside the Backstage native ShadowRoot host',async({
 });
 
 test('desktop Workbench preview offers the Text window and reopens it with rebuilt text when the document rerenders',async({page,server})=>{
-  await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
+  await page.setViewportSize({width:1800,height:1000});await page.goto(server.origin+'/workbench.html');
   const raw=board();await paste(page,JSON.stringify(raw));await closeTools(page);const root=page.locator('#docview'),before=await page.locator('#src').inputValue();
   await launcher(root).click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();
   await expect(textOf(dialog)).toContainText('# Doorbell delivery as text — steps');expect(await shown(textOf(dialog))).toBe('ok');
@@ -265,11 +296,11 @@ test('desktop Workbench preview offers the Text window and reopens it with rebui
 });
 
 test('the Text window uses readable theme colours in all nine skins',async({page,server})=>{
-  await page.setViewportSize({width:1280,height:900});
+  await page.setViewportSize({width:1600,height:900});
   for(const skin of ['aurora','daylight','editorial','terminal','pastel','blueprint','rose','lavender','lilac']){
     const root=await open(page,server,board(skin),'text-view-'+skin);await launcher(root).click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();
     const styles=await textOf(dialog).evaluate(pre=>{const d=pre.closest('[role="dialog"]'),s=getComputedStyle(d),p=getComputedStyle(pre),r=d.getBoundingClientRect();return {color:s.color,background:s.backgroundColor,text:p.color,right:r.right,bottom:r.bottom};});
     expect(styles.color).not.toBe(styles.background);expect(styles.text).not.toBe(styles.background);expect(styles.background).not.toBe('rgba(0, 0, 0, 0)');
-    expect(styles.right).toBeLessThanOrEqual(1280);expect(styles.bottom).toBeLessThanOrEqual(900);
+    expect(styles.right).toBeLessThanOrEqual(1600);expect(styles.bottom).toBeLessThanOrEqual(900);
   }
 });

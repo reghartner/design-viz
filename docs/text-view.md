@@ -18,6 +18,8 @@ item in that menu. Otherwise it is not shown at that width (for example a crowde
 Backstage bar at 1024 px). When the reader bar is 670 px wide or less (a phone, or
 a narrow compare pane) it is hidden together with Search. An open window closes
 when Text is withdrawn from the bar; it stays open when Text moves into the menu.
+So the button may be absent at some window widths when the bar is full; widen the
+window to see it.
 
 The text is built from the page the reader shows, with shared-topology imports
 already resolved, when the window opens. Imported nodes and connections carry an

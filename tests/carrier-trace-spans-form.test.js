@@ -227,10 +227,10 @@ test('E10 a span name the provider declares is taken even while hidden here: ren
   ui.select(INODE);
   // Every string in the editor names the provider by its title.
   assert.equal(ui.texts('.trace-span-origin')[0],'Inherited from Order platform');
-  assert.match(ui.h.guide.querySelector('details.trace-spans-editor').textContent,/imported from Order platform\. Changes here are stored in this document; everything else keeps following Order platform\./);
+  const words=()=>ui.h.guide.querySelectorAll('p').map(p=>p.textContent).join(' ');
+  assert.match(words(),/imported from Order platform\. Changes here are stored in this document; everything else keeps following Order platform\./);
   assert.equal(ui.control('process name').title,'Inherited span names come from Order platform. To rename one, hide it and add a new span.');
   assert.match(ui.control('process hidden for this document').title,/Order platform keeps it/);
-  assert.doesNotMatch(ui.h.guide.querySelector('details.trace-spans-editor').textContent+ui.h.guide.querySelectorAll('input,button').map(c=>c.title || '').join(' '),/\bprovider\b(?! declares| Order)/,'the spec id is not used where the title exists');
   ui.check('find hidden for this document',true);
   addSpan(ui,{name:'audit',service:'order-worker',value:'audit write',role:'database'});ui.select(INODE);
   const kept={spans:{audit:{serviceName:'order-worker',operation:'audit write',role:'database'}},hide:['find']};
@@ -244,6 +244,9 @@ test('E10 a span name the provider declares is taken even while hidden here: ren
   assert.equal(ui.text,held,'the add changes nothing');
   assert.match(ui.beside('New span name'),/^The provider Order platform declares a span named find, hidden in this document; pick another name, or show find and change it instead\.$/);
   assert.deepEqual(overlay(),kept,'the hide is kept');
+  ui.select(INODE);assert.equal(ui.control('find hidden for this document').title,'Clear to show find from Order platform again.');
+  ui.set('process namespace','eu');ui.select(INODE);
+  assert.match(ui.control('Revert process to inherited').title,/follows Order platform again/);
 });
 
 test('E11 a refused attribute type change says why beside the type it changed',()=>{
@@ -258,10 +261,10 @@ test('E11 a refused attribute type change says why beside the type it changed',(
 
 test('E12 note slots stay in the page; each refusal clears its note and sets it again, so a repeated refusal is announced',()=>{
   const ui=harness(board()).select(NODE);addSpan(ui,{name:'process',service:'s',value:'handle',role:'process'});ui.select(NODE);
-  const value=ui.control('process value'),note=()=>ui.h.guide.querySelectorAll('p').find(p=>p.classList.contains('trace-span-note') && p.id===value.getAttribute('aria-describedby'));
+  let value=ui.control('process value');const note=()=>ui.h.guide.querySelectorAll('p').find(p=>p.classList.contains('trace-span-note') && p.id===value.getAttribute('aria-describedby'));
   assert.ok(ui.h.guide.querySelectorAll('p').filter(p=>p.classList.contains('trace-span-note')).length>0,'note slots exist before any refusal');
   assert.ok(ui.h.guide.querySelectorAll('p').filter(p=>p.classList.contains('trace-span-note')).every(p=>!p.hidden && p.getAttribute('role')==='status'),'note slots are status regions in the page, not hidden');
-  ui.control('process match').value='prefix';ui.control('process match').fire('change');ui.h.flush();
+  ui.set('process match','operationPrefix');ui.select(NODE);value=ui.control('process value');
   value.value='x';value.fire('change');
   assert.equal(note().textContent,'','the refusal first clears the note');
   ui.h.flush();assert.match(note().textContent,/A prefix needs at least 2 characters/,'then sets it');

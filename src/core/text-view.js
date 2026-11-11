@@ -60,7 +60,12 @@
      field. pathId picks that path in each diagram that has it, else its first path.
    textViewElements(model) -> markdown (layout B): an index table, then one sheet per
      element with every query written once.
-   Markdown keeps multi-line queries exact in fenced blocks. */
+   Markdown keeps multi-line queries exact in fenced blocks.
+
+   Not printed: page `protocols` (the legend), diagram `panels` definitions (only
+   steps' panel patches and visibility are), `groups` definitions (a node's group
+   name is), section prose, and the layout fields in TEXT_VIEW_LAYOUT. An empty
+   diff therefore does not mean an unchanged spec. */
 
 /* Fields that only place or paint an element (geometry, ports, sizes, colours,
    icons); every other authored field is shown. Step `tone` and `presentation`

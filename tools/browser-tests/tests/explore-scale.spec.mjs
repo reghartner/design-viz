@@ -16,7 +16,8 @@ function fixture(scale){
   d.steps[1].panelVisibility={clip:false};d.steps[2].panelVisibility={clip:true};
   return spec;
 }
-async function railWidth(page){const rail=page.locator('.reader-rail');await expect(rail).toBeVisible();return (await rail.boundingBox()).width;}
+// The closed Contents rail is 44px wide; a change there fails here as a rail failure, not as a scale failure.
+async function railWidth(page){const rail=page.locator('.reader-rail');await expect(rail).toBeVisible();const width=(await rail.boundingBox()).width;expect(width,'closed Contents rail width').toBe(44);return width;}
 function pristineFixture(){const spec=fixture();spec.page.sections[0].diagram.layouts[1].exploreLayout={};return spec;}
 async function build(server,spec,name='scale'){
   const input=path.join(server.root,name+'.json'),out=path.join(server.root,name+'.html');await writeFile(input,JSON.stringify(spec));

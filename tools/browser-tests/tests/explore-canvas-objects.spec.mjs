@@ -320,7 +320,7 @@ test('mixed floating default remains responsive when another panel uses independ
  await page.setViewportSize({width:1280,height:800});await open(page,server,raw,'reader');await page.locator('.reader-top>button').click();await page.evaluate(()=>document.fonts.ready);
  const r1=await clip(page).boundingBox();expect(await clip(page).evaluate(el=>getComputedStyle(el).getPropertyValue('--explore-overlay-scale'))).toBe('0.8');
  // #1305: this board has two pages (two Views), so closed Contents shows its rail; the stage is the viewport minus the rail.
- const rail=page.locator('.reader-rail');await expect(rail).toBeVisible();const railWidth=(await rail.boundingBox()).width;
+ const rail=page.locator('.reader-rail');await expect(rail).toBeVisible();const railWidth=(await rail.boundingBox()).width;expect(railWidth,'closed Contents rail width').toBe(44);
  await page.setViewportSize({width:1440+railWidth,height:900});await expect.poll(async()=>clip(page).evaluate(el=>getComputedStyle(el).getPropertyValue('--explore-overlay-scale'))).toBe('1');
  expect((await clip(page).boundingBox()).width/r1.width).toBeCloseTo(1.25,2);await expect(home(page)).toHaveCSS('width','340px');
 });

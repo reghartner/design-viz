@@ -64,6 +64,13 @@ test('P3 the contract covers each step\'s effective selector, so a provider span
   assert.doesNotThrow(compare(p=>{p.nodes.worker.trace.spans.find.operationPrefix='aggregate ';}),'a span no step uses (the worker\'s find) does not');
   assert.throws(compare(p=>{p.nodes.api.trace.spans.process.operation='POST /v2/orders';}),/Trace mappings changed/,'the api node\'s process span times the shop connection\'s hand-off');
   assert.doesNotThrow(compare((p,b)=>{b.nodes.shop.trace.spans.process.operation='GET /v2/checkout';}),'nor the shop node, which no step lights and no step\'s hand-off ends at');
+  // Lighting the worker from an explicit step makes it shared, so an inheriting step on it changes outcome: re-approve.
+  // An explicit step's own digest is its traceMatch; only its nodes change here.
+  const scoped=edit=>orders((p,b)=>{b.steps.push({id:'work',text:'Work',nodes:['orders::worker']},{id:'explicit',text:'Explicit',traceMatch:{serviceName:'shop-web',operation:'GET /checkout'}});if(edit)edit(p,b);}).resolved;
+  const base=T.approveReference(scoped(),ORDER(),{reason:'r'}),ref2=diagramOf(base).referenceTrace;
+  const shared=scoped((p,b)=>{b.steps.find(x=>x.id==='explicit').nodes=['orders::worker'];});
+  diagramOf(shared).referenceTrace=C.clone(ref2);
+  assert.throws(()=>T.compareTrace(shared,ORDER()),/Trace mappings changed/,'the work step no longer inherits from the now-shared worker');
 });
 
 test('P4 incident steps for inheriting steps use the step and its spans',async()=>{
@@ -90,25 +97,43 @@ test('P4 incident steps for inheriting steps use the step and its spans',async()
   const out=T.compareTrace(slow,slowTrace),texts=diagramOf(out.spec).steps.filter(s=>s.evidence).map(s=>s.text);
   assert.equal(out.firstDivergence,'start');
   assert.ok(texts.includes('Observed shop-web · POST /orders'),texts.join(' | '));
+  // A node step with several spans names the first and counts the rest.
+  const many=orders((p,b)=>{b.steps.unshift({id:'start',text:'Start',nodes:['shop'],traceScope:{maxDurationMs:1000}});b.steps.push({id:'work',text:'Work',nodes:['orders::worker'],traceScope:{}});}).resolved;
+  diagramOf(many).referenceTrace=T.approveReference(orders((p,b)=>{b.steps.unshift({id:'start',text:'Start',nodes:['shop'],traceScope:{maxDurationMs:1000}});b.steps.push({id:'work',text:'Work',nodes:['orders::worker'],traceScope:{}});}).resolved,ORDER(),{reason:'r'}).page.sections[0].diagram.referenceTrace;
+  const two=ORDER();two.spans[0].duration_ms=5000;two.spans.push(span('find','proc','order-worker','find orders',45,3),span('aud','proc','order-worker','audit write',50,2));
+  const workText=diagramOf(T.compareTrace(many,two).spec).steps.filter(s=>s.evidence && s.evidence.canonicalStepId==='work').map(s=>s.text);
+  assert.deepEqual(workText,['Observed order-worker · process orders v2 and 2 more']);
 });
 
-test('P5 a provider declaration that matches nothing in its approved reference trace warns, naming the provider for imports',async()=>{
+test('P5 declarations a board owns, on carriers its flow lights, are checked against its approved reference trace',async()=>{
   const T=await load(),warnings=s=>plain(C.validateSpec(s).warnings).filter(w=>/approved reference trace/.test(w));
-  // The provider approves a reference trace with one of its own steps.
-  const {platform}=orders();
-  diagramOf(platform).steps=[{id:'publish',text:'Publish',edge:'api->worker'}];
-  const ref=ORDER();
-  // The provider's own build validates it resolved (its exports removed).
-  const approved=T.approveReference(C.materializeTopology([platform])[0],ref,{reason:'Provider reference'});
+  const NOT_SEEN=' was not seen in the approved reference trace. If it only appears in some runs, such as retries, nothing is wrong; otherwise check the declaration or approve a new reference';
+  // The provider's own check: its steps light the worker and the connection; ctx is a context node no step lights.
+  const {platform}=orders(p=>{p.nodes.worker.trace.spans.retry={serviceName:'order-worker',operation:'retry orders',role:'process'};
+    p.nodes.ctx={title:'Context',trace:{spans:{process:{serviceName:'ctx-svc',operation:'nothing here',role:'process'}}}};p.rows[0].push('ctx');
+    p.steps=[{id:'publish',text:'Publish',edge:'api->worker'},{id:'work',text:'Work',nodes:['worker'],traceScope:{}}];});
+  const providerTrace=ORDER();providerTrace.spans[4].name='process orders';
+  const approved=T.approveReference(C.materializeTopology([platform])[0],providerTrace,{reason:'Provider reference'});
   assert.deepEqual(warnings(approved),[
-    'sections[0].diagram.nodes.worker.trace.spans.process: no span in the approved reference trace matches order-worker process orders; check the declaration or approve a new reference',
-    'sections[0].diagram.nodes.worker.trace.spans.find: no span in the approved reference trace matches order-worker operations starting "find "; check the declaration or approve a new reference'],
-    'process orders is not in this trace (the v2 worker ran); the attribute-only cache span is not checked');
-  // The consumer's own approved reference: an imported carrier's warning names the provider.
-  const {resolved}=orders(),board=T.approveReference(resolved,ORDER(),{reason:'Board reference'});
-  assert.deepEqual(warnings(board).filter(w=>/orders::worker/.test(w)),[
-    'sections[0].diagram.nodes.orders::worker.trace.spans.find: no span in the approved reference trace matches order-worker operations starting "find "; check the declaration or approve a new reference. This node is imported from "orders-platform": fix the declaration there, or override it in this board\'s nodeTracking for worker',
-    'sections[0].diagram.nodes.orders::worker.trace.spans.audit: no span in the approved reference trace matches order-worker audit write; check the declaration or approve a new reference. This node is imported from "orders-platform": fix the declaration there, or override it in this board\'s nodeTracking for worker']);
+    'sections[0].diagram.nodes.worker.trace.spans.find: order-worker operations starting "find "'+NOT_SEEN,
+    'sections[0].diagram.nodes.worker.trace.spans.retry: order-worker retry orders'+NOT_SEEN],
+    'process orders is in the trace; the attribute-only cache span is not checked; ctx is lit by no step');
+  // The consumer's check: its own local declarations and its own overlay spans, at the overlay path; never
+  // the provider's inherited spans (find, retry) or carriers its flow does not light (ctx).
+  const variant=(p,b)=>{
+    p.nodes.worker.trace.spans.retry={serviceName:'order-worker',operation:'retry orders',role:'process'};
+    p.nodes.ctx={title:'Context',trace:{spans:{process:{serviceName:'ctx-svc',operation:'nothing here',role:'process'}}}};p.rows[0].push('ctx');p.topologyExports.core.nodes.push('ctx');
+    b.topologyImports[0].nodeTracking.ctx={trace:{spans:{extra:{serviceName:'ctx-svc',operation:'still nothing',role:'process'}}}};
+    b.steps.push({id:'work',text:'Work',nodes:['orders::worker'],traceScope:{}});
+    b.edges[0].trace.spans.retry={serviceName:'shop-web',operation:'POST /orders retry',role:'send'};
+  };
+  const {resolved}=orders(variant),reference=diagramOf(T.approveReference(resolved,ORDER(),{reason:'Board reference'})).referenceTrace;
+  const authored=orders(variant);diagramOf(authored.board).referenceTrace=reference;
+  const board=C.materializeTopology([authored.platform,authored.board]).find(s=>s.page.canon.id==='orders-board');
+  assert.deepEqual(warnings(board),[
+    'sections[0].diagram.edges[0].trace.spans.retry: shop-web POST /orders retry'+NOT_SEEN,
+    'sections[0].diagram.topologyImports[0].nodeTracking.worker.trace.spans.audit: order-worker audit write'+NOT_SEEN]);
+  assert.ok(warnings(board).every(w=>!/imported from/.test(w)),'no warning sends the author to the provider');
   // Without an approved reference trace nothing is checked.
   assert.deepEqual(warnings(orders().resolved),[]);
 });

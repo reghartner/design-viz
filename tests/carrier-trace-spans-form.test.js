@@ -70,8 +70,11 @@ test('E1 a local node and connection: add, edit every field, switch match modes,
   oneStep(ui,()=>ui.set('process match','attributes'),NODE);
   assert.equal(Object.hasOwn(worker().trace.spans.process,'operationPrefix'),false,'attributes only drops the operation and prefix');
   assert.equal(ui.control('process value').disabled,true,'no value to enter for attributes only');
-  oneStep(ui,()=>ui.set('process match','operation'),NODE);
-  assert.equal(worker().trace.spans.process.operation,'process orders v2','switching back restores the last value');
+  // Back to an operation: there is no value yet, so the editor asks for one before writing anything.
+  let held=ui.text;ui.set('process match','operation');assert.equal(ui.text,held);
+  assert.equal(ui.control('process value').disabled,false);assert.match(ui.beside('process value'),/^Enter the operation, then press Enter\.$/);
+  oneStep(ui,()=>ui.set('process value','process orders v3'),NODE);
+  assert.deepEqual(plain(worker().trace.spans.process),{serviceName:'order-worker-v2',role:'work',namespace:'eu',attributes:{'db.system':'redis'},operation:'process orders v3'});
   oneStep(ui,()=>ui.click('Remove span process'),NODE);
   assert.equal(Object.hasOwn(worker(),'trace'),false,'the last span removes trace');
   // A connection.
@@ -93,7 +96,8 @@ test('E2 refusals say what is wrong in plain words, beside the field, and change
   ui.select(NODE);addSpan(ui,{name:'process',service:'s',value:'v',role:'process'});ui.select(NODE);
   refuse(()=>addSpan(ui,{name:'process',service:'s',value:'w',role:'process'}),'New span name',/A span named process already exists here; choose another name\./);
   ui.select(NODE);refuse(()=>ui.set('process service',''),'process service',/A span needs its service name\. To delete the span, use Remove span\./);
-  ui.select(NODE);ui.set('process match','operationPrefix');ui.select(NODE);
+  ui.select(NODE);ui.set('process value','proc');ui.set('process match','operationPrefix');ui.select(NODE);
+  assert.equal(diagramOf(ui.raw).nodes.worker.trace.spans.process.operationPrefix,'proc');
   refuse(()=>ui.set('process value','p'),'process value',/A prefix needs at least 2 characters\./);
 });
 
@@ -140,11 +144,11 @@ test('E3 imported carriers: the overlay stores only the change; hide, revert, re
 test('E4 E5 validator messages beside their span; the receive side of a connection; Declare receive span here',()=>{
   const d=board();diagramOf(d).nodes.worker.trace={spans:{process:{serviceName:'order-worker',operation:'process orders',role:'process'},bad:{serviceName:'order-worker',role:'process'}}};
   const ui=harness(d).select(NODE);
-  assert.match(ui.beside('bad service'),/needs operation, operationPrefix or attributes/);
+  assert.match(ui.beside('bad value'),/needs operation, operationPrefix or attributes/,'a missing match sits beside the value');
   assert.equal(ui.beside('process service'),'');
   ui.select(EDGE);
   assert.match(ui.texts('.trace-span-receiver').join(' '),/^Receive side: Worker's process span \(process: order-worker process orders\)\. Declare a receive span here only when the receiving span is a different one\.$/);
   oneStep(ui,()=>ui.click('Declare receive span here'),EDGE);
   assert.deepEqual(plain(diagramOf(ui.raw).edges[0].trace),{spans:{receive:{serviceName:'order-worker',operation:'process orders',role:'receive'}}});
-  assert.deepEqual(plain(ui.e.C.FlowCanon.validate(ui.raw)).filter(e=>/trace/.test(e)),[],'the declared receive span is valid');
+  assert.deepEqual(plain(ui.e.C.FlowCanon.validate(ui.raw)).filter(e=>/^edges\./.test(e)),[],'the declared receive span is valid');
 });

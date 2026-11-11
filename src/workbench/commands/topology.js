@@ -214,7 +214,14 @@ function topologyTrackingTarget(text,raw,section,kind,id,context,index){
   return t;
 }
 function planTopologyTracking(text,raw,section,kind,id,field,ref,remove,context,index){
-  if(field!=='tickets' && field!=='prs' && field!=='existsWhen' && field!=='missingWork' && field!=='telemetry')return {error:'Choose tickets, pull requests, availability, Missing work or metrics.'};
+  if(field!=='tickets' && field!=='prs' && field!=='existsWhen' && field!=='missingWork' && field!=='telemetry' && field!=='trace')return {error:'Choose tickets, pull requests, availability, Missing work, metrics or trace spans.'};
+  if(field==='trace'){
+    // #1290: ref is the whole consumer trace overlay ({spans, hide}); the resolver merges it.
+    var spans=topologyTrackingTarget(text,raw,section,kind,id,context,index);if(spans.error)return spans;
+    if(remove)delete spans.local.trace;
+    else{try{FlowTopology.validateTracking({trace:ref},'trace spans');}catch(ex){return {error:ex.message};}spans.local.trace=builderClone(ref);}
+    return topologyTrackingPlan(text,raw,spans,context);
+  }
   if(field==='telemetry'){
     // ref is the whole consumer binding (#941); its content is warning-only, like the resolver.
     var bound=topologyTrackingTarget(text,raw,section,kind,id,context,index);if(bound.error)return bound;

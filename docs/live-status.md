@@ -508,6 +508,22 @@ state for (an `unknown` ticket does not count; a warning when none, since they w
 recorded with the first one. A file that is not a snapshot, or larger than 8 MB, is refused there
 with its reason.
 
+### Trace spans on a node or connection
+
+Select a node or connection and open **Inspect → Tracking → Trace spans** (desktop) to edit
+its declared spans (`trace.spans`, see [provider traces](provider-traces.md#trace-spans-declared-on-nodes-and-connections-1290)).
+Each span shows **Name**, **Service**, **Match** (Operation, Prefix or Attributes only),
+**Value**, **Namespace**, **Role** and its **Attributes**; **Add span** (or Enter) adds one and
+**Remove span** removes one. A refused edit changes nothing and says why beside the field, for
+example "A prefix needs at least 2 characters.". On an imported node or connection each span
+says which provider it is inherited from; an edit stores only the changed field in this
+document's `nodeTracking` / `edgeTracking` overlay, **Hidden for this document** hides an
+inherited span, **Revert <name> to inherited** drops your changes to it and **Revert all trace
+spans** drops them all. Inherited span names are read only: hide one and add a new span to
+rename it. A connection shows its receive side when it comes from the receiving node's
+`process` span, and **Declare receive span here** adds a `receive` span on the connection.
+Each edit is one Undo step.
+
 ### Step trace match
 
 Select a step and open **Inspect → Code and trace evidence → Trace match** (desktop)

@@ -43,6 +43,7 @@
     "viewer/follow-active.js",
     "viewer/explore.js",
     "viewer/explore-canvas.js", "viewer/compare-view.js",
+    "core/text-view.js",
     "viewer/document-search.js",
     "viewer/contents.js",
     "viewer/tab-views.js",

@@ -112,7 +112,7 @@ test('flat lines are one fact per line, sorted, section-qualified and identical 
   has('edge delivery/platform::api->platform::store origin imported tv-platform core as platform');
   has('edge delivery/platform::api->platform::store ticket PLAT-8');
   has('node delivery/notify telemetry.use kafka-topic');
-  has('node delivery/iot metric.refused.logGroups arn:aws:logs:us-east-1:${iotAccount}:log-group:AWSIotLogsV2');
+  has('node delivery/iot metric.refused.query.logGroups arn:aws:logs:us-east-1:${iotAccount}:log-group:AWSIotLogsV2');
   has('node delivery/queue metric.sent.query.dimensions.QueueName camera_message_power_state_${env}');
   has('step delivery/happy/2 touches node ingest');
   has('step delivery/happy/2 text Firmware publishes the press event.\\nIngest validates it.');
@@ -146,8 +146,11 @@ test('the Steps renderer shows names by default and full queries on request, per
   assert.match(names, /errors \(grafana\) unit req\/h/);
   assert.ok(!names.includes('code=~"5.."'), 'names hides query text');
   assert.ok(full.includes('sum(rate(http_server_requests_total{service="event-ingest",route="/v1/events",code=~"5.."}[5m]))*3600'));
-  assert.ok(full.includes('arn:aws:logs:us-east-1:${iotAccount}:log-group:AWSIotLogsV2'), 'log signal fields in full');
-  assert.ok(full.includes('by clientId | sort n desc | limit 20'), 'breakdown query in full');
+  // The IoT log signal sits on the refused path only.
+  const refusedFull = C.textViewSteps(model, {queries: 'full', pathId: 'refused'});
+  assert.ok(refusedFull.includes('arn:aws:logs:us-east-1:${iotAccount}:log-group:AWSIotLogsV2'), 'log signal fields in full');
+  assert.ok(refusedFull.includes('by clientId | sort n desc | limit 20'), 'breakdown query in full');
+  assert.ok(!C.textViewSteps(model, {pathId: 'refused'}).includes('AWSIotLogsV2'), 'names hides log fields');
   assert.match(names, /Press to notification/);
   assert.match(names, /On-call check/, 'every section appears');
   assert.match(names, /platform::api.*imported/);

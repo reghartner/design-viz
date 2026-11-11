@@ -122,3 +122,25 @@ test('reference --resolve-imports approves a trace that lacks an optional step; 
   assert.equal(empty.status,1,'a trace with no instrumented step present is not a reference');assert.match(empty.stderr,blocked);
   assert.deepEqual(fs.readFileSync(spec),before);h.unchanged();
 });
+
+// #1290 PR 5: the checkout approval made through --resolve-imports keeps the contract it had before
+// declared spans (computed on trace-spans cb205631), and preview shows inherited rows through imports.
+test('reference --resolve-imports keeps the existing checkout contract digest',t=>{
+  const h=setup(t),out=path.join(h.dir,'pinned.json');
+  const run=cli('reference','--spec',h.spec,'--trace',h.happy,'--resolve-imports',REGISTRY,'--reason','Reviewed checkout mapping','--out',out);
+  assert.equal(run.status,0,run.stderr);
+  assert.equal(JSON.parse(fs.readFileSync(out,'utf8')).page.sections[0].diagram.referenceTrace.contract,'6f2920565b34a55eac2986849955b16eba540a31574b8d033916c2a1b2735625');
+});
+test('preview --resolve-imports shows steps that inherit declared spans from imported carriers',t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'trace-cli-inherit-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const s=(id,parent,service,name,startMs,ms,extra={})=>({'trace.trace_id':'orders-1','trace.span_id':id,'trace.parent_id':parent || '','service.name':service,name,startMs,duration_ms:ms,...extra});
+  const file=path.join(dir,'order.json');
+  fs.writeFileSync(file,JSON.stringify({spans:[s('post',null,'shop-web','POST /orders',10,5),s('api','post','order-api','POST /orders',12,60),
+    s('pub','api','order-api','publish orders',30,2,{'service.namespace':'eu'}),s('proc','pub','order-worker','process orders v2',40,30)]}));
+  const run=cli('preview','--spec',path.join(TOPOLOGY,'orders-board.json'),'--trace',file,'--resolve-imports',REGISTRY);
+  assert.equal(run.status,0,run.stderr);
+  const out=JSON.parse(run.stdout);
+  assert.deepEqual(out.mapping.steps.map(x=>[x.stepId,x.status,x.inherited,x.spans.map(p=>p.serviceName+' '+p.operation)]),
+    [['place','matched',true,['shop-web POST /orders']],['publish','matched',true,['order-api publish orders']]]);
+  assert.equal(out.eligible,true);
+});

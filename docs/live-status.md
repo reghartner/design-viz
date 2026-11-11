@@ -2140,7 +2140,9 @@ mode:
   is there but cannot take it is named with its own reason: a clear whose carrier no longer
   has a Missing work marker set on this board, a span mapping whose step their version maps
   to another span, a declared span whose key their version uses for a different span
-  ("declare yours again under another name"). A change
+  ("declare yours again under another name"), a ticket the provider of an imported node or
+  connection now carries. Each such change is its own sentence. A declared span their version
+  already has, under any key, counts as already there. A change
   the winning version already has is named as already there. Nothing is published until the
   editor saves again, and the notice ends with “Save again.” only while a change is pending.
 - A read-only answer (`not_writer`, `not_granted`, `capability_disabled`,

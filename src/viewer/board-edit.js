@@ -260,6 +260,9 @@ function createBoardEditor(options){
           refuse('their version already declares a different span under '+sp.key+' ('+(typeof theirs.operation==='string'?spanName(theirs):theirs.serviceName+' · '+(theirs.operationPrefix || '')+'…')+(same || theirs.role!==sp.role?', role '+theirs.role:'')+'); declare yours again under another name');
           return;
         }
+        // The same span under another key in their version is already there: no second declaration.
+        var hs=have && have.trace && have.trace.spans && typeof have.trace.spans==='object'?have.trace.spans:{};
+        if(Object.keys(hs).some(function(k){return boardEditSameSpan(hs[k],entry.span);})){already++;return;}
         if(declare(ref,entry.span,entry.span.key,false)){applied++;return;}
         var why=tt?declaration(tt,entry.span,null):null;
         if(why && why.error)refuse(/^Already declared as /.test(why.error)?'their version already declares it as '+why.error.replace(/^Already declared as /,'').replace(/ on .*$/,''):why.error.replace(/\.$/,'').replace(/^./,function(c){return c.toLowerCase();}));
@@ -275,19 +278,25 @@ function createBoardEditor(options){
           if(m && m.serviceName===want.serviceName && m.operation===want.operation){already++;return;}
           refuse(Array.isArray(m)?'their version gives that step alternatives; edit it in Inspect':m?'their version maps that step to '+m.serviceName+' · '+m.operation:'their version removed the trace match it replaced');return;}
         // Already true in the winning version: nothing left to do for it.
-        var t=target(text,ref);var has=t && authoredKeys(t).indexOf(entry.ticket)>=0;
-        if(t && ((entry.op==='add')===has))already++;else dropped.push(describe);
+        var t=null;try{t=target(text,ref);}catch(ex){t=null;}var has=t && authoredKeys(t).indexOf(entry.ticket)>=0;
+        if(t && ((entry.op==='add')===has)){already++;return;}
+        if(!t){dropped.push(describe);return;}
+        // The carrier is there: say why it cannot take the ticket change.
+        var inherited=null;
+        if(t.imported){try{var it=topologyTrackingTarget(text,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,context,t.index);if(!it.error && it.inherited.tickets.indexOf(entry.ticket)>=0)inherited=it.got.d.topologyImports[it.index].spec;}catch(ex){inherited=null;}}
+        refuse(inherited?'their version already gets '+entry.ticket+' on '+where+' from '+inherited:entry.op==='add'?'their version could not take '+entry.ticket+' on '+where:'their version could not drop '+entry.ticket+' from '+where);
         return;
       }
       applied++;
     });
     if(!ops.length)active=false;
     // #1253: a change the winning version already has is not re-applied, and "Save again" only when one is pending.
-    var parts=[applied+' of your changes were re-applied'];
+    // One sentence for the counts, then one sentence per refused change (#1290 PR 9 review c3).
+    var parts=[applied+' of your changes '+(applied===1?'was':'were')+' re-applied'];
     if(already)parts.push(already+' '+(already===1?'was':'were')+' already in their version');
-    if(dropped.length || !refused.length)parts.push(dropped.length+' could not be (carrier moved, removed or ambiguous)'+(dropped.length?': '+dropped.join('; '):''));
-    refused.forEach(function(text){parts.push(text);});
-    notice={kind:'warn',text:'Another editor saved first. '+parts.join('; ')+'.'+(ops.length?' Save again.':'')};
+    if(dropped.length)parts.push(dropped.length+' could not be (carrier moved, removed or ambiguous): '+dropped.join('; '));
+    var sentences=refused.map(function(text){return ' '+text.charAt(0).toUpperCase()+text.slice(1)+'.';}).join('');
+    notice={kind:'warn',text:'Another editor saved first. '+parts.join('; ')+'.'+sentences+(ops.length?' Save again.':'')};
     changed();
   }
   // A rendered-carrier reference for a concrete path in raw.

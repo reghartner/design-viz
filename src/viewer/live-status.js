@@ -2216,6 +2216,10 @@ function createLiveStatus(ctl,page,options,renderOptions){
       var focused=focusRoot && focusRoot.activeElement,focusCarrier=focused && focused.classList && focused.classList.contains('dv-live-target') && focused.getAttribute('data-live-carrier'),focusBinding=focusCarrier && bindings.find(function(binding){return binding.el.contains(focused);});
       // #1253: an open popover stays open through the repaint, the post-drop question too (rebuilt in place).
       var openId=active && active.getAttribute('data-live-carrier'),openBinding=active && bindings.find(function(binding){return binding.el.contains(active);}),openMetrics=!!(active && active._liveCarrier && active._liveCarrier.metricsOnly);
+      // #1324: an Outline card open on hover, focus or tap, and focus on a link inside it, survive the repaint.
+      var peekCard=view.querySelector('.dv-metrics-card.dv-metrics-peek'),peekOutline=peekCard && peekCard._metricsOutline,peekId=peekOutline && peekOutline.getAttribute('data-metrics-carrier');
+      var peekBinding=peekOutline && bindings.find(function(binding){return binding.el.contains(peekOutline);}),peekSignal=focused && peekCard && peekCard.contains(focused) && focused.getAttribute('data-signal');
+      if(!focusBinding && peekSignal){focusCarrier=peekId;focusBinding=peekBinding;}
       syncBindings();clearTargets();refreshDependencies();
       if(applied || availabilityOn || refs().tickets.length){
         view.querySelectorAll('.dv-live-halo').forEach(function(el){el.remove();});
@@ -2233,7 +2237,16 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(statusMode==='trace')bindings.forEach(function(binding){binding.el.querySelectorAll('svg').forEach(function(svg){if(svg._refreshStatusFrame)svg._refreshStatusFrame();});});
       view.querySelectorAll('.dv-edit-target').forEach(function(el){el.classList.remove('dv-edit-target');});
       if(editing())bindings.forEach(function(binding){if(binding.ordinal!=null)binding.el.querySelectorAll('g.node[data-dv-node]:not(.node-text),path.edge[data-dv-edge]').forEach(function(el){el.classList.add('dv-edit-target');});});
-      if(focusBinding){var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier && !el.classList.contains('dv-metrics-label-hidden');});if(replacement)replacement.focus({preventScroll:true});}
+      var peekNow=peekBinding && peekId && Array.prototype.find.call(peekBinding.el.querySelectorAll('.dv-metrics-outline'),function(el){return el.getAttribute('data-metrics-carrier')===peekId;});
+      var peekLink=peekNow && peekSignal && peekNow._metricsCard && peekNow._metricsCard.querySelector('a.dv-metrics-query-link[data-signal="'+peekSignal+'"]');
+      if(peekLink){metricsPeek(peekNow);peekLink.focus({preventScroll:true});}
+      else if(focusBinding){
+        var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier && !el.classList.contains('dv-metrics-label-hidden');});
+        if(replacement)replacement.focus({preventScroll:true});
+        // #1324: the carrier is gone (no button for it now): its board takes focus, never the page.
+        else if(focused && focused.isConnected===false && focusBinding.el.isConnected!==false)focusBoard(focusBinding);
+      }
+      if(peekNow && !peekLink)metricsPeek(peekNow);
       if(active){
         var target=openBinding && openBinding.el.isConnected && Array.from(openBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===openId && !el.classList.contains('dv-metrics-label-hidden') && !!(el._liveCarrier && el._liveCarrier.metricsOnly)===openMetrics;});
         if(target){active=target;refreshPopover();}else close(false);
@@ -2244,6 +2257,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }
     if(traceRecheck){traceRecheck=false;traceLabelsResized();}
     if(!retired && editor){focusEditedCarrier();askPending();}
+  }
+  /* #1324: focus for a carrier that is gone after a repaint: its board section, named for screen readers. */
+  function focusBoard(binding){
+    var el=binding.el;if(!el || typeof el.focus!=='function')return;
+    if(el.getAttribute('tabindex')==null)el.setAttribute('tabindex','-1');
+    if(!el.getAttribute('aria-label') && !el.getAttribute('aria-labelledby'))el.setAttribute('aria-label',String(binding.section && (binding.section.heading || binding.section.title) || binding.page && binding.page.title || 'Diagram'));
+    el.focus({preventScroll:true});
   }
   function schedule(){if(retired || painting || frame)return;frame=requestAnimationFrame(function(){frame=0;paint();notify();});}
   /* Last-refresh stamp in the viewer's local clock (Chuck, 2026-11-02): a relative

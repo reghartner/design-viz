@@ -147,6 +147,30 @@ class AuthoringPacketTests(unittest.TestCase):
             self.assertIn('docs/trace-ready-authoring.md', output.read_text())
             self.assert_local_links_resolve(output.read_text(), kit)
 
+    def test_portable_trace_mapper_maps_the_declared_spans_example(self):
+        # #1290 PR 10: examples/trace-ready/declared.spec.json declares the spans on the nodes
+        # (trace.spans) instead of step traceMatch; its steps inherit them, one narrowed by a
+        # traceScope parent step. It travels in the folder kit, validates, and maps the normal trace.
+        runtime = (ROOT / 'tools/canon/generated-runtime.cjs').read_text()
+        bundle = json.loads(folder_agent_kit(ROOT, runtime))
+        files = json.loads(gzip.decompress(base64.b64decode(bundle['gzip'])))['files']
+        self.assertIn('examples/trace-ready/declared.spec.json', files)
+        with tempfile.TemporaryDirectory() as temp:
+            kit = Path(temp)
+            for name, content in files.items():
+                path = kit / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text(content)
+            source = kit / 'examples/trace-ready/declared.spec.json'
+            raw = json.loads(source.read_text())
+            d = raw['page']['sections'][0]['diagram']
+            self.assertFalse(any('traceMatch' in step for step in d['steps']), 'the steps inherit; no traceMatch')
+            self.assertEqual(sorted(k for k, n in d['nodes'].items() if 'trace' in n), ['api', 'store'])
+            checked = subprocess.run(['node', 'tools/validate.js', str(source)], cwd=kit, text=True, capture_output=True)
+            self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+            run = subprocess.run(['node', 'tools/canon/trace-cli.mjs', 'preview', '--spec', str(source), '--trace', 'examples/trace-ready/normal.json'], cwd=kit, text=True, capture_output=True)
+            self.assertEqual(run.returncode, 0, run.stderr)
+            rows = json.loads(run.stdout)['mapping']['steps']
+            self.assertEqual([(r['stepId'], r['status']) for r in rows], [('receive', 'matched'), ('persist', 'matched')])
+
     def test_handoff_contract_and_migration_travel_in_packets_and_folder_kit(self):
         text, _ = packet.generate([], [])
         self.assertIn('`spec` is required; `handoff.url` is removed and rejected', text)

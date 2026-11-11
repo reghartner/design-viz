@@ -444,8 +444,9 @@ Honeycomb number or boolean attribute values warn, as for step `traceMatch`.
 match, with each declaration in the label's title; see
 [Live status trace labels](live-status.md). A declaration matches spans of its
 `serviceName` by exact `operation`, by `operationPrefix`, or by `attributes` alone, and one
-span may match several carriers. Connection hand-off timing from `send` and `receive` comes
-in a later change.
+span may match several carriers. A connection reads the hand-off from its `send` span to the
+receiving span: its own `receive` declaration, or else the receiving node's `process` spans
+(see [Live status trace labels](live-status.md)).
 
 ## Honeycomb lookback
 

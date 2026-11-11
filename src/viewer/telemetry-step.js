@@ -87,8 +87,60 @@ function telemetryTraceModel(diagram,pathId,exemplar){
   });
   // Multiple authored steps claiming one edge cannot supply one exact duration.
   Object.keys(edges).forEach(function(key){if(edges[key].length!==1)delete edges[key];});
+  // #1290: a connection with declared spans reads its hand-off (receive start minus send start).
+  if(carriers)telemetryTraceHandoffRows(diagram,normalized,carriers,rows,edges);
   var parents=Object.create(null);(exemplar.spans || []).forEach(function(s){parents[s.id]=s.parentId || null;});
   return {mapping:mapping,warning:warning,rows:rows,nodes:nodes,edges:edges,parents:parents};
+}
+/* #1290: one row per declared connection. Sends are its role:send spans; receivers its own
+   role:receive spans, else the receiving node's role:process spans (resolved, so imported
+   carriers included). The receiver's duration stays on its node. On a declared connection
+   this row is the label; a step row that timed the connection moves into its title. With
+   only receive spans, a row only when the connection declares receive itself. */
+function telemetryTraceHandoffRows(diagram,trace,carriers,rows,edges){
+  function spansOf(list,role){var seen=Object.create(null),out=[];(list || []).forEach(function(x){if(x.role===role)x.spans.forEach(function(s){if(!seen[s.id]){seen[s.id]=true;out.push(s);}});});return out;}
+  function name(s){return s.serviceName+' '+s.operation;}
+  function names(list){return list.map(name).filter(function(n,i,all){return all.indexOf(n)===i;}).join(', ');}
+  (diagram.edges || []).forEach(function(edge,index){
+    var key=edge.from+'->'+edge.to,list=carriers.edges[key];if(!list)return;
+    if((diagram.edges || []).filter(function(e){return e.from+'->'+e.to===key;}).length!==1)return;
+    var own=spansOf(list,'receive'),declaresReceive=list.some(function(x){return x.role==='receive';});
+    var sends=spansOf(list,'send'),receivers=declaresReceive?own:spansOf(carriers.nodes[edge.to],'process');
+    var pairs=FlowTraceMatch.handoffs(trace,sends,receivers),paired=pairs.filter(function(p){return p.receive;}),text='',title='',ids=[];
+    if(paired.length){
+      var intervals=paired.map(function(p){return {id:p.send.id+'>'+p.receive.id,startMs:p.send.startMs,durationMs:Math.max(0,p.receive.startMs-p.send.startMs)};});
+      var time=telemetryTraceSpanTime([{status:'matched',intervals:intervals}]).replace(/ across (\d+) spans$/,' across $1 hand-offs');
+      text=time;
+      title=(paired.length>1?'Hand-offs '+time+': each from the start of a send span ('+names(paired.map(function(p){return p.send;}))+') to the start of its receiving span ('+names(paired.map(function(p){return p.receive;}))+').':
+        'Hand-off '+time+': from the start of the send span ('+name(paired[0].send)+') to the start of the receiving span ('+name(paired[0].receive)+').');
+      paired.filter(function(p){return p.orphan;}).forEach(function(p){
+        title+=p.receive.parentId?' The receiving span\'s parent is not in this trace; it was paired as the only receiving span that started after the send.':
+          ' The receiving span has no parent span (it starts its own trace tree); it was paired as the only receiving span that started after the send.';
+      });
+      // A receiver that descends from the send but starts before it: the services' clocks disagree.
+      if(paired.some(function(p){return p.receive.startMs<p.send.startMs;}))title+=' The receiving span starts before its send span, so the services\' clocks disagree; that hand-off counts as 0 ms.';
+      var lone=pairs.length-paired.length;if(lone)title+=' '+lone+(lone===1?' send span has':' send spans have')+' no receiver in this trace.';
+      paired.forEach(function(p){ids.push(p.send.id,p.receive.id);});
+    }else if(sends.length){
+      var own_=telemetryTraceSpanTime([{status:'matched',intervals:sends.map(function(s){return {id:s.id,startMs:s.startMs,durationMs:s.durationMs};})}]);
+      text='send only · '+own_;
+      title='No receiver found in this trace; showing the send span\'s own time ('+own_+').';
+      ids=sends.map(function(s){return s.id;});
+    }else if(declaresReceive && own.length){
+      text='receive seen · send not in trace';
+      title='The receiving span ('+names(own)+') is in this trace but no send span is, so there is no hand-off time.';
+      ids=own.map(function(s){return s.id;});
+    }else return;
+    // The step rows that timed this connection keep their time, budget and conditions in the title,
+    // and their worst tone on the label: a declared send never hides a step's warning or error.
+    var ranks={unknown:0,observed:1,warning:2,error:3},all=sends.concat(receivers),tone=all.some(function(s){return ids.indexOf(s.id)>=0 && s.error;})?'error':'observed',conditions=[];
+    rows.filter(function(r){return r.edgeIndex===index && r.status==='matched';}).forEach(function(r){
+      title+=' Step '+r.id+', '+telemetryTraceRowTitle(r)+'.';
+      if(ranks[r.tone]>ranks[tone])tone=r.tone;conditions=conditions.concat(r.conditions || []);
+    });
+    edges[key]=[{id:'carrier:'+key,kind:'carrier',nodeId:null,edgeIndex:index,status:'matched',duration:null,label:text,text:text,titleText:title,operation:'',service:'',alternative:null,optional:false,otherAlternatives:[],conditions:conditions,
+      tone:tone,spanIds:ids,intervals:[]}];
+  });
 }
 /* #1185: each trace carrier's highlight level against the focused span: "current" (the focused
    span's step), "above" (an ancestor span's), "below" (a descendant span's) or "other". With no
@@ -215,20 +267,23 @@ function telemetryTraceSpanTime(rows){
   spans.slice(1).forEach(function(s){if(s.startMs>end){total+=end-start;start=s.startMs;}end=Math.max(end,s.startMs+s.durationMs);});
   return telemetryTraceDuration(total+end-start)+(spans.length>1?' across '+spans.length+' spans':'');
 }
+/* One step row's title text: its operation and time, budget, conditions and other alternatives. */
+function telemetryTraceRowTitle(r){
+  var others=r.otherAlternatives || [],absent=others.filter(function(a){return !a.seen;}),unused=others.filter(function(a){return a.seen;});
+  var named=r.alternative!=null && r.status==='matched'?'Matched: '+r.service+' '+r.operation:r.operation;
+  return [r.optional?'optional, not in this trace: '+r.service+' '+r.operation:named+': '+(r.duration!=null?r.duration+' ms':r.label)+(r.budget!=null?' / '+r.budget+' ms budget':'')].concat(r.conditions.map(function(c){return c.label;}),
+    absent.length?['not in this trace: '+absent.map(function(a){return a.name;}).join(', ')]:[],unused.length?['in this trace, not matched: '+unused.map(function(a){return a.name;}).join(', ')]:[]).join('; ');
+}
 function telemetryTraceLabel(listed){
   // #1175: an optional step missing from this trace is left out of the label; the title lists it.
   var rows=listed.filter(function(r){return !r.optional;}),time=telemetryTraceSpanTime(rows),one=rows.length===1 && rows[0],steps=rows.filter(function(r){return r.kind!=='carrier';});
   function count(status,word){var n=rows.filter(function(r){return r.status===status;}).length;return n?n+' '+word:'';}
-  function named(r){return r.alternative!=null && r.status==='matched'?'Matched: '+r.service+' '+r.operation:r.operation;}
   // On the canvas the service and operation are cut to 40 characters; the title keeps them whole.
-  var name=one && one.service+' '+one.operation,text=one && one.status!=='matched'?one.label:one?[one.alternative!=null?'Matched: '+(name.length>40?name.slice(0,39)+'…':name):'',time || one.label].filter(Boolean).join(' · '):
+  var name=one && one.service+' '+one.operation,text=one && one.kind==='carrier' && one.text?one.text:one && one.status!=='matched'?one.label:one?[one.alternative!=null?'Matched: '+(name.length>40?name.slice(0,39)+'…':name):'',time || one.label].filter(Boolean).join(' · '):
     // #1290: a carrier row is the node's declared spans, not an operation; only step rows are counted.
     [(steps.length>1?steps.length+' operations':''),count('missing','unknown'),count('ambiguous','ambiguous'),time].filter(Boolean).join(' · ');
   var title=listed.map(function(r){
-    if(r.kind==='carrier')return 'Declared spans: '+r.declarations.join('; ');
-    var others=r.otherAlternatives || [],absent=others.filter(function(a){return !a.seen;}),unused=others.filter(function(a){return a.seen;});
-    return [r.optional?'optional, not in this trace: '+r.service+' '+r.operation:named(r)+': '+(r.duration!=null?r.duration+' ms':r.label)+(r.budget!=null?' / '+r.budget+' ms budget':'')].concat(r.conditions.map(function(c){return c.label;}),
-      absent.length?['not in this trace: '+absent.map(function(a){return a.name;}).join(', ')]:[],unused.length?['in this trace, not matched: '+unused.map(function(a){return a.name;}).join(', ')]:[]).join('; ');
+    return r.kind==='carrier'?r.titleText || 'Declared spans: '+r.declarations.join('; '):telemetryTraceRowTitle(r);
   }).join(' · ')+(time?' · Time '+time+': time covers each matched span from start to end (overlaps counted once).':'');
   return {text:text,title:title};
 }

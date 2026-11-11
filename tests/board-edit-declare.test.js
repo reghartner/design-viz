@@ -8,11 +8,13 @@
 | row | rule |
 |---|---|
 | D1 | Local node and connection: declareSpan writes trace.spans.<slug> {serviceName, operation, role}; declared() names it; Undo restores the exact text. |
-| D2 | Keys: a slug of the operation, starting with a letter, unique on the carrier (-2, -3); declarePreview says the key before the write. |
+| D2 | Keys: a slug of the operation's last meaningful segment (after the last /, skipping {id}, :id and numbers), starting with a letter, unique on the carrier (-2, -3); declarePreview says the key before the write. |
 | D3 | Refusals change nothing: no operation, a role the carrier cannot have, an unknown carrier. |
 | D4 | Imported node: an added span in nodeTracking.<id>.trace.spans (tickets kept), a hidden provider name is taken, the provider untouched, the resolved board shows it. |
 | D5 | Save records {op:"trace-span", path, label, node|edge, span:{key, serviceName, operation, role}}; the validator accepts the history entry. |
 | D6 | A conflict replay re-applies the declaration on the winner's text, or counts it as already there. |
+| D8 | A conflict replay compares the whole declared span: a winner with the same key and another role is not "already there", and the change is dropped (not written under a new key). |
+| D9 | A span the carrier already declares under another key (same service, operation and role) is refused: "Already declared as <key> on <title>." |
 | D7 | Declare on <title> instead (team-lead ruling: the immediate mapping stays): declareInstead swaps the pending mapping for the declaration, one pending change; its Undo restores the mapping as it was; Save records only the trace-span. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
@@ -51,26 +53,30 @@ const PAY={section:0,kind:'node',id:'pay'},WEB={section:0,kind:'node',id:'web'},
 test('D1 local node and connection: one declaration each, named for the Undo note, and Undo restores the exact text',async()=>{
   const b=await editor(local());
   assert.equal(b.e.declareSpan(WEB,{serviceName:'frontend',operation:'/cart/checkout',role:'process'}),true);
-  assert.deepEqual(plain(b.d().nodes.web.trace),{spans:{'cart-checkout':{serviceName:'frontend',operation:'/cart/checkout',role:'process'}}});
+  assert.deepEqual(plain(b.d().nodes.web.trace),{spans:{checkout:{serviceName:'frontend',operation:'/cart/checkout',role:'process'}}});
   assert.equal(b.e.state().pending,1);
-  assert.deepEqual(plain(b.e.state().declared),{key:'cart-checkout',label:'Web',span:{serviceName:'frontend',operation:'/cart/checkout',role:'process'}});
+  assert.deepEqual(plain(b.e.state().declared),{key:'checkout',label:'Web',span:{serviceName:'frontend',operation:'/cart/checkout',role:'process'}});
   assert.equal(b.e.undoDeclare(),true);assert.equal(b.e.text(),b.text,'Undo restores the exact text');assert.equal(b.e.state().pending,0);assert.equal(b.e.state().declared,null);
   assert.equal(b.e.declareSpan(EDGE,{serviceName:'frontend',operation:'POST /charge',role:'send'}),true);
-  assert.deepEqual(plain(b.d().edges[0].trace),{spans:{'post-charge':{serviceName:'frontend',operation:'POST /charge',role:'send'}}});
+  assert.deepEqual(plain(b.d().edges[0].trace),{spans:{charge:{serviceName:'frontend',operation:'POST /charge',role:'send'}}});
   assert.equal(b.e.state().declared.label,'Web → Pay');
   // A node that has spans keeps them, its tickets and its order.
   assert.equal(b.e.declareSpan(PAY,{serviceName:'payment',operation:'Refund',role:'process'}),true);
   assert.deepEqual(Object.keys(b.d().nodes.pay.trace.spans),['charge-card','refund']);assert.deepEqual(plain(b.d().nodes.pay.tickets),['PAY-1']);
 });
 
-test('D2 keys: a slug of the operation, starting with a letter, unique on the carrier; the preview says it first',async()=>{
+test('D2 keys: a slug of the operation\'s last meaningful segment, starting with a letter, unique on the carrier; the preview says it first',async()=>{
   const b=await editor(local());
-  assert.deepEqual(plain(b.e.declarePreview(PAY,{serviceName:'payment',operation:'Charge card',role:'process'})),{key:'charge-card-2'},'charge-card is taken on Pay');
-  assert.equal(b.e.declareSpan(PAY,{serviceName:'payment',operation:'Charge card',role:'process'}),true);
+  assert.deepEqual(plain(b.e.declarePreview(PAY,{serviceName:'payment',operation:'Charge card',role:'call'})),{key:'charge-card-2'},'charge-card is taken on Pay');
+  assert.equal(b.e.declareSpan(PAY,{serviceName:'payment',operation:'Charge card',role:'call'}),true);
   assert.deepEqual(Object.keys(b.d().nodes.pay.trace.spans),['charge-card','charge-card-2']);
-  assert.deepEqual(plain(b.e.declarePreview(PAY,{serviceName:'payment',operation:'Charge card',role:'process'})),{key:'charge-card-3'});
+  assert.deepEqual(plain(b.e.declarePreview(PAY,{serviceName:'payment',operation:'Charge card',role:'work'})),{key:'charge-card-3'});
+  assert.deepEqual(plain(b.e.declarePreview(WEB,{serviceName:'x',operation:'grpc.msdemo.PaymentService/Charge',role:'process'})),{key:'charge'});
+  assert.deepEqual(plain(b.e.declarePreview(WEB,{serviceName:'x',operation:'INSERT orders',role:'process'})),{key:'insert-orders'});
+  assert.deepEqual(plain(b.e.declarePreview(WEB,{serviceName:'x',operation:'GET /items/{id}',role:'process'})),{key:'items'},'a path parameter is skipped');
+  assert.deepEqual(plain(b.e.declarePreview(WEB,{serviceName:'x',operation:'/v2/orders/42/',role:'process'})),{key:'orders'},'numbers and a trailing slash are skipped');
+  assert.deepEqual(plain(b.e.declarePreview(WEB,{serviceName:'x',operation:'route.event',role:'process'})),{key:'route-event'},'no slash: the whole operation');
   assert.deepEqual(plain(b.e.declarePreview(WEB,{serviceName:'x',operation:'123 go!',role:'process'})),{key:'span-123-go'});
-  assert.deepEqual(plain(b.e.declarePreview(WEB,{serviceName:'x',operation:'GET /items/{id}',role:'process'})),{key:'get-items-id'});
 });
 
 test('D3 refusals change nothing: no operation, a role the carrier cannot have, an unknown carrier',async()=>{
@@ -110,14 +116,32 @@ test('D6 a conflict replay re-applies the declaration, or counts it as already t
   first.e.declareSpan(WEB,{serviceName:'frontend',operation:'/cart/checkout',role:'process'});first.e.save();await settle();
   const winner=local();winner.page.sections[0].diagram.nodes.web.tickets=['WEB-9'];
   const next=await editor(winner,{store,start:false});
-  assert.deepEqual(plain(next.d().nodes.web.trace),{spans:{'cart-checkout':{serviceName:'frontend',operation:'/cart/checkout',role:'process'}}});
+  assert.deepEqual(plain(next.d().nodes.web.trace),{spans:{checkout:{serviceName:'frontend',operation:'/cart/checkout',role:'process'}}});
   assert.match(next.e.state().notice.text,/1 of your changes were re-applied/);
   const store2=new Map(),again=await editor(local(),{store:store2,reject:'conflict'});
   again.e.declareSpan(WEB,{serviceName:'frontend',operation:'/cart/checkout',role:'process'});again.e.save();await settle();
-  const already=local();already.page.sections[0].diagram.nodes.web.trace={spans:{'cart-checkout':{serviceName:'frontend',operation:'/cart/checkout',role:'process'}}};
+  const already=local();already.page.sections[0].diagram.nodes.web.trace={spans:{checkout:{serviceName:'frontend',operation:'/cart/checkout',role:'process'}}};
   const third=await editor(already,{store:store2,start:false});
   assert.match(third.e.state().notice.text,/1 was already in their version/);
-  assert.deepEqual(Object.keys(third.d().nodes.web.trace.spans),['cart-checkout'],'not declared twice');
+  assert.deepEqual(Object.keys(third.d().nodes.web.trace.spans),['checkout'],'not declared twice');
+});
+
+test('D8 a replay compares the whole declared span: the same key with another role is not already there, and is dropped',async()=>{
+  const store=new Map(),first=await editor(local(),{store,reject:'conflict'});
+  first.e.declareSpan(WEB,{serviceName:'frontend',operation:'/cart/checkout',role:'process'});first.e.save();await settle();
+  const winner=local();winner.page.sections[0].diagram.nodes.web.trace={spans:{checkout:{serviceName:'frontend',operation:'/cart/checkout',role:'call'}}};
+  const next=await editor(winner,{store,start:false});
+  assert.match(next.e.state().notice.text,/0 of your changes were re-applied/);assert.match(next.e.state().notice.text,/1 could not be/);
+  assert.deepEqual(plain(next.d().nodes.web.trace),{spans:{checkout:{serviceName:'frontend',operation:'/cart/checkout',role:'call'}}},'the winner\'s span stays; nothing under a new key');
+});
+
+test('D9 a span the carrier already declares under another key is refused, and nothing is written',async()=>{
+  const b=await editor(local());
+  assert.deepEqual(plain(b.e.declarePreview(PAY,{serviceName:'payment',operation:'Charge card',role:'process'})),{error:'Already declared as charge-card on Pay.'});
+  assert.equal(b.e.declareSpan(PAY,{serviceName:'payment',operation:'Charge card',role:'process'}),false);
+  assert.equal(b.e.text(),b.text);assert.equal(b.e.state().pending,0);
+  const f=imported(),c=await editor(f.consumer,{context:f.context});
+  assert.deepEqual(plain(c.e.declarePreview(STORE,{serviceName:'store-svc',operation:'INSERT orders',role:'database'})),{error:'Already declared as write on Store.'},'an inherited span counts');
 });
 
 test('D7 Declare instead swaps the pending mapping for the declaration; its Undo brings the mapping back as it was',async()=>{

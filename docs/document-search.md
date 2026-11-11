@@ -6,10 +6,10 @@ focus in the document, **Ctrl/Cmd+Shift+F** also opens it. Workbench's
 
 Typing highlights matches without navigating. **Highlights** and **Results**
 share one query. Matching page markers, nodes and step markers have dashed
-outlines; current-page selection and active-step styling remain separate. While
-a query is present, the closed Contents rail shows the document's numbered
-pages, including separate Views of the same section. Choose a matching page,
-then a matching step, to read highlighted words.
+outlines; current-page selection and active-step styling remain separate. The
+closed Contents rail always shows the document's numbered pages, the same pages
+as "Page n of m", including separate Views of the same section (#1305). Choose a
+matching page, then a matching step, to read highlighted words.
 
 **Results** shows location labels and snippets. Selecting a result opens its
 exact tab, View and section. Step results use the original source-step index and

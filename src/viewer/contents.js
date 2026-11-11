@@ -1,6 +1,11 @@
 /* Shared document shell over the Tab View controller. Original utility DOM
    stays owned by createExploreNavigation; this controller owns only its tree,
    reader zoom and temporary presentation state, never authored source. */
+/* #1305: one rail marker per document page (the "Page n of m" list: each section in each View
+   of each Tab), numbered in pager order, with the pager's current page marked. */
+function readerRailPages(pages,current,title){
+  return pages.map(function(page,i){return {label:'Page '+(i+1)+': '+title(page.rec)+' · '+page.definition.name,owner:page.owner,definition:page.definition,rec:page.rec,current:i===current};});
+}
 function createReaderContents(ctl,nav,actions,options){
   var doc=ctl.view.ownerDocument,view=ctl.view,retired=false,current=null,viewportRecord=null,owner=null,members=[],narrow=false,opened=typeof options.initialOpen==='boolean'?options.initialOpen:null,pinnedTop=null,scrollHeld=false,holdFrame=0;
   var expandedTabs=new Set(),collapsedViews=new Set(),standardZoom=new Map(),moved=[],overflowActions=null,actionAttemptWidth=null;
@@ -187,7 +192,9 @@ function createReaderContents(ctl,nav,actions,options){
     var focusKey=tree.contains(focused) && focused.getAttribute('data-reader-key'),scroll=tree.scrollTop;
     tree.replaceChildren();
     // The overlay keeps its own disclosure set: only the current part opens.
-    var shown=hovering?overlayTabs:expandedTabs,numbered=topParts().length>1,number=0;
+    // #1305: page rows carry the rail's numbers (pager order); Tab rows are not numbered.
+    var shown=hovering?overlayTabs:expandedTabs,pages=documentPages(),numbered=pages.length>1;
+    tree.classList.toggle('reader-tree-numbered',numbered);
     topParts().forEach(function(item){
       var embed=embedded(),canonical=item.records.some(function(record){return Array.isArray(record.section.views);}),groups=[];
       // Keep each section/View occurrence intact, then omit grouping levels
@@ -204,20 +211,22 @@ function createReaderContents(ctl,nav,actions,options){
       if(search)search.mark(tabButton,item);
       tabButton.classList.add('reader-tree-tab');tabButton.setAttribute('data-reader-key','tab:'+item.path);
       if(item===owner)tabButton.setAttribute('data-current-part','true');
-      if(numbered){var badge=element('span','reader-part-number',String(++number));badge.setAttribute('aria-hidden','true');tabButton.prepend(badge);}
       function trail(parent){var levels=detailTrail();if(levels.length){var details=element('ol','reader-tree-details',null,parent);levels.forEach(function(level,i){var entry=element('li','reader-tree-detail',level.label,details);entry.title=level.title;if(i===levels.length-1)entry.setAttribute('aria-current','location');});}}
       function leaf(choice,definition,parent,key){
         var rec=definition.members[0].record.runtime,selected=item===owner && item.current===definition && current===rec;
         if(search)search.mark(choice,item,rec,definition);
+        var page=numbered?pages.findIndex(function(entry){return entry.owner===item && entry.definition===definition && entry.rec===rec;}):-1;
+        // The number is drawn by CSS from data-page-index, so row text and names stay the section/View title.
+        if(page>=0){choice.setAttribute('data-page-index',String(page+1));choice.setAttribute('aria-description','Page '+(page+1)+' of '+pages.length);}
         choice.classList.add('reader-tree-leaf');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-owner-selected',String(item.current===definition));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-current',selected?'page':'false');choice.setAttribute('aria-pressed',String(selected));
-        if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
+        if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description',(page>=0?'Page '+(page+1)+' of '+pages.length+'. ':'')+'Explore: pan and zoom the graph.');}
         if(selected)trail(parent);
       }
       function viewLeaf(definition,parent){
         var rec=definition.members[0].record.runtime,row=element('div','reader-tree-view-row',null,parent),choice=button(definition.name,definition.name,row,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-view');leaf(choice,definition,row,item.path+':'+definition.key);
       }
-      function sectionLeaf(definition,parent,index,key){
-        var rec=definition.members[0].record.runtime,li=element('li','',null,parent),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');if(canonical)choice.classList.add('reader-tree-single-view');if(index!==null)choice.setAttribute('data-page-number',String(index+1));leaf(choice,definition,li,key);
+      function sectionLeaf(definition,parent,key){
+        var rec=definition.members[0].record.runtime,li=element('li','',null,parent),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');if(canonical)choice.classList.add('reader-tree-single-view');leaf(choice,definition,li,key);
       }
       function disclosure(row,key,label){
         var expanded=!collapsedViews.has(key),control=button((expanded?'Collapse ':'Expand ')+label,expanded?'⌄':'›',row,function(){if(collapsedViews.has(key))collapsedViews.delete(key);else collapsedViews.add(key);drawTree();});control.classList.add('reader-view-disclosure');control.setAttribute('aria-expanded',String(expanded));control.setAttribute('data-reader-key',key+':disclosure');return expanded;
@@ -230,36 +239,30 @@ function createReaderContents(ctl,nav,actions,options){
         var sections=element('ol','reader-tree-sections',null,tab);
         groups.forEach(function(group){
           var rec=group.record.runtime,key=item.path+':section:'+rec.number;
-          if(group.definitions.length===1){sectionLeaf(group.definitions[0],sections,null,item.path+':'+group.definitions[0].key);return;}
+          if(group.definitions.length===1){sectionLeaf(group.definitions[0],sections,item.path+':'+group.definitions[0].key);return;}
           var li=element('li','',null,sections),row=element('div','reader-tree-view-row',null,li),heading=button(title(rec),title(rec),row,function(){choose(item,sectionViewDefault(item,group.record,item.views),rec);});heading.classList.add('reader-tree-section');heading.setAttribute('data-reader-key',key);heading.setAttribute('data-reader-section',rec.reference);
           if(disclosure(row,key,title(rec))){var views=element('div','reader-tree-views',null,li);group.definitions.forEach(function(definition){viewLeaf(definition,views);});}
         });return;
       }
-      if(groups.length===1){var sections=element('ol','reader-tree-sections',null,tab);sections.setAttribute('data-reader-view',groups[0].id);groups[0].definitions.forEach(function(definition,index){sectionLeaf(definition,sections,index,item.path+':'+groups[0].id+':'+definition.members[0].record.runtime.number);});return;}
+      if(groups.length===1){var sections=element('ol','reader-tree-sections',null,tab);sections.setAttribute('data-reader-view',groups[0].id);groups[0].definitions.forEach(function(definition){sectionLeaf(definition,sections,item.path+':'+groups[0].id+':'+definition.members[0].record.runtime.number);});return;}
       var views=element('div','reader-tree-views',null,tab);
       groups.forEach(function(group){
         if(group.definitions.length===1){viewLeaf(group.definitions[0],views);return;}
         var definition=group.definitions.find(function(d){return d.members[0].record.runtime===item.selected;}) || group.definitions[0],key=item.path+':'+group.id,row=element('div','reader-tree-view-row',null,views),choice=button(definition.name,definition.name,row,function(){choose(item,definition);});choice.classList.add('reader-tree-view');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-owner-selected',String(group.definitions.indexOf(item.current)>=0));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-pressed',String(item===owner && group.definitions.indexOf(item.current)>=0));
         if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
-        if(disclosure(row,key,definition.name)){var sections=element('ol','reader-tree-sections',null,views);sections.setAttribute('data-reader-view',definition.id);group.definitions.forEach(function(d,index){sectionLeaf(d,sections,index,key+':'+d.members[0].record.runtime.number);});}
+        if(disclosure(row,key,definition.name)){var sections=element('ol','reader-tree-sections',null,views);sections.setAttribute('data-reader-view',definition.id);group.definitions.forEach(function(d){sectionLeaf(d,sections,key+':'+d.members[0].record.runtime.number);});}
       });
     });
     tree.scrollTop=scroll;
     if(focusKey){var target=Array.from(tree.querySelectorAll('[data-reader-key]')).find(function(el){return el.getAttribute('data-reader-key')===focusKey;});if(target)target.focus({preventScroll:true});}
   }
-  /* A part is a top-level Contents entry: the page's own sections, then each
-     Tab. With a single entry the rail lists its selected View’s sections. */
+  /* A part is a top-level Contents entry: the page's own sections, then each Tab.
+     The rail and the tree's page numbers follow documentPages() (#1305). */
   function topParts(){var embed=embedded();return (ctl.views?ctl.views.owners:[]).filter(function(item){return item.views.length && !(embed && ctl.views.owner(embed)!==item);});}
-  function parts(){
-    var owners=topParts();
-    if(search && search.hasQuery())return documentPages().map(function(page,i){return {label:'Page '+(i+1)+': '+title(page.rec)+' · '+page.definition.name,owner:page.owner,definition:page.definition,rec:page.rec,current:page.owner===owner && page.definition===owner.current && page.rec===current};});
-    if(owners.length>1)return owners.map(function(item){return {label:ownerLabel(item),owner:item,current:item===owner};});
-    return members.map(function(rec){return {label:title(rec),rec:rec,current:rec===current};});
-  }
+  // #1305: the rail lists the pager's document pages, so marker n is "Page n of m".
+  function parts(){var pages=documentPages();return readerRailPages(pages,currentPageIndex(pages),title);}
   function goPart(part){
-    if(part.definition)choose(part.owner,part.definition,part.rec,true);
-    else if(part.owner){var definition=part.owner.current,first=definition && definition.members[0];if(definition)choose(part.owner,definition,first && first.record.runtime,true);}
-    else if(options.selectSection){options.selectSection(part.rec);pinnedTop=part.rec.sectionEl.getBoundingClientRect().top;}
+    choose(part.owner,part.definition,part.rec,true);
   }
   // A document page is one navigable rendering of a section in a View. Preserve
   // owner, View and member order so a shared section remains reachable in each

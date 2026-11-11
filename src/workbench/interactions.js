@@ -767,7 +767,7 @@ function createBuilderInteractions(opts){
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .path-chip, .tabbtn, .skbtn, #go, ' +
     '#undo-builder, #redo-builder, #file-open, #file-save, #file-show-exports, #workspace-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
-    '#diagram-add, #diagram-add-target, #add-node, #add-edge, #add-step, #add-panel, #add-paragraph, #add-bullet, #add-section, #add-tabs, #add-contract, ' +
+    '#diagram-add, #diagram-add-target, #add-node, #add-edge, #add-step, #add-panel, #add-paragraph, #add-bullet, #add-section, #add-tabs, #add-contract, #add-grid-table, ' +
     '#import-mermaid, #import-mermaid-convert, #import-trace, #trace-convert, .outline-item, .patchedit .fctl, .groupctl';
   function addModeBlocker(ev){
     /* while ADD TO STEP is armed, controls that would change the shown

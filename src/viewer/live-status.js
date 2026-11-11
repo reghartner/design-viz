@@ -1150,10 +1150,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(statusMode!=='trace')return null;
     var selected=traceSelection && traceSources().entries.find(function(e){return e.key===traceSelection.key;}),example=null;
     if(selected && !selected.manual && selected.binding.ordinal!=null)example={key:'carried/'+selected.binding.ordinal+'/'+selected.carrier+'/'+selected.exemplar.selectionToken,environment:telemetry.environment(),ordinal:selected.binding.ordinal,carrier:selected.carrier,exemplar:selected.exemplar,traceId:traceSelection.traceId,chosen:!!traceSelection.chosen};
-    return {direct:directTrace.carry(),example:example,spanId:selected && traceFocus?traceFocus.spanId:null,show:traceShow,returnSpan:traceReturnSpan,autoFocused:traceAutoFocused};
+    // #1290 PR 9: the "Declare on <title> instead" offer outlives the re-render its mapping causes.
+    return {direct:directTrace.carry(),example:example,spanId:selected && traceFocus?traceFocus.spanId:null,show:traceShow,returnSpan:traceReturnSpan,autoFocused:traceAutoFocused,declareOffer:traceDeclareOffer};
   }
   function traceRestore(carried){
-    statusMode='trace';statusAuto=false;traceShow=carried.show!==false;traceAutoFocused=carried.autoFocused || '';
+    statusMode='trace';statusAuto=false;traceShow=carried.show!==false;traceAutoFocused=carried.autoFocused || '';traceDeclareOffer=carried.declareOffer || null;
     var direct=!!(carried.direct && directTrace.restore(carried.direct));
     // The reader's pick wins: a picked example stays selected beside a loaded trace (#1180).
     if(carried.example){carriedExample=carried.example;traceSelection={key:carried.example.key,traceId:carried.example.traceId,chosen:carried.example.chosen};traceInitial=false;}
@@ -1254,7 +1255,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // "Declare on <title> instead" beside the note of the mapping a carrier drop just made.
   function declareOfferNote(context){
     var o=traceDeclareOffer,st=editing() && editor.state(),m=st && st.mapped;
-    if(!o || !m || o.context!==context || m.step!==o.step || st.lastTrace==='declare' || !editor.declareInstead)return null;
+    // The offer belongs to the pending mapping it came with (its step), not to a trace context, which a
+    // re-render may rename (a carried example).
+    if(!o || !m || m.step!==o.step || st.lastTrace==='declare' || !editor.declareInstead)return null;
     return {label:o.label,kind:o.kind,roles:DECLARE_ROLES[o.kind],error:traceDeclareError};
   }
   // The board editor's reason a declaration would be refused, shown beside the button; nothing is written.

@@ -283,7 +283,7 @@ function createBoardEditor(options){
         if(!t){dropped.push(describe);return;}
         // The carrier is there: say why it cannot take the ticket change.
         var inherited=null;
-        if(t.imported){try{var it=topologyTrackingTarget(text,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,context,t.index);if(!it.error && it.inherited.tickets.indexOf(entry.ticket)>=0)inherited=it.got.d.topologyImports[it.index].spec;}catch(ex){inherited=null;}}
+        if(t.imported){try{var it=topologyTrackingTarget(text,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,context,t.index);if(!it.error && it.inherited.tickets.indexOf(entry.ticket)>=0)inherited=providerTitle(it.got.d.topologyImports[it.index].spec);}catch(ex){inherited=null;}}
         refuse(inherited?'their version already gets '+entry.ticket+' on '+where+' from '+inherited:entry.op==='add'?'their version could not take '+entry.ticket+' on '+where:'their version could not drop '+entry.ticket+' from '+where);
         return;
       }
@@ -344,6 +344,11 @@ function createBoardEditor(options){
   var DECLARE_ROLES={node:['process','database','cache','call','work'],edge:['send','receive']};
   // The key: the operation's last meaningful segment (after the last "/", skipping {id}, :id and numbers;
   // the whole operation when it has no "/"), slugged and starting with a letter.
+  // A provider named by its page title (its spec id when it has none), as the rest of #1290 does.
+  function providerTitle(id){
+    var specs=context && Array.isArray(context.specs)?context.specs:[],spec=specs.find(function(x){return x && x.page && x.page.canon && x.page.canon.id===id;});
+    return spec && typeof spec.page.title==='string' && spec.page.title.trim()?spec.page.title.trim():id;
+  }
   function slug(operation){
     var op=String(operation),method=/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+\//i.exec(op);
     var parts=op.split('/').map(function(p){return p.trim();}).filter(function(p){return p && !/^\{.*\}$/.test(p) && !/^:/.test(p) && !/^\d+$/.test(p);});

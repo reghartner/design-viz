@@ -1088,7 +1088,8 @@ function boardContentBounds(svg){
     // Packet dots follow already included paths. Their transient SMIL position
     // must not change saved framing; the 24-unit gutter covers their <=4.5 radius.
     // Metrics packet streams (#939) ride the same paths and are skipped likewise.
-    if(child.tagName.toLowerCase()==='defs' || child.matches('.dv-board-ground,.dv-board-grid,.pkt,.dv-metrics-stream') || typeof child.getBBox!=='function')return;
+    // #1294: an Outline card is hidden until hovered or focused and never reserves frame space.
+    if(child.tagName.toLowerCase()==='defs' || child.matches('.dv-board-ground,.dv-board-grid,.pkt,.dv-metrics-stream,[data-metrics-style="outline"]') || typeof child.getBBox!=='function')return;
     try{
       var box=boardInkBBox(child),matrix=child.getCTM();if(!matrix || !box.width && !box.height)return;
       matrix=inverse.multiply(matrix);
@@ -1526,7 +1527,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   svg._layoutStatusCoins=function(){
     var broken=Array.from(svg.querySelectorAll('.dv-live-comm-failure .comm-break')).some(function(el){return !!boardControlBox(el,svg);});
     var reserved=[];
-    if(broken || svg.querySelector('.dv-metrics-card'))svg.querySelectorAll('.dv-metrics-card-box,.comm-break,text.lbl,.dvdelta,.node-review-badge,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff]').forEach(function(el){
+    if(broken || svg.querySelector('.dv-metrics-card:not([data-metrics-style="outline"])'))svg.querySelectorAll('.dv-metrics-card-box,.comm-break,text.lbl,.dvdelta,.node-review-badge,.nlink,.nbackref,.detail-trigger,.handoff-link,[data-dv-handoff]').forEach(function(el){
       if(el.closest('.coin'))return;
       var box=boardControlBox(el,svg);if(box)reserved.push({x:box.x-4,y:box.y-4,w:box.w+8,h:box.h+8});
     });
@@ -1538,7 +1539,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     // frame is already intentional. Grow only for the overlay's own controls
     // and coins displaced by a live break, and only if they extend past it.
     var boxes=[],liveBreak=Array.from(svg.querySelectorAll('.dv-live-comm-failure .comm-break')).some(function(el){return !!boardControlBox(el,svg);});
-    svg.querySelectorAll('.dv-metrics-card,.dv-metrics-leader,.dv-jira-cue,.dv-trace-overlay,.dv-live-comm-failure .comm-break'+(liveBreak || svg.querySelector('.dv-metrics-card')?',.coin':'')).forEach(function(el){
+    svg.querySelectorAll('.dv-metrics-card,.dv-metrics-leader,.dv-jira-cue,.dv-trace-overlay,.dv-live-comm-failure .comm-break'+(liveBreak || svg.querySelector('.dv-metrics-card:not([data-metrics-style="outline"])')?',.coin':'')).forEach(function(el){
       var box=boardControlBox(el,svg);if(box)boxes.push(box);
     });
     if(boxes.length)extendFrame(unionGraphFrame(null,boxes,4));

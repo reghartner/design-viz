@@ -312,10 +312,12 @@ test('M10 M12 Document settings edit the page telemetry block, validate window a
   for(const [label,group,key,value] of [['Grafana Prometheus UID','grafana','prometheus','prom-main'],['Grafana Loki UID','grafana','loki','loki-main'],['Grafana Tempo UID','grafana','tempo','tempo-main'],['Grafana SQL UID','grafana','sql','lake'],['Honeycomb environment','honeycomb','environment','prod'],['Honeycomb dataset','honeycomb','dataset','doorbell-prod']]){
     oneStep(ui,()=>ui.set(label,value),DOC);assert.equal(tracking().telemetry[group][key],value);assert.deepEqual(tracking().jira,jira);
   }
-  for(const [label,value,message] of [['Metrics window','90x',/duration/],['Metrics window','0h',/duration/],['Metrics window','+6h',/duration/],['Metrics window','now--6h',/duration/],['Metrics refresh ms','1000',/60000/],['Metrics refresh ms','-5',/60000/]]){
+  for(const [label,value,message] of [['Metrics window','90x',/duration/],['Metrics window','0h',/duration/],['Metrics window','+6h',/duration/],['Metrics window','now--6h',/duration/],['Metrics refresh ms','1000',/300000/],['Metrics refresh ms','60000',/300000/],['Metrics refresh ms','-5',/300000/]]){
     const before=ui.text;ui.set(label,value);assert.equal(ui.text,before,label+' '+value+' is refused');assert.match(ui.error(),message);ui.select(DOC);
   }
-  for(const bad of [Infinity,NaN,'300000'])assert.match(api(ui.e.C).telemetryEditPage({},{op:'refreshMs',value:bad}).error || '',/60000/,'refresh refuses '+String(bad));
+  // #1287: the refresh field names its five-minute floor before anything is typed.
+  {const field=ui.control('Metrics refresh ms');assert.equal(field.placeholder,'300000 (5 min)');assert.equal(String(field.min),'300000');assert.match(field.title || '',/at least 300000 \(five minutes\)/);}
+  for(const bad of [Infinity,NaN,'300000'])assert.match(api(ui.e.C).telemetryEditPage({},{op:'refreshMs',value:bad}).error || '',/at least 300000 ms \(five minutes\)/,'refresh refuses '+String(bad));
   for(const value of [' -6h ',' now-6h ']){
     oneStep(ui,()=>ui.set('Metrics window',value),DOC);
     assert.equal(tracking().telemetry.window,value.trim(),'editor keeps the entered alias');

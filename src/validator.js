@@ -827,6 +827,12 @@ function traceScopeWarnings(d,DP,warnings){
         else if(hit.kind==='edge' && !spans.some(function(x){return x.key===entry && x.role==='send';}))warnings.push(where+': a step on a connection takes only its send spans, so skipping '+entry+' does nothing');
       });
     });
+    // #1290: a parent step on no path with this step is never found, so the step always reads missing.
+    if(specObject(st.traceScope) && typeof st.traceScope.parentStepId==='string' && st.traceScope.parentStepId!==st.id){
+      var pj=steps.findIndex(function(x){return specObject(x) && x.id===st.traceScope.parentStepId;});
+      if(pj>=0 && !paths.some(function(path){return path.indices.indexOf(i)>=0 && path.indices.indexOf(pj)>=0;}))
+        warnings.push(at+'.traceScope.parentStepId: parent step '+st.traceScope.parentStepId+' is on no path with step '+(st.id || i)+', so this step always reads missing');
+    }
     // #1290: a budget on a step that lights nothing with declared spans is never checked.
     if(specObject(st.traceScope) && !carriers.length && (st.traceScope.maxDurationMs!=null || st.traceScope.maxQueueDepth!=null))
       warnings.push(at+'.traceScope: step '+(st.id || i)+' lights no node or connection that declares trace spans, so its budget is never checked');

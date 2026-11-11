@@ -379,9 +379,17 @@ var FlowCanon = (function(){
       if(d.incidents!=null && (!Array.isArray(d.incidents) || d.incidents.some(function(i){return !object(i) || typeof i.pathId!=='string' || typeof i.traceId!=='string' || typeof i.firstDivergence!=='string';})))errors.push('incidents: expected comparison provenance objects');
       // Every alternative's parentStepId is an edge; a cycle through any of them fails.
       // #1290: traceScope.parentStepId joins the same cycle check.
-      var parents=new Map(steps.filter(function(s){return s && (s.traceMatch || object(s.traceScope));}).map(function(s){return [s.id,[].concat(s.traceMatch || []).map(function(m){return m && m.parentStepId;}).concat(object(s.traceScope) && s.traceScope.parentStepId?[s.traceScope.parentStepId]:[]).filter(Boolean)];})),acyclic=new Set();
-      var cyclic=function(id,path){if(acyclic.has(id))return false;if(path.has(id))return true;path.add(id);var hit=(parents.get(id) || []).some(function(p){return cyclic(p,path);});path.delete(id);if(!hit)acyclic.add(id);return hit;};
-      parents.forEach(function(_,id){if(cyclic(id,new Set()))errors.push('traceMatch: cyclic parentStepId');});
+      // A cycle that needs a traceScope parent is reported under traceScope, where the step form shows it
+      // (a step naming itself is already reported as a self parentStepId).
+      var cycles=function(withScope){
+        var parents=new Map(steps.filter(function(s){return s && (s.traceMatch || withScope && object(s.traceScope));}).map(function(s){return [s.id,[].concat(s.traceMatch || []).map(function(m){return m && m.parentStepId;}).concat(withScope && object(s.traceScope) && s.traceScope.parentStepId && s.traceScope.parentStepId!==s.id?[s.traceScope.parentStepId]:[]).filter(Boolean)];})),acyclic=new Set(),hits=[];
+        var cyclic=function(id,path){if(acyclic.has(id))return false;if(path.has(id))return true;path.add(id);var hit=(parents.get(id) || []).some(function(p){return cyclic(p,path);});path.delete(id);if(!hit)acyclic.add(id);return hit;};
+        parents.forEach(function(_,id){if(cyclic(id,new Set()))hits.push(id);});
+        return hits;
+      };
+      var matchCycles=cycles(false);
+      matchCycles.forEach(function(){errors.push('traceMatch: cyclic parentStepId');});
+      cycles(true).filter(function(id){return matchCycles.indexOf(id)<0;}).forEach(function(){errors.push('traceScope: cyclic parentStepId');});
       steps.forEach(function(st){
         if(!st)return;
         // An array lists alternatives; each entry is validated as one selector and

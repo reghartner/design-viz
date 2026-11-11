@@ -2183,9 +2183,11 @@ them in is mechanical; the agent asks the author only about a real conflict.
    them into the local file: the tickets and Missing work markers on the nodes and edges
    those edits touched, the `traceMatch` of each step a board edit mapped (found by
    section and step id; a local step that already maps the same service and operation
-   keeps its own), each span the board declared on a node or connection (the consumer
-   overlay for an imported one; a local span under the same key that is the same in every
-   field, service, operation or prefix, role, namespace and attributes, is kept), plus their
+   keeps its own; the mapping removes the step's `traceScope` when the local scope is the
+   one the board's mapping replaced), each span the board declared on a node or connection
+   (found as tickets are, so a locally relabeled connection still matches; the consumer
+   overlay for an imported one; a local span that is the same in every field, service,
+   operation or prefix, role, namespace and attributes, under that key or another, is kept), plus their
    `page.editHistory` entries. Every other line stays as
    written and changes made only in the local copy are kept. Tell the author the listed
    lines.
@@ -2194,13 +2196,16 @@ them in is mechanical; the agent asks the author only about a real conflict.
      local copy no longer has. (A board edit that removed a ticket from, or cleared the
      marker of, a node or edge the local copy deleted needs no question: both sides agree
      the ticket is not there.) A board edit that mapped a span to a step is a conflict
-     when the local step maps a different span or was deleted. A board edit that declared a
-     span is a conflict when the local node or connection declares something else under the
-     same key, or no longer exists. Ask the author, then rerun with `--resolve KEY=live` (keep the board's
+     when the local step maps a different span, has a trace scope the board's mapping did
+     not replace, or was deleted. A board edit that declared a span is a conflict when the
+     local node or connection declares something else under the same key, hides that key,
+     or no longer exists (for an imported one, also when its import is gone or renamed).
+     Ask the author, then rerun with `--resolve KEY=live` (keep the board's
      placement) or `--resolve KEY=local` (keep the local one, after placing the ticket
      where the author says). For a step, KEY is `step:<step id>`; for a declared span,
-     `span:<carrier>/<span key>` (the node id, or `from->to` for a connection; plain
-     `span:<span key>` works only while one node or connection has that key).
+     `span:<carrier>/<span key>` (the node id, or `from->to` for a connection, so quote it:
+     `--resolve 'span:api->worker/send=live'`; plain `span:<span key>` works only while the
+     board's new declarations use that key on one node or connection).
    - Exit 3, nothing written: the live board was republished by an agent from another
      copy, so its structure may differ. Start again from `live.json`: copy it over the
      local file and redo the requested change. If the local file has changes of its own
@@ -2214,8 +2219,10 @@ them in is mechanical; the agent asks the author only about a real conflict.
    newest agent entry added, moved or removed that ticket; the message names who made the
    board edit, when, and what it did. It also refuses when the change maps a different
    span to a step, removes its `traceMatch` or deletes the step, and a board edit saved
-   after the newest agent entry mapped that step (KEY `step:<step id>`); the summary
-   counts added, changed and removed step mappings. Ask the
+   after the newest agent entry mapped that step (KEY `step:<step id>`), or when it removes
+   or changes a span such an edit declared on a node or connection, or deletes that node or
+   connection (KEY `'span:<carrier>/<span key>'`); the summary counts added, changed and
+   removed step mappings and span declarations. Ask the
    author and rerun with `--confirm KEY` once they agree. Board edits older than the
    newest agent entry were already in front of the author and need no question
    (Chuck 2026-11-04). Exit 3: pull first.

@@ -47,7 +47,7 @@ function telemetryTraceModel(diagram,pathId,exemplar){
   var nodes=Object.create(null),edges=Object.create(null),rows=[];
   if(mapping)mapping.steps.forEach(function(match){
     // #1290: an inheriting step has no selector; its traceScope holds its budget.
-    var step=(diagram.steps || []).find(function(s){return s.id===match.stepId;}),selector=FlowTraceMatch.selector(step,match) || (match.inherited && step.traceScope) || {},keys=stepDeliveredKeys(step);
+    var step=typeof match.stepIndex==='number' && (diagram.steps || [])[match.stepIndex] || (diagram.steps || []).find(function(s){return s.id===match.stepId;}),selector=FlowTraceMatch.selector(step,match) || (match.inherited && step.traceScope) || {},keys=stepDeliveredKeys(step);
     var exact=(diagram.edges || []).filter(function(e){return keys.indexOf(e.from+'->'+e.to)>=0 && (!match.nodeId || e.to===match.nodeId);});
     var duration=match.status!=='matched'?null:match.durationMs!=null?match.durationMs:Math.max.apply(null,match.spans.map(function(s){return s.durationMs;}));
     var kinds=match.conditions.map(function(c){return c.kind;}),tone=match.status!=='matched'?'unknown':kinds.some(function(k){return k==='service-error' || k==='delivery-failed';})?'error':kinds.some(function(k){return ['slow','database-slow','queue-buildup','backpressure'].indexOf(k)>=0;})?'warning':'observed';
@@ -286,10 +286,11 @@ function telemetryTraceRowTitle(r){
    inherits through a traceScope replaces that scope. */
 function traceMapStepNote(step){return step && step.traceScope && typeof step.traceScope==='object' && !Array.isArray(step.traceScope)?' · replaces this step\'s trace scope':'';}
 function telemetryTraceReaderHint(diagram,step,shared){
-  function stepTitle(id){var st=(diagram.steps || []).find(function(x){return x && x.id===id;});return '“'+String(st && st.text || id).replace(/\s+/g,' ').trim()+'”';}
+  // A step named by its id, or (an id-less step) by its index in the diagram's steps, as mapTrace names it.
+  function stepTitle(id){var steps=diagram.steps || [],st=steps.find(function(x){return x && x.id===id;}) || (/^\d+$/.test(String(id))?steps[Number(id)]:null);return '“'+String(st && st.text || id).replace(/\s+/g,' ').trim()+'”';}
   var nodeTitle=function(id){var n=(diagram.nodes || {})[id];return n && n.title || id;},parts=shared.id.split('->');
   var carrier=shared.kind==='node'?nodeTitle(shared.id):nodeTitle(parts[0])+' → '+nodeTitle(parts[1]);
-  return 'Step '+stepTitle(step.id)+': '+carrier+' is also part of '+(shared.steps.length>1?'steps ':'step ')+shared.steps.map(stepTitle).join(', ')+', so this step shows no trace spans of its own.';
+  return 'Step “'+String(step && (step.text || step.id) || '').replace(/\s+/g,' ').trim()+'”: '+carrier+' is also part of '+(shared.steps.length>1?'steps ':'step ')+shared.steps.map(stepTitle).join(', ')+', so this step shows no trace spans of its own.';
 }
 function telemetryTraceCounts(model){
   var rows=model.rows || [],n=function(f){return rows.filter(f).length;};

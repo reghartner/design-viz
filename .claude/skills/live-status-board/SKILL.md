@@ -358,10 +358,12 @@ and carry on. Every time you change a published board:
    - Exit 2, nothing written: the same ticket was placed differently on the
      board and in your local spec, or a board edit added a ticket to a node or
      edge your local spec no longer has, or a board edit mapped a span to a step
-     your local spec maps differently or deleted, or a board edit declared a span
-     under a key your local node or connection uses for another span. Show the author the printed conflict, ask which placement
-     to keep, then rerun with `--resolve KEY=live` or `--resolve KEY=local`
-     (KEY `step:<step id>` for a step, `span:<node id or from->to>/<span key>` for a declared span).
+     your local spec maps differently, scopes differently or deleted, or a board
+     edit declared a span on a node or connection your local spec no longer has
+     (or whose import is gone), hides, or uses that key for another span. Show the
+     author the printed conflict, ask which to keep, then rerun with
+     `--resolve KEY=live` or `--resolve KEY=local` (KEY `step:<step id>` for a step,
+     `'span:<node id or from->to>/<span key>'` for a declared span; keep the quotes).
    - Exit 3, nothing written: another agent republished the board from a
      different copy. Copy `live.json` over your local spec and redo the
      requested change on it. If your local spec has changes of its own that

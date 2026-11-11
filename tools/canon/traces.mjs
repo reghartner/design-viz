@@ -78,6 +78,9 @@ export function compareTrace(spec,raw,{section=0,label='Incident trace',into=nul
   const env=reference.trace.context.environment;
   if(env && trace.context.environment && env!==trace.context.environment)throw new Error('Environment differs from the reference; select a comparable trace.');
   if(!env || !trace.context.environment)warnings.push('Environment is not fully recorded; comparability is unverified.');
+  // #1290: a step the approved reference mapped that now reads "Not this flow" means another flow (its trace root differs).
+  const approvedSteps=mapTrace(original,reference.trace).steps,other=mapping.steps.filter((st,i)=>st.notThisFlow && approvedSteps[i] && approvedSteps[i].status==='matched').length;
+  if(other)throw new Error('This trace is another flow: '+other+(other===1?' step':' steps')+' of the approved reference read Not this flow; select a comparable trace.');
   for(const [key,version] of Object.entries(reference.trace.context.versions))if(trace.context.versions[key] && trace.context.versions[key]!==version)warnings.push('Service version changed: '+key+' '+version+' → '+trace.context.versions[key]);
   const first=mapping.steps.findIndex(s=>s.conditions.length),out=C.clone(into || spec),d=C.sections(out)[section].diagram;
   const result={trace,mapping,warnings,firstDivergence:first<0?null:base[first].id,spec:out,pathId:null};

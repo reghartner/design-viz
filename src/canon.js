@@ -236,6 +236,12 @@ var FlowCanon = (function(){
           if(typeof m.attributes[k]!=='string')warnings.push(at+'Honeycomb table cells are text; a '+typeof m.attributes[k]+' value never matches');
         });
       });
+      // #1290: and for a step's traceScope.attributes.
+      var scoped=st && object(st.traceScope) && object(st.traceScope.attributes)?st.traceScope.attributes:{};
+      Object.keys(scoped).forEach(function(k){
+        if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}) || typeof scoped[k]==='string')return;
+        warnings.push('steps.'+(st.id || '?')+'.traceScope.attributes.'+k+': Honeycomb table cells are text; a '+typeof scoped[k]+' value never matches');
+      });
     });
     // #1290: the same rule for span declarations on nodes and edges.
     function declared(value,at){

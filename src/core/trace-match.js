@@ -243,7 +243,7 @@ function handoffs(trace,sends,receivers){
    as before; a step that inherits digests its traceScope and the declarations of every declared
    carrier it lights (shared or not), plus, for a connection, the receiving node's process
    declarations that time its hand-off. A step with neither digests {id, traceMatch:null}, as before. */
-function effectiveSelector(d,step){
+function effectiveSelector(d,step,steps){
   if(step.traceMatch)return {id:step.id,traceMatch:step.traceMatch};
   const lit=litCarriers(step),carriers=[],declared=v=>object(v) && object(v.trace) && object(v.trace.spans)?v.trace.spans:null;
   lit.nodes.forEach(id=>{const spans=declared((d.nodes || {})[id]);if(spans)carriers.push({node:id,spans});});
@@ -255,7 +255,14 @@ function effectiveSelector(d,step){
   });
   const out={id:step.id,traceMatch:null};
   if(object(step.traceScope))out.traceScope=step.traceScope;
-  if(carriers.length)out.carriers=carriers;
+  if(carriers.length){
+    out.carriers=carriers;
+    // The outcome of the shared-carrier rule (D9): which carriers it inherits from. Another step that
+    // starts lighting one of them changes it, even when that step's own selector does not change.
+    const others=(steps || []).filter(s=>s && s!==step).map(litCarriers);
+    const sharedWith=(kind,id)=>others.some(l=>(kind==='node'?l.nodes:l.edges).includes(id));
+    out.inherits=carriers.filter(c=>object(step.traceScope) || !sharedWith(c.node?'node':'edge',c.node || c.edge)).map(c=>c.node || c.edge);
+  }
   return out;
 }
 return {baseSteps:baseSteps,mapTrace:mapTrace,selector:selector,carrierSpans:carrierSpans,handoffs:handoffs,effectiveSelector:effectiveSelector};

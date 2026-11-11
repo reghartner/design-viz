@@ -747,31 +747,21 @@ function editHistoryEntries(page, warn){
   return kept.map(function(item){return item.entry;});
 }
 
-/* #1290 (D19): on a diagram with an approved reference trace, a declared exact operation or
-   operation prefix with no span of its service in that trace warns, so the declaration's owner
-   keeps the strings true. Attribute-only declarations are not checked (the attribute may not be
-   recorded). An imported carrier's warning names the provider to fix it in. */
+/* #1290 (D19): on a diagram with an approved reference trace, each declaration the board owns on a
+   carrier its reference flow lights is checked against that trace. Local carriers are checked here;
+   spans the board's own import overlay adds or overrides are checked when it resolves (at the overlay
+   path, src/canon-topology.js). Spans a provider declares are left to the provider's own check. */
 function referenceTraceDeclarationWarnings(d,DP,warnings){
-  var ref=specObject(d.referenceTrace)?d.referenceTrace:null,spans=ref && specObject(ref.approval) && specObject(ref.trace) && Array.isArray(ref.trace.spans)?ref.trace.spans:null;
-  if(!spans)return;
-  var imports=specObject(d.topologyProvenance) && Array.isArray(d.topologyProvenance.imports)?d.topologyProvenance.imports:[];
-  function check(value,at,kind,id){
+  if(typeof FlowCanon==='undefined' || !FlowCanon.referenceSpans)return;
+  var spans=FlowCanon.referenceSpans(d);if(!spans)return;
+  var lit=FlowCanon.referenceLit(d),imports=specObject(d.topologyProvenance) && Array.isArray(d.topologyProvenance.imports)?d.topologyProvenance.imports:[];
+  function imported(kind,id){return imports.some(function(imp){return specObject(imp) && Array.isArray(imp[kind]) && imp[kind].indexOf(id)>=0;});}
+  function check(value,at){
     var declared=specObject(value) && specObject(value.trace) && specObject(value.trace.spans)?value.trace.spans:{};
-    Object.keys(declared).forEach(function(key){
-      var m=declared[key];if(!specObject(m) || typeof m.serviceName!=='string')return;
-      var exact=typeof m.operation==='string',prefix=!exact && typeof m.operationPrefix==='string';if(!exact && !prefix)return;
-      if(spans.some(function(s){return specObject(s) && s.serviceName===m.serviceName && (exact?s.operation===m.operation:typeof s.operation==='string' && s.operation.indexOf(m.operationPrefix)===0);}))return;
-      var text=at+'.trace.spans.'+key+': no span in the approved reference trace matches '+m.serviceName+' '+(exact?m.operation:'operations starting "'+m.operationPrefix+'"')+'; check the declaration or approve a new reference';
-      var owner=imports.find(function(imp){return specObject(imp) && Array.isArray(imp[kind==='node'?'nodes':'edges']) && imp[kind==='node'?'nodes':'edges'].indexOf(id)>=0;});
-      if(owner){
-        var prefixed=owner.as+'::',relative=id.split('->').map(function(part){return part.indexOf(prefixed)===0?part.slice(prefixed.length):part;}).join('->');
-        text+='. This '+(kind==='node'?'node':'connection')+' is imported from "'+owner.spec+'": fix the declaration there, or override it in this board\'s '+(kind==='node'?'nodeTracking':'edgeTracking')+' for '+relative;
-      }
-      warnings.push(text);
-    });
+    Object.keys(declared).forEach(function(key){var miss=FlowCanon.traceReferenceMiss(declared[key],spans);if(miss)warnings.push(at+'.trace.spans.'+key+': '+miss);});
   }
-  if(specObject(d.nodes))Object.keys(d.nodes).forEach(function(id){check(d.nodes[id],DP+'.nodes.'+id,'node',id);});
-  (Array.isArray(d.edges)?d.edges:[]).forEach(function(e,i){if(specObject(e))check(e,DP+'.edges['+i+']','edge',e.from+'->'+e.to);});
+  if(specObject(d.nodes))lit.nodes.forEach(function(id){if(specObject(d.nodes[id]) && !imported('nodes',id))check(d.nodes[id],DP+'.nodes.'+id);});
+  (Array.isArray(d.edges)?d.edges:[]).forEach(function(e,i){if(specObject(e) && lit.edges.indexOf(e.from+'->'+e.to)>=0 && !imported('edges',e.from+'->'+e.to))check(e,DP+'.edges['+i+']');});
 }
 /* #1290: steps inherit the trace spans declared on the carriers they light. Warn, in plain words,
    when a traceScope skip names a span the carrier does not declare or a carrier the step does

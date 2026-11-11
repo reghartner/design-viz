@@ -197,7 +197,7 @@ var FlowTopology = (function(){
      provider lacks, and a span both hidden and patched (the hide wins), are overlay
      warnings: `note(type, at, message)`, at relative to the overlay's trace. */
   var traceDrops=new WeakMap();
-  function inheritTrace(value,overlay,kind,page,providerPage,drop,note){
+  function inheritTrace(value,overlay,kind,page,providerPage,drop,note,reference){
     var addition=object(overlay) && own(overlay,'trace')?clone(overlay.trace):null;
     if(!own(value,'trace') && !addition)return;
     var errors=own(value,'trace')?FlowCanon.traceDeclarationErrors(value.trace,kind,page):[];
@@ -233,6 +233,12 @@ var FlowTopology = (function(){
           !own(entry,'operation') && !own(entry,'operationPrefix') && !(object(entry.attributes) && Object.keys(entry.attributes).length);
         note('error','.spans.'+key,(own(provided,key) || !incomplete?'':'the provider declares no span '+key+' on this carrier, so this entry is a new span and needs a full declaration: ')+still.join('; '));
       }
+    });
+    // #1290 (D19): the spans this board's overlay adds or overrides are its own declarations; on a
+    // carrier its reference flow lights they are checked against its approved reference trace.
+    if(reference && addition && object(addition.spans))Object.keys(addition.spans).forEach(function(key){
+      var miss=object(addition.spans[key]) && object(value.trace.spans[key])?FlowCanon.traceReferenceMiss(value.trace.spans[key],reference):null;
+      if(miss)note('warning','.spans.'+key,miss);
     });
     if(!Object.keys(value.trace.spans).length)delete value.trace;
   }
@@ -367,6 +373,7 @@ var FlowTopology = (function(){
       var spec=byId.get(id);
       sections(spec).forEach(function(sec,si){
         var d=sec.diagram,at=id+' section '+(sec.id || si),imports=d.topologyImports || [],provenance=[],defaultPlacements=Object.create(null),drops=[],spanDrops=[];
+        var referenceSpans=FlowCanon.referenceSpans(d),referenceLit=referenceSpans?FlowCanon.referenceLit(d):{nodes:[],edges:[]};
         imports.forEach(function(imp,importIndex){
           var where=at+' import '+imp.as+' ('+imp.spec+' export '+imp.export+')',prefix=imp.as+'::';
           if(!byId.has(imp.spec))fail(where,'missing spec '+imp.spec);
@@ -425,7 +432,7 @@ var FlowTopology = (function(){
             }
             if(own(imp.nodeCodeRefs || {},key))value.codeRefs=(value.codeRefs || []).concat(clone(imp.nodeCodeRefs[key]));
             inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));applyTracking(value,(imp.nodeTracking || {})[key]);
-            inheritTrace(value,(imp.nodeTracking || {})[key],'node',spec,byId.get(imp.spec),traceDropped('nodes',prefix+key,providerAt+'.nodes.'+key),traceNoted('nodeTracking',key));
+            inheritTrace(value,(imp.nodeTracking || {})[key],'node',spec,byId.get(imp.spec),traceDropped('nodes',prefix+key,providerAt+'.nodes.'+key),traceNoted('nodeTracking',key),referenceLit.nodes.indexOf(prefix+key)>=0?referenceSpans:null);
             if(imp.presentation)value.presentation=imp.presentation;
             Object.keys((imp.nodeOverrides || {})[key] || {}).forEach(function(field){var override=imp.nodeOverrides[key][field];if(override===null)delete value[field];else value[field]=clone(override);});
             // Reveal indices belong to the provider's story, not the consumer.
@@ -454,7 +461,7 @@ var FlowTopology = (function(){
             var matches=(provider.edges || []).filter(function(e){return e && edgeKey(e)===key;});
             if(matches.length!==1)fail(where,'missing or ambiguous exported edge '+key);
             var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));applyTracking(edge,(imp.edgeTracking || {})[key]);
-            inheritTrace(edge,(imp.edgeTracking || {})[key],'edge',spec,byId.get(imp.spec),traceDropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'),traceNoted('edgeTracking',key));
+            inheritTrace(edge,(imp.edgeTracking || {})[key],'edge',spec,byId.get(imp.spec),traceDropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'),traceNoted('edgeTracking',key),referenceLit.edges.indexOf(importedEdge(key))>=0?referenceSpans:null);
             if(imp.presentation)edge.presentation=imp.presentation;
             if(!selected.has(edge.from) || !selected.has(edge.to))fail(where,'exported edge '+key+' must include both endpoints in exported nodes');
             Object.keys((imp.edgeOverrides || {})[key] || {}).forEach(function(field){var value=imp.edgeOverrides[key][field];if(value===null)delete edge[field];else edge[field]=clone(value);});

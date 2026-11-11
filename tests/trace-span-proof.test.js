@@ -131,8 +131,8 @@ test('P5 declarations a board owns, on carriers its flow lights, are checked aga
   const authored=orders(variant);diagramOf(authored.board).referenceTrace=reference;
   const board=C.materializeTopology([authored.platform,authored.board]).find(s=>s.page.canon.id==='orders-board');
   assert.deepEqual(warnings(board),[
-    'sections[0].diagram.edges[0].trace.spans.retry: shop-web POST /orders retry'+NOT_SEEN,
-    'sections[0].diagram.topologyImports[0].nodeTracking.worker.trace.spans.audit: order-worker audit write'+NOT_SEEN]);
+    'sections[0].diagram.topologyImports[0].nodeTracking.worker.trace.spans.audit: order-worker audit write'+NOT_SEEN,
+    'sections[0].diagram.edges[0].trace.spans.retry: shop-web POST /orders retry'+NOT_SEEN]);
   assert.ok(warnings(board).every(w=>!/imported from/.test(w)),'no warning sends the author to the provider');
   // Without an approved reference trace nothing is checked.
   assert.deepEqual(warnings(orders().resolved),[]);

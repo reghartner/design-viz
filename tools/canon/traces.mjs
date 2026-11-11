@@ -49,7 +49,7 @@ const baseSteps=d=>C.traceMatch.baseSteps(d);
 export function mapTrace(d,trace,pathId){return C.traceMatch.mapTrace(d,trace,pathId);}
 // #1290 (D20): the approval covers each base step's effective selector, so a provider or overlay
 // change to a span a step inherits asks for a new approval. Steps without declarations digest as before.
-const contract=d=>digest(baseSteps(d).map(s=>C.traceMatch.effectiveSelector(d,s)));
+const contract=d=>{const steps=baseSteps(d);return digest(steps.map(s=>C.traceMatch.effectiveSelector(d,s,steps)));};
 export function referencePreview(spec,raw,section=0){
   const d=C.sections(spec)[section]?.diagram;if(!d)throw new Error('Diagram section not found.');
   const steps=baseSteps(d);if(!steps.length || steps.some(s=>!s || typeof s.id!=='string' || !s.id) || new Set(steps.map(s=>s.id)).size!==steps.length)throw new Error('Give every baseline step a stable unique ID before attaching trace evidence.');
@@ -68,7 +68,9 @@ export function approveReference(spec,raw,{section=0,reason,actor='local reviewe
     contract:contract(d),approval:{actor,reason:reason.trim(),at}};
   return out;
 }
-export function compareTrace(spec,raw,{section=0,label='Incident trace'}={}){
+/* `into`: the spec the incident is written into, when it differs from the one compared (the CLI
+   compares the resolved board and writes the authored one); the contract is checked once, on `spec`. */
+export function compareTrace(spec,raw,{section=0,label='Incident trace',into=null}={}){
   const original=C.sections(spec)[section]?.diagram;if(!original?.referenceTrace?.approval)throw new Error('Approve a reference trace first.');
   const base=baseSteps(original),reference=original.referenceTrace;
   if(reference.contract!==contract(original))throw new Error('Trace mappings changed; approve the reference again.');
@@ -77,7 +79,7 @@ export function compareTrace(spec,raw,{section=0,label='Incident trace'}={}){
   if(env && trace.context.environment && env!==trace.context.environment)throw new Error('Environment differs from the reference; select a comparable trace.');
   if(!env || !trace.context.environment)warnings.push('Environment is not fully recorded; comparability is unverified.');
   for(const [key,version] of Object.entries(reference.trace.context.versions))if(trace.context.versions[key] && trace.context.versions[key]!==version)warnings.push('Service version changed: '+key+' '+version+' → '+trace.context.versions[key]);
-  const first=mapping.steps.findIndex(s=>s.conditions.length),out=C.clone(spec),d=C.sections(out)[section].diagram;
+  const first=mapping.steps.findIndex(s=>s.conditions.length),out=C.clone(into || spec),d=C.sections(out)[section].diagram;
   const result={trace,mapping,warnings,firstDivergence:first<0?null:base[first].id,spec:out,pathId:null};
   if(mapping.unmatched.length)warnings.push(mapping.unmatched.length+' unmatched span(s); inspect them before drawing conclusions.');
   if(first<0)return result;
@@ -91,7 +93,8 @@ export function compareTrace(spec,raw,{section=0,label='Incident trace'}={}){
     // No copied success patches beyond the fork: a server span cannot prove a
     // notification appeared, a door opened, or a physical device started recording.
     // #1290: an inheriting step has no selector; its text names its spans, or the step itself.
-    const named=selector?selector.serviceName+' · '+selector.operation:evidence.spans.length?[...new Set(evidence.spans.map(p=>p.serviceName+' · '+p.operation))].join(', '):originalStep.text || originalStep.id;
+    const names=[...new Set(evidence.spans.map(p=>p.serviceName+' · '+p.operation))];
+    const named=selector?selector.serviceName+' · '+selector.operation:names.length?names[0]+(names.length>1?' and '+(names.length-1)+' more':''):originalStep.text || originalStep.id;
     const step={id,text:(evidence.status==='unmapped'?'Uninstrumented step · outcome unknown':evidence.notThisFlow?'Not this flow: '+(originalStep.text || originalStep.id):evidence.optional?'Optional, not in this trace: '+(selector?named:originalStep.text || originalStep.id):evidence.conditions.length?evidence.conditions.map(c=>c.label).join('; '):'Observed '+named),
       conditions:C.clone(evidence.conditions),nodes:evidence.nodeId?[evidence.nodeId]:[],
       codeRefs:C.clone(originalStep.codeRefs || []),evidence:{traceId:trace.traceId,spanIds:evidence.spans.map(s=>s.id),canonicalStepId:originalStep.id,status:evidence.status}};

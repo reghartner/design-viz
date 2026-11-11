@@ -806,8 +806,13 @@ function traceSpansControls(){
       var span=state.spans[key],group=el('fieldset','trace-span');el('legend','','Span '+key,group);
       var inherited=state.imported && Object.prototype.hasOwnProperty.call(state.inherited,key),changed=inherited && state.overlay && state.overlay.spans && state.overlay.spans[key]!=null;
       el('p','fnote trace-span-origin',!state.imported?'Declared here':inherited?'Inherited from '+state.provider+(changed?', changed here':''):'Added here',group);
-      var nameInput=named(document.createElement('input'),key+' name',inherited?'Inherited span names come from '+state.provider+'. To rename one, hide it and add a new span.':'To rename a span, remove it and add it again.');
-      nameInput.type='text';nameInput.className='fctl';nameInput.value=key;nameInput.readOnly=true;row(group,'Name',nameInput);
+      var nameInput;
+      if(inherited){
+        nameInput=named(document.createElement('input'),key+' name','Inherited span names come from '+state.provider+'. To rename one, hide it and add a new span.');
+        nameInput.type='text';nameInput.className='fctl';nameInput.value=key;nameInput.readOnly=true;
+      }else nameInput=named(textControl(key,function(v){return commit({op:'rename',name:key,to:v==null?'':v},{name:nameInput});},{placeholder:key}),key+' name','Rename this span. Its fields are kept, and trace scope skips on this board that name it follow.');
+      if(!inherited)nameInput.readOnly=false;
+      row(group,'Name',nameInput);
       var service=row(group,'Service',named(textControl(span.serviceName,function(v){return commit({op:'set',name:key,field:'serviceName',value:v},{serviceName:service});},{placeholder:'order-worker'}),key+' service','The span service.name, exactly as the trace shows it.'));
       var mode=traceSpanMode(span),match=row(group,'Match',select(modes,mode,key+' match'));
       var value=row(group,'Value',named(textControl(span.operation!=null?span.operation:span.operationPrefix,function(v){return commit({op:'set',name:key,field:'match',mode:match.value,value:v},{value:value});},{placeholder:mode==='operationPrefix'?'find ':'process orders'}),key+' value',
@@ -824,21 +829,26 @@ function traceSpansControls(){
       // Attributes: one row per key and an add row.
       var attrs=span.attributes && typeof span.attributes==='object'?span.attributes:{},box=document.createElement('div');box.className='rowsedit trace-span-attributes';
       box.setAttribute('role','group');box.setAttribute('aria-label',key+' attributes');
+      var TYPES=[['string','Text'],['number','Number'],['boolean','True/false']];
       Object.keys(attrs).forEach(function(a){
         var line=el('div','rowline','',box),label=el('span','fnote',a+' = '+String(attrs[a]),line);label.setAttribute('aria-hidden','true');
+        var type=typeof attrs[a],types=select(TYPES,type,key+' attribute '+a+' type');types.title='Value type. Honeycomb table cells are text; Tempo keeps numbers and true/false.';line.appendChild(types);
+        listen(types,'change',function(){if(commit({op:'attribute',name:key,key:a,attrName:a,value:String(attrs[a]),type:types.value},{attribute:addName})===false)types.value=type;});
         var x=named(actionButton('\u00d7',function(){return commit({op:'attribute',name:key,key:a,attrName:null},{any:addName});},'rowx'),'Remove attribute '+a+' from '+key,'Remove attribute '+a);line.appendChild(x);
       });
       var addLine=el('div','rowline','',box),draftKey='attr:'+key+':';
       var addName=named(document.createElement('input'),key+' new attribute name','A supported span attribute, such as db.system.');addName.type='text';addName.className='fctl';addName.placeholder='attribute';
       var addValue=named(document.createElement('input'),key+' new attribute value');addValue.type='text';addValue.className='fctl';addValue.placeholder='value';
       [addName,addValue].forEach(function(input,i){var k=draftKey+i;if(TRACE_SPAN_DRAFTS.has(k))input.value=TRACE_SPAN_DRAFTS.get(k);listen(input,'input',function(){TRACE_SPAN_DRAFTS.set(k,input.value);});input._flowviewHasDraft=function(){return input.value!=='';};addLine.appendChild(input);});
-      function addAttribute(){if(commit({op:'attribute',name:key,key:null,attrName:addName.value,value:addValue.value,type:'string'},{any:addName})!==false){TRACE_SPAN_DRAFTS.delete(draftKey+0);TRACE_SPAN_DRAFTS.delete(draftKey+1);}}
+      if(state.allowed && state.allowed.length){var listId=prefix+'-span-attrs';if(!guide.querySelector('#'+listId) && !fold.querySelector('#'+listId)){var dl=el('datalist','',null);dl.id=listId;state.allowed.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});}addName.setAttribute('list',listId);}
+      var addType=select(TYPES,'string',key+' new attribute type');addType.title='Value type. Honeycomb table cells are text; Tempo keeps numbers and true/false.';addLine.appendChild(addType);
+      function addAttribute(){if(commit({op:'attribute',name:key,key:null,attrName:addName.value,value:addValue.value,type:addType.value},{any:addName,attribute:addName})!==false){TRACE_SPAN_DRAFTS.delete(draftKey+0);TRACE_SPAN_DRAFTS.delete(draftKey+1);}}
       [addName,addValue].forEach(function(input){listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addAttribute();}});});
       addLine.appendChild(named(actionButton('Add attribute',addAttribute,'rowadd'),'Add attribute to '+key,'Add the attribute typed to the left (Enter also adds it).'));
       group.appendChild(frowBlock('Attributes',box));slot(group,addName);
       // Validator messages for this span, beside the field they concern.
       (state.messages[key] || []).forEach(function(text){
-        var target=/role/.test(text)?role:/operation|prefix|needs operation/i.test(text)?value:/attribute/.test(text)?addName:service;
+        var target=/declares no span/.test(text)?service:/role/.test(text)?role:/operation|prefix|needs operation/i.test(text)?value:/attribute/.test(text)?addName:service;
         if(target._spanNote)target._spanNote(text);
       });
       var acts=actionGroup('Span '+key+' actions','trace-span-actions');
@@ -855,6 +865,13 @@ function traceSpansControls(){
         var c=checkboxControl(true,function(on){return commit({op:'hide',name:key,value:on},{any:null});});named(c.firstChild,key+' hidden for this document','Clear to show '+key+' from '+state.provider+' again.');
         var cap=document.createElement('span');cap.className='fnote';cap.textContent=' '+key;c.appendChild(cap);hiddenBox.appendChild(frow(key,c));
       });
+    }
+    var askReceive=null;
+    if(state.kind==='edge' && state.receiver && !state.receiver.declared && !state.receiver.process.length){
+      // No process span on the receiver: the hand-off cannot end anywhere until a receive span is declared.
+      el('p','fnote trace-span-receiver','The receiving node '+state.receiver.title+' declares no process span, so this connection reads send only. Declare a receive span here to time the hand-off.');
+      askReceive=actionButton('Declare receive span here',function(){newName.value='receive';newRole.value='receive';TRACE_SPAN_DRAFTS.set('add:name','receive');newService.focus();return true;});
+      askReceive.title='Starts a receive span in Add span below: enter its service and operation.';el('div','iacts').appendChild(askReceive);
     }
     if(state.kind==='edge' && state.receiver && !state.receiver.declared && state.receiver.process.length){
       var procs=state.receiver.process;

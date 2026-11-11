@@ -514,14 +514,21 @@ Select a node or connection and open **Inspect → Tracking → Trace spans** (d
 its declared spans (`trace.spans`, see [provider traces](provider-traces.md#trace-spans-declared-on-nodes-and-connections-1290)).
 Each span shows **Name**, **Service**, **Match** (Operation, Prefix or Attributes only),
 **Value**, **Namespace**, **Role** and its **Attributes**; **Add span** (or Enter) adds one and
-**Remove span** removes one. A refused edit changes nothing and says why beside the field, for
-example "A prefix needs at least 2 characters.". On an imported node or connection each span
-says which provider it is inherited from; an edit stores only the changed field in this
-document's `nodeTracking` / `edgeTracking` overlay, **Hidden for this document** hides an
+**Remove span** removes one. Each attribute has a type (Text, Number or True/false); Honeycomb
+table cells are text, while Tempo keeps numbers and true/false. Only attributes the board can
+match are accepted (the trace attribute allowlist, or a trace connection's `allowedAttributes`).
+A refused edit changes nothing and says why beside the field, for example "A prefix needs at
+least 2 characters.". Renaming a span on this board keeps its fields and updates the step
+`traceScope.skip` entries that name it, in one Undo step. On an imported node or connection
+each span says which provider it is inherited from; an edit stores only the changed field in
+this document's `nodeTracking` / `edgeTracking` overlay, **Hidden for this document** hides an
 inherited span, **Revert <name> to inherited** drops your changes to it and **Revert all trace
 spans** drops them all. Inherited span names are read only: hide one and add a new span to
-rename it. A connection shows its receive side when it comes from the receiving node's
-`process` span, and **Declare receive span here** adds a `receive` span on the connection.
+rename it; spans added here can be renamed. An override the resolver cannot use stays listed
+with its error beside the field, and other edits keep it as written. A connection shows its
+receive side when it comes from the receiving node's `process` span; when the receiving node
+declares no process span the connection reads send only. In both cases **Declare receive span
+here** starts a `receive` span on the connection.
 Each edit is one Undo step.
 
 ### Step trace match

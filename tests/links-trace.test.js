@@ -2,7 +2,11 @@
 /* #1243 part 2: the Links window's Trace match tab. Read model and planners for
    By trace match / By element, drag move/copy (Replace or Add as alternative),
    + Assign step and the shared rename. Every write is the step's `traceMatch`,
-   as the #1238 Inspect form writes it, in one plan (one Undo step). */
+   as the #1238 Inspect form writes it, in one plan (one Undo step).
+   #1290 PR 8 (LT17-LT20): spans declared on nodes and connections (trace.spans) join the
+   groups as read-only declaration rows, with the steps that inherit them (the per-path D9 rule
+   and skips, as the step trace scope form); By element lists a carrier's own declarations;
+   imported carriers show their merged declarations. */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const loader=require('../tools/source-loader.cjs');
 const c={URL,TextEncoder};vm.createContext(c);
@@ -232,4 +236,68 @@ test('LT15 a step without an id cannot be given a trace match: Create, Assign, M
   assert.match(c.linksTraceDropRefusal(step(1),target,null,false),needsId);
   const ok=apply(board(),(t,r)=>c.planLinksTraceEdit(t,r,0,2,{op:'create',serviceName:'push-gw',operation:'apns.send'},null));
   assert.deepEqual(plain(c.validate(c.normalize(ok.raw)).errors),[],'with an id, Create leaves a valid board');
+});
+
+/* #1290 PR 8: a board whose nodes and connections declare spans. Path A has push and retry on
+   notify (shared, so push inherits nothing there); Path B has push alone (it inherits). */
+function declared(){
+  const spec=board(),dd=d(spec);
+  dd.nodes.notify.trace={spans:{route:{serviceName:'notify-svc',operation:'route.event',role:'process'},lookup:{serviceName:'notify-svc',operationPrefix:'GET ',role:'database'}}};
+  dd.edges[0].trace={spans:{send:{serviceName:'ingest-api',operation:'POST /v1/events',role:'send'}}};
+  delete dd.steps[0].traceMatch;
+  dd.paths=[{id:'a',label:'Path A',steps:['publish','route','push','retry']},{id:'b',label:'Path B',steps:['publish','push']}];
+  return spec;
+}
+const decl=(g,key)=>{const x=(g.declarations || []).find(x=>x.spanKey===key);assert.ok(x,'declaration '+key+' is listed under '+g.key);return x;};
+
+test('LT17 By trace match: declarations join their group, read only, with the steps that inherit them per path',()=>{
+  assert.deepEqual(plain(c.validate(c.normalize(declared())).errors),[],'the fixture is a board the product accepts');
+  const m=model(declared());assert.equal(m.error,undefined,m.error);
+  assert.deepEqual(plain(m.groups.map(g=>g.key)),['ingest-api · POST /v1/events','notify-svc · GET … (prefix)',KEY]);
+  const route=group(m,KEY);
+  assert.deepEqual(plain(route.uses.map(u=>u.index)),[1,3],'the steps with this trace match stay');
+  const r=decl(route,'route');
+  assert.deepEqual(plain({carrier:r.carrier,carrierLabel:r.carrierLabel,text:r.text,label:r.label,imported:r.imported}),
+    {carrier:{kind:'node',section:0,id:'notify'},carrierLabel:'Notification service',text:'route · notify-svc route.event',label:'declared on Notification service (route)',imported:false});
+  assert.deepEqual(plain(r.inherited.map(x=>x.text)),['Step 3 · push (inherited on Path B)'],'push inherits notify only where no other step lights it');
+  const send=decl(group(m,'ingest-api · POST /v1/events'),'send');
+  assert.deepEqual(plain(send.carrier),{kind:'edge',section:0,index:0,key:'ctrl->ingest'});
+  assert.equal(send.carrierLabel,'Doorbell controller → Event ingest');
+  assert.deepEqual(plain(send.inherited.map(x=>x.text)),['Step 1 · publish (inherited)'],'on every path: no path name');
+  const prefix=group(m,'notify-svc · GET … (prefix)');
+  assert.deepEqual(plain(prefix.uses),[],'a prefix declaration has no step trace match');
+  assert.equal(prefix.assignable,false,'a step cannot take a prefix as its trace match');
+  assert.equal(route.assignable,true);
+});
+
+test('LT18 skips and scopes: a scoped step inherits shared carriers; a skipped span or role is not listed',()=>{
+  const spec=declared();d(spec).steps[2].traceScope={skip:{notify:['lookup']}};
+  const m=model(spec);
+  assert.deepEqual(plain(decl(group(m,KEY),'route').inherited.map(x=>x.text)),['Step 3 · push (inherited)'],'a scope inherits shared carriers on every path');
+  assert.deepEqual(plain(decl(group(m,'notify-svc · GET … (prefix)'),'lookup').inherited),[],'a skipped span is not inherited');
+  d(spec).steps[2].traceScope={skip:{notify:['role:process']}};
+  assert.deepEqual(plain(decl(group(model(spec),KEY),'route').inherited),[],'a skipped role is not inherited');
+  // A connection's receive span only times the hand-off: no step inherits it.
+  const recv=declared();d(recv).edges[0].trace.spans.receive={serviceName:'ingest-api',operation:'consume',role:'receive'};
+  assert.deepEqual(plain(decl(group(model(recv),'ingest-api · consume'),'receive').inherited),[]);
+});
+
+test('LT19 By element: a node or connection lists its own declarations, not only via its steps',()=>{
+  const m=model(declared());
+  assert.ok(Array.isArray(el(m,'node','notify').declarations),'a node row carries its declarations');
+  assert.deepEqual(plain(el(m,'node','notify').declarations.map(x=>x.text)),['route · notify-svc route.event','lookup · notify-svc GET … (prefix)']);
+  assert.deepEqual(plain(el(m,'edge',0).declarations.map(x=>x.text)),['send · ingest-api POST /v1/events']);
+  assert.deepEqual(plain(el(m,'node','ctrl').declarations),[]);
+});
+
+test('LT20 imported carriers: merged declarations (the consumer overlay adds and hides), named by namespaced id',()=>{
+  const f=imported({api:{title:'API',trace:{spans:{get:{serviceName:'api',operation:'GET /items',role:'process'},old:{serviceName:'api',operation:'GET /old',role:'process'}}}},store:{title:'Store'}});
+  d(f.source).topologyImports[0].nodeTracking={api:{trace:{spans:{audit:{serviceName:'api',operation:'audit',role:'work'}},hide:['old']}}};
+  const m=model(f.source,f.context);assert.equal(m.error,undefined,m.error);
+  const api=el(m,'node','canon::api');
+  assert.equal(api.imported,true);assert.ok(Array.isArray(api.declarations),'an imported node row carries its declarations');
+  assert.deepEqual(plain(api.declarations.map(x=>x.spanKey)),['get','audit'],'the overlay adds audit and hides old');
+  const g=decl(group(m,'api · GET /items'),'get');
+  assert.deepEqual(plain({carrier:g.carrier,imported:g.imported,label:g.label}),{carrier:{kind:'node',section:0,id:'canon::api'},imported:true,label:'declared on API (get)'});
+  assert.equal(m.groups.some(x=>x.key==='api · GET /old'),false,'a hidden span is not listed');
 });

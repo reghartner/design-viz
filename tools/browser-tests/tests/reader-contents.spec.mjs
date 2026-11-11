@@ -578,10 +578,11 @@ test('#622 closed Contents shows a numbered rail, a hover overlay, marker clicks
   await expect(toggle).toHaveAttribute('aria-expanded','true');await expect(side).toBeVisible();await expect(side).not.toHaveClass(/reader-contents-overlay/);expect((await side.boundingBox()).x).toBe(navBox.x);await expect(railOf(root)).toBeHidden();
   await expect(root.locator('.reader-tab-label')).toHaveText('Smart motion');
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  // H4 with every Tab expanded: each page 1..9 has exactly one numbered row, and Answer and talk's section rows 3-6 name rail markers 3-6.
+  // H4 with every Tab expanded: each page 1..9 has exactly one numbered row, and Answer and talk's section rows 3-6 name the
+  // pages of rail markers 3-6 (atlasPages; the rail itself is hidden while Contents is pinned, and its names were checked above).
   expect((await side.locator('[data-page-index]').evaluateAll(els=>els.map(el=>+el.getAttribute('data-page-index')))).sort((a,b)=>a-b)).toEqual([1,2,3,4,5,6,7,8,9]);
   expect((await drawnNumbers(side.locator('[data-page-index]'))).map(Number).sort((a,b)=>a-b)).toEqual([1,2,3,4,5,6,7,8,9]);
-  for(const row of await side.locator('.reader-tree-section[data-page-index]').all()){const k=+await row.getAttribute('data-page-index');expect(await drawnNumbers(row)).toEqual([String(k)]);expect((await marksOf(root).nth(k-1).getAttribute('aria-label')).startsWith('Page '+k+': '+await row.getAttribute('aria-label')+' · ')).toBe(true);}
+  for(const row of await side.locator('.reader-tree-section[data-page-index]').all()){const k=+await row.getAttribute('data-page-index');expect(await drawnNumbers(row)).toEqual([String(k)]);await expect(row).toHaveAccessibleName(atlasPages[k-1]);}
   expect(await tabs.evaluateAll(els=>els.map(el=>el.getAttribute('aria-expanded')))).toEqual([null,null,'true',null,null,null]);
   expect((await root.locator('#section-motion').boundingBox()).x).toBeGreaterThanOrEqual((await side.boundingBox()).x+(await side.boundingBox()).width);
   await closeContents(root);await expectCurrentPart(root,6);

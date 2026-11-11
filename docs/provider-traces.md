@@ -318,6 +318,17 @@ by absence. Provider errors, budget violations and supplied queue/backpressure
 conditions are shown separately. An unavailable or over-200-span timeline retains
 its identity and warnings without asserting missing operations.
 
+### Duplicate calls and retries
+
+For duplicate calls, first use a verified parent/link or retained attribute.
+`occurrence:1` is only valid for fully timed, non-overlapping serial calls;
+concurrent calls remain ambiguous. `repeat:"attempts"` requires distinct numeric
+`retry.attempt` values and a common parent; do not combine it with `occurrence`.
+One span matching two steps is ambiguous. Do not silence ambiguity by renaming
+nodes, taking the first span or inventing attributes. Leave the unresolved
+mapping visible and report what instrumentation/context is missing. Per-transport
+root spans of one step: [alternatives](#tracematch-alternatives).
+
 ### traceMatch alternatives
 
 When the same logical operation is recorded by different root spans depending on

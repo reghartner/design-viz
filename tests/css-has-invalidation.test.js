@@ -13,9 +13,12 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const repo=path.join(__dirname,'..'),src=path.join(repo,'src');
 
-/* Classes that Workbench code puts on <body> (document.body.classList.add/toggle/remove('…')). */
+/* Classes that land on <body>: written by body.classList.add/toggle/remove('…'); the skin classes
+   (applySkinClasses puts sk-<name> on body); and the #1318 canvas state classes, which are set on the
+   .workspace-canvas element through a variable. */
+const CANVAS_STATE_CLASSES=['workspace-docview-contents','workspace-extraction-preview'];
 function bodyClasses(){
-  const out=new Set();
+  const out=new Set(CANVAS_STATE_CLASSES);
   (function walk(dir){
     for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
       const file=path.join(dir,entry.name);
@@ -23,6 +26,9 @@ function bodyClasses(){
       else if(/\.(js|html)$/.test(entry.name))for(const m of fs.readFileSync(file,'utf8').matchAll(/body\.classList\.(?:add|toggle|remove)\('([\w-]+)'/g))out.add(m[1]);
     }
   })(src);
+  const skins=fs.readFileSync(path.join(src,'validator.js'),'utf8').match(/SKIN_NAMES\s*=\s*\[([^\]]*)\]/);
+  assert.ok(skins,'SKIN_NAMES is readable from src/validator.js');
+  for(const m of skins[1].matchAll(/'([\w-]+)'/g))out.add('sk-'+m[1]);
   return out;
 }
 function stylesheets(){
@@ -30,9 +36,11 @@ function stylesheets(){
     .concat(fs.readdirSync(path.join(src,'workbench')).filter(f=>f.endsWith('.css')).map(f=>'src/workbench/'+f))
     .concat(fs.existsSync(path.join(src,'viewer'))?fs.readdirSync(path.join(src,'viewer')).filter(f=>f.endsWith('.css')).map(f=>'src/viewer/'+f):[]);
   const out=files.map(f=>[f,fs.readFileSync(path.join(repo,f),'utf8')]);
-  for(const f of fs.readdirSync(path.join(src,'panels','types')).filter(f=>f.endsWith('.js'))){
-    const text=fs.readFileSync(path.join(src,'panels','types',f),'utf8');
-    for(const m of text.matchAll(/(?:styles|editorStyles)\s*:\s*(?:String\.raw)?`([^`]*)`/g))out.push(['src/panels/types/'+f,m[1]]);
+  // Panel styles are template literals in several shapes (styles:`…`, styles:[{css:`…`}], const LIVE_STYLES=`…`):
+  // read every template literal in the panel sources that looks like CSS.
+  for(const dir of ['panels',path.join('panels','types')])for(const f of fs.readdirSync(path.join(src,dir)).filter(f=>f.endsWith('.js'))){
+    const text=fs.readFileSync(path.join(src,dir,f),'utf8');
+    for(const m of text.matchAll(/`([^`]*)`/g))if(/[.#\w\]):-]\s*\{[^{}]*:[^{}]*\}/.test(m[1]))out.push(['src/'+dir.replace(/\\/g,'/')+'/'+f,m[1]]);
   }
   return out;
 }
@@ -86,9 +94,12 @@ test('H0 the checker finds body-anchored and bare-type :has() selectors and leav
 });
 
 test('H1 H2 shipped stylesheets have no body-anchored :has() and no bare type selector after :has()',()=>{
-  const classes=bodyClasses();
-  assert.ok(classes.has('workspace-canvas'),'the body class list is read from source');
-  const found=check(stylesheets(),classes);
+  const sheets=stylesheets(),classes=bodyClasses();
+  for(const name of ['workspace-canvas','sk-aurora','sk-pastel','workspace-docview-contents','workspace-extraction-preview','workspace-agent-window-open'])
+    assert.ok(classes.has(name),'body class '+name+' is known to the check');
+  assert.ok(sheets.some(([file,css])=>file.endsWith('live-status.js') && css.includes(':has(')),'panel style constants (LIVE_STYLES) are scanned');
+  assert.ok(sheets.some(([file])=>file.endsWith('replicas.js')) && sheets.some(([file])=>file.endsWith('homemap.js')),'array-held panel styles are scanned');
+  const found=check(sheets,classes);
   assert.deepEqual(found.body,[],'H1 :has() anchored on <body>:\n'+found.body.join('\n'));
   assert.deepEqual(found.bare,[],'H2 bare type selector after :has():\n'+found.bare.join('\n'));
 });

@@ -301,3 +301,24 @@ test('LT20 imported carriers: merged declarations (the consumer overlay adds and
   assert.deepEqual(plain({carrier:g.carrier,imported:g.imported,label:g.label}),{carrier:{kind:'node',section:0,id:'canon::api'},imported:true,label:'declared on API (get)'});
   assert.equal(m.groups.some(x=>x.key==='api · GET /old'),false,'a hidden span is not listed');
 });
+
+test('LT21 Assign, a drag drop and Move onto a step with a trace scope replace the scope in the same edit: a valid board, one plan',()=>{
+  const scoped=()=>{const spec=declared();d(spec).steps[2].traceScope={skip:{notify:['lookup']}};return spec;};
+  const valid=raw=>assert.deepEqual(plain(c.validate(c.normalize(raw)).errors),[],'a valid board');
+  // + Assign step
+  let s=apply(scoped(),(t,r)=>c.planLinksTraceAssign(t,r,{serviceName:'notify-svc',operation:'route.event'},step(2),false,null));
+  assert.deepEqual(plain(d(s.raw).steps[2]),{id:'push',text:'push',nodes:['notify'],traceMatch:{serviceName:'notify-svc',operation:'route.event'}});valid(s.raw);
+  // A drag drop or Move to… (planLinksTraceMove), and Copy
+  s=apply(scoped(),(t,r)=>c.planLinksTraceMove(t,r,step(1),step(2),null,false,null));
+  assert.equal(Object.hasOwn(d(s.raw).steps[2],'traceScope'),false);assert.equal(d(s.raw).steps[2].traceMatch.operation,'route.event');valid(s.raw);
+  s=apply(scoped(),(t,r)=>c.planLinksTraceMove(t,r,step(1),step(2),null,true,null));
+  assert.equal(Object.hasOwn(d(s.raw).steps[2],'traceScope'),false);assert.equal(d(s.raw).steps[1].traceMatch.operation,'route.event');valid(s.raw);
+  // The Assign list, Move to… list and drop text read this to say "replaces this step's trace scope" first.
+  const m=model(scoped());
+  assert.equal(el(m,'step',2).scoped,true,'the step row says it has a trace scope');assert.equal(el(m,'step',1).scoped,false);
+});
+
+test('LT22 a prefix or attributes-only group cannot be assigned to a step, in plain words',()=>{
+  const text=JSON.stringify(declared(),null,2),raw=JSON.parse(text),g=group(model(declared()),'notify-svc · GET … (prefix)');
+  assert.equal(c.planLinksTraceAssign(text,raw,g,step(2),false,null).error,'notify-svc · GET … (prefix) is not an exact operation, so it cannot be a step\'s trace match. Steps inherit it from the node or connection that declares it.');
+});

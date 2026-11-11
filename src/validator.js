@@ -381,6 +381,13 @@ function validateSection(sec, P, protos, lanes, errors, warnings, notes){
       if(ct.id!=null && (typeof ct.id!=='string' || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(ct.id) || ct.id==='legacy'))warnings.push(CP+'.id: use a stable ID beginning with a letter; "legacy" is reserved');
       if (ct.source && typeof ct.source !== 'string')
         warnings.push(CP + '.source: must be a URL string — source chip skipped');
+      // #1304: a block with `columns` is a grid; rows put their values in `cells`.
+      var gridColumns=Array.isArray(ct.columns)?contractGridColumns(ct).map(function(col){return col.id;}):null;
+      if(ct.columns!=null && !gridColumns)warnings.push(CP+'.columns: must be an array of {id, label?, width?} — block renders without grid columns');
+      if(gridColumns){
+        contractGridColumnWarnings(ct,CP,warnings);
+        if(ct.fieldLabel!=null && typeof ct.fieldLabel!=='string')warnings.push(CP+'.fieldLabel: expected text — using Field');
+      }
       if (!Array.isArray(ct.fields) || !ct.fields.length){
         warnings.push(CP + '.fields: required — array of {k, v?, g?, hot?, link?, delta?, revealAt?, hideAt?}; card renders without rows');
       } else ct.fields.forEach(function(f, fi){
@@ -395,6 +402,17 @@ function validateSection(sec, P, protos, lanes, errors, warnings, notes){
           warnings.push(CP + '.fields[' + fi + '].delta: unknown token "' + f.delta +
             '" — badge omitted (valid: added removed changed)');
         revealFieldWarnings(f, CP + '.fields[' + fi + ']', sectionStepCount, warnings);
+        var FP=CP+'.fields['+fi+']';
+        if(!gridColumns){if(f.cells!=null)warnings.push(FP+'.cells: needs block columns — cells ignored');return;}
+        ['v','g'].forEach(function(key){if(f[key]!=null)warnings.push(FP+'.'+key+': not shown in a grid block — move it to a cell');});
+        if(f.cells==null)return;
+        if(!specObject(f.cells)){warnings.push(FP+'.cells: expected an object keyed by column id — cells ignored');return;}
+        Object.keys(f.cells).forEach(function(key){
+          var value=f.cells[key];
+          if(gridColumns.indexOf(key)<0)warnings.push(FP+'.cells.'+key+': not a declared column — cell ignored');
+          else if(typeof value!=='string' && !(typeof value==='number' && isFinite(value)))warnings.push(FP+'.cells.'+key+': use text or a number — shown as text');
+          else if(typeof value==='string' && value.length>CONTRACT_GRID_CELL_CHARS)warnings.push(FP+'.cells.'+key+': grid cells are for short values ('+CONTRACT_GRID_CELL_CHARS+' characters or fewer) — shown in full; use the block note for longer text');
+        });
       });
     }
   }

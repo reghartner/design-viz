@@ -7,9 +7,9 @@ const traceText=fixture('honeycomb-trace.txt'),candidateText=fixture('honeycomb-
 const rawQuery=()=>({query_spec:{filters:[{column:'service.name',op:'=',value:'event-ingest'}]},raw_row_columns:['trace.trace_id','timestamp','error'],results_limit:20});
 const binding=(source='honeycomb')=>({kind:'service',signals:{trace:source==='tempo'?{tempo:'{ resource.service.name = "event-ingest" }'}:{honeycomb:rawQuery()}}});
 const pageSpec=(source='honeycomb')=>({tracking:{telemetry:{honeycomb:{environment:'flowview-demo',dataset:'doorbell'},grafana:{tempo:'tempo-main',prometheus:'prom-main'}}},sections:[{id:'main',diagram:{nodes:{a:{telemetry:binding(source)}},rows:[['a']]}}]});
-function context(){const timers=new Map();let serial=0;class Clock extends Date{static now(){return Date.parse('2026-10-30T00:00:00Z');}}const C={URL,AbortController,TextDecoder,TextEncoder,Date:Clock,console,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id),document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint('standalone').body,C);return {C,timers};}
-async function setup({page=pageSpec(),transport,wrap,host=false,hosted=false,permission='granted',spyTraces}={}){
- const {createMockBridge}=await import('./helpers/honeycomb-bridge.mjs'),bridge=createMockBridge({day:9,transport}),{C,timers}=context();if(wrap)wrap(bridge);
+function context(clock){const timers=new Map();let serial=0;class Clock extends Date{constructor(...args){if(clock && !args.length)super(clock.now);else super(...args);}static now(){return clock?clock.now:Date.parse('2026-10-30T00:00:00Z');}}const C={URL,AbortController,TextDecoder,TextEncoder,Date:Clock,console,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id),document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint('standalone').body,C);return {C,timers};}
+async function setup({page=pageSpec(),transport,wrap,host=false,hosted=false,permission='granted',spyTraces,clock}={}){
+ const {createMockBridge}=await import('./helpers/honeycomb-bridge.mjs'),bridge=createMockBridge({day:9,transport}),{C,timers}=context(clock);if(wrap)wrap(bridge);
  // #1289: a test can hold the Traces adapter and the facade the providers hand it.
  if(spyTraces){const create=C.createTelemetryTraces;C.createTelemetryTraces=(...args)=>{const adapter=create(...args);if(adapter){const attach=adapter.attach;adapter.attach=(next,nextPage)=>{spyTraces.adapter=adapter;spyTraces.facade=next.telemetry;return attach(next,nextPage);};}return adapter;};}
  let permissions=[];
@@ -335,4 +335,27 @@ test('a reused answer keeps a host provider\'s example trace, which the host sti
  // A retracted example trace never comes back with a reused answer.
  api.retractExemplars();assert.equal(api.snapshot().map.a,undefined);api.setEnabled(false);api.setEnabled(true);await settle();
  assert.equal(calls,1);assert.equal(api.snapshot().map.a?.exemplars,undefined,'retracted stays retracted');api.destroy();
+});
+
+/* #1313 review c1: example traces refresh with the metrics. A reuse under 5 minutes keeps the session's trace search;
+   an overdue off/on and Refresh now search again (as off/on past 5 minutes did before #1293). */
+test('example traces are searched again on an overdue off/on and on Refresh now, not on a fresh reuse',async t=>{
+ const clock={now:Date.parse('2026-10-30T00:00:00Z')},h=await setup({clock});t.after(()=>h.close());
+ const searches=()=>h.bridge.calls.filter(c=>c.name==='run_query').length;
+ assert.equal(typeof h.api.refreshNow,'function','Refresh now exists');
+ h.api.setEnabled(true);await settle();assert.equal(searches(),1,'Metrics on searches once');
+ clock.now+=120000;h.api.setEnabled(false);h.api.setEnabled(true);await settle();assert.equal(searches(),1,'a reuse under 5 minutes keeps the search');
+ assert.ok(h.api.snapshot().map.a?.exemplars?.[0],'and its example trace');
+ clock.now+=360000;h.api.setEnabled(false);h.api.setEnabled(true);await settle();assert.equal(searches(),2,'an overdue off/on searches again');
+ clock.now+=61000;assert.equal(h.api.refreshNow(),true);await settle();assert.equal(searches(),3,'Refresh now searches again');
+ assert.ok(h.api.snapshot().map.a?.exemplars?.[0],'and the new example trace is listed');
+});
+
+/* #1313 review c3: during the wait after a failed answer, a host provider's example trace stays, as it does on a reuse. */
+test('during the wait after a failed answer a host provider\'s example trace stays',async()=>{
+ const {C}=context(),p=C.normalize(pageSpec()),e=plain(envelope(C));let calls=0;
+ const api=C.createTelemetry(p,{provider:async(b,s,report)=>{calls++;report.note('a other: boom');return {a:{signals:{},exemplars:[e]}};},canChooseExemplar:()=>true,chooseExemplar:async()=>e},{carriers:fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram||{};Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,p));})});
+ api.setEnabled(true);await settle();assert.equal(calls,1);assert.match(api.status().note,/boom/);
+ api.setEnabled(false);api.setEnabled(true);await settle();assert.equal(calls,1,'the wait: no call');
+ assert.equal(api.refreshNowState().waiting,true);assert.equal(api.snapshot().map.a?.exemplars?.[0]?.traceId,e.traceId,'the host\'s example trace stays');api.destroy();
 });

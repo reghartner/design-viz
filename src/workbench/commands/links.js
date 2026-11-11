@@ -51,7 +51,8 @@ function linksInheritedSource(raw,context){
    Step elements: {kind:'step',section,index,label,caption,lit,shown,filtered,via}. */
 function linksTicketModel(text,raw,context){
   var resolved;try{resolved=linksResolve(raw,context);}catch(ex){return {error:ex.message};}
-  var stripped=linksInheritedSource(raw,context),page=normalize(resolved),records=page?sectionRecords(page):[];
+  // With no consumer overlays to strip, every ticket on an imported carrier is the provider's.
+  var stripped=linksInheritedSource(raw,context) || resolved,page=normalize(resolved),records=page?sectionRecords(page):[];
   var paths=specSectionPaths(resolved),authoredPaths=specSectionPaths(raw),sections=[],elements=[];
   paths.forEach(function(rec,section){
     var d=specValueAt(resolved,rec.diagram),authored=authoredPaths[section] && specValueAt(raw,authoredPaths[section].diagram);

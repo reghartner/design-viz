@@ -147,6 +147,11 @@ connection with tickets takes the color of their Jira state. A `live-status` pan
 **Start new project → Epic status board** opens a laid-out board with
 **Demo live status** on.
 
+**[Text view](docs/text-view.md):** the reader's **Text** button, next to Search,
+shows a step diagram as text: steps with the nodes, connections, tickets, metrics,
+log queries and code references they touch, one sheet per element, or sorted flat
+lines for diffs. `node tools/spec-text.js` prints the same text.
+
 **New: [Honeycomb trace → diagram](docs/trace-import.md).** In the workbench,
 choose **import trace…**, paste or open event JSON, and **Build diagram**.
 The result is a service board, an offset-aware waterfall, and a step for each

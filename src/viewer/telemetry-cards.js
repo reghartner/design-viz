@@ -270,7 +270,7 @@ function telemetryFrameBoxes(svg){
   f={x:f.x,y:f.y,width:f.width,height:f.height};
   // The part of the board the reader can see: the viewBox cut by every clipping ancestor (the board canvas and its scroller).
   try{
-    var m=svg.getScreenCTM(),view=svg.ownerDocument.defaultView,r=svg.getBoundingClientRect(),clip={l:r.left,t:r.top,r:r.right,b:r.bottom};
+    var m=svg.getScreenCTM(),view=svg.ownerDocument.defaultView,r=svg.getBoundingClientRect(),clip={l:Math.max(r.left,0),t:Math.max(r.top,0),r:Math.min(r.right,view.innerWidth),b:Math.min(r.bottom,view.innerHeight)};
     for(var a=svg.parentElement || (svg.getRootNode && svg.getRootNode().host);a;a=a.parentElement || (a.getRootNode && a.getRootNode().host)){
       var cs=view.getComputedStyle(a);if(cs.overflowX==='visible' && cs.overflowY==='visible')continue;
       var c=a.getBoundingClientRect();clip={l:Math.max(clip.l,c.left),t:Math.max(clip.t,c.top),r:Math.min(clip.r,c.right),b:Math.min(clip.b,c.bottom)};
@@ -289,8 +289,8 @@ function telemetryFrameBoxes(svg){
    visible board; if none has room, the side with the most visible room, partly clipped, never over its line. */
 function telemetryOutlineEdgePlace(path,w,h,obstacles,fr){
   var first=telemetryCardPlace(path,w,h,{},obstacles.concat(fr.boxes));if(!first.fallback)return first;
-  var order={below:['above','right','left'],above:['below','right','left'],right:['left','below','above'],left:['right','below','above']}[first.side],tries=[first];
-  for(var i=0;i<order.length;i++){var next=telemetryCardPlace(path,w,h,{side:order[i]},obstacles.concat(fr.boxes));if(!next.fallback)return next;tries.push(next);}
+  var order={below:['above','right','left'],above:['below','right','left'],right:['left','below','above'],left:['right','below','above']}[first.side];
+  for(var i=0;i<order.length;i++){var next=telemetryCardPlace(path,w,h,{side:order[i]},obstacles.concat(fr.boxes));if(!next.fallback)return next;}
   var f=fr.rect;if(!f)return first;
   function room(t){var b=t.box;return Math.max(0,Math.min(b.x+b.w,f.x+f.width)-Math.max(b.x,f.x))*Math.max(0,Math.min(b.y+b.h,f.y+f.height)-Math.max(b.y,f.y));}
   // The nearest box on each side (off the line, ignoring the frame) and its visible room.

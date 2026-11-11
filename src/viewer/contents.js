@@ -1,12 +1,17 @@
 /* Shared document shell over the Tab View controller. Original utility DOM
    stays owned by createExploreNavigation; this controller owns only its tree,
    reader zoom and temporary presentation state, never authored source. */
+/* #1305: one rail marker per document page (the "Page n of m" list: each section in each View
+   of each Tab), numbered in pager order, with the pager's current page marked. */
+function readerRailPages(pages,current,title){
+  return pages.map(function(page,i){return {label:'Page '+(i+1)+': '+title(page.rec)+' · '+page.definition.name,owner:page.owner,definition:page.definition,rec:page.rec,current:i===current};});
+}
 function createReaderContents(ctl,nav,actions,options){
   var doc=ctl.view.ownerDocument,view=ctl.view,retired=false,current=null,viewportRecord=null,owner=null,members=[],narrow=false,opened=typeof options.initialOpen==='boolean'?options.initialOpen:null,pinnedTop=null,scrollHeld=false,holdFrame=0;
   var expandedTabs=new Set(),collapsedViews=new Set(),standardZoom=new Map(),moved=[],overflowActions=null,actionAttemptWidth=null;
   // Closed Contents leaves a numbered rail; hovering it floats the panel over the page
   // and clicking a marker goes to that part with Contents still closed.
-  var search=null;
+  var search=null,textView=null;
   var hovering=false,overlayTabs=new Set(),intentTimer=0,leaveTimer=0,partCount=0,RAIL_WIDTH=44,toggleFit=null;
   function element(tag,cls,text,parent){var el=doc.createElement(tag);el.className=cls;if(text)el.textContent=text;if(parent)parent.appendChild(el);return el;}
   function button(label,text,parent,fn){var el=element('button','reader-button',text,parent);el.type='button';el.setAttribute('aria-label',label);el.title=label;
@@ -14,6 +19,10 @@ function createReaderContents(ctl,nav,actions,options){
     if(paths[text])el.innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="'+paths[text]+'"/></svg>';
     el.addEventListener('click',fn);return el;}
   nav.classList.add('reader-navigation');nav.classList.toggle('reader-single-toolbar',!!options.singleReaderToolbar);view.classList.add('has-reader-contents');
+  // #1318: the Workbench canvas styles its zoom buttons from this class instead of :has(#docview.has-reader-contents) on <body>.
+  var workspaceCanvas=view.id==='docview' && view.closest?view.closest('.workspace-canvas'):null;if(workspaceCanvas)workspaceCanvas.classList.add('workspace-docview-contents');
+  // #1318: count the Contents using the inset host, so a replacement (destroy, then mount) keeps --reader-host-inset.
+  var insetHost=options.insetTarget || null;if(insetHost)insetHost._readerContentsUsers=(insetHost._readerContentsUsers || 0)+1;
   var top=element('div','reader-top',null,nav),toggle=button('Open Contents','☰',top,function(){setOpen(!opened,true,true);});
   element('span','reader-toggle-label','Contents',toggle);element('span','reader-toggle-separator',' · ',toggle).setAttribute('aria-hidden','true');var toggleCount=element('span','reader-toggle-count',null,toggle);
   var breadcrumb=element('div','reader-breadcrumb',null,top),tabLabel=element('span','reader-tab-label',null,breadcrumb);
@@ -49,6 +58,9 @@ function createReaderContents(ctl,nav,actions,options){
     var copy=button('Copy '+(item.kind==='claude'?'Claude link':'internal site link'),'Copy',row,function(){});bindCopyControl(window,copy,function(){return item.url;});
   });
   destinations.hidden=!destinations.children.length;
+  // #1322: a "Text view" row of its own, outside the tree and the document links,
+  // so the text view is reachable at every bar width (filled by createReaderTextView).
+  var textEntry=element('div','reader-text-view-entry',null,sidebar);
   var footer=element('div','reader-theme-footer',null,sidebar);element('span','reader-theme-label','Theme',footer);
   var themeMenu=element('details','reader-theme-menu',null,footer),themeSummary=element('summary','reader-button',null,themeMenu);themeSummary.setAttribute('aria-label','Choose theme');
   var themeOptions=element('div','reader-theme-options',null,themeMenu);themeOptions.setAttribute('role','menu');themeOptions.setAttribute('aria-label','Themes');
@@ -91,7 +103,9 @@ function createReaderContents(ctl,nav,actions,options){
     sidebar.style.left=(hovering?rect.left+RAIL_WIDTH:rect.left)+'px';sidebar.style.top=rect.bottom+'px';sidebar.style.width=width+'px';sidebar.style.height=Math.max(0,bottom-rect.bottom)+'px';
     scrim.style.left=rect.left+'px';scrim.style.top=rect.bottom+'px';scrim.style.width=rect.width+'px';scrim.style.height=Math.max(0,bottom-rect.bottom)+'px';scrim.hidden=!opened || !narrow;
     view.style.setProperty('--reader-left',rect.left+'px');view.style.setProperty('--reader-width',rect.width+'px');
-    var inset=opened && !narrow?width+'px':railShown?RAIL_WIDTH+'px':'0px';view.style.setProperty('--reader-inset',inset);if(options.insetTarget)options.insetTarget.style.setProperty('--reader-host-inset',inset);
+    var inset=opened && !narrow?width+'px':railShown?RAIL_WIDTH+'px':'0px';view.style.setProperty('--reader-inset',inset);
+    // #1318: an inherited property on the host (the Workbench body) restyles the whole page when written, so write it only when it changes.
+    if(options.insetTarget && options.insetTarget.style.getPropertyValue('--reader-host-inset')!==inset)options.insetTarget.style.setProperty('--reader-host-inset',inset);
     themeOptions.style.maxHeight=Math.max(70,bottom-rect.bottom-110)+'px';
     fitToggle(rect.width);
   }
@@ -114,7 +128,32 @@ function createReaderContents(ctl,nav,actions,options){
       if(restore){reopenNestedMenus(entry.node);restore.focus({preventScroll:true});}else if(summaryFocused && !pageUtilitySummary.checkVisibility({visibilityProperty:true})){var target=Array.from(entry.node.querySelectorAll('summary,button,[href],select')).find(function(control){return !control.disabled && control.checkVisibility({visibilityProperty:true});});if(target)target.focus({preventScroll:true});}
     }
   }
+  // #1322 Text launcher: lowest priority in the bar; no other control ever moves.
+  // Every pass fits the bar without it (exactly as before it existed), then:
+  // inline if it fits; else the last item of "More page actions" when the base
+  // shows that menu; else a ⋯ menu for Text alone if that fits; else nothing in
+  // the bar. The Contents panel always has a "Text view" entry. The decision
+  // never feeds back into the base fit, so it cannot oscillate.
+  var textPlace='none',textMenuOnly=false;
+  function measureText(){
+    if(!textView)return;textView.place('measure',textMenuOnly && !overflowActions);
+    if(textMenuOnly){textMenuOnly=false;if(!overflowActions)pageUtilities.hidden=true;}
+  }
+  function fitText(fits){
+    if(!textView)return;
+    if(narrow)textPlace='none';
+    else{
+      textView.place('inline',true);
+      if(fits())textPlace='inline';
+      else if(overflowActions && !pageUtilities.hidden)textPlace='menu';
+      else{pageUtilities.hidden=false;textView.place('menu',true);if(fits()){textMenuOnly=true;textPlace='menu';}else{pageUtilities.hidden=true;textPlace='none';}}
+    }
+    // A ⋯ that is hidden is closed, so it never reappears already open.
+    if(pageUtilities.hidden)pageUtilities.open=false;
+    textView.place(textPlace);
+  }
   function fitToggle(width){
+    measureText();
     if(options.singleReaderToolbar){
       var root=view.getRootNode(),focused=root.activeElement || doc.activeElement,focusedView=viewStrip.contains(focused),focusedPicker=focused===viewPicker;
       if(overflowActions && width>900 && actionAttemptWidth!==width){actionAttemptWidth=width;overflowViewportActions(false);}
@@ -134,15 +173,20 @@ function createReaderContents(ctl,nav,actions,options){
       }
       var needsPicker=settle();
       if(!overflowActions && width>900 && (top.scrollWidth>top.clientWidth+1 || overlapsCenter(actions))){overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();}
+      // The base's own overlap test (overlapsCenter), so Text takes exactly the room
+      // the base leaves and never more.
+      fitText(function(){return !overlapsCenter(actions) && top.scrollWidth<=top.clientWidth+1;});
       if(needsPicker && (focusedView || focusedPicker))viewPicker.focus({preventScroll:true});
       else if(focusedPicker){var selected=viewStrip.querySelector('[aria-selected="true"]');if(selected)selected.focus({preventScroll:true});}
       return;
     }
     var actionBounds=actions.getBoundingClientRect();
-    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,actionBounds.width,actionBounds.height,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit)return;toggleFit=key;
-    top.classList.remove('reader-toggle-compact');if(narrow)return;
+    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,actionBounds.width,actionBounds.height,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit){if(textView){if(textPlace==='menu' && !overflowActions){pageUtilities.hidden=false;textMenuOnly=true;}textView.place(textPlace);}return;}toggleFit=key;
+    top.classList.remove('reader-toggle-compact');if(!narrow){
     var full=top.getBoundingClientRect().height;top.classList.add('reader-toggle-compact');
-    if(top.getBoundingClientRect().height>=full)top.classList.remove('reader-toggle-compact');
+    if(top.getBoundingClientRect().height>=full)top.classList.remove('reader-toggle-compact');}
+    var settled=top.getBoundingClientRect().height;
+    fitText(function(){return top.getBoundingClientRect().height<=settled+.5 && top.scrollWidth<=top.clientWidth+1;});
   }
   function title(rec){var record=rec && rec.viewOwner && rec.viewOwner.records.find(function(r){return r.runtime===rec;});return record && record.section.heading || rec && rec.sectionEl.querySelector('.sec-h')?.textContent || 'Section';}
   // An open drill-down stays inside its root section; name each open level.
@@ -187,7 +231,9 @@ function createReaderContents(ctl,nav,actions,options){
     var focusKey=tree.contains(focused) && focused.getAttribute('data-reader-key'),scroll=tree.scrollTop;
     tree.replaceChildren();
     // The overlay keeps its own disclosure set: only the current part opens.
-    var shown=hovering?overlayTabs:expandedTabs,numbered=topParts().length>1,number=0;
+    // #1305: page rows carry the rail's numbers (pager order); Tab rows are not numbered.
+    var shown=hovering?overlayTabs:expandedTabs,pages=documentPages(),numbered=pages.length>1;
+    tree.classList.toggle('reader-tree-numbered',numbered);
     topParts().forEach(function(item){
       var embed=embedded(),canonical=item.records.some(function(record){return Array.isArray(record.section.views);}),groups=[];
       // Keep each section/View occurrence intact, then omit grouping levels
@@ -204,20 +250,22 @@ function createReaderContents(ctl,nav,actions,options){
       if(search)search.mark(tabButton,item);
       tabButton.classList.add('reader-tree-tab');tabButton.setAttribute('data-reader-key','tab:'+item.path);
       if(item===owner)tabButton.setAttribute('data-current-part','true');
-      if(numbered){var badge=element('span','reader-part-number',String(++number));badge.setAttribute('aria-hidden','true');tabButton.prepend(badge);}
       function trail(parent){var levels=detailTrail();if(levels.length){var details=element('ol','reader-tree-details',null,parent);levels.forEach(function(level,i){var entry=element('li','reader-tree-detail',level.label,details);entry.title=level.title;if(i===levels.length-1)entry.setAttribute('aria-current','location');});}}
       function leaf(choice,definition,parent,key){
         var rec=definition.members[0].record.runtime,selected=item===owner && item.current===definition && current===rec;
         if(search)search.mark(choice,item,rec,definition);
+        var page=numbered?pages.findIndex(function(entry){return entry.owner===item && entry.definition===definition && entry.rec===rec;}):-1;
+        // The number is drawn by CSS from data-page-index, so row text and names stay the section/View title.
+        if(page>=0){choice.setAttribute('data-page-index',String(page+1));choice.setAttribute('aria-description','Page '+(page+1)+' of '+pages.length);}
         choice.classList.add('reader-tree-leaf');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-reader-section',rec.reference);choice.setAttribute('data-owner-selected',String(item.current===definition));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-current',selected?'page':'false');choice.setAttribute('aria-pressed',String(selected));
-        if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
+        if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description',(page>=0?'Page '+(page+1)+' of '+pages.length+'. ':'')+'Explore: pan and zoom the graph.');}
         if(selected)trail(parent);
       }
       function viewLeaf(definition,parent){
         var rec=definition.members[0].record.runtime,row=element('div','reader-tree-view-row',null,parent),choice=button(definition.name,definition.name,row,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-view');leaf(choice,definition,row,item.path+':'+definition.key);
       }
-      function sectionLeaf(definition,parent,index,key){
-        var rec=definition.members[0].record.runtime,li=element('li','',null,parent),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');if(canonical)choice.classList.add('reader-tree-single-view');if(index!==null)choice.setAttribute('data-page-number',String(index+1));leaf(choice,definition,li,key);
+      function sectionLeaf(definition,parent,key){
+        var rec=definition.members[0].record.runtime,li=element('li','',null,parent),choice=button(title(rec),title(rec),li,function(){choose(item,definition,rec);});choice.classList.add('reader-tree-section');if(canonical)choice.classList.add('reader-tree-single-view');leaf(choice,definition,li,key);
       }
       function disclosure(row,key,label){
         var expanded=!collapsedViews.has(key),control=button((expanded?'Collapse ':'Expand ')+label,expanded?'⌄':'›',row,function(){if(collapsedViews.has(key))collapsedViews.delete(key);else collapsedViews.add(key);drawTree();});control.classList.add('reader-view-disclosure');control.setAttribute('aria-expanded',String(expanded));control.setAttribute('data-reader-key',key+':disclosure');return expanded;
@@ -230,36 +278,30 @@ function createReaderContents(ctl,nav,actions,options){
         var sections=element('ol','reader-tree-sections',null,tab);
         groups.forEach(function(group){
           var rec=group.record.runtime,key=item.path+':section:'+rec.number;
-          if(group.definitions.length===1){sectionLeaf(group.definitions[0],sections,null,item.path+':'+group.definitions[0].key);return;}
+          if(group.definitions.length===1){sectionLeaf(group.definitions[0],sections,item.path+':'+group.definitions[0].key);return;}
           var li=element('li','',null,sections),row=element('div','reader-tree-view-row',null,li),heading=button(title(rec),title(rec),row,function(){choose(item,sectionViewDefault(item,group.record,item.views),rec);});heading.classList.add('reader-tree-section');heading.setAttribute('data-reader-key',key);heading.setAttribute('data-reader-section',rec.reference);
           if(disclosure(row,key,title(rec))){var views=element('div','reader-tree-views',null,li);group.definitions.forEach(function(definition){viewLeaf(definition,views);});}
         });return;
       }
-      if(groups.length===1){var sections=element('ol','reader-tree-sections',null,tab);sections.setAttribute('data-reader-view',groups[0].id);groups[0].definitions.forEach(function(definition,index){sectionLeaf(definition,sections,index,item.path+':'+groups[0].id+':'+definition.members[0].record.runtime.number);});return;}
+      if(groups.length===1){var sections=element('ol','reader-tree-sections',null,tab);sections.setAttribute('data-reader-view',groups[0].id);groups[0].definitions.forEach(function(definition){sectionLeaf(definition,sections,item.path+':'+groups[0].id+':'+definition.members[0].record.runtime.number);});return;}
       var views=element('div','reader-tree-views',null,tab);
       groups.forEach(function(group){
         if(group.definitions.length===1){viewLeaf(group.definitions[0],views);return;}
         var definition=group.definitions.find(function(d){return d.members[0].record.runtime===item.selected;}) || group.definitions[0],key=item.path+':'+group.id,row=element('div','reader-tree-view-row',null,views),choice=button(definition.name,definition.name,row,function(){choose(item,definition);});choice.classList.add('reader-tree-view');choice.setAttribute('data-tab-view',definition.id);choice.setAttribute('data-owner-selected',String(group.definitions.indexOf(item.current)>=0));choice.setAttribute('data-reader-key',key);choice.setAttribute('aria-pressed',String(item===owner && group.definitions.indexOf(item.current)>=0));
         if(definition.presentation==='explore'){choice.setAttribute('data-explore-view','true');choice.setAttribute('aria-description','Explore: pan and zoom the graph.');}
-        if(disclosure(row,key,definition.name)){var sections=element('ol','reader-tree-sections',null,views);sections.setAttribute('data-reader-view',definition.id);group.definitions.forEach(function(d,index){sectionLeaf(d,sections,index,key+':'+d.members[0].record.runtime.number);});}
+        if(disclosure(row,key,definition.name)){var sections=element('ol','reader-tree-sections',null,views);sections.setAttribute('data-reader-view',definition.id);group.definitions.forEach(function(d){sectionLeaf(d,sections,key+':'+d.members[0].record.runtime.number);});}
       });
     });
     tree.scrollTop=scroll;
     if(focusKey){var target=Array.from(tree.querySelectorAll('[data-reader-key]')).find(function(el){return el.getAttribute('data-reader-key')===focusKey;});if(target)target.focus({preventScroll:true});}
   }
-  /* A part is a top-level Contents entry: the page's own sections, then each
-     Tab. With a single entry the rail lists its selected View’s sections. */
+  /* A part is a top-level Contents entry: the page's own sections, then each Tab.
+     The rail and the tree's page numbers follow documentPages() (#1305). */
   function topParts(){var embed=embedded();return (ctl.views?ctl.views.owners:[]).filter(function(item){return item.views.length && !(embed && ctl.views.owner(embed)!==item);});}
-  function parts(){
-    var owners=topParts();
-    if(search && search.hasQuery())return documentPages().map(function(page,i){return {label:'Page '+(i+1)+': '+title(page.rec)+' · '+page.definition.name,owner:page.owner,definition:page.definition,rec:page.rec,current:page.owner===owner && page.definition===owner.current && page.rec===current};});
-    if(owners.length>1)return owners.map(function(item){return {label:ownerLabel(item),owner:item,current:item===owner};});
-    return members.map(function(rec){return {label:title(rec),rec:rec,current:rec===current};});
-  }
+  // #1305: the rail lists the pager's document pages, so marker n is "Page n of m".
+  function parts(){var pages=documentPages();return readerRailPages(pages,currentPageIndex(pages),title);}
   function goPart(part){
-    if(part.definition)choose(part.owner,part.definition,part.rec,true);
-    else if(part.owner){var definition=part.owner.current,first=definition && definition.members[0];if(definition)choose(part.owner,definition,first && first.record.runtime,true);}
-    else if(options.selectSection){options.selectSection(part.rec);pinnedTop=part.rec.sectionEl.getBoundingClientRect().top;}
+    choose(part.owner,part.definition,part.rec,true);
   }
   // A document page is one navigable rendering of a section in a View. Preserve
   // owner, View and member order so a shared section remains reachable in each
@@ -282,7 +324,8 @@ function createReaderContents(ctl,nav,actions,options){
     var root=view.getRootNode(),focused=root.activeElement || doc.activeElement,focusIndex=railList.contains(focused)?Array.from(railList.querySelectorAll('.reader-rail-mark')).indexOf(focused):-1;
     railList.replaceChildren();
     list.forEach(function(part,i){
-      var li=element('li','',null,railList),mark=button(part.label,String(i+1),li,function(){goPart(part);});
+      // #1318: the item carries its past state, so the connector style needs no :has().
+      var li=element('li',i<index?'reader-rail-past-item':'',null,railList),mark=button(part.label,String(i+1),li,function(){goPart(part);});
       if(search)search.mark(mark,part.owner || owner,part.rec,part.definition);
       mark.classList.add('reader-rail-mark');if(i<index)mark.classList.add('reader-rail-past');if(i===index)mark.setAttribute('aria-current','page');
       if(i===focusIndex)mark.focus({preventScroll:true});
@@ -334,11 +377,11 @@ function createReaderContents(ctl,nav,actions,options){
     release();
     if(!options.singleShareAction && !options.skipTabShare && owner && owner.tabBlock){var block=ctl.tabBlocks[owner.tabBlock-1],copy=block.copyButtons[owner.tab];if(copy){var anchor=doc.createComment('reader tab copy');copy.before(anchor);actions.prepend(copy);moved.push({node:copy,anchor:anchor});}}
     if(options.singleReaderToolbar){var pageActions=actions.querySelector(':scope > .viewport-actions');if(pageActions)Array.from(actions.querySelectorAll(':scope > .embedcopy')).filter(function(node){return node!==copy;}).forEach(function(node){var anchor=doc.createComment('reader page action');node.before(anchor);pageActions.appendChild(node);moved.push({node:node,anchor:anchor});});}
-    Array.from(actions.children).filter(function(node){return node!==utilities && !node.classList.contains('viewport-actions') && !node.classList.contains('document-search-launch');}).forEach(function(node){var anchor=doc.createComment('reader utility');node.before(anchor);utilityBody.appendChild(node);moved.push({node:node,anchor:anchor});});
+    Array.from(actions.children).filter(function(node){return node!==utilities && !node.classList.contains('viewport-actions') && !node.classList.contains('document-search-launch') && !node.classList.contains('text-view-launch');}).forEach(function(node){var anchor=doc.createComment('reader utility');node.before(anchor);utilityBody.appendChild(node);moved.push({node:node,anchor:anchor});});
     if(!options.singleReaderToolbar){var expand=actions.querySelector('.viewport-expand');if(expand){var anchor=doc.createComment('reader expand');expand.before(anchor);utilityBody.appendChild(expand);moved.push({node:expand,anchor:anchor});}}
     utilities.hidden=!utilityBody.children.length;
     scrollHeld=true;cancelAnimationFrame(holdFrame);holdFrame=requestAnimationFrame(function(){scrollHeld=false;pinnedTop=current && current.sectionEl.getBoundingClientRect().top;});
-    drawViews();drawTree();updateZoom();updateTheme();geometry();if(search)search.refresh();
+    drawViews();drawTree();updateZoom();updateTheme();geometry();if(search)search.refresh();if(textView)textView.refresh();
   }
   function keydown(ev){
     if(viewStrip.contains(ev.target) && (ev.key==='Enter' || ev.key===' '))ev.stopPropagation();
@@ -357,10 +400,15 @@ function createReaderContents(ctl,nav,actions,options){
     if(themeMenu.open && ['ArrowDown','ArrowUp','Home','End'].indexOf(ev.key)>=0 && themeMenu.contains(ev.target)){ev.preventDefault();var nodes=Array.from(themeOptions.querySelectorAll('button')),index=nodes.indexOf(ev.target);index=ev.key==='Home'?0:ev.key==='End'?nodes.length-1:(index+(ev.key==='ArrowDown'?1:-1)+nodes.length)%nodes.length;nodes[index].focus();}
   }
   search=createDocumentSearch(ctl,nav,top,actions,documentPages,choose,function(){if(search){drawParts();drawTree();geometry();}});
+  textView=typeof createReaderTextView==='function'?createReaderTextView(ctl,nav,actions,function(){return current;},{menu:pageUtilityBody,closeMenu:function(){pageUtilities.open=false;},menuSummary:pageUtilitySummary,
+    entry:textEntry,contentsButton:toggle,
+    // A narrow Contents panel is a modal overlay with a focus trap: close it before the window opens.
+    closeContents:function(){if(narrow && opened)setOpen(false,false,true);}}):null;
+  if(textView){toggleFit=null;geometry();}
   if(opened!==null)setOpen(opened,false,false);
   var initialFrame=requestAnimationFrame(function(){if(retired)return;(ctl.views?ctl.views.owners:[]).forEach(function(item){expandedTabs.add(item.path);});drawTree();});
   nav.addEventListener('keydown',keydown,true);view.addEventListener('reader-skin-change',updateTheme);view.addEventListener('viewer-presentation-changing',release);view.addEventListener('reader-zoom-change',updateZoom);window.addEventListener('resize',geometry);window.addEventListener('scroll',geometry,true);
   function snapshot(){return {opened:opened,expanded:Array.from(expandedTabs),collapsed:Array.from(collapsedViews),zoom:(ctl.views?ctl.views.owners:[]).flatMap(function(item){return item.views.map(function(definition){return {owner:item.path,id:definition.id,section:definition.members[0].record.reference,value:standardZoom.get(definition) || 1};});})};}
   function restore(saved){if(!saved)return;cancelAnimationFrame(initialFrame);expandedTabs=new Set(saved.expanded || []);collapsedViews=new Set(saved.collapsed || []);(saved.zoom || []).forEach(function(entry){var item=ctl.views && ctl.views.owners.find(function(item){return item.path===entry.owner;}),definition=item && item.views.find(function(definition){return definition.id===entry.id && (!entry.section || definition.members[0].record.reference===entry.section);});if(definition)standardZoom.set(definition,entry.value);});setOpen(saved.opened===true,false,false);refresh(current,viewportRecord);}
-  return {zoom:zoom,setZoom:setZoom,snapshot:snapshot,restore:restore,setOpen:function(value){setOpen(value,false,false);},refresh:refresh,geometry:geometry,release:release,retainScroll:function(){if(scrollHeld)return true;if(pinnedTop===null || !current)return false;if(Math.abs(current.sectionEl.getBoundingClientRect().top-pinnedTop)<1)return true;pinnedTop=null;return false;},destroy:function(){retired=true;if(search)search.destroy();hideOverlay(true);cancelAnimationFrame(initialFrame);cancelAnimationFrame(holdFrame);release();view.removeEventListener('reader-skin-change',updateTheme);view.removeEventListener('viewer-presentation-changing',release);view.removeEventListener('reader-zoom-change',updateZoom);nav.removeEventListener('keydown',keydown,true);window.removeEventListener('resize',geometry);window.removeEventListener('scroll',geometry,true);view.classList.remove('has-reader-contents','reader-contents-open');view.style.removeProperty('--reader-inset');view.style.removeProperty('--reader-left');view.style.removeProperty('--reader-width');if(options.insetTarget)options.insetTarget.style.removeProperty('--reader-host-inset');ctl.sections.forEach(function(rec){rec.sectionEl.style.removeProperty('zoom');});}};
+  return {zoom:zoom,setZoom:setZoom,snapshot:snapshot,restore:restore,setOpen:function(value){setOpen(value,false,false);},refresh:refresh,geometry:geometry,release:release,retainScroll:function(){if(scrollHeld)return true;if(pinnedTop===null || !current)return false;if(Math.abs(current.sectionEl.getBoundingClientRect().top-pinnedTop)<1)return true;pinnedTop=null;return false;},destroy:function(){retired=true;if(search)search.destroy();if(textView)textView.destroy();hideOverlay(true);cancelAnimationFrame(initialFrame);cancelAnimationFrame(holdFrame);release();view.removeEventListener('reader-skin-change',updateTheme);view.removeEventListener('viewer-presentation-changing',release);view.removeEventListener('reader-zoom-change',updateZoom);nav.removeEventListener('keydown',keydown,true);window.removeEventListener('resize',geometry);window.removeEventListener('scroll',geometry,true);view.classList.remove('has-reader-contents','reader-contents-open');if(workspaceCanvas)workspaceCanvas.classList.remove('workspace-docview-contents');view.style.removeProperty('--reader-inset');view.style.removeProperty('--reader-left');view.style.removeProperty('--reader-width');if(insetHost){insetHost._readerContentsUsers--;Promise.resolve().then(function(){if(!insetHost._readerContentsUsers)insetHost.style.removeProperty('--reader-host-inset');});}ctl.sections.forEach(function(rec){rec.sectionEl.style.removeProperty('zoom');});}};
 }

@@ -35,8 +35,14 @@ var FlowCanon = (function(){
     function records(value,visit){if(object(value))Object.keys(value).sort().forEach(function(key){visit(value[key],key);});}
     function bullets(value){list(value,function(item){text(item);fields(item,['text']);if(object(item))bullets(item.sub);});}
     function contract(value){
-      fields(value,['title','note']);
-      if(object(value))list(value.fields,function(field){fields(field,['k','v','g']);});
+      fields(value,['title','note','fieldLabel']);
+      if(!object(value))return;
+      // #1304 grid blocks: column labels and cell values are reader text too.
+      list(value.columns,function(col){fields(col,['label']);});
+      list(value.fields,function(field){
+        fields(field,['k','v','g']);
+        if(object(field))records(field.cells,function(cell){text(typeof cell==='number' && isFinite(cell)?String(cell):cell);});
+      });
     }
     // Panel declarations and playback patches share these authored content
     // shapes. Traverse explicit collections, never arbitrary object properties.

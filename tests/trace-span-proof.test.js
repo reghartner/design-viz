@@ -107,8 +107,8 @@ test('P5 a provider declaration that matches nothing in its approved reference t
   // The consumer's own approved reference: an imported carrier's warning names the provider.
   const {resolved}=orders(),board=T.approveReference(resolved,ORDER(),{reason:'Board reference'});
   assert.deepEqual(warnings(board).filter(w=>/orders::worker/.test(w)),[
-    'sections[0].diagram.nodes.orders::worker.trace.spans.find: no span in the approved reference trace matches order-worker operations starting "find "; check the declaration or approve a new reference. It comes from "orders-platform"; fix it there, or patch it in this board\'s nodeTracking for worker',
-    'sections[0].diagram.nodes.orders::worker.trace.spans.audit: no span in the approved reference trace matches order-worker audit write; check the declaration or approve a new reference']);
+    'sections[0].diagram.nodes.orders::worker.trace.spans.find: no span in the approved reference trace matches order-worker operations starting "find "; check the declaration or approve a new reference. This node is imported from "orders-platform": fix the declaration there, or override it in this board\'s nodeTracking for worker',
+    'sections[0].diagram.nodes.orders::worker.trace.spans.audit: no span in the approved reference trace matches order-worker audit write; check the declaration or approve a new reference. This node is imported from "orders-platform": fix the declaration there, or override it in this board\'s nodeTracking for worker']);
   // Without an approved reference trace nothing is checked.
   assert.deepEqual(warnings(orders().resolved),[]);
 });

@@ -537,10 +537,13 @@
       if(top>=edgeTop && bottom<=edgeBottom)return 0;
       return top<edgeTop || bottom-top>edgeBottom-edgeTop-16?top-edgeTop-8:bottom-edgeBottom+8;
     }
-    // The page's top edge sits below the reader's fixed navigation bar: the engine publishes its bottom (+8 px) as
-    // --flowview-navigation-bottom on the view, which this panel inherits. Without a bar it is 0.
+    // The page's top edge sits below the reader's navigation bar (fixed in the published reader, sticky in a native mount).
+    // It is read live from the view's .explore-navigation, which is right whether the bar is stuck or not; the engine's
+    // --flowview-navigation-bottom (its bottom + 8, measured at a nav resize or font load) is only the fallback. No bar: 0.
     function pageTop(view){
-      var style=view.getComputedStyle?view.getComputedStyle(host):null,value=style && style.getPropertyValue?parseFloat(style.getPropertyValue('--flowview-navigation-bottom')):NaN;
+      var docview=host.closest && host.closest('.docview'),bar=docview && Array.prototype.find.call(docview.children || [],function(child){return child.classList && child.classList.contains('explore-navigation');});
+      if(bar && bar.getClientRects && bar.getClientRects().length)return Math.max(0,bar.getBoundingClientRect().bottom);
+      var style=view && view.getComputedStyle?view.getComputedStyle(host):null,value=style && style.getPropertyValue?parseFloat(style.getPropertyValue('--flowview-navigation-bottom')):NaN;
       return isFinite(value)?Math.max(0,value-8):0;
     }
     /* What a span focus shows: from the item's top (its row) to the opened detail's own bottom. The item's trailing space
@@ -554,7 +557,8 @@
     // box: the part of `node` to show ({top, bottom} in viewport px); default its whole rect.
     function revealInView(node,pageOff,box){
       var holder=scrollHolder(node),ib=box || node.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement,delta;
-      if(holder){var hb=holder.getBoundingClientRect();delta=revealDelta(ib.top,ib.bottom,hb.top,hb.bottom);if(delta)holder.scrollTop+=delta;return;}
+      // A holder scrolled up under the bar shows rows only below it.
+      if(holder){var hb=holder.getBoundingClientRect();delta=revealDelta(ib.top,ib.bottom,Math.max(hb.top,pageTop(view)),hb.bottom);if(delta)holder.scrollTop+=delta;return;}
       if(pageOff)return;
       if(page && view && view.innerHeight){delta=revealDelta(ib.top,ib.bottom,pageTop(view),view.innerHeight);if(delta)page.scrollTop+=delta;}
       else if(node.scrollIntoView)node.scrollIntoView({block:'nearest',inline:'nearest'});
@@ -568,7 +572,7 @@
     // the screen by scrolling the list alone wherever the page is scrolled. The listeners exist only while the cap is on.
     function measureListCap(list){
       if(!list.getBoundingClientRect || !list.style || !list.style.setProperty)return;
-      var top=Math.max(0,Math.round(list.getBoundingClientRect().top))+'px';if(list._traceCapTop===top)return;
+      var view=doc.defaultView || (typeof window!=='undefined'?window:null),top=Math.round(Math.max(pageTop(view),list.getBoundingClientRect().top))+'px';if(list._traceCapTop===top)return;
       list._traceCapTop=top;list.style.setProperty('--dv-trace-list-top',top);
     }
     function watchListCap(list){

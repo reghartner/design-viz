@@ -94,7 +94,7 @@ test('B4 workbench grid edits are one Undo step each; Add grid table and Use col
   // Add column
   await root.locator('[data-dv-contract="0"] .cttitle>span').click();
   const columns=guide.locator('[data-contract-editor="columns"]');await expect(columns).toBeVisible();
-  await oneStep(async()=>{await columns.getByRole('button',{name:'+ Add column',exact:true}).click();const name=columns.getByLabel('Column name *').last();await name.fill('Leia');await name.press('Tab');},
+  await oneStep(async()=>{await columns.getByRole('button',{name:'+ Add column',exact:true}).click();const name=columns.getByLabel('Column name',{exact:true}).last();await name.fill('Leia');await name.press('Tab');},
     list=>expect(list[0].columns.map(c=>c.label)).toEqual(['Yoda','Jyn','Han','Leia']));
   // Reorder a column
   await root.locator('[data-dv-contract="0"] .cttitle>span').click();

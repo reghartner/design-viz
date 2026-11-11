@@ -12,6 +12,7 @@
 | O7 repaint keeps the open node popover | cueSpec | a node's Jira popover opened in Outline stays open on its node card, with the same text, through a metrics repaint | the ring stealing the popover or focus |
 | O8 loaded detail | importedDetailSpec | Outline outlines the loaded detail's imported carriers and shows their cards | detail carriers left out |
 | O9 handoff node | handoffSpec with a bound handoff node | its ring opens the ticket popover from the Jira cue that took over the node's button | a ring pointing at a cleared button |
+| O10 repaint (#1324) | cueSpec | a card open on hover stays open through a metrics repaint and shows the new value; keyboard focus on a carrier stays on it | the repaint closing the card |
 | O3 (c2) hidden next stop | O3 board | Tab from the card's last link skips a hidden next stop and leaves the link | a keyboard trap on the link |
 Every DOM measurement starts at #host's shadowRoot (the native viewer renders inside it).
 Flip: without the Outline style the "Metrics style" group does not exist, so every row fails at the toggle. */
@@ -275,4 +276,20 @@ test('O9 a handoff node ring opens the ticket popover from the cue that took ove
  await page.mouse.click(p.x,p.y);
  await expect(pop).toBeVisible();await expect(pop.getByRole('link',{name:'LOC-1',exact:true})).toBeVisible();
  await expect(section.locator('g.node[data-dv-node="h"] .dv-jira-cue')).toHaveAttribute('aria-expanded','true');
+});
+
+test('O10 #1324 a metrics repaint keeps the hovered card open with the new value, and keyboard focus on its carrier',async({page,server})=>{
+ const {root}=await mountCues(page,server),{section,outline}=await overlayOn(root);await outline.click();
+ await outlinesReady(page,EDGES.length+NODES.length);
+ const id='ingest->app',p=await point(page,id);await page.mouse.move(p.x,p.y);
+ await expect.poll(async()=>(await canvas(page)).cards.filter(c=>c.shown).map(c=>c.id)).toEqual([id]);
+ await page.evaluate(samples=>{samples['ingest->app']={signals:{rate:{value:4242},errors:{value:4}}};window.viewer.controller.telemetry.apply(samples);},structuredClone(CUE_SAMPLES));
+ await expect.poll(async()=>(await canvas(page)).cards.filter(c=>c.shown).map(c=>c.id),'the hovered card stays open after the repaint').toEqual([id]);
+ await expect(section.locator('.dv-metrics-card[data-metrics-card="ingest->app"]')).toContainText('4,242');
+ // Keyboard: focus on an imported connection survives a repaint, with its card open.
+ const halo=section.locator('.dv-metrics-outline[data-metrics-carrier="shared::api->shared::store"]');await halo.focus();
+ await page.evaluate(samples=>{samples['shared::api->shared::store']={signals:{rate:{value:6060},errors:{value:1}}};window.viewer.controller.telemetry.apply(samples);},structuredClone(CUE_SAMPLES));
+ await expect.poll(async()=>(await canvas(page)).active,'focus stays on the imported carrier').toBe('shared::api->shared::store');
+ await expect.poll(async()=>(await canvas(page)).cards.filter(c=>c.shown).map(c=>c.id)).toEqual(['shared::api->shared::store']);
+ await expect(section.locator('.dv-metrics-card[data-metrics-card="shared::api->shared::store"]')).toContainText('6,060');
 });

@@ -551,7 +551,7 @@ function initWorkbenchLinksView(opts){
   function traceMove(from,to,key,mode,copy){
     var verb=copy?'Copied ':'Moved ';
     var ok=commit(function(text,raw,ctx){return planLinksTraceMove(text,raw,from,stepRef(to),mode,copy,ctx);},
-      {ok:verb+key+' to '+to.label+(mode==='alternative'?' as an alternative':mode==='replace'?', replacing its match':'')+'. Undo restores it.'});
+      {ok:verb+key+' to '+to.label+(mode==='alternative'?' as an alternative':mode==='replace'?', replacing its match':'')+(to.scoped?'; its trace scope was removed':'')+'. Undo restores it.'});
     if(ok)focusTraceChip(to,key);
     return ok;
   }

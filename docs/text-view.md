@@ -9,8 +9,9 @@ window edits the document.
 
 The button appears wherever the reader top bar appears: the standalone page, the
 Workbench preview, the library reader, each compare pane and the Backstage native
-viewer. The Confluence (Forge) viewer has no top bar and no Text button. On a
-phone-width bar the button is hidden, as Search is.
+viewer. The Confluence (Forge) viewer has no top bar and no Text button. When
+the reader bar is 670 px wide or less (a phone, or a narrow compare pane) the
+button is hidden together with Search; an open window then closes.
 
 The text is built from the page the reader shows, with shared-topology imports
 already resolved, when the window opens. Imported nodes and connections carry an
@@ -75,11 +76,17 @@ page logsearch.camera-model.query loki-main {app="device-gateway",env="${env}"} 
   Elements and Flat lines always show full queries.
 - **Wrap lines** (default off): off, long lines scroll sideways inside the text
   block; on, they wrap.
-- **Copy Markdown** copies the open tab. The copy always carries full queries,
-  whatever the Queries switch shows. If the browser refuses the clipboard, the
-  text appears in a field below the controls to copy by hand.
-- **Escape** or **×** closes the window and returns focus to the Text button.
-  The tab and switches are remembered until the page is reloaded.
+- **Copy Markdown** (Steps, Elements) or **Copy lines** (Flat lines) copies the
+  open tab. The copy always carries full queries, whatever the Queries switch
+  shows. If the browser refuses the clipboard or has none, the text appears in a
+  field below the controls to copy by hand.
+- **Escape** (while the window has focus) or **×** closes the window and returns
+  focus to the Text button. An open zoom or theme menu closes first.
+- Text and Search are never open together: opening one closes the other.
+- The tab and switches are remembered until the page is reloaded, and the chosen
+  path while the same document is shown. When the Workbench preview redraws after
+  an edit, an open window reopens on the same tab and scroll position with the
+  new text.
 
 ## Command line and `git diff`
 

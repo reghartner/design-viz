@@ -4,10 +4,15 @@
    document. Tabs: Steps (textViewSteps), Elements (textViewElements), Flat lines
    (textViewFlat). The Queries switch reaches Steps only; Copy Markdown always
    copies full queries. The last tab and switches are remembered in memory for
-   this page load only (no URL hash, no storage). */
+   this page load only (no URL hash, no storage). A reader rebuilt in the same
+   host (a Workbench preview rerender) reopens an open window on its tab and
+   scroll position; the chosen path is kept while the same document is shown.
+   Opening it closes Search and the reverse ('reader-window-open' on the view). */
 var TEXT_VIEW_TABS=[{id:'steps',label:'Steps'},{id:'elements',label:'Elements'},{id:'flat',label:'Flat lines'}];
 var textViewSession={tab:'steps',queries:'names',wrap:false};
 var textViewSequence=0;
+var textViewHosts=typeof WeakMap==='function'?new WeakMap():null;
+function textViewDocKey(page){return page && (page.canon && page.canon.id || page.title) || '';}
 
 /* state: {tab, queries:'names'|'full', pathId}; copy: true for the copied text,
    which always carries full queries. */
@@ -32,19 +37,19 @@ function textViewReaderPath(paths,readerPath,chosen){
 
 function createReaderTextView(ctl,nav,actions,currentRecord){
   var doc=ctl.view.ownerDocument,view=ctl.view,win=doc.defaultView || window,retired=false,opened=false,chosenPath=null,model=null,copyGen=0;
-  var id='flowview-text-view-'+(++textViewSequence);
+  var id='flowview-text-view-'+(++textViewSequence),docKey=textViewDocKey(ctl.page);
+  var memory=textViewHosts && textViewHosts.get(view) || {};if(textViewHosts)textViewHosts.set(view,memory);
   function el(tag,cls,text,parent){var node=doc.createElement(tag);if(cls)node.className=cls;if(text)node.textContent=text;if(parent)parent.appendChild(node);return node;}
   function button(label,text,parent,fn){var node=el('button','reader-button',text,parent);node.type='button';node.setAttribute('aria-label',label);node.title=label;node.addEventListener('click',fn);return node;}
   var launch=el('span','text-view-launch'),searchLaunch=actions.querySelector(':scope > .document-search-launch');
   if(searchLaunch)searchLaunch.after(launch);else actions.prepend(launch);
-  var toggle=button('Text view','',launch,function(){setOpen(!opened);});
-  toggle.innerHTML='<svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 6h14M5 10h14M5 14h9M5 18h11"/></svg>';
+  var toggle=button('Text view','Text',launch,function(){setOpen(!opened,{focus:true});});
   toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-haspopup','dialog');toggle.title='Text view: read this document as text';
 
   var panel=el('section','text-view',null,nav);panel.id=id;panel.hidden=true;panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','false');
   toggle.setAttribute('aria-controls',id);
   var heading=el('div','text-view-heading',null,panel),title=el('strong','','Text view',heading);title.id=id+'-title';panel.setAttribute('aria-labelledby',title.id);
-  var close=button('Close text view','×',heading,function(){setOpen(false);toggle.focus();});
+  button('Close text view','×',heading,function(){setOpen(false);focusBar();});
   var controls=el('div','text-view-controls',null,panel),tablist=el('div','text-view-tabs',null,controls);tablist.setAttribute('role','tablist');tablist.setAttribute('aria-label','Text layout');
   var panels={},tabs=TEXT_VIEW_TABS.map(function(def){
     var tab=el('button','reader-button text-view-tab',def.label,tablist);tab.type='button';tab.id=id+'-tab-'+def.id;tab.setAttribute('role','tab');tab.setAttribute('aria-controls',id+'-panel-'+def.id);
@@ -54,7 +59,7 @@ function createReaderTextView(ctl,nav,actions,currentRecord){
     return {id:def.id,tab:tab};
   });
   var pathField=el('label','text-view-path',null,controls);el('span','','Path',pathField);var pathSelect=el('select','',null,pathField);pathSelect.setAttribute('aria-label','Path');
-  pathSelect.addEventListener('change',function(){chosenPath=pathSelect.value;render();});
+  pathSelect.addEventListener('change',function(){chosenPath=pathSelect.value;memory.path=chosenPath;memory.docKey=docKey;render();});
   var queries=el('div','text-view-queries',null,controls);queries.setAttribute('role','group');queries.setAttribute('aria-label','Queries');el('span','text-view-group-label','Queries',queries);
   var names=button('Query names','names',queries,function(){textViewSession.queries='names';render();});
   var full=button('Full queries','full',queries,function(){textViewSession.queries='full';render();});
@@ -80,7 +85,10 @@ function createReaderTextView(ctl,nav,actions,currentRecord){
     names.setAttribute('aria-pressed',String(textViewSession.queries!=='full'));full.setAttribute('aria-pressed',String(textViewSession.queries==='full'));
     names.disabled=full.disabled=!steps;queries.title=steps?'':'Elements and Flat lines always show full queries.';
     wrap.setAttribute('aria-checked',String(!!textViewSession.wrap));panel.classList.toggle('text-view-wrapped',!!textViewSession.wrap);
-    var pre=panels[tab].pre;pre.textContent=problem || (model?textViewReaderText(model,current,false):'');
+    // Flat lines are not Markdown.
+    var label=tab==='flat'?'Copy lines':'Copy Markdown';copy.textContent=label;copy.setAttribute('aria-label',label);copy.title=label;
+    // Unchanged text is left alone so the block keeps its scroll position.
+    var pre=panels[tab].pre,text=problem || (model?textViewReaderText(model,current,false):'');if(pre.textContent!==text)pre.textContent=text;
     TEXT_VIEW_TABS.forEach(function(def){if(def.id!==tab)panels[def.id].pre.textContent='';});
     copy.disabled=!model;position();
   }
@@ -101,9 +109,22 @@ function createReaderTextView(ctl,nav,actions,currentRecord){
     var top=Math.max(b.top+8,Math.min(rect.bottom+8,b.bottom-208));
     panel.style.width=width+'px';panel.style.left=left+'px';panel.style.top=top+'px';panel.style.height=Math.max(160,Math.min(760,b.bottom-top-8))+'px';
   }
-  function setOpen(value){
-    if(retired)return;opened=!!value;panel.hidden=!opened;toggle.setAttribute('aria-expanded',String(opened));clearManual();status.textContent='';
-    if(opened){chosenPath=null;render(build());panels[textViewSession.tab].tab.focus();}
+  function shown(node){return !!node.getClientRects().length;}
+  function activeElement(){var a=view.getRootNode().activeElement || doc.activeElement;while(a && a.shadowRoot && a.shadowRoot.activeElement)a=a.shadowRoot.activeElement;return a;}
+  // Focus the launcher, or the first visible bar control when the bar hides it.
+  function focusBar(){
+    if(shown(toggle)){toggle.focus();return;}
+    var target=Array.from(nav.querySelectorAll('.reader-top :is(button,summary,select)')).find(function(node){return !panel.contains(node) && !node.disabled && shown(node);});
+    if(target)target.focus();
+  }
+  function setOpen(value,options){
+    if(retired)return;options=options || {};opened=!!value;panel.hidden=!opened;toggle.setAttribute('aria-expanded',String(opened));clearManual();status.textContent='';
+    if(opened){
+      chosenPath=memory.docKey===docKey?memory.path || null:null;render(build());
+      view.dispatchEvent(new CustomEvent('reader-window-open',{detail:{window:panel}}));
+      if(options.scroll){var pre=panels[textViewSession.tab].pre;pre.scrollTop=options.scroll.top;pre.scrollLeft=options.scroll.left;}
+      if(options.focus)panels[textViewSession.tab].tab.focus();
+    }
     else{model=null;TEXT_VIEW_TABS.forEach(function(def){panels[def.id].pre.textContent='';});}
   }
   function clearManual(){manual.replaceChildren();manual.hidden=true;}
@@ -117,8 +138,8 @@ function createReaderTextView(ctl,nav,actions,currentRecord){
     manual.hidden=false;area.focus();area.select();
   }
   function copyText(){
-    if(!model)return;var text=textViewReaderText(model,state(),true),gen=++copyGen;clearManual();
-    function done(){if(gen===copyGen && !retired)status.textContent='Markdown copied.';}
+    if(!model)return;var text=textViewReaderText(model,state(),true),gen=++copyGen,what=textViewSession.tab==='flat'?'Lines':'Markdown';clearManual();
+    function done(){if(gen===copyGen && !retired)status.textContent=what+' copied.';}
     function fallback(){
       if(gen!==copyGen || retired)return;
       var anchor=el('span','',null,manual);
@@ -130,9 +151,13 @@ function createReaderTextView(ctl,nav,actions,currentRecord){
       else fallback();
     }catch(ex){fallback();}
   }
+  // Escape closes this window when it holds focus; an open bar menu (theme,
+  // zoom) closes first through the bar's own handler.
   function keydown(ev){
-    if(!opened || ev.defaultPrevented)return;
-    if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();setOpen(false);toggle.focus();}
+    if(!opened || ev.defaultPrevented || ev.key!=='Escape')return;
+    var target=ev.composedPath?ev.composedPath()[0]:ev.target;if(!(panel.contains(target) || target===toggle))return;
+    if(Array.from(nav.querySelectorAll('details[open]')).some(function(menu){return !panel.contains(menu);}))return;
+    ev.preventDefault();ev.stopPropagation();setOpen(false);focusBar();
   }
   tablist.addEventListener('keydown',function(ev){
     var keys=['ArrowRight','ArrowLeft','Home','End'];if(keys.indexOf(ev.key)<0)return;ev.preventDefault();ev.stopPropagation();
@@ -145,16 +170,27 @@ function createReaderTextView(ctl,nav,actions,currentRecord){
   // A path picked in the reader moves the Steps tab with it until one is chosen here.
   function pathChanged(){if(opened && chosenPath==null)render();}
   view.addEventListener('dv:pathchange',pathChanged);
+  function otherWindow(ev){if(opened && ev.detail && ev.detail.window!==panel)setOpen(false);}
+  view.addEventListener('reader-window-open',otherWindow);
   win.addEventListener('resize',position);win.addEventListener('scroll',position,true);
-  // A phone-width bar has no room for the launcher (Search hides there too); a
-  // compare pane or a narrow desktop column keeps it.
-  function cramped(){if(!retired)nav.classList.toggle('text-view-cramped',nav.getBoundingClientRect().width<480);}
-  var sizes=typeof ResizeObserver==='function'?new ResizeObserver(cramped):null;if(sizes)sizes.observe(nav);cramped();
+  // A narrow bar hides the launcher (with Search, .reader-narrow); an open
+  // window then closes and focus moves to a visible bar control.
+  function barChanged(){if(retired || !opened || !nav.classList.contains('reader-narrow') || shown(toggle))return;var inside=panel.contains(activeElement());setOpen(false);if(inside)focusBar();}
+  var bar=typeof MutationObserver==='function'?new MutationObserver(barChanged):null;if(bar)bar.observe(nav,{attributes:true,attributeFilter:['class']});
   render();
+  if(memory.open){
+    var reopen=memory;memory.open=false;
+    setOpen(true,{scroll:reopen.tab===textViewSession.tab?reopen.scroll:null,focus:reopen.focus});
+    if(reopen.scroll && reopen.tab===textViewSession.tab)requestAnimationFrame(function(){if(!opened || retired)return;var pre=panels[textViewSession.tab].pre;pre.scrollTop=reopen.scroll.top;pre.scrollLeft=reopen.scroll.left;});
+  }
   return {
     isOpen:function(){return opened;},
     // The reader's document can change while the window is open: rebuild from ctl.page.
     refresh:function(){if(opened && !retired)render(build());},
-    destroy:function(){retired=true;opened=false;if(sizes)sizes.disconnect();nav.classList.remove('text-view-cramped');view.removeEventListener('keydown',keydown,true);view.removeEventListener('dv:pathchange',pathChanged);win.removeEventListener('resize',position);win.removeEventListener('scroll',position,true);panel.remove();launch.remove();}
+    destroy:function(){
+      if(opened){var pre=panels[textViewSession.tab].pre;memory.open=true;memory.tab=textViewSession.tab;memory.scroll={top:pre.scrollTop,left:pre.scrollLeft};memory.focus=panel.contains(activeElement());}
+      memory.path=chosenPath;memory.docKey=docKey;
+      retired=true;opened=false;if(bar)bar.disconnect();view.removeEventListener('keydown',keydown,true);view.removeEventListener('dv:pathchange',pathChanged);view.removeEventListener('reader-window-open',otherWindow);win.removeEventListener('resize',position);win.removeEventListener('scroll',position,true);panel.remove();launch.remove();
+    }
   };
 }

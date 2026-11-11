@@ -43,17 +43,51 @@ async function shown(locator){
 const focusInside=dialog=>dialog.evaluate(d=>{let a=d.getRootNode().activeElement;while(a && a.shadowRoot && a.shadowRoot.activeElement)a=a.shadowRoot.activeElement;return d.contains(a);});
 const isFocused=locator=>locator.evaluate(n=>n.getRootNode().activeElement===n);
 
-test('Text sits beside Search in the top bar, opens a labelled window and closes with Escape and Close',async({page,server})=>{
-  await page.setViewportSize({width:1440,height:900});const root=await open(page,server);const button=launcher(root);
-  await expect(button).toBeVisible();expect(await shown(button)).toBe('ok');
+for(const width of [1440,1024])test('Text sits beside Search in the top bar at '+width+', opens a labelled window and closes with Escape and Close while Contents stays open',async({page,server})=>{
+  await page.setViewportSize({width,height:900});const root=await open(page,server,board(),'text-view-'+width);const button=launcher(root);
+  await expect(button).toBeVisible();await expect(button).toHaveText('Text');expect(await shown(button)).toBe('ok');
   expect(await button.evaluate(n=>!!n.closest('.reader-top') && !n.closest('.reader-utilities,.reader-utility-options,.reader-page-utilities'))).toBe(true);
   expect(await button.evaluate(n=>{const launch=n.closest('.text-view-launch');return !!launch && !!launch.previousElementSibling && launch.previousElementSibling.classList.contains('document-search-launch');})).toBe(true);
   await expect(button).toHaveAttribute('aria-expanded','false');
+  const contents=root.locator('.reader-contents');const contentsOpen=await contents.isVisible();
   await button.click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();await expect(button).toHaveAttribute('aria-expanded','true');
   expect(await focusInside(dialog)).toBe(true);expect(await shown(textOf(dialog))).toBe('ok');
   await page.keyboard.press('Escape');await expect(dialog).toBeHidden();expect(await isFocused(button)).toBe(true);
+  expect(await contents.isVisible()).toBe(contentsOpen);
   await button.click();await expect(dialog).toBeVisible();
   await dialog.getByRole('button',{name:'Close text view',exact:true}).click();await expect(dialog).toBeHidden();expect(await isFocused(button)).toBe(true);
+});
+
+test('Escape leaves Contents open, closes an open zoom menu first, and arrow keys in the window do not move the diagram step',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});const root=await open(page,server,board(),'text-view-keys');
+  const contents=root.locator('.reader-contents');await expect(contents).toBeVisible();
+  const stepState=()=>root.locator('#section-delivery').evaluate(sec=>({current:Array.from(sec.querySelectorAll('[aria-current="true"]')).map(n=>n.getAttribute('data-step-source') || n.textContent.trim()),text:Array.from(sec.querySelectorAll('.step-text')).map(n=>n.textContent)}));
+  const before=await stepState();
+  await launcher(root).click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();
+  await dialog.getByRole('tab',{name:'Steps'}).focus();await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowLeft');
+  await textOf(dialog).focus();for(const key of ['ArrowRight','ArrowLeft','ArrowDown',' '])await page.keyboard.press(key);
+  expect(await stepState()).toEqual(before);
+  const zoom=root.getByRole('button',{name:'Zoom',exact:true}).or(root.locator('.reader-zoom-menu>summary')).first();await zoom.click();
+  await expect(root.locator('.reader-zoom-menu')).toHaveAttribute('open','');
+  await page.keyboard.press('Escape');await expect(root.locator('.reader-zoom-menu')).not.toHaveAttribute('open','');await expect(dialog).toBeVisible();
+  await dialog.getByRole('tab',{name:'Steps'}).focus();await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(contents).toBeVisible();
+});
+
+test('Text and Search never overlap: opening one closes the other',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});const root=await open(page,server,board(),'text-view-search');
+  const search=root.locator('.document-search'),dialog=dialogOf(root);
+  await root.getByRole('button',{name:'Search document',exact:true}).click();await expect(search).toBeVisible();
+  await launcher(root).click();await expect(dialog).toBeVisible();await expect(search).toBeHidden();
+  await root.getByRole('button',{name:'Search document',exact:true}).click();await expect(search).toBeVisible();await expect(dialog).toBeHidden();
+  await expect(launcher(root)).toHaveAttribute('aria-expanded','false');
+});
+
+test('a bar that turns narrow hides the launcher, closes the window and moves focus to a visible bar control',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});const root=await open(page,server,board(),'text-view-narrow');
+  await launcher(root).click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();expect(await focusInside(dialog)).toBe(true);
+  await page.setViewportSize({width:600,height:900});
+  await expect(dialog).toBeHidden();await expect(launcher(root)).toBeHidden();
+  expect(await root.locator('.reader-top').evaluate(top=>{let a=top.getRootNode().activeElement;return !!a && top.contains(a) && a.getClientRects().length>0;})).toBe(true);
 });
 
 test('three tabs switch content, Queries reaches Steps only, the path chooser follows the reader and choices are remembered',async({page,server})=>{
@@ -85,6 +119,7 @@ test('three tabs switch content, Queries reaches Steps only, the path chooser fo
   await page.keyboard.press('Escape');await expect(dialog).toBeHidden();
   await launcher(root).click();await expect(dialog.getByRole('tab',{name:'Elements'})).toHaveAttribute('aria-selected','true');
   await expect(dialog.getByRole('switch',{name:'Wrap lines',exact:true})).toHaveAttribute('aria-checked','true');
+  await expect(chooser).toHaveValue('happy');await dialog.getByRole('tab',{name:'Steps'}).click();await expect(text).toContainText('Path: Connected');
 });
 
 test('with wrap off a long query scrolls sideways inside the text block only; wrap on folds it',async({page,server})=>{
@@ -120,7 +155,8 @@ test('Copy Markdown copies full queries even when Steps shows names, and a refus
   const clip=await page.evaluate(()=>navigator.clipboard.readText());
   expect(clip).toContain('# Doorbell delivery as text — steps');expect(clip).toContain('sum(rate(http_server_requests_total');
   expect(clip.split('\n').length).toBeGreaterThan(20);
-  await dialog.getByRole('tab',{name:'Flat lines'}).click();await copy.click();
+  await dialog.getByRole('tab',{name:'Flat lines'}).click();await expect(dialog.getByRole('button',{name:'Copy Markdown',exact:true})).toHaveCount(0);
+  const copyLines=dialog.getByRole('button',{name:'Copy lines',exact:true});await copyLines.click();
   await expect.poll(()=>page.evaluate(()=>navigator.clipboard.readText())).toBe(await text.evaluate(pre=>pre.textContent));
 
   await page.evaluate(()=>{navigator.clipboard.writeText=async()=>{throw Error('Denied');};document.execCommand=()=>false;});
@@ -128,6 +164,12 @@ test('Copy Markdown copies full queries even when Steps shows names, and a refus
   const manual=dialog.getByRole('textbox',{name:'Copy this text manually',exact:true});await expect(manual).toBeVisible();
   const value=await manual.inputValue();expect(value).toContain('sum(rate(http_server_requests_total');expect(value.split('\n').length).toBeGreaterThan(20);
   await expect(dialog.getByRole('status')).toContainText('Copy failed');
+  // No Clipboard API at all (not only a refused write) also reaches the box.
+  await page.reload();await launcher(root).click();
+  await page.evaluate(()=>{Object.defineProperty(Navigator.prototype,'clipboard',{get:()=>undefined,configurable:true});document.execCommand=()=>false;});
+  expect(await page.evaluate(()=>navigator.clipboard)).toBeUndefined();
+  await dialog.getByRole('button',{name:'Copy Markdown',exact:true}).click();await expect(manual).toBeVisible();
+  expect(await manual.inputValue()).toContain('sum(rate(http_server_requests_total');await expect(dialog.getByRole('status')).toContainText('Copy failed');
 });
 
 test('the Text window works inside the Backstage native ShadowRoot host',async({page,server})=>{
@@ -148,14 +190,15 @@ test('the Text window works inside the Backstage native ShadowRoot host',async({
   await page.evaluate(()=>window.one.destroy());
 });
 
-test('desktop Workbench preview offers the Text window and retires it when the document rerenders',async({page,server})=>{
+test('desktop Workbench preview offers the Text window and reopens it with rebuilt text when the document rerenders',async({page,server})=>{
   await page.setViewportSize({width:1440,height:1000});await page.goto(server.origin+'/workbench.html');
   const raw=board();await paste(page,JSON.stringify(raw));await closeTools(page);const root=page.locator('#docview'),before=await page.locator('#src').inputValue();
   await launcher(root).click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();
   await expect(textOf(dialog)).toContainText('# Doorbell delivery as text — steps');expect(await shown(textOf(dialog))).toBe('ok');
   await expect(page.locator('#src')).toHaveValue(before);
   await page.locator('#editor-tab-json').click();raw.page.title='Doorbell delivery renamed';await page.locator('#src').fill(JSON.stringify(raw));await page.locator('#go').click();
-  await expect(dialog).toBeHidden();await launcher(root).click();await expect(textOf(dialog)).toContainText('# Doorbell delivery renamed — steps');
+  await expect(textOf(dialog)).toContainText('# Doorbell delivery renamed — steps');await expect(dialog).toBeVisible();
+  await expect(launcher(root)).toHaveAttribute('aria-expanded','true');expect(await shown(textOf(dialog))).toBe('ok');
 });
 
 test('the Text window uses readable theme colours in all nine skins',async({page,server})=>{

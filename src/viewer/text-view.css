@@ -1,8 +1,10 @@
 /* Reader Text window (#1322). Theme-owned paper, ink and accent, as document
    search uses. Long lines scroll inside the text block; the window never does. */
 .text-view-launch{display:inline-flex;flex:none;align-items:center;}
-.text-view-launch .reader-button{width:32px;height:32px;}
-.reader-navigation.text-view-cramped .text-view-launch{display:none;}
+/* A compact labelled button; hidden on a narrow bar together with Search. */
+body .reader-navigation .text-view-launch .reader-button{display:inline-flex;align-items:center;height:32px;min-height:32px;padding:0 8px;border-color:var(--explore-border);background:var(--reader-paper,var(--explore-bg));color:var(--dtext);font-size:13px;font-weight:600;white-space:nowrap;}
+body .reader-navigation .text-view-launch .reader-button[aria-expanded=true]{color:var(--navigation-accent);border-color:var(--navigation-accent);background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 10%,var(--explore-bg)));}
+.reader-narrow .text-view-launch{display:none;}
 .text-view{position:fixed;z-index:115;box-sizing:border-box;display:flex;flex-direction:column;gap:8px;overflow:hidden;padding:12px 14px 14px;border:1px solid var(--explore-border);border-radius:10px;background:var(--reader-paper,var(--explore-bg));color:var(--dtext);box-shadow:0 8px 30px color-mix(in srgb,var(--dtext) 18%,transparent);font:13px/1.5 'IBM Plex Sans',sans-serif;text-align:left;}
 .text-view[hidden],.text-view [hidden]{display:none!important;}
 .text-view-heading,.text-view-controls,.text-view-tabs,.text-view-queries,.text-view-path{display:flex;align-items:center;gap:6px;min-width:0;}

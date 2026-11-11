@@ -321,6 +321,8 @@ test('each attachment kind appears in each layout that shows it', () => {
     ['environment profile override', 'page tracking.telemetry.environments.prd.grafana.prometheus prom-prd', ['happy', '- tracking.telemetry.environments.prd.grafana.prometheus: `prom-prd`'], null],
     ['template definition', 'page tracking.telemetry.templates.kafka-topic.params group', null, '- tracking.telemetry.templates.kafka-topic.params: `topic`'],
     ['log search', 'page logsearch.camera-model.value[1] DB-300', ['happy', '  - query: `{app="device-gateway",env="${env}"} |= "camera_model" | json | camera_model="$value"`'], '  - fields.traceId: trace_id'],
+    ['step delta text', 'step delivery/happy/2 delta.text Publishes now carry the firmware version.', ['happy', '- delta Publishes now carry the firmware version.'], null],
+    ['metric table', null, null, '- Telemetry: service\n\n| Metric | Source | Unit | Pass rule |\n|---|---|---|---|\n| rate | grafana | req/h | min 10 |'],
     ['page title', 'page title Doorbell delivery as text', ['happy', '# Doorbell delivery as text — steps'], '# Doorbell delivery as text — elements'],
     ['section heading', 'section delivery heading Press to notification', ['happy', '## Press to notification (section delivery)'], '## Press to notification (section delivery)'],
     ['path label', 'path delivery/happy label Connected', ['happy', 'Path: Connected (`happy`)'], null],

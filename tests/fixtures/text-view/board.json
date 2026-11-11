@@ -512,7 +512,8 @@
          "url": "https://wiki.example.test/doorbell/publish-v2"
         }
        ],
-       "delta": true
+       "delta": true,
+       "deltaText": "Publishes now carry the firmware version."
       },
       {
        "id": "route",

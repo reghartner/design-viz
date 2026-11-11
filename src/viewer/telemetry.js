@@ -461,22 +461,36 @@ function createTelemetry(page,options,hooks){
   var answers=Object.create(null),lastCallKeys=null;
   function envKey(){return environment || '';}
   function forgetAnswers(){answers=Object.create(null);}
+  /* #1293: Metrics on always shows the environment's cached answer at once, with its own time. Under 5 minutes old it makes
+     no call; older, the due refresh runs at once in the background (busy, "Refreshing…") and the timer restarts from it. */
   function startLive(){
     var key=envKey(),hit=answers[key],now=Date.now();
-    if(hit && now-hit.at<delay && hit.keys===JSON.stringify(bindingKeys()) && hit.config===JSON.stringify(api.config())){
+    if(hit && hit.keys===JSON.stringify(bindingKeys()) && hit.config===JSON.stringify(api.config())){
       // A host provider owns its tokens (its canChooseExemplar decides), so its exemplars are kept as they were.
       var reused=copy(hit.value),restored={};
       if(typeof options.restoreExemplars==='function'){
         try{restored=options.restoreExemplars(copy(hit.value)) || {};}catch(ex){restored={};}
         Object.keys(reused).forEach(function(id){if(!reused[id] || typeof reused[id]!=='object')return;delete reused[id].exemplars;if(restored[id])reused[id].exemplars=[restored[id]];});
       }
-      store(reused,JSON.parse(hit.keys));setStatus({state:'ok',busy:false,refreshedAt:hit.refreshedAt,note:''});poller.start(delay-(now-hit.at));return;
+      store(reused,JSON.parse(hit.keys));setStatus({state:'ok',busy:false,refreshedAt:hit.refreshedAt,note:''});poller.start(Math.max(0,delay-(now-hit.at)));return;
     }
     poller.start();
   }
+  /* #1293 Refresh now: the reader's "call now". Honeycomb allows 10 query results a minute, so a Refresh now never starts
+     a refresh within 60 s of the previous one (automatic or not). A click inside that minute makes no call and shows the
+     cooldown until it ends; a refresh in flight ignores clicks. Nothing is queued. */
+  var TELEMETRY_REFRESH_NOW_GAP_MS=60000,lastStart=null,refreshNowUntil=0,cooldownTimer=0;
+  function stopCooldown(){if(cooldownTimer){clearTimeout(cooldownTimer);cooldownTimer=0;}}
+  function showCooldown(until){refreshNowUntil=until;stopCooldown();var wait=until-Date.now();if(wait>0)cooldownTimer=setTimeout(function(){cooldownTimer=0;if(!retired)notify();},wait);}
+  function refreshNowOn(){return !retired && enabled && available && !past && !!poller;}
+  function refreshNowState(){
+    if(!refreshNowOn())return {state:'off',until:null,refreshedAt:null};
+    var now=Date.now(),cooling=refreshNowUntil>now;
+    return {state:status.busy?'busy':cooling?'cooldown':'ready',until:cooling?new Date(refreshNowUntil).toISOString():null,refreshedAt:status.refreshedAt};
+  }
   // Each call owns its transient progress; retired generations cannot repaint.
   var poller=provider?liveStatusPoller(function(signal){
-    clearPending();var generation=requestGeneration,noted='',bound=bindings(),keys=bindingKeys(),env=envKey(),config=JSON.stringify(api.config());lastCallKeys=JSON.stringify(keys);
+    clearPending();var generation=requestGeneration,noted='',bound=bindings(),keys=bindingKeys(),env=envKey(),config=JSON.stringify(api.config());lastCallKeys=JSON.stringify(keys);lastStart=Date.now();
     function current(id,name){var binding=bound.find(function(b){return b.id===id;});return !retired && enabled && available && !signal.aborted && generation===requestGeneration && keys[id]===bindingKeys()[id] && binding && binding.signals[name] && !proofVerdicts.isTraceSignal(binding.signals[name]);}
     var report={note:function(text){noted=typeof text==='string'?text:'';if(!retired && enabled && !signal.aborted && generation===requestGeneration){if(past)liveStatus=Object.assign({},liveStatus,{note:noted});else setStatus({note:noted});notify();}},
       pending:function(id,name){if(!current(id,name))return;if(!pending[id])pending[id]=Object.create(null);pendingKeys[id]=keys[id];pending[id][name]=true;notify();},
@@ -742,7 +756,14 @@ function createTelemetry(page,options,hooks){
       available=value;setStatus({state:value?'idle':'absent',busy:false,refreshedAt:null,note:availabilityNote});notify();
     },
     onChange:function(fn){if(typeof fn!=='function' || retired)return function(){};listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
-    destroy:function(){if(retired)return;retired=true;forgetAnswers();clearPending();cancelHistory();historyCache.clear();windowCache=Object.create(null);past=null;enabled=false;liveMap=map=Object.create(null);resetObservations();setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];if(typeof hooks.changed==='function')hooks.changed();}
+    refreshNowState:function(){return copy(refreshNowState());},
+    refreshNow:function(){
+      if(!refreshNowOn() || status.busy)return false;
+      var now=Date.now();if(refreshNowUntil>now)return false;
+      if(lastStart!=null && now-lastStart<TELEMETRY_REFRESH_NOW_GAP_MS){showCooldown(lastStart+TELEMETRY_REFRESH_NOW_GAP_MS);notify();return false;}
+      showCooldown(now+TELEMETRY_REFRESH_NOW_GAP_MS);poller.stop();poller.start();return true;
+    },
+    destroy:function(){if(retired)return;retired=true;stopCooldown();forgetAnswers();clearPending();cancelHistory();historyCache.clear();windowCache=Object.create(null);past=null;enabled=false;liveMap=map=Object.create(null);resetObservations();setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];if(typeof hooks.changed==='function')hooks.changed();}
   };
   return api;
 }

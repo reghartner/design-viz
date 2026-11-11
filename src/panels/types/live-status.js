@@ -42,12 +42,12 @@
     function el(parent,tag,key,cls,text){
       var children=parent._liveChildren || (parent._liveChildren=Object.create(null)),node=children[key];
       if(node && node.tagName.toLowerCase()!==tag){node.remove();node=null;}
-      if(!node){node=children[key]=['svg','circle','polyline','line','title'].indexOf(tag)>=0?doc.createElementNS('http://www.w3.org/2000/svg',tag):doc.createElement(tag);parent.appendChild(node);}
+      if(!node){node=children[key]=['svg','circle','polyline','line','title','path'].indexOf(tag)>=0?doc.createElementNS('http://www.w3.org/2000/svg',tag):doc.createElement(tag);parent.appendChild(node);}
       if(parent._liveOrderEpoch!==epoch){parent._liveOrderEpoch=epoch;parent._livePosition=0;}
       var position=parent._livePosition++;
       if(parent.children[position]!==node)parent.insertBefore(node,parent.children[position] || null);
       node._liveEpoch=epoch;
-      if(['svg','circle','polyline','line','title'].indexOf(tag)>=0)node.setAttribute('class',cls || '');else node.className=cls || '';
+      if(['svg','circle','polyline','line','title','path'].indexOf(tag)>=0)node.setAttribute('class',cls || '');else node.className=cls || '';
       if(text!=null && node.textContent!==String(text))node.textContent=String(text);
       return node;
     }
@@ -622,6 +622,8 @@
       // #1265: an agent's snapshot names its time, so it is never read as live.
       if(metricsState==='snapshot')metricsText='Metrics: '+metrics.snapshot.charAt(0).toLowerCase()+metrics.snapshot.slice(1);
       if(!metrics.available && metrics.note)metricsText=metrics.note;
+      // #1293: a refresh over a shown answer keeps the answer and says so.
+      if(answered && metrics.busy)metricsText+=' · Refreshing…';
       if(metrics.environment)metricsText+=' · '+metrics.environment;
       el(metricsConnection,'span','text','',metricsText);metricsConnection.title=metricsText;
       metricsConnection.hidden=!metrics.available && !metrics.note;
@@ -657,6 +659,17 @@
       var metricsSwitch=el(top,'button','metrics','dv-live-metrics');metricsSwitch.type='button';metricsSwitch.setAttribute('role','switch');metricsSwitch.setAttribute('aria-checked',String(!!metrics.enabled));metricsSwitch.hidden=!metrics.available;metricsSwitch._liveArgument=!metrics.enabled;
       el(el(metricsSwitch,'span','track','dv-live-switch-track'),'i','thumb','dv-live-switch-thumb').parentNode.setAttribute('aria-hidden','true');el(metricsSwitch,'span','label','','Metrics overlay');
       if(!metricsSwitch._liveClick){metricsSwitch._liveClick=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnabled(metricsSwitch._liveArgument);};metricsSwitch.addEventListener('click',metricsSwitch._liveClick);}
+      // #1293 Refresh now, beside the switch while Metrics is on in Live: busy while a refresh runs, then a 60 s
+      // cooldown named in its tooltip. aria-disabled keeps keyboard focus on it through both.
+      var refreshNow=metrics.refreshNow || {state:'off'},pastDay=!!(value && value.overTime && value.overTime.active);
+      var refreshControl=el(top,'button','metrics-refresh','dv-live-metrics-refresh');refreshControl.type='button';refreshControl.setAttribute('aria-label','Refresh metrics now');
+      var recycle=el(refreshControl,'svg','icon','dv-live-metrics-refresh-icon');recycle.setAttribute('viewBox','0 0 16 16');recycle.setAttribute('aria-hidden','true');recycle.setAttribute('focusable','false');
+      el(recycle,'path','arc','').setAttribute('d','M13 8a5 5 0 1 1-1.46-3.54');el(recycle,'polyline','head','').setAttribute('points','12.5 1.5 12.5 4.5 9.5 4.5');
+      refreshControl.hidden=!metrics.available || !metrics.enabled || refreshNow.state==='off' || !!metrics.demo || !!metrics.snapshot || pastDay;
+      inert(refreshControl,refreshNow.state==='busy' || refreshNow.state==='cooldown');
+      if(refreshNow.state==='busy')refreshControl.setAttribute('aria-busy','true');else refreshControl.removeAttribute('aria-busy');
+      refreshControl.title=refreshNow.title || 'Refresh now';
+      if(!refreshControl._liveClick){refreshControl._liveClick=function(){var owner=host._livePanelApi;if(owner && refreshControl.getAttribute('aria-disabled')!=='true' && typeof owner.refreshMetricsNow==='function')owner.refreshMetricsNow();};refreshControl.addEventListener('click',refreshControl._liveClick);}
       var available=value && value.available,hasData=available && value.hasData;
       // Live and Over time are the two modes (#929, Chuck 2026-11-04), in a row of their own. The selected one is filled. Live returns from a past day; while selected it still turns colors off (D6).
       var over=value && value.overTime,past=!!(over && over.active);
@@ -859,6 +872,14 @@
 .dv-live-metrics[aria-checked="true"] .dv-live-switch-track{background:var(--dv-live-active)}
 .dv-live-metrics[aria-checked="true"] .dv-live-switch-thumb{transform:translateX(14px)}
 .dv-live-metrics:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;border-radius:4px}
+.dv-live-metrics-refresh{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;min-width:24px;padding:0;border:1px solid var(--dline,currentColor);border-radius:6px;background:none;color:var(--dink);cursor:pointer}
+.dv-live-metrics-refresh[hidden]{display:none}
+.dv-live-metrics-refresh[aria-disabled="true"]{opacity:.5;cursor:default}
+.dv-live-metrics-refresh:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:2px}
+.dv-live-metrics-refresh-icon{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.dv-live-metrics-refresh[aria-busy="true"] .dv-live-metrics-refresh-icon{animation:dv-live-refresh-spin 1s linear infinite}
+@keyframes dv-live-refresh-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.dv-live-metrics-refresh-icon{animation:none!important}}
 @media(prefers-reduced-motion:reduce){.dv-live-switch-track,.dv-live-switch-thumb{transition:none}}
 .dv-status-header>.dv-live-over-time-status{margin:0;font:11px/1.5 'IBM Plex Mono',monospace}
 .dv-status-header>.dv-live-day-row{margin-top:0}
@@ -1041,7 +1062,7 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls,.dv-live-day-row) .tbtn:is(:disabled,[aria-disabled="true"]){opacity:.5;cursor:default;}
 .pt-live-status :is(.dv-live-time,.dv-live-edit-controls) .tbtn[aria-disabled="true"]{cursor:progress;}
 /* Paper has no controls: print hides these buttons as it hides the reader's other tbtn controls. */
-@media print{.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls,.dv-live-day-row) .tbtn,.pt-live-status :is(.dv-live-metrics,.dv-live-environment){display:none;}}
+@media print{.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls,.dv-live-day-row) .tbtn,.pt-live-status :is(.dv-live-metrics,.dv-live-metrics-refresh,.dv-live-environment){display:none;}}
 .dv-live-edit-reason,.dv-live-edit-notice{flex-basis:100%;font:12px/1.5 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .dv-live-edit-notice[data-kind="warn"],.dv-live-edit-notice[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-draggable{cursor:grab;}

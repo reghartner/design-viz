@@ -1308,7 +1308,16 @@ calls once five minutes have passed. Like Jira, turning Metrics on or coming bac
 to an environment within five minutes shows that environment's last clean answer
 with its own refreshed time and makes no call; its example traces return under
 fresh selection tokens. An answer that names a failure is not reused. Retry
-always calls at once. A rejection reports the error and keeps the previous map. Turning
+always calls at once. When that answer is older than five minutes it still shows
+at once, and the due refresh runs in the background ("Refreshing…") (#1293).
+
+**Refresh now** (a recycle icon beside the Metrics overlay switch, while Metrics
+is on in Live) calls the providers at once and restarts the five-minute timer
+from that answer. It is busy while a refresh runs and then cools down for 60 s,
+because Honeycomb allows 10 query results a minute; a click within 60 s of any
+refresh makes no call and names when it is available again. It is hidden while
+Metrics is off and in Over time; in the Trace view it refreshes the metric
+values, and example traces keep the session's search. A rejection reports the error and keeps the previous map. Turning
 Metrics off or destroying the page aborts the signal, stops the timer and drops any
 late answer; turning it off also clears the map. `report.note(text)` attaches a note
 to that answer, such as a query that failed while the others answered; it becomes

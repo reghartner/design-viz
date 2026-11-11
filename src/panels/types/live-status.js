@@ -183,8 +183,9 @@
     };
     // #1099: find a trace from a Loki log line. A chosen line loads through the
     // form above it (connection, environment, lookback) and focuses its span.
-    // #1233: each authored lookup is its own search box (label, value, Find) in authored order, then the typed
-    // LogQL query in its own collapsible box. The results, and a load error (#1230), sit under the box that ran.
+    // #1349: one Log search dropdown lists the authored searches in order, then Type a LogQL query; only the
+    // selected search's value (or the LogQL box) and Find show. Without authored searches only the LogQL box shows.
+    // The results, and a load error (#1230), sit under the search that ran.
     function logLookupBody(config,box,logs,direct,atRow){
       var section=el(config,'section','logs','dv-trace-logs');section.setAttribute('aria-label','Find a trace from a log line');
       el(section,'h4','title','dv-trace-logs-title','Find a trace from a log line');
@@ -221,7 +222,15 @@
       var traced=control(section,'traced','Only lines with a trace ID','checkbox');if(traced.checked!==logs.form.traced)traced.checked=logs.form.traced;
       // #1141: in Over time Find searches the selected day; name it.
       if(logs.search)el(section,'p','window','dv-trace-logs-window',logs.search);
+      var shown=logs.form.lookup,typedShown=shown===logs.typed || !logs.lookups.length;
+      if(logs.lookups.length){
+        // Choosing a search makes no call, so the dropdown stays usable while the connector is missing.
+        var pick=control(section,'lookup','Log search','select');pick.disabled=false;
+        logs.lookups.concat([{id:logs.typed,label:'Type a LogQL query'}]).forEach(function(o,i){var option=el(pick,'option',String(i),'',o.label);option.value=o.id;});
+        if(pick.value!==shown)pick.value=shown;
+      }
       logs.lookups.forEach(function(lookup){
+        if(typedShown || lookup.id!==shown)return;
         var group=el(section,'div','search-'+lookup.id,'dv-trace-log-search');group.setAttribute('role','group');group.setAttribute('aria-label',lookup.label+' log search');group.setAttribute('data-log-search',lookup.id);
         var line=el(group,'div','controls','dv-trace-log-search-controls');
         if(lookup.slot){
@@ -229,19 +238,17 @@
           if(lookup.values.length){var ids=host._logValuesIds || (host._logValuesIds=Object.create(null)),list=el(line,'datalist','values','');list.id=ids[lookup.id] || (ids[lookup.id]='dv-trace-log-values-'+(++logValueLists));lookup.values.forEach(function(v,i){el(list,'option',String(i),'').value=v;});value.setAttribute('list',list.id);}
           else value.removeAttribute('list');
           if(value.value!==typedValue)value.value=typedValue;onEnter(value,lookup.id,false);
-        }else el(line,'span','name','dv-trace-log-name',lookup.label);
+        }
         find(line,lookup.id,lookup.label);
         results(group,lookup.id);
       });
-      // The reader-typed query: open by default only when no lookup is authored; the reader's toggle then holds.
-      var typed=el(section,'details','typed','dv-trace-log-typed');typed.setAttribute('data-log-search',logs.typed);
-      if(!typed._logOpenInit){typed._logOpenInit=true;typed.open=host._logTypedOpen!=null?host._logTypedOpen:!logs.lookups.length;}
-      if(!typed._logToggle){typed._logToggle=function(){host._logTypedOpen=typed.open;};typed.addEventListener('toggle',typed._logToggle);}
-      el(typed,'summary','summary','dv-trace-log-typed-summary','Type a LogQL query');
-      var area=control(typed,'logql','LogQL log query','textarea',logs.typed);area.maxLength=2000;area.rows=3;area.spellcheck=false;area.placeholder='{env="prod"} |= "message" | field="value"';area.title='Ctrl+Enter or Cmd+Enter runs Find';
-      if(area.value!==logs.form.logql)area.value=logs.form.logql;onEnter(area,logs.typed,true);
-      find(el(typed,'div','actions','dv-live-controls'),logs.typed,'LogQL query');
-      results(typed,logs.typed);
+      if(typedShown){
+        var typed=el(section,'div','typed','dv-trace-log-search dv-trace-log-typed');typed.setAttribute('role','group');typed.setAttribute('aria-label','LogQL query log search');typed.setAttribute('data-log-search',logs.typed);
+        var area=control(typed,'logql','LogQL log query','textarea',logs.typed);area.maxLength=2000;area.rows=3;area.spellcheck=false;area.placeholder='{env="prod"} |= "message" | field="value"';area.title='Ctrl+Enter or Cmd+Enter runs Find';
+        if(area.value!==logs.form.logql)area.value=logs.form.logql;onEnter(area,logs.typed,true);
+        find(el(typed,'div','actions','dv-live-controls'),logs.typed,'LogQL query');
+        results(typed,logs.typed);
+      }
       return reportItem;
       function results(parent,search){
         if(!r || r.lookup!==search)return;
@@ -930,7 +937,7 @@
 .pt-live-status .dv-live-metrics-style .tbtn[aria-pressed="true"],.pt-live-status .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
 .dv-live-trace{font-size:12px}.dv-live-trace p{margin:6px 0;overflow-wrap:anywhere}.dv-trace-mode-status:empty{display:none}
 .dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-check-label{display:flex;align-items:center;gap:6px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
-.dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{margin-left:.4em;color:var(--dfaint)}.dv-trace-request{margin:6px 0}.dv-trace-request>summary{cursor:pointer;overflow-wrap:anywhere;font-weight:600}.dv-trace-log-search,.dv-trace-log-typed{margin:8px 0;padding:8px;border:1px solid var(--explore-border);border-radius:6px;min-width:0}.dv-trace-log-search-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 8px;min-width:0}.dv-trace-log-search-controls>.dv-trace-input-label{flex:1 1 160px;min-width:0;margin:0}.dv-trace-log-name,.dv-trace-log-label{font-weight:600;overflow-wrap:anywhere}.dv-trace-log-name{flex:1 1 auto;align-self:center;min-width:0}.dv-trace-log-typed>summary{cursor:pointer;font-weight:600;padding:2px 0}.dv-trace-log-find[aria-busy=true]{cursor:progress}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}
+.dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{margin-left:.4em;color:var(--dfaint)}.dv-trace-request{margin:6px 0}.dv-trace-request>summary{cursor:pointer;overflow-wrap:anywhere;font-weight:600}.dv-trace-log-search{margin:8px 0;padding:8px;border:1px solid var(--explore-border);border-radius:6px;min-width:0}.dv-trace-log-search-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 8px;min-width:0}.dv-trace-log-search-controls>.dv-trace-input-label{flex:1 1 160px;min-width:0;margin:0}.dv-trace-log-label{font-weight:600;overflow-wrap:anywhere}.dv-trace-log-find[aria-busy=true]{cursor:progress}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}.dv-trace-log-report>.dv-trace-direct-report{margin-top:0}.dv-trace-log-row:has(+.dv-trace-log-report){border-bottom:0}
 .dv-trace-selected{min-width:0}.dv-trace-slot{margin:10px 0;min-width:0}.dv-trace-slot-hint{margin:0;padding:10px;border:1px dashed var(--explore-border);border-radius:6px;color:var(--dfaint);font-size:11px}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}

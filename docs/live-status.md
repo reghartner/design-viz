@@ -297,8 +297,8 @@ Undo/Redo per edit. Future offsets (`+6h`), zero, fractional durations and date
 expressions are unsupported: authored invalid values warn and use `24h`, while
 the editor refuses invalid edits. This shared window applies to metrics and
 native trace search/detail for all local and imported carriers. `refreshMs`
-is the connector refresh interval; values under one minute use 60000 and an
-absent value leaves the connector default. `templates` are named signal sets
+is the refresh interval; values under five minutes use 300000 (with a warning)
+and an absent value means five minutes. `templates` are named signal sets
 authored on the page; the repository ships none.
 
 A carrier applies a template with `"use"` plus a value for every declared
@@ -588,7 +588,7 @@ and **Remove metrics** restores the inherited one.
 **Status board settings → Metrics** edits the page
 `tracking.telemetry` block: the Grafana Prometheus, Loki, Tempo and SQL datasource
 UIDs, the Honeycomb environment and dataset, **Metrics window** (such as `1h`) and
-**Metrics refresh ms** (60000 or more). **Allow metrics** controls availability on
+**Metrics refresh ms** (300000 or more). **Allow metrics** controls availability on
 this page, including all direct/nested imports and loaded details. It is checked
 by default; that permits Metrics but never turns it on or runs queries. Uncheck
 it to hide Metrics controls and suppress telemetry discovery, data calls, cards
@@ -829,6 +829,30 @@ a `path.dv-metrics-ghost[data-metrics-edge]`. A node's cues sit in a
 `g.dv-metrics-seal[data-seal]` (`proven`, `degraded`, `unproven`, `live-early`).
 Metrics packets reuse the ordinary packet motion along the edge path but never the
 `.pkt` or `.comm-packet` classes, so step packets and failure packets are untouched.
+
+### Metrics style: Cards or Outline (#1294)
+
+While **Metrics overlay** is on, a **Cards | Outline** choice sits right of the switch.
+**Cards** (the default) draws a metric card beside each bound connection. **Outline**
+draws no cards. Each bound connection gets a wide halo under its line and each bound
+node a ring a few pixels outside its border, in the metric verdict colour: green
+healthy, amber degraded, red breach (an error signal outside its limit), grey no
+data. A carrier with several signals takes the worst one, in that order: breach,
+degraded, no data, healthy. The Jira colours stay on the node border and the line,
+so the two remain distinct. Imported and loaded-detail
+carriers are outlined the same way.
+
+Hovering or focusing an outlined carrier shows its card, the same card Cards draws,
+beside it on a side with free room inside the board, never over the carrier. A
+connection's halo is its one carrier button (its label points to it); a node that
+already has a Jira card button keeps it, and its ring opens the same popover. A
+click, Enter or Space opens the full detail popover on the carrier, and Escape
+closes it. Tab moves from the carrier to the shown card's query links, then on. On a touch screen the first tap shows
+the card; a second tap, or a tap on the card, opens the detail. The choice is
+remembered per viewer and board in browser storage. Workbench authoring and the
+preview always draw cards. A connection halo is a `path.dv-metrics-outline`, a node
+ring a `rect.dv-metrics-outline`, each with `data-metrics-carrier` and
+`data-metric-state`; the hidden card has `data-metrics-style="outline"`.
 
 ## Live status panel
 
@@ -1302,9 +1326,13 @@ turns `observedAt` and marker times into ISO text, and gives every kept carrier
 `signals`, `observedAt` (or `null`), `markers` and `links`.
 
 The first call runs when Metrics turns on. Calls repeat every `refreshMs`, else the
-page's `tracking.telemetry.refreshMs`, else one minute, and never more often than
-once a minute. A hidden document pauses refresh; returning to visible runs one
-catch-up call. A rejection reports the error and keeps the previous map. Turning
+page's `tracking.telemetry.refreshMs`, else five minutes, never more often (#1287).
+A hidden document pauses refresh; returning to visible, or closing Over time,
+calls once five minutes have passed. Like Jira, turning Metrics on or coming back
+to an environment within five minutes shows that environment's last clean answer
+with its own refreshed time and makes no call; its example traces return under
+fresh selection tokens. An answer that names a failure is not reused. Retry
+always calls at once. A rejection reports the error and keeps the previous map. Turning
 Metrics off or destroying the page aborts the signal, stops the timer and drops any
 late answer; turning it off also clears the map. `report.note(text)` attaches a note
 to that answer, such as a query that failed while the others answered; it becomes
@@ -1843,7 +1871,7 @@ panel shows **Allow Grafana**, which makes the same call once and restarts Metri
 Until then no further call is made. An authorization answer (reconnect, not
 allowed) also clears the map and stops calls until Metrics is
 turned on again. Missing or removed capabilities hide Metrics entirely. Refreshes follow the [telemetry provider](#telemetry-provider)
-loop: at most once a minute (the page's `refreshMs` when longer), paused while the
+loop: at most every five minutes (the page's `refreshMs` when longer), paused while the
 document is hidden, aborted when Metrics turns off. The connector line reads
 "Grafana connected · 24h window · refreshed 10:42:13". Each refresh makes these
 calls:
@@ -2373,11 +2401,14 @@ Stage 2 (#1186) finishes the layout. **Show on diagram** (a toggle) and **Open
 trace** are icons at the right end of the request line, outside its summary, with
 those accessible names. The request card also holds **Pin as evidence**, **Source
 and limitations** and **All operation mappings**. A header row, "Spans · 55 · click
-a span to focus it on the diagram", sits above the span list. In a section layout
-tile the list fills the rest of the panel and scrolls inside it, so its length
-never grows the tile. A focused span's detail (duration, service, operation, the
-matched step or the step choices, **Clear trace focus**) opens directly under its
-row, and a span focused from the diagram is scrolled into the list's view.
+a span to focus it on the diagram", sits above the span list. The list has no
+scroll bar of its own: it is as tall as its spans (#1280). In a section layout the
+Live status tile grows with it, so the page scrolls instead. A focused span's detail
+(duration, service, operation, the matched step or the step choices, **Clear trace
+focus**) opens directly under its row. A span the reader focuses (a row, a step
+choice, or the log line it was loaded from) is scrolled into view by the least page
+scroll. A focus nobody asked for, such as the failed span focused when a trace loads
+or a focus kept across an Edit-mode change, never scrolls the page.
 
 Each annotated node or uniquely matched edge gets one label from its rows: one row per
 step on the current path whose `traceMatch` names it (#1154). Connection timing (#1196):

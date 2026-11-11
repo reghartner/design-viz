@@ -11,7 +11,7 @@
 | A4 | One refresh (default 24h window) makes exactly: get_annotations first and alone (no other call starts until it settles), one query_prometheus range call per grafana signal, one query_loki_logs metric range call per loki signal, generate_deeplink once per numeric signal without an authored query link; relative times now-24h..now, stepSeconds 360, the page's datasource UIDs, the provider's AbortSignal on every call. tempo and honeycomb signals are not queried. A later refresh repeats the queries but not the deeplinks. | One-shot deferred get_annotations, start/settle event log, then a second refresh | Exactly one pending call, no query starts before annotation settlement; exact inputs, budget, signals and cached links | Annotations launched concurrently with queries, early queries, extra calls or repeated deeplinks |
 | A5 | Day 10 recorded payloads map to the provider shape: every Prometheus and Loki series as ascending [ms, number] points (several series added point by point), value = the last point, the authored unit; a query with no data is value 0 with no points; observedAt = the newest point; markers = the window's annotations ascending as {at, kind, label}; links = authored dashboard/query plus the generated Explore link. Imported carriers map by their resolved id. | Pinned Day 10 payloads, local and resolved imported carriers, pure mapper inputs; empty map if absent | Named A5 carrier ids, mapped values/series/units, markers, timestamps and links | Wrong Loki field, missing markers, lost imported ids or incorrect series aggregation |
 | A6 | The page window drives the range and step (6h → now-6h, 90 s; 30m → 60 s floor); Day 11 shows the incident marker and the lagging queue; Day 12 the recovered queue and the still-silent push edge. | 6h/30m/7d windows and pinned Day 11/12/all-todo story; missing calls read as undefined | Named A6 ranges, step floor, incident marker, lag/recovery and silent-edge values | Fixed window/step, missing incident marker or wrong recovery/silence values |
-| A7 | Through ctl.telemetry: Metrics off makes no data call (metadata discovery is permitted); the refresh never runs faster than 60 s even when the page asks for less; a hidden document pauses and returns with one catch-up; Metrics off aborts the signal. | Fake timers and document visibility through ctl.telemetry; page requests 1000 ms | Named A7 off/on calls, delivered map, 60000 ms floor, hidden pause, one catch-up and abort | Eager calls, sub-minute refresh, hidden polling, duplicate catch-up or no abort |
+| A7 | Through ctl.telemetry: Metrics off makes no data call (metadata discovery is permitted); the refresh never runs faster than 5 minutes even when the page asks for less (#1287); a hidden document pauses and returns with one catch-up once 5 minutes have passed; Metrics off aborts the signal. | Fake timers and document visibility through ctl.telemetry; page requests 1000 ms | Named A7 off/on calls, delivered map, 300000 ms floor, hidden pause, one catch-up and abort | Eager calls, sub-minute refresh, hidden polling, duplicate catch-up or no abort |
 | A8 | A connector-level failure (server_unavailable) keeps the previous map and sets status().note; a tool_error on one query keeps the other carriers fresh, keeps that signal's previous sample and reports the failed query in status().note. | Good sample then connector failure and per-query error with distinct second-refresh Prometheus/Loki peer series, plus missing datasource; inert provider if absent | Named A8 error status/note, retained previous map/failed sample, every successful peer equals the new series and differs from its first sample, and cleared note | Failure reported as success, erased previous map, an implementation that keeps the whole stale map after one failure, or unreported query error |
 | A9 | approval_required → status `approval`, no further connector call in that Metrics session, an "Allow Grafana" action on ctl.liveStatus (re-shown after another connector clears the slot, never over another connector's action); Allow makes the same call once and restarts Metrics. Authorization denials clear the map, set the note and stop calls until Metrics is turned on again; user_changed retires the adapter. | Deferred approval/denial behavior and fake live-status action through ctl.telemetry | Named A9 approval status/text, one Allow retry, retracted map and retired adapter | Silent success, repeated unattended requests, overwritten action or retained unauthorized data |
 | A10 | sql signals call query_sql at most once an hour (the value is reused in between); without query_sql on the connector there is no call and the note says so. | SQL connector, controlled clock at 0/59/61 minutes, missing-tool case; no calls if absent | Named A10 SQL inputs/value, hourly cap/cache and missing-tool note | Missing SQL call, per-refresh SQL query, stale hourly cache or unsupported tool call |
@@ -472,16 +472,19 @@ test('A6 the page window drives range and step; Day 11 shows the incident and th
  assert.deepEqual(quiet['button->mcu']?.signals.rate,{value:0,series:[],unit:'press/h',links:quiet['button->mcu'].signals.rate.links},'A6 a silent scenario reports zeros');
 });
 
-test('A7 through ctl.telemetry: off makes no call, refresh is floored at 60 s, hidden pauses with one catch-up, off aborts',async()=>{
+test('A7 through ctl.telemetry: off makes no call, refresh is floored at 5 minutes, hidden pauses with one catch-up after 5 minutes, off aborts',async()=>{
  const raw=boardPage();raw.tracking.telemetry.refreshMs=1000;
  const s=await setup({page:raw}),t=s.C.createTelemetry(s.page,s.adapter.options,{carriers:carriersOf(s.C,s.page)});
  s.adapter.attach({telemetry:t},s.page);await settled();assert.equal(s.net.calls.length,0,'A7 Metrics off: no call');assert.equal(s.host.used(),1,'A7 Metrics off: metadata only');
  t.setEnabled(true);await settled();
  const first=s.net.calls.length;assert.ok(first>0,'A7 Metrics on refreshes at once');assert.equal(t.status().state,'ok');
  assert.equal(Object.keys(plain(t.snapshot().map)).length,6,'A7 the map reaches ctl.telemetry');
- assert.deepEqual([...s.timers.values()].map(x=>x.ms),[60000],'A7 the page asks for 1000 ms; the refresh floor is 60 s');
+ assert.deepEqual([...s.timers.values()].map(x=>x.ms),[300000],'A7 the page asks for 1000 ms; the refresh floor is 5 minutes');
+ // #1287: a fake clock; the poller reads Date.now from the page's global Date.
+ const now={at:Date.now()};s.C.Date=class extends Date{constructor(...a){super(...(a.length?a:[now.at]));}static now(){return now.at;}};
  s.hide(true);assert.equal(s.timers.size,0,'A7 hidden pauses the refresh');await settled();assert.equal(s.net.calls.length,first);
- s.hide(false);await settled();
+ s.hide(false);await settled();assert.equal(s.net.calls.length,first,'A7 visible again within 5 minutes: no call');
+ s.hide(true);now.at+=300000;s.hide(false);await settled();
  const second=s.net.calls.length;assert.ok(second>first,'A7 visible again: one catch-up refresh');
  assert.equal(s.net.calls.slice(first).filter(c=>c.tool==='get_annotations').length,1,'A7 exactly one catch-up');
  const signal=s.net.calls.at(-1).signal;t.setEnabled(false);assert.equal(signal.aborted,true,'A7 off aborts the in-flight signal');
@@ -500,10 +503,10 @@ test('A8 a connector failure keeps the previous map and sets the note; one faile
    ?Promise.resolve({payload:{data:[{values:peerSeries.map(([ms,value])=>({timestamp:String(ms/1000),value:String(value)}))}]}}):null}});
  const t=s.C.createTelemetry(s.page,s.adapter.options,{carriers:carriersOf(s.C,s.page)});
  s.adapter.attach({telemetry:t},s.page);await settled();t.setEnabled(true);await settled();const good=plain(t.snapshot().map);assert.equal(t.status().state,'ok','A8 the first refresh answers');assert.equal(t.status().note,'','A8 no note on a clean answer');
- mode='down';s.tick(60000);await settled();
+ mode='down';s.tick(300000);await settled();
  assert.equal(t.status().state,'error','A8 a connector failure reports error');assert.equal(t.status().note,'Grafana did not answer','A8 the connector note');
  assert.deepEqual(plain(t.snapshot().map),good,'A8 the previous map is kept');
- mode='bad';s.tick(60000);await settled();
+ mode='bad';s.tick(300000);await settled();
  assert.equal(t.status().state,'ok','A8 one failed query does not fail the refresh');
  assert.equal(t.status().note,'1 Grafana query failed: mcu->ingest p95: bad_data: parse error at char 3','A8 the note names the carrier, signal and message');
  const map=plain(t.snapshot().map);
@@ -514,7 +517,7 @@ test('A8 a connector failure keeps the previous map and sets the note; one faile
   assert.notDeepEqual(expected,previous,'A8 the second-refresh fixture differs for '+id+' '+name);
   assert.deepEqual(map[id]?.signals[name],expected,'A8 the successful peer has the new value and series: '+id+' '+name);
  }
- mode=null;s.tick(60000);await settled();assert.equal(t.status().note,'','A8 a clean refresh clears the note');
+ mode=null;s.tick(300000);await settled();assert.equal(t.status().note,'','A8 a clean refresh clears the note');
  // A first refresh with a failed query and no previous sample leaves that signal out.
  const fresh=await setup({overrides:{query_prometheus:input=>input.expr===Q.eventP95?Promise.reject({code:'tool_error',message:'boom'}):null}});
  const {map:first,notes}=await fresh.refresh();
@@ -534,7 +537,7 @@ test('A9 approval, authorization denials and user_changed: one Allow call, no na
  await settled();t.setEnabled(true);await settled();
  assert.equal(t.status().state,'approval','A9 status approval');assert.equal(t.status().note,'Grafana access needs your approval');
  assert.equal(s.net.calls.length,1,'A9 the first call asked and stopped the refresh');assert.equal(live.label(),'Allow Grafana','A9 the Allow action');
- s.tick(60000);await settled();assert.equal(s.net.calls.length,1,'A9 no unattended call while approval is pending');
+ s.tick(300000);await settled();assert.equal(s.net.calls.length,1,'A9 no unattended call while approval is pending');
  live.action('',null);assert.equal(live.label(),'Allow Grafana','A9 re-shown after another connector clears the slot');
  const jira=()=>{};live.action('Allow Jira',jira);assert.equal(live.label(),'Allow Jira','A9 never over another connector action');live.action('',null);assert.equal(live.label(),'Allow Grafana');
  approve=true;live.run();await settled();
@@ -548,14 +551,14 @@ test('A9 approval, authorization denials and user_changed: one Allow call, no na
   let deny=false;const d=await setup({overrides:{query_prometheus:()=>deny?Promise.reject({code,message:code}):null}});
   const dt=d.C.createTelemetry(d.page,d.adapter.options,{carriers:carriersOf(d.C,d.page)});d.adapter.attach({telemetry:dt,liveStatus:fakeLive()},d.page);
   await settled();dt.setEnabled(true);await settled();assert.ok(Object.keys(plain(dt.snapshot().map)).length,code+' first refresh');
-  deny=true;d.tick(60000);await settled();
+  deny=true;d.tick(300000);await settled();
   assert.equal(dt.status().state,'error',code);assert.equal(dt.status().note,note,'A9 '+code+' note');assert.deepEqual(plain(dt.snapshot().map),{},'A9 '+code+' retracts the map');
-  const after=d.net.calls.length;d.tick(60000);await settled();assert.equal(d.net.calls.length,after,'A9 '+code+': no unattended call');
+  const after=d.net.calls.length;d.tick(300000);await settled();assert.equal(d.net.calls.length,after,'A9 '+code+': no unattended call');
   deny=false;dt.setEnabled(false);dt.setEnabled(true);await settled();assert.ok(d.net.calls.length>after,'A9 '+code+': turning Metrics on again retries');assert.equal(dt.status().state,'ok');
  }
  let changed=false;const u=await setup({overrides:{get_annotations:()=>changed?Promise.reject({code:'user_changed',message:'user changed'}):null}});
  const ut=u.C.createTelemetry(u.page,u.adapter.options,{carriers:carriersOf(u.C,u.page)});u.adapter.attach({telemetry:ut,liveStatus:fakeLive()},u.page);
- await settled();ut.setEnabled(true);await settled();changed=true;u.tick(60000);await settled();assert.deepEqual(plain(ut.snapshot().map),{},'A9 user_changed retracts');
+ await settled();ut.setEnabled(true);await settled();changed=true;u.tick(300000);await settled();assert.deepEqual(plain(ut.snapshot().map),{},'A9 user_changed retracts');
  const frozen=u.net.calls.length;changed=false;ut.setEnabled(false);ut.setEnabled(true);await settled();assert.equal(u.net.calls.length,frozen,'A9 user_changed retires the adapter');
 });
 function fakeLive(){

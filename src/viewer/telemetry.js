@@ -34,8 +34,9 @@
              links are dropped, times become ISO text, and each kept carrier
              always has signals, observedAt (or null), markers and links.
    refreshMs The refresh interval while Metrics is on. Without it the page's
-             tracking.telemetry.refreshMs applies, else one minute. Never
-             below 60000.
+             tracking.telemetry.refreshMs applies, else five minutes. Never
+             below 300000, and no automatic call (a visibility return, closing
+             Over time) comes sooner than that after the previous one (#1287).
    source    Optional connector name for the panel's Metrics text
              ('Grafana' from the claude.ai adapter, viewer/telemetry-claude.js).
    demo      Optional {mount(api) → cleanup}: a demo source mounted when Metrics
@@ -418,6 +419,7 @@ function createTelemetry(page,options,hooks){
   var windowHistory=options.historyMode==='window',windowCache=Object.create(null);
   var demo=options.demo && typeof options.demo.mount==='function'?options.demo:null;
   var configured=Number(options.refreshMs),authored=trackingTelemetry(page || {}).refreshMs;
+  // #1287: at most once every 5 minutes (TELEMETRY_MIN_REFRESH_MS), whatever the host or the page asks for.
   var delay=Math.max(TELEMETRY_MIN_REFRESH_MS,configured>0 && isFinite(configured)?configured:authored || TELEMETRY_MIN_REFRESH_MS);
   var map=Object.create(null),liveMap=map,past=null,historyRequests=[],historyGeneration=0,historyCache=telemetryHistoryCache(),liveStatus=null,enabled=false,retired=false,listeners=[],demoCleanup=null;
   available=available && !!(provider || demo);
@@ -451,9 +453,30 @@ function createTelemetry(page,options,hooks){
     liveKeys=keys;if(!Object.keys(next).length)resetObservations();
     else if(past)heldObservation=true;else observed();
   }
+  /* #1289, like Jira's 5-minute answer reuse: the last clean answer per environment (same bindings and settings) is shown again,
+     with its own time and no call, when Metrics turns on or the environment comes back within 5 minutes. An answer
+     that names a failure is not reused, so turning Metrics off and on still tries again after a failure. A trace
+     exemplar's selection token belongs to the session that loaded it: options.restoreExemplars registers the cached
+     exemplar again under a fresh token (no call); one it cannot restore is left out until the next refresh. */
+  var answers=Object.create(null),lastCallKeys=null;
+  function envKey(){return environment || '';}
+  function forgetAnswers(){answers=Object.create(null);}
+  function startLive(){
+    var key=envKey(),hit=answers[key],now=Date.now();
+    if(hit && now-hit.at<delay && hit.keys===JSON.stringify(bindingKeys()) && hit.config===JSON.stringify(api.config())){
+      // A host provider owns its tokens (its canChooseExemplar decides), so its exemplars are kept as they were.
+      var reused=copy(hit.value),restored={};
+      if(typeof options.restoreExemplars==='function'){
+        try{restored=options.restoreExemplars(copy(hit.value)) || {};}catch(ex){restored={};}
+        Object.keys(reused).forEach(function(id){if(!reused[id] || typeof reused[id]!=='object')return;delete reused[id].exemplars;if(restored[id])reused[id].exemplars=[restored[id]];});
+      }
+      store(reused,JSON.parse(hit.keys));setStatus({state:'ok',busy:false,refreshedAt:hit.refreshedAt,note:''});poller.start(delay-(now-hit.at));return;
+    }
+    poller.start();
+  }
   // Each call owns its transient progress; retired generations cannot repaint.
   var poller=provider?liveStatusPoller(function(signal){
-    clearPending();var generation=requestGeneration,noted='',bound=bindings(),keys=bindingKeys();
+    clearPending();var generation=requestGeneration,noted='',bound=bindings(),keys=bindingKeys(),env=envKey(),config=JSON.stringify(api.config());lastCallKeys=JSON.stringify(keys);
     function current(id,name){var binding=bound.find(function(b){return b.id===id;});return !retired && enabled && available && !signal.aborted && generation===requestGeneration && keys[id]===bindingKeys()[id] && binding && binding.signals[name] && !proofVerdicts.isTraceSignal(binding.signals[name]);}
     var report={note:function(text){noted=typeof text==='string'?text:'';if(!retired && enabled && !signal.aborted && generation===requestGeneration){if(past)liveStatus=Object.assign({},liveStatus,{note:noted});else setStatus({note:noted});notify();}},
       pending:function(id,name){if(!current(id,name))return;if(!pending[id])pending[id]=Object.create(null);pendingKeys[id]=keys[id];pending[id][name]=true;notify();},
@@ -470,11 +493,13 @@ function createTelemetry(page,options,hooks){
     // Automatic adapters opt into precise reporting after capability/config checks.
     if(!options.managesPending)bound.forEach(function(b){telemetryMetricNames(b).forEach(function(name){if(!b.signals[name].error)report.pending(b.id,name);});});
     signal.addEventListener('abort',function(){if(generation===requestGeneration){clearPending();notify();}},{once:true});
-    return Promise.resolve().then(function(){return provider(bound,signal,report,{environment:environment,config:api.config()});}).then(function(value){return {value:value,note:noted,keys:keys};});
+    return Promise.resolve().then(function(){return provider(bound,signal,report,{environment:environment,config:api.config()});}).then(function(value){return {value:value,note:noted,keys:keys,env:env,config:config};});
   },delay,{
+    spaced:true,
     busy:function(){if(past){liveStatus=Object.assign({},liveStatus,{busy:true});return;}setStatus({busy:true});notify();},
-    result:function(answer){clearPending();store(answer.value,answer.keys);var next={state:'ok',busy:false,refreshedAt:new Date().toISOString(),note:answer.note};if(past)liveStatus=next;else setStatus(next);notify();},
-    error:function(error){clearPending();var next={state:error && error.state==='approval'?'approval':'error',busy:false,note:error && typeof error.message==='string'?error.message:String(error)};if(past)liveStatus=next;else setStatus(next);notify();}
+    result:function(answer){clearPending();store(answer.value,answer.keys);var next={state:'ok',busy:false,refreshedAt:new Date().toISOString(),note:answer.note};if(past)liveStatus=next;else setStatus(next);
+      if(answer.note)delete answers[answer.env];else answers[answer.env]={value:copy(answer.value || {}),keys:JSON.stringify(answer.keys),config:answer.config,at:Date.now(),refreshedAt:next.refreshedAt};notify();},
+    error:function(error){delete answers[envKey()];clearPending();var next={state:error && error.state==='approval'?'approval':'error',busy:false,note:error && typeof error.message==='string'?error.message:String(error)};if(past)liveStatus=next;else setStatus(next);notify();}
   }):null;
   function stopDemo(){var cleanup=demoCleanup;demoCleanup=null;if(typeof cleanup==='function'){try{cleanup();}catch(ex){}}}
   function cancelHistory(){if(past)past.pending={};historyGeneration++;historyRequests.forEach(function(request){request.abort.abort();});historyRequests=[];}
@@ -617,7 +642,7 @@ function createTelemetry(page,options,hooks){
       setStatus({state:available?(enabled?'loading':'idle'):'absent',busy:false,refreshedAt:null,note:availabilityNote});
       notify();
       if(enabled && available){
-        if(past)loadHistory();else if(poller)poller.start();
+        if(past)loadHistory();else if(poller)startLive();
         if(demo){var epoch=environmentGeneration,facade=Object.assign({},api,{apply:function(value){if(epoch===environmentGeneration)api.apply(value);}});var cleanup=demo.mount(environment?facade:api);demoCleanup=typeof cleanup==='function'?cleanup:null;}
       }
       return true;
@@ -638,7 +663,9 @@ function createTelemetry(page,options,hooks){
       if(retired || !enabled || past || before!==JSON.stringify(bindings()) || liveMap[id]!==sample)throw new Error('Trace selection expired.');
       sample.exemplars=[telemetryTraceEnvelope(result,traceAllowed(result && result.provider))];notify();return copy(sample.exemplars[0]);
     },
-    retractExemplars:function(){[liveMap,map].forEach(function(m){Object.keys(m).forEach(function(id){delete m[id].exemplars;if(!Object.keys(m[id].signals).length)delete m[id];});});notify();},
+    // #1289: a retracted exemplar never comes back with a reused answer either.
+    retractExemplars:function(){Object.keys(answers).forEach(function(key){var v=answers[key].value;Object.keys(v).forEach(function(id){if(v[id] && typeof v[id]==='object')delete v[id].exemplars;});});
+      [liveMap,map].forEach(function(m){Object.keys(m).forEach(function(id){delete m[id].exemplars;if(!Object.keys(m[id].signals).length)delete m[id];});});notify();},
     openHistory:function(days,index){
       if(retired)return;cancelHistory();liveStatus=copy(status);past={days:days,index:index,map:{}};map=Object.create(null);
       if(poller)poller.pause();
@@ -650,7 +677,8 @@ function createTelemetry(page,options,hooks){
     closeHistory:function(){
       if(!past || retired)return;cancelHistory();past=null;map=enabled?liveMap:Object.create(null);
       if(enabled && heldObservation){heldObservation=false;observed();}
-      if(enabled){if(liveStatus)setStatus(liveStatus);if(poller)poller.resume();}liveStatus=null;notify();
+      // A carrier added while Over time was open has no live answer yet: refresh at once; otherwise wait out the 5 minutes.
+      if(enabled){if(liveStatus)setStatus(liveStatus);if(poller){if(lastCallKeys!==null && lastCallKeys!==JSON.stringify(bindingKeys())){poller.stop();poller.start();}else poller.resume();}}liveStatus=null;notify();
     },
     bindings:function(){return copy(bindings());},
     // Runtime detail identity: identical authored bindings can belong to a replacement load.
@@ -669,20 +697,22 @@ function createTelemetry(page,options,hooks){
     // Automatic-provider facade: revoke only the named sources immediately,
     // including cached history, without erasing a healthy peer on that carrier.
     retractSources:function(sources){
-      if(retired)return;var owned=Object.create(null);bindings().forEach(function(b){owned[b.id]=Object.keys(b.signals).filter(function(n){return sources.indexOf(b.signals[n].source)>=0;});});
+      if(retired)return;forgetAnswers();var owned=Object.create(null);bindings().forEach(function(b){owned[b.id]=Object.keys(b.signals).filter(function(n){return sources.indexOf(b.signals[n].source)>=0;});});
       sources.forEach(function(source){bindings().forEach(function(b){Object.keys(b.signals).forEach(function(name){if(b.signals[name].source===source && pending[b.id])delete pending[b.id][name];});});});
       Object.keys(pending).forEach(function(id){if(!Object.keys(pending[id]).length)delete pending[id];});
       function strip(target){Object.keys(target || {}).forEach(function(id){var sample=target[id],changed=false;(owned[id] || []).forEach(function(name){if(telemetryOwn(sample.signals,name)){delete sample.signals[name];changed=true;}});if(changed){sample.links={};sample.markers=[];sample.observedAt=null;}if(!Object.keys(sample.signals).length && !(sample.exemplars || []).length)delete target[id];});}
       strip(liveMap);strip(map);if(past)strip(past.map);historyCache.clear();windowCache=Object.create(null);notify();
     },
     // Explicit consent retry keeps healthy peer data while renewing the session.
+    // Retry is the one "call now" (#1289): it never reuses an answer. The panel has no Retry button; Allow after an
+    // approval, a binding change and a host call it.
     retry:function(){if(retired || !enabled || !available)return;if(past)loadHistory(true);else if(poller){poller.stop();poller.start();}},
     apply:function(value){
       if(retired || !enabled && !preload || !permitted || !available && (provider || demo || options.available===false))return;store(value);
       if(enabled && !past)setStatus({state:'ok',refreshedAt:new Date().toISOString(),note:''});
       notify();
     },
-    clear:function(signal){if(retired)return;clearPending();if(!historyRequests.some(function(request){return request.abort.signal===signal;})){cancelHistory();setStatus({busy:false});}historyCache.clear();windowCache=Object.create(null);liveMap=map=Object.create(null);resetObservations();if(past)past.map={};notify();},
+    clear:function(signal){if(retired)return;forgetAnswers();clearPending();if(!historyRequests.some(function(request){return request.abort.signal===signal;})){cancelHistory();setStatus({busy:false});}historyCache.clear();windowCache=Object.create(null);liveMap=map=Object.create(null);resetObservations();if(past)past.map={};notify();},
     snapshot:function(){
       var input=telemetryProofInput(hooks.carriers || function(){},hooks.diagrams || function(){},typeof hooks.jira==='function'?hooks.jira():{},map,environment,telemetryEnvironmentConfig(page,environment));
       return {environment:environment,environments:permitted?Object.keys(trackingTelemetry(page).environments || {}):[],available:available && !retired,enabled:enabled,map:copy(map),pending:enabled?copy(past?past.pending || {}:pending):{},status:copy(status),carriers:copy(input.carriers),
@@ -697,7 +727,7 @@ function createTelemetry(page,options,hooks){
       preload=false;enabled=value;if(!enabled)clearPending();
       if(enabled){
         setStatus({state:'loading',busy:false,refreshedAt:null,note:''});
-        if(past)loadHistory();else if(poller)poller.start();
+        if(past)loadHistory();else if(poller)startLive();
         if(demo){var epoch=environmentGeneration,facade=Object.assign({},api,{apply:function(value){if(epoch===environmentGeneration)api.apply(value);}});var cleanup=demo.mount(environment?facade:api);demoCleanup=typeof cleanup==='function'?cleanup:null;}
       }else{
         cancelHistory();if(poller)poller.stop();stopDemo();
@@ -708,11 +738,11 @@ function createTelemetry(page,options,hooks){
     setAvailable:function(value,note){
       if(retired)return;value=!!value && permitted && !!(provider || demo);if(note!==undefined)availabilityNote=permitted?String(note || ''):'';
       if(value===available){if(note!==undefined && status.note!==availabilityNote){setStatus({note:availabilityNote});notify();}return;}
-      if(!value){api.setEnabled(false);historyCache.clear();windowCache=Object.create(null);liveMap=map=Object.create(null);resetObservations();}
+      if(!value){api.setEnabled(false);forgetAnswers();historyCache.clear();windowCache=Object.create(null);liveMap=map=Object.create(null);resetObservations();}
       available=value;setStatus({state:value?'idle':'absent',busy:false,refreshedAt:null,note:availabilityNote});notify();
     },
     onChange:function(fn){if(typeof fn!=='function' || retired)return function(){};listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
-    destroy:function(){if(retired)return;retired=true;clearPending();cancelHistory();historyCache.clear();windowCache=Object.create(null);past=null;enabled=false;liveMap=map=Object.create(null);resetObservations();setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];if(typeof hooks.changed==='function')hooks.changed();}
+    destroy:function(){if(retired)return;retired=true;forgetAnswers();clearPending();cancelHistory();historyCache.clear();windowCache=Object.create(null);past=null;enabled=false;liveMap=map=Object.create(null);resetObservations();setStatus({state:'absent',busy:false,refreshedAt:null,note:''});if(poller)poller.stop();stopDemo();listeners=[];if(typeof hooks.changed==='function')hooks.changed();}
   };
   return api;
 }

@@ -62,7 +62,8 @@ for(const transport of ['structuredContent','payload'])test('actual mock bridge 
  const query=bridge.calls.find(c=>c.name==='run_query').args.query_spec;assert.deepEqual(query,{...nativeQuery(),from:'-24h'});assert.equal(s.map.a.signals.latency.series.length,24);
  h.api.setEnabled(false);h.p.tracking.telemetry.window='6h';h.api.setEnabled(true);await settle();s=h.api.snapshot();assert.equal(s.map.a.signals.latency.value,expected(11,'mcu->ingest',6));assert.equal(s.map.a.signals.latency.series.length,6);assert.notEqual(s.map.a.signals.latency.value,expected());
  const calls=bridge.calls.length;h.api.snapshot();h.api.verdicts();await settle();assert.equal(bridge.calls.length,calls);
- h.api.setEnabled(false);bridge.day=7;h.api.setEnabled(true);await settle();assert.equal(h.api.snapshot().map.a?.signals.latency,undefined,'actual Day8 missing never zero');assert.equal(h.fetches.length,0);
+ // #1289: off/on within 5 minutes reuses the answer, so Retry (the one call-now) asks for the new day.
+ bridge.day=7;h.api.retry();await settle();assert.equal(h.api.snapshot().map.a?.signals.latency,undefined,'actual Day8 missing never zero');assert.equal(h.fetches.length,0);
 });
 test('structured exact transport is deeply bounded and conflicting/malformed raw stays unobserved',async()=>{
  const {C}=context(),signal=new AbortController().signal,win={fetch(){assert.fail('invalid structured payload must not fall back to fetch');}};
@@ -116,7 +117,7 @@ test('actual mock clock: November client keeps October measurement as-of and vis
  assert.equal(h.C.liveStatusProofPresentation(later,'24h').rows.find(r=>r.id==='a').chart.observedAt,'2026-11-01T00:00:00.000Z');
  assert.equal(legacy.a.signals.rate.observedAt,undefined,'composition never mutates provider-owned samples');
  const before=bridge.calls.length;h.C.liveStatusProofPresentation(snapshot,'24h');h.api.verdicts();assert.equal(bridge.calls.length,before);
- h.api.setEnabled(false);bridge.day=7;h.api.setEnabled(true);await settle();assert.equal(h.api.snapshot().map.a?.signals.rate,undefined);const missing=h.C.liveStatusProofPresentation(h.api.snapshot(),'24h').rows.find(r=>r.id==='a');assert.equal(missing.chart.points.length,0);assert.equal(missing.chart.observedAt,null);
+ bridge.day=7;h.api.retry();await settle();assert.equal(h.api.snapshot().map.a?.signals.rate,undefined);const missing=h.C.liveStatusProofPresentation(h.api.snapshot(),'24h').rows.find(r=>r.id==='a');assert.equal(missing.chart.points.length,0);assert.equal(missing.chart.observedAt,null);
 });
 test('signed raw clock keeps actual bucket times and distinct retrieval; no series means unknown as-of',async t=>{
  const h=await setup({clientNow:Date.parse('2026-11-05T00:00:00Z')});t.after(()=>h.close());h.api.setEnabled(true);await settle();const sample=h.api.snapshot().map.a.signals.latency;

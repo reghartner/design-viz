@@ -46,7 +46,9 @@ test('H5 historical proof never borrows live; newest pending live answer is held
  api.setEnabled(true);await settle();api.apply(sample(100));api.openHistory(days,0);await settle();assert.equal(api.verdicts().carriers.a.verdict,'done-unproven');
  resolve(sample(200));await settle();assert.equal(api.snapshot().map.a.signals.rate.value,0,'late live answer cannot overwrite historical zero');assert.equal(C.timers.size,0);
  api.historyDay(1);assert.equal(api.verdicts().carriers.a.telemetry,'unobserved');api.historyDay(2);assert.equal(api.verdicts().carriers.a.verdict,'proven');assert.equal(history,1);
- api.closeHistory();assert.equal(api.snapshot().map.a.signals.rate.value,200);await settle();assert.equal(live,2);api.destroy();
+ api.closeHistory();assert.equal(api.snapshot().map.a.signals.rate.value,200);await settle();
+ // #1287: closing Over time shows the held live answer; the next live call waits out the 5 minutes since the last one.
+ assert.equal(live,1,'closing Over time makes no early live call');assert.equal(C.timers.size,1,'the refresh is armed');assert.ok([...C.timers.values()][0].ms<=300000,'within 5 minutes of the last call');api.destroy();
 });
 test('#1200 an Over time day gives the card the metric state of that day',async()=>{
  const {api,C,carrier}=runtime({provider:async()=>sample(100),history:async()=>series([[T,0],[T+2*DAY,5]])});
@@ -194,4 +196,16 @@ test('opening history notifies direct-trace consumers when numeric metrics are o
   assert.deepEqual(seen,[true]);assert.equal(historyCalls,0);assert.equal(liveCalls,0);assert.equal(api.enabled(),false);
   api.closeHistory();assert.deepEqual(seen,[true,false]);api.destroy();
  }
+});
+
+/* #1289 CI (telemetry-history.spec late detail): a carrier loaded while Over time is open has no live answer yet, so
+   closing Over time refreshes at once; with the same carriers it waits out the 5 minutes (H5). */
+test('closing Over time refreshes at once when carriers were added during it, and only then',async()=>{
+ const C=context(),page={},carriers=[['a',{tickets:['AA-1'],telemetry:{kind:'service',signals:{rate:{grafana:'authored[24h]',unit:'req/h'}}}}]];let live=0;
+ const api=C.createTelemetry(page,{provider:async()=>{live++;return sample(100);},history:async()=>series([[T,0]])},{carriers:fn=>carriers.forEach(([id,c])=>fn(c,id,page)),diagrams:()=>{},jira:()=>({})});
+ api.setEnabled(true);await settle();assert.equal(live,1);
+ api.openHistory(days,0);await settle();api.closeHistory();await settle();assert.equal(live,1,'the same carriers: no early live call');
+ api.openHistory(days,0);await settle();carriers.push(['b',{telemetry:{kind:'service',signals:{rate:{grafana:'detail[24h]',unit:'req/h'}}}}]);api.bindingsChanged();await settle();
+ api.closeHistory();await settle();assert.equal(live,2,'a carrier added during Over time: one live call at once');
+ assert.equal(C.timers.size,1,'and one refresh armed');api.destroy();
 });

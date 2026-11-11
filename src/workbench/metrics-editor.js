@@ -229,7 +229,9 @@ function createFlowMetricsSettings(o){
   o.listen(environmentName,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addEnvironment();}});
   environments.appendChild(c.action('Add environment',addEnvironment));
   d.row(box,'Metrics window',c.text(typeof t.window==='string'?t.window:t.window==null?null:JSON.stringify(t.window),function(v){return commit({op:'window',value:v});},{placeholder:'24h'}));
-  var refresh=c.number(t.refreshMs==null?null:t.refreshMs,function(v){return commit({op:'refreshMs',value:v});});refresh.placeholder='connector default';
+  // #1287: metrics refresh at most every five minutes; the field says so before anything is typed.
+  var refresh=c.number(t.refreshMs==null?null:t.refreshMs,function(v){return commit({op:'refreshMs',value:v});});refresh.placeholder='300000 (5 min)';
+  refresh.min=String(TELEMETRY_MIN_REFRESH_MS);refresh.title='How often Metrics refreshes while it is on, in ms: at least 300000 (five minutes), the default when empty.';
   d.row(box,'Metrics refresh ms',refresh);
   var templates=telemetryObject(t.templates)?t.templates:{};
   Object.keys(templates).forEach(function(name){

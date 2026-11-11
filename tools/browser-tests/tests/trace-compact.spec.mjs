@@ -43,9 +43,10 @@ test('#1173 at 1440x900 a loaded trace\'s span list starts beside the diagram, a
  // Expanded request details before the list took over 300 px.
  expect(row.y-body.y,'the span list follows the collapsed lines directly').toBeLessThan(260);
 });
-/* #1186 stage 2 (Chuck approved the mockup 2026-11-09): the span list fills the rest of the panel and scrolls inside it,
-   and a focused span's detail opens directly under its row. */
-test('#1186 at 1440x900 the span list fills the panel and scrolls itself; a focused span\'s detail opens under its row',async({page,server},info)=>{
+/* #1186 stage 2 (Chuck approved the mockup 2026-11-09): a focused span's detail opens directly under its row.
+   #1280 (Chuck 2026-11-10) replaces "the list fills the panel and scrolls inside it": in this stretching Standard layout the
+   list grows with its spans and the tile grows with it (no inner scroll anywhere); the search still follows the list. */
+test('#1186 #1280 at 1440x900 the span list grows with its spans and the tile grows with it; a focused span\'s detail opens under its row',async({page,server},info)=>{
  const {panel}=await open(page,server);
  await panel.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await panel.getByRole('button',{name:'Load trace',exact:true}).click();
  const list=panel.locator('.dv-trace-waterfall');await expect(list.locator('.dv-trace-span').first()).toBeVisible();
@@ -56,11 +57,11 @@ test('#1186 at 1440x900 the span list fills the panel and scrolls itself; a focu
  const icons=await panel.locator('.dv-trace-request-icons').boundingBox(),line=await summary.boundingBox();
  expect(Math.abs(icons.y-line.y),'the icons sit at the top of the request line').toBeLessThan(8);expect(icons.x+icons.width,'at its right end').toBeGreaterThan(line.x+line.width-4);
  const g=await geometry();
- expect(g.box.y+g.box.height,'the list ends inside the panel').toBeLessThanOrEqual(g.card.y+g.card.height+1);
- // #1230: the trace sits above the search, which stays open; the list fills what the search leaves.
+ // #1280: no scroll of its own; the tile grows to its content, so the panel body has no inner scroll either.
+ expect(['auto','scroll'],'the list has no scroll of its own').not.toContain(g.overflow);expect(g.scroll,'the list is as tall as its spans').toBeLessThanOrEqual(g.client+1);
+ await expect.poll(()=>panel.locator('.pbody').first().evaluate(el=>el.scrollHeight<=el.clientHeight+1),{message:'the tile grows: no panel-body scroll'}).toBe(true);
+ // #1230: the trace sits above the search, which stays open below the list.
  const search=await panel.locator('.dv-trace-direct').boundingBox();expect(g.box.y+g.box.height,'the list ends above the search').toBeLessThanOrEqual(search.y+1);
- expect(search.y+search.height,'the search ends inside the panel').toBeLessThanOrEqual(g.card.y+g.card.height+1);expect(g.card.y+g.card.height-(search.y+search.height),'the list and the search below it fill the panel').toBeLessThan(48);
- expect(['auto','scroll'],'the list scrolls itself').toContain(g.overflow);expect(g.scroll,'55 spans overflow the list').toBeGreaterThan(g.client+40);
  // A span from the middle of the list: its detail opens directly under its row, inside the list.
  const row=list.locator('.dv-trace-span').nth(5);await row.scrollIntoViewIfNeeded();await row.click();
  const detail=list.locator('.dv-trace-span-detail');await expect(detail).toHaveCount(1);await expect(detail).toBeVisible();
@@ -68,16 +69,26 @@ test('#1186 at 1440x900 the span list fills the panel and scrolls itself; a focu
  expect(Math.abs(d.y-(r.y+r.height)),'the detail sits directly under its row').toBeLessThan(10);
  await page.screenshot({path:info.outputPath('trace-stage2-1440x900.png')});
 });
-test('#1186 a span focused from the diagram far down the list is scrolled into the list\'s view (no scroll anchoring)',async({page,server})=>{
+/* #1280: the list no longer scrolls; in this stretching layout the tile grows, so the reveal scrolls the page. */
+test('#1186 #1280 a span focused from the diagram far down the list is scrolled into view by the page (no scroll anchoring)',async({page,server})=>{
  const {panel}=await open(page,server);
  await panel.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await panel.getByRole('button',{name:'Load trace',exact:true}).click();
  const list=panel.locator('.dv-trace-waterfall');await expect(list.locator('.dv-trace-span').first()).toBeVisible();
- await list.evaluate(el=>{el.style.overflowAnchor='none';});
+ await page.evaluate(()=>{document.documentElement.style.overflowAnchor='none';});
  // A span near the top first, so its detail is open above the next one when that one is focused.
  await list.locator('.dv-trace-span').nth(1).click();await expect(list.locator('.dv-trace-span-detail')).toHaveCount(1);
  const far=await page.evaluate(()=>{const t=window.ctl.liveStatus.snapshot().trace.selected,span=t.exemplar.spans[41];window.ctl.liveStatus.selectTraceSpan({context:t.context,spanId:span.id});return span.id;});
  const row=list.locator('.dv-trace-span[data-span-id="'+far+'"]');await expect(row).toHaveAttribute('aria-pressed','true');
- await expect.poll(async()=>{const l=await list.boundingBox(),r=await row.boundingBox();return r.y>=l.y-1 && r.y+r.height<=l.y+l.height+1;},{message:'the focused row is inside the list\'s box'}).toBe(true);
+ // Visible by every clipping ancestor and the viewport, and hit at its centre (not only "in the viewport").
+ await expect.poll(()=>row.evaluate(el=>{
+  const b=el.getBoundingClientRect(),x=b.left+b.width/2,y=b.top+b.height/2;if(!b.height || x<0 || y<0 || x>innerWidth || y>innerHeight)return false;
+  for(let a=el.parentElement || (el.parentNode && el.parentNode.host);a && a!==document;a=a.parentElement || (a.parentNode && a.parentNode.host) || null){
+   if(a.nodeType!==1)continue;const st=getComputedStyle(a);if(st.overflowX==='visible' && st.overflowY==='visible')continue;
+   const c=a.getBoundingClientRect();if(x<c.left || x>c.right || y<c.top || y>c.bottom)return false;
+  }
+  const root=el.getRootNode(),hit=(root.elementFromPoint?root:document).elementFromPoint(x,y);return !!hit && (hit===el || el.contains(hit));
+ }),{message:'the focused row is scrolled into view (all clipping ancestors and the viewport)'}).toBe(true);
+ expect(await list.evaluate(el=>el.scrollTop),'the list itself did not scroll').toBe(0);
 });
 /* #1230 review: in the tile the trace above never paints over an open search that is taller than the space left; the panel
    body scrolls instead. Regression guard for the reserved-space layout (unchanged product code has no slot and passes). */

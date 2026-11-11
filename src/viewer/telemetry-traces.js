@@ -112,10 +112,27 @@ function createTelemetryTraces(page,win,now,bound){
     // Revalidate metadata on explicit actions, including cached alternatives.
     try{await discover(abort.signal);if(!active(entry.epoch))telemetryTraceFail('Trace selection expired.');var attempt=entry.attempt=(entry.attempt || 0)+1,value=await detail(entry,candidate,'explicit user selection');if(!active(entry.epoch) || attempt!==entry.attempt)telemetryTraceFail('Trace selection replaced.');entry.selected=Object.assign({},value,{selectionReason:'explicit user selection; first explicit trace signal in authored order'});return entry.selected;}catch(e){throw fail(e);}
   }
+  /* #1289: Metrics reuses an answer for 5 minutes without a call. Its example traces come back under this session:
+     each is registered again from its cached search result (candidates, range, the selected trace) with a fresh
+     token, so choosing works and the next poll reuses it like a loaded one. Detail calls stay the reader's. */
+  function restore(map){
+    var out=Object.create(null);if(retired || !ctl || !ctl.telemetry.enabled())return out;
+    var jobs=telemetryTraceJobs(ctl.telemetry.bindings()),config=telemetryProviderConfig(current,ctl);
+    var mcp={callTool:function(){var args=arguments;if(!namespace)namespace=Promise.resolve(win.claude.use('mcp'));return namespace.then(function(m){return m.callTool.apply(m,args);});}};
+    Object.keys(map || {}).forEach(function(id){
+      var old=map[id] && Array.isArray(map[id].exemplars) && map[id].exemplars[0],job=jobs.find(function(j){return j.id===id;});
+      if(!old || !job || !contracts[job.signal.source] || old.provider!==job.signal.source)return;
+      var token='trace-'+session+'-'+epoch+'-'+(++serial),selected;
+      try{selected=telemetryTraceEnvelope(Object.assign({},old,{selectionToken:token}));}catch(error){return;}
+      var entry={key:JSON.stringify([job.binding,config]),epoch:epoch,job:job,config:config,contract:contracts[job.signal.source],mcp:mcp,range:{from:selected.range.from,to:selected.range.to},token:token,details:new Map(),candidates:selected.candidates,warnings:[],selected:selected};
+      entry.details.set(selected.traceId,Promise.resolve(selected));entry.promise=Promise.resolve(selected);entries.set(id,entry);out[id]=selected;
+    });
+    return out;
+  }
   function canChoose(id,token,traceId){
     var entry=entries.get(id);return !!(entry && entry.token===token && active(entry.epoch) && contracts[entry.job.signal.source] && entry.key===JSON.stringify([ctl.telemetry.bindings().find(function(b){return b.id===id;}),telemetryProviderConfig(current,ctl)]) && entry.candidates.some(function(c){return c.traceId===traceId;}));
   }
-  return {options:{environmentChanged:function(){invalidate();var e=epoch,mine=ctl;discover().catch(function(error){if(ctl===mine && e===epoch){fail(error);if(ctl===mine)ctl.telemetry.setAvailable(false);}});},provider:provider,chooseExemplar:choose,canChooseExemplar:canChoose,available:false,source:'Traces'},attach:function(next,nextPage){
+  return {options:{environmentChanged:function(){invalidate();var e=epoch,mine=ctl;discover().catch(function(error){if(ctl===mine && e===epoch){fail(error);if(ctl===mine)ctl.telemetry.setAvailable(false);}});},provider:provider,chooseExemplar:choose,canChooseExemplar:canChoose,restoreExemplars:restore,available:false,source:'Traces'},attach:function(next,nextPage){
     ctl=next;current=nextPage || current;invalidate();var mine=ctl,attachedEpoch=epoch;discover().catch(function(e){if(ctl===mine && attachedEpoch===epoch){fail(e);if(ctl===mine)ctl.telemetry.setAvailable(false);}});
     off=ctl.telemetry.onChange(function(s){if(!s.enabled && entries.size)invalidate();});
     return {destroy:function(){if(ctl!==mine)return;invalidate();if(off)off();off=null;ctl=null;namespace=null;}};

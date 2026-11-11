@@ -8,8 +8,10 @@ const rawQuery=()=>({query_spec:{filters:[{column:'service.name',op:'=',value:'e
 const binding=(source='honeycomb')=>({kind:'service',signals:{trace:source==='tempo'?{tempo:'{ resource.service.name = "event-ingest" }'}:{honeycomb:rawQuery()}}});
 const pageSpec=(source='honeycomb')=>({tracking:{telemetry:{honeycomb:{environment:'flowview-demo',dataset:'doorbell'},grafana:{tempo:'tempo-main',prometheus:'prom-main'}}},sections:[{id:'main',diagram:{nodes:{a:{telemetry:binding(source)}},rows:[['a']]}}]});
 function context(){const timers=new Map();let serial=0;class Clock extends Date{static now(){return Date.parse('2026-10-30T00:00:00Z');}}const C={URL,AbortController,TextDecoder,TextEncoder,Date:Clock,console,setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id),document:{hidden:false,addEventListener(){},removeEventListener(){}}};vm.runInNewContext(entrypoint('standalone').body,C);return {C,timers};}
-async function setup({page=pageSpec(),transport,wrap,host=false,hosted=false,permission='granted'}={}){
+async function setup({page=pageSpec(),transport,wrap,host=false,hosted=false,permission='granted',spyTraces}={}){
  const {createMockBridge}=await import('./helpers/honeycomb-bridge.mjs'),bridge=createMockBridge({day:9,transport}),{C,timers}=context();if(wrap)wrap(bridge);
+ // #1289: a test can hold the Traces adapter and the facade the providers hand it.
+ if(spyTraces){const create=C.createTelemetryTraces;C.createTelemetryTraces=(...args)=>{const adapter=create(...args);if(adapter){const attach=adapter.attach;adapter.attach=(next,nextPage)=>{spyTraces.adapter=adapter;spyTraces.facade=next.telemetry;return attach(next,nextPage);};}return adapter;};}
  let permissions=[];
  if(hosted){const list=bridge.listTools;bridge.listTools=async()=>{const servers=await list();return servers.map(s=>({...s,tools:s.tools.map(t=>({name:t.name,description:t.description,annotations:t.annotations}))}));};bridge.describeTool=async(server,name)=>{const servers=await list();return servers.find(s=>s.server===server).tools.find(t=>t.name===name);};}
  const p=C.normalize(page),win={claude:{use:async name=>name==='permissions'?{request:async names=>{permissions.push(...names);return Object.fromEntries(names.map(n=>[n,typeof permission==='function'?permission(n):permission]));}}:bridge}},adapter=host?null:C.createTelemetryProviders(p,win);
@@ -59,7 +61,10 @@ test('official Grafana source fixture preserves exact timing, events; synthetic 
 });
 test('returned ID mismatch fails closed while scalar peer survives; no signed error leakage',async t=>{const {EVENT_QUERY}=await import('./helpers/honeycomb-bridge.mjs'),p=pageSpec();p.sections[0].diagram.nodes.a.telemetry.signals.rate={grafana:EVENT_QUERY};const h=await setup({page:p,wrap:b=>{const call=b.callTool;b.callTool=async(...args)=>{const result=await call(...args);if(args[1]==='get_trace')result.content[0].text=result.content[0].text.replace(/  trace_id: .*/, '  trace_id: "'+ 'f'.repeat(32)+'"');return result;};}});t.after(()=>h.close());h.api.setEnabled(true);await settle();assert.ok(h.api.snapshot().map.a.signals.rate.value>0);assert.equal(h.api.snapshot().map.a.exemplars,undefined);assert.match(h.api.status().note,/Returned trace ID differs/);});
 test('failed scalar cannot clobber healthy trace and passing alternative is an actual returned status',async t=>{const {nativeQuery}=await import('./helpers/honeycomb-bridge.mjs'),p=pageSpec();p.sections[0].diagram.nodes.a.telemetry.signals.bad={honeycomb:nativeQuery('does-not-exist')};const h=await setup({page:p});t.after(()=>h.close());h.api.setEnabled(true);await settle();const e=h.api.snapshot().map.a.exemplars[0];assert.equal(h.api.snapshot().map.a.signals.bad,undefined);const passing=e.candidates.find(c=>c.status==='passing'&&c.traceId!==e.traceId);assert.ok(passing);const chosen=await h.api.chooseExemplar('a',e.selectionToken,passing.traceId);assert.equal(chosen.traceId,passing.traceId);assert.ok(chosen.spans.every(s=>!s.error));});
-test('rebinding then off/on cannot reuse an old selection token',async t=>{const h=await setup();t.after(()=>h.close());h.api.setEnabled(true);await settle();const old=h.api.snapshot().map.a.exemplars[0];h.p.sections[0].diagram.nodes.a.telemetry.signals.trace.honeycomb.results_limit=1;h.api.bindingsChanged();await settle();const current=h.api.snapshot().map.a.exemplars[0];assert.notEqual(current.selectionToken,old.selectionToken);await assert.rejects(h.api.chooseExemplar('a',old.selectionToken,current.traceId),/expired/);h.api.setEnabled(false);h.api.setEnabled(true);await settle();assert.notEqual(h.api.snapshot().map.a.exemplars[0].selectionToken,current.selectionToken);});
+test('rebinding then off/on cannot reuse an old selection token',async t=>{const h=await setup();t.after(()=>h.close());h.api.setEnabled(true);await settle();const old=h.api.snapshot().map.a.exemplars[0];h.p.sections[0].diagram.nodes.a.telemetry.signals.trace.honeycomb.results_limit=1;h.api.bindingsChanged();await settle();const current=h.api.snapshot().map.a.exemplars[0];assert.notEqual(current.selectionToken,old.selectionToken);await assert.rejects(h.api.chooseExemplar('a',old.selectionToken,current.traceId),/expired/);const searches=h.bridge.calls.filter(c=>c.name==='run_query').length;h.api.setEnabled(false);h.api.setEnabled(true);await settle();
+ // #1289 review c2: on again within 5 minutes reuses the answer, its example trace included, under a fresh token; the old token is dead.
+ const reused=h.api.snapshot().map.a?.exemplars?.[0];assert.ok(reused,'the reused answer keeps its example trace');assert.equal(reused.traceId,current.traceId);assert.notEqual(reused.selectionToken,current.selectionToken);
+ assert.equal(h.api.canChooseExemplar('a',current.selectionToken,current.traceId),false);assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,searches,'no new trace search');});
 test('latest candidate ordering preserves sub-millisecond timestamps; conflicting complete/collapsed flags stay partial',()=>{const {C}=context(),c=[{traceId:'a'.repeat(32),time:'2026-10-12T00:00:00.000000001Z',status:'unknown'},{traceId:'b'.repeat(32),time:'2026-10-12T00:00:00.000000002Z',status:'unknown'}];assert.equal(C.telemetryTraceSelect(c).candidate.traceId,c[1].traceId);const conflict=traceText.replace('collapsed_nodes: 1','collapsed_nodes: 0').replace('total_spans: 77','total_spans: 55').replace('view_mode: auto','view_mode: full');assert.equal(C.telemetryHoneycombTrace({payload:conflict},recordedId).completeness,'partial');});
 test('oversize source with duplicate spans fails before display limit; missing raw wrapper fields do not query',async t=>{const {C}=context(),lines=traceText.split('\n'),duplicate=[lines[0],lines[1],...Array(201).fill(lines[2]),'','Metadata:',`  trace_id: ${recordedId}`].join('\n');assert.throws(()=>C.telemetryHoneycombTrace({payload:duplicate},recordedId),/Duplicate/);const p=pageSpec();delete p.sections[0].diagram.nodes.a.telemetry.signals.trace.honeycomb.results_limit;const h=await setup({page:p});t.after(()=>h.close());h.api.setEnabled(true);await settle();assert.equal(h.bridge.calls.length,0);assert.equal(h.api.snapshot().available,false);});
 test('synthetic 1ns boundary catches epoch-before-subtraction precision loss',()=>{const {C}=context();const variant=traceText.replace('1791779586602194688','1791779586602194689').replace('1791779591242913280','1791779586602194690');const spans=C.telemetryHoneycombTrace({payload:variant},recordedId).spans;assert.equal(spans[1].startMs,0.000001);});
@@ -169,7 +174,9 @@ test('identical trace queries in different deployment profiles never share candi
  hold=true;const choice=h.api.chooseExemplar('a',old.selectionToken,other.traceId),rejected=assert.rejects(choice,/cancelled|expired|unavailable/i);await settle();assert.ok(release);
  h.api.setEnvironment('prd');assert.deepEqual(plain(h.api.snapshot().map),{});assert.equal(h.api.canChooseExemplar('a',old.selectionToken,other.traceId),false);await settle();release();await rejected;await settle();
  assert.equal(h.api.enabled(),true);const fresh=h.api.snapshot().map.a.exemplars[0];assert.notEqual(fresh.selectionToken,old.selectionToken);assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,2);
- h.api.setEnvironment('qa');await settle();assert.notEqual(h.api.snapshot().map.a.exemplars[0].selectionToken,old.selectionToken);assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,3);
+ // #1289 review c2: back to qa within 5 minutes reuses qa's answer without a call; its example trace returns under a fresh token, and the old token stays dead.
+ h.api.setEnvironment('qa');await settle();const back=h.api.snapshot().map.a?.exemplars?.[0];assert.ok(back,'qa\'s example trace is listed again');assert.equal(back.traceId,old.traceId);assert.notEqual(back.selectionToken,old.selectionToken);assert.notEqual(back.selectionToken,fresh.selectionToken);
+ assert.equal(h.api.canChooseExemplar('a',old.selectionToken,other.traceId),false);assert.equal(h.bridge.calls.filter(c=>c.name==='run_query').length,2);
 });
 
 test('switch during trace discovery keeps the newest environment available without data queries',async()=>{
@@ -271,4 +278,61 @@ test('#1252 a late rejection does not delete the entry that replaced it',async t
  release();await settle();
  const again=await poll(changed);await settle();
  assert.equal(searches(),before,'the newer entry is still cached after the late rejection');assert.equal(again.a?.exemplars?.length,1);
+});
+
+/* #1289 review c2: a reused answer (Metrics off/on within 5 minutes) keeps a trace-only carrier and its example trace,
+   re-issued under a fresh selection token from the cached data, with no provider call; choosing another returned
+   candidate is the reader's action and loads only that trace's detail. */
+test('a reused answer keeps example traces choosable under fresh tokens, without a provider call',async t=>{
+ const h=await setup();t.after(()=>h.close());h.api.setEnabled(true);await settle();
+ const first=h.api.snapshot().map.a?.exemplars?.[0];assert.ok(first,'the carrier holds only an example trace');const other=first.candidates.find(c=>c.traceId!==first.traceId);assert.ok(other,'a second candidate');
+ const before=h.bridge.calls.length;h.api.setEnabled(false);h.api.setEnabled(true);await settle();
+ assert.equal(h.bridge.calls.length,before,'Metrics on within 5 minutes makes no provider call');
+ const again=h.api.snapshot().map.a?.exemplars?.[0];assert.ok(again,'the trace-only carrier is still listed with its example trace');
+ assert.equal(again.traceId,first.traceId);assert.deepEqual(again.candidates.map(c=>c.traceId),first.candidates.map(c=>c.traceId));assert.equal(again.spans.length,first.spans.length);
+ assert.notEqual(again.selectionToken,first.selectionToken,'a fresh token');
+ assert.equal(h.api.canChooseExemplar('a',first.selectionToken,other.traceId),false,'the old token is dead');assert.equal(h.api.canChooseExemplar('a',again.selectionToken,other.traceId),true,'the fresh token chooses');
+ const chosen=await h.api.chooseExemplar('a',again.selectionToken,other.traceId);assert.equal(chosen.traceId,other.traceId);
+ const after=h.bridge.calls.slice(before).map(c=>c.name);
+ assert.ok(after.includes('get_trace'),'choosing loads that trace\'s detail: '+JSON.stringify(after));assert.ok(!after.includes('run_query'),'and runs no new trace search: '+JSON.stringify(after));
+});
+
+/* #1289 review c3: the restore guards. Each row fails if its guard is removed (mutation-checked):
+| row | guard | fixture | assertion |
+|---|---|---|---|
+| G0 | none (control) | Metrics on, Traces available, matching provider | restore lists the example trace under a fresh token |
+| G1 | Metrics must be on | Metrics off | the Traces adapter restores nothing |
+| G2 | the Traces part must be available | the Traces part reports unavailable (its tools removed or denied) while Grafana and Honeycomb stay on | the providers restore nothing, and off/on lists no example trace |
+| G3 | the cached trace's provider must have a current contract | a cached trace from another provider (tempo) for a honeycomb trace signal | the Traces adapter restores nothing |
+*/
+test('restore guards: Metrics on, the Traces part available, a current contract for the cached provider',async t=>{
+ const {nativeQuery,EVENT_QUERY}=await import('./helpers/honeycomb-bridge.mjs'),p=pageSpec();p.sections[0].diagram.nodes.a.telemetry.signals={rate:{grafana:EVENT_QUERY},zero:{honeycomb:nativeQuery('notify->app')},trace:{honeycomb:rawQuery()}};
+ const spy={},h=await setup({page:p,spyTraces:spy,wrap:b=>{b.day=11;}});t.after(()=>h.close());
+ h.api.setEnabled(true);await settle();const cached=plain(h.api.snapshot().map),first=cached.a?.exemplars?.[0];assert.ok(first && spy.adapter && spy.facade,'an example trace and the Traces adapter');
+ const restore=map=>plain(spy.adapter.options.restoreExemplars(map)),viaProviders=map=>plain(h.adapter.options.restoreExemplars(map));
+ // G0: the control. A restore while Metrics is on lists the trace under a fresh token.
+ const control=restore(cached);assert.equal(control.a?.traceId,first.traceId,'G0 the control restores');assert.notEqual(control.a.selectionToken,first.selectionToken);
+ // G3: a cached trace whose provider has no matching contract is not restored.
+ const tempo=plain(cached);tempo.a.exemplars[0].provider='tempo';assert.deepEqual(restore(tempo),{},'G3 another provider\'s cached trace');
+ // G1: with Metrics off nothing is restored.
+ h.api.setEnabled(false);assert.deepEqual(restore(cached),{},'G1 Metrics off');
+ // G2: the Traces part is unavailable (its tools were removed or denied) while the numeric parts stay on.
+ h.api.setEnabled(true);await settle();assert.ok(h.api.snapshot().map.a?.exemplars?.length,'traces are back after a fresh on');
+ spy.facade.setAvailable(false,'Trace tools removed.');await settle();assert.equal(h.api.snapshot().available,true,'Metrics stays available for Grafana and Honeycomb');
+ assert.deepEqual(viaProviders(cached),{},'G2 the providers restore nothing while the Traces part is unavailable');
+ h.api.setEnabled(false);h.api.setEnabled(true);await settle();assert.equal(h.api.snapshot().map.a?.exemplars,undefined,'G2 off/on lists no example trace');
+});
+
+/* #1289 CI (telemetry-step.spec): a host provider owns its exemplars' selection tokens (canChooseExemplar decides),
+   so a reused answer keeps the host's example trace as it was; the reader can still pick a candidate. */
+test('a reused answer keeps a host provider\'s example trace, which the host still validates',async()=>{
+ const {C}=context(),p=C.normalize(pageSpec()),e=plain(envelope(C));let calls=0;
+ const api=C.createTelemetry(p,{provider:async()=>{calls++;return {a:{signals:{},exemplars:[e]}};},canChooseExemplar:()=>true,chooseExemplar:async(id,token,traceId)=>e},{carriers:fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram||{};Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,p));})});
+ api.setEnabled(true);await settle();assert.equal(calls,1);assert.equal(api.snapshot().map.a?.exemplars?.[0]?.traceId,e.traceId);
+ api.setEnabled(false);api.setEnabled(true);await settle();
+ assert.equal(calls,1,'Metrics on within 5 minutes makes no call');
+ const kept=api.snapshot().map.a?.exemplars?.[0];assert.ok(kept,'the host\'s example trace is kept');assert.equal(kept.selectionToken,e.selectionToken,'with the host\'s own token');
+ // A retracted example trace never comes back with a reused answer.
+ api.retractExemplars();assert.equal(api.snapshot().map.a,undefined);api.setEnabled(false);api.setEnabled(true);await settle();
+ assert.equal(calls,1);assert.equal(api.snapshot().map.a?.exemplars,undefined,'retracted stays retracted');api.destroy();
 });

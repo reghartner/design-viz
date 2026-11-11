@@ -304,7 +304,7 @@ function telemetryEditPage(telemetry,edit){
   }
   if(op==='refreshMs'){
     if(edit.value==null)delete t.refreshMs;
-    else if(!telemetryNumber(edit.value) || edit.value<TELEMETRY_MIN_REFRESH_MS)return {error:'Use at least '+TELEMETRY_MIN_REFRESH_MS+' ms (one minute), or clear it for the connector default.'};
+    else if(!telemetryNumber(edit.value) || edit.value<TELEMETRY_MIN_REFRESH_MS)return {error:'Use at least '+TELEMETRY_MIN_REFRESH_MS+' ms (five minutes), or clear it for the default of five minutes.'};
     else t.refreshMs=edit.value;
     return done();
   }

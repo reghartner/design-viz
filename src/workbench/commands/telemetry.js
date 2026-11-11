@@ -819,6 +819,9 @@ function planCarrierTraceSpans(text,raw,target,edit,context){
   var state=traceSpansState(raw,target,context);if(state.error)return state;
   var op=edit && edit.op;
   if(op==='rename' && t.owner && telemetryOwn(state.inherited,edit.name))return {error:'Inherited span names come from '+state.provider+'. To rename one, hide it and add a new span.',field:'name'};
+  // A provider name hidden here is still taken: reusing it would drop the hide and patch the provider's span.
+  var claimed=op==='rename'?edit.to:op==='add'?edit.name:null;claimed=typeof claimed==='string'?claimed.trim():claimed;
+  if(t.owner && claimed && telemetryOwn(state.inherited,claimed) && !telemetryOwn(state.spans,claimed))return {error:claimed+' is a span '+state.provider+' declares (hidden here); pick another name, or show it and change it instead.',field:'name'};
   var plan;
   if(!t.owner){
     if(op==='hide' || op==='revert' || op==='revertAll')return {error:'Only spans inherited from an imported node or connection can be hidden or reverted.'};

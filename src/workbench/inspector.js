@@ -833,8 +833,9 @@ function traceSpansControls(){
       Object.keys(attrs).forEach(function(a){
         var line=el('div','rowline','',box),label=el('span','fnote',a+' = '+String(attrs[a]),line);label.setAttribute('aria-hidden','true');
         var type=typeof attrs[a],types=select(TYPES,type,key+' attribute '+a+' type');types.title='Value type. Honeycomb table cells are text; Tempo keeps numbers and true/false.';line.appendChild(types);
-        listen(types,'change',function(){if(commit({op:'attribute',name:key,key:a,attrName:a,value:String(attrs[a]),type:types.value},{attribute:addName})===false)types.value=type;});
+        listen(types,'change',function(){if(commit({op:'attribute',name:key,key:a,attrName:a,value:String(attrs[a]),type:types.value},{any:types})===false)types.value=type;});
         var x=named(actionButton('\u00d7',function(){return commit({op:'attribute',name:key,key:a,attrName:null},{any:addName});},'rowx'),'Remove attribute '+a+' from '+key,'Remove attribute '+a);line.appendChild(x);
+        slot(box,types);
       });
       var addLine=el('div','rowline','',box),draftKey='attr:'+key+':';
       var addName=named(document.createElement('input'),key+' new attribute name','A supported span attribute, such as db.system.');addName.type='text';addName.className='fctl';addName.placeholder='attribute';

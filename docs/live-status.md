@@ -524,7 +524,8 @@ each span says which provider it is inherited from; an edit stores only the chan
 this document's `nodeTracking` / `edgeTracking` overlay, **Hidden for this document** hides an
 inherited span, **Revert <name> to inherited** drops your changes to it and **Revert all trace
 spans** drops them all. Inherited span names are read only: hide one and add a new span to
-rename it; spans added here can be renamed. An override the resolver cannot use stays listed
+rename it; spans added here can be renamed. A name the provider declares stays taken while
+it is hidden here, so a new or renamed span cannot reuse it. An override the resolver cannot use stays listed
 with its error beside the field, and other edits keep it as written. A connection shows its
 receive side when it comes from the receiving node's `process` span; when the receiving node
 declares no process span the connection reads send only. In both cases **Declare receive span

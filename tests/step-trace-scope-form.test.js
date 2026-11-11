@@ -5,7 +5,7 @@
    tools/browser-tests/tests/step-trace-scope-form.spec.mjs.
 | row | rule |
 |---|---|
-| S1 | Without a scope the form says what the step inherits, naming a shared node or connection and the other step by title; a step whose carriers declare nothing says so; the spans are listed read only. |
+| S1 | Without a scope the form says what the step inherits, naming a shared node or connection and the other step by title; a step whose carriers declare nothing opens on its own span as before, and its scope view says so; the spans are listed read only. |
 | S2 | Mode switch: the radios change only the view; "Use its nodes and connections (removes this step's trace match)", Add trace scope, Remove trace scope and Add trace match (replaces the scope) are one Undo step each. |
 | S3 | Skip checkboxes name the span, its service and its operation; checked means the span counts; unchecking writes skip, checking again removes it (no empty skip left); role checkboxes write role:<role>; a connection lists only its send spans and says a receive span times the hand-off. |
 | S4 | An imported node lists its merged spans (consumer overlay added and hidden spans included); skip uses the namespaced id; the import is untouched. |
@@ -25,7 +25,7 @@ const spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',o
 const diagramOf=s=>s.page.sections[0].diagram;
 function boards(){
   const provider=spec('provider',{nodes:{store:{title:'Store',trace:{spans:{write:{serviceName:'store-svc',operation:'INSERT orders',role:'database'},read:{serviceName:'store-svc',operationPrefix:'SELECT ',role:'database'}}}}},
-    rows:[['store']],topologyExports:{core:{nodes:['store']}}});
+    rows:[['store']],topologyExports:{core:{nodes:['store'],edges:[]}}});
   const consumer=spec('consumer',{nodes:{
       api:{title:'API',trace:{spans:{handle:{serviceName:'order-api',operation:'POST /orders',role:'process'}}}},
       worker:{title:'Worker',trace:{spans:{process:{serviceName:'order-worker',operation:'process orders',role:'process'},find:{serviceName:'order-worker',operationPrefix:'find ',role:'database'},cache:{serviceName:'order-worker',attributes:{'db.system':'redis'},role:'cache'}}}},
@@ -69,7 +69,7 @@ function oneStep(ui,act){
   assert.equal(ui.h.session.redo(),true);assert.equal(ui.text,after,'Redo restores the exact next text');
   ui.reselect();return after;
 }
-const refused=(ui,act)=>{const before=ui.text;act();assert.equal(ui.text,before,'a refusal changes nothing');ui.reselect();};
+const refused=(ui,act)=>{const before=ui.text;act();assert.equal(ui.text,before,'a refusal changes nothing');};
 const SCOPE='From its nodes and connections (trace scope)',OWN='Own span (trace match)';
 
 test('S1 without a scope: what the step inherits, the shared carrier and the other step by title, read-only spans',()=>{
@@ -86,6 +86,8 @@ test('S1 without a scope: what the step inherits, the shared carrier and the oth
   ui.select(1);
   assert.deepEqual(ui.texts('.trace-scope-status'),['Inherits from API → Worker (1 span).']);
   ui.select(6);
+  assert.equal(ui.control(OWN).checked,true,'a step whose nodes declare no spans opens on its own span, as before');
+  ui.check(SCOPE,true);
   assert.deepEqual(ui.texts('.trace-scope-status'),['Its nodes and connections declare no trace spans, so a loaded trace leaves this step unmapped. Declare spans in Inspect on a node or connection, or use a trace match.']);
   ui.select(0);
   assert.equal(ui.control(OWN).checked,true,'a step with a trace match opens on its own span');
@@ -185,7 +187,7 @@ test('S5 root, parent, attributes, optional, budget and queue depth: one Undo ea
   oneStep(ui,()=>ui.set('Max queue depth','10'));assert.equal(scope().maxQueueDepth,10);
   refused(ui,()=>ui.set('Max queue depth','many'));assert.equal(ui.beside('Max queue depth'),'Max queue depth is a number, 0 or more.');
   assert.equal(ui.note('Max queue depth').getAttribute('role'),'status','refusals are announced');
-  assert.deepEqual(ui.e.C.FlowCanon.validate(ui.raw).filter(m=>/traceScope/.test(m)),[]);
+  assert.deepEqual(plain(ui.e.C.FlowCanon.validate(ui.raw)).filter(m=>/traceScope/.test(m)),[]);
 });
 
 test('S6 a skip that no longer applies is listed with its reason and can be removed',()=>{
@@ -198,7 +200,7 @@ test('S6 a skip that no longer applies is listed with its reason and can be remo
 });
 
 test('S7 a step without an ID: the refusal sits beside Add trace scope and Go to Step ID focuses the Step ID field',()=>{
-  const ui=harness().select(5);
+  const ui=harness().select(5);ui.check(SCOPE,true);
   refused(ui,()=>ui.click('Add trace scope'));
   assert.equal(ui.beside('Add trace scope'),'A trace scope needs a stable step ID. Enter one in Step ID above, then add the scope.');
   ui.click('Go to Step ID');
@@ -214,5 +216,10 @@ test('S8 validator messages sit beside their field; the fold summary counts them
   assert.match(ui.beside('Trace root service'),/traceScope\.root: expected \{serviceName, operation\}/);
   assert.equal(ui.note('Trace root service').getAttribute('role'),'status');
   assert.equal(ui.texts('summary').find(x=>x.startsWith('Code and trace evidence')),'Code and trace evidence · trace scope set · 3 warnings');
-  oneStep(ui,()=>ui.set('Time budget (ms)','100'));assert.equal(ui.beside('Time budget (ms)'),'');
+  // In a document that imports, an edit that leaves the materialized spec invalid is not applied and says why (#1238 rule).
+  refused(ui,()=>ui.set('Time budget (ms)','100'));
+  assert.match((ui.h.guide.querySelector('.ierr') || {}).textContent || '',/^This edit was not applied: .*unknown or self parentStepId/);
+  ui.reselect();oneStep(ui,()=>ui.click('Remove trace scope'));
+  assert.equal(Object.hasOwn(ui.step(3),'traceScope'),false);
+  assert.equal(ui.texts('summary').find(x=>x.startsWith('Code and trace evidence')),'Code and trace evidence');
 });

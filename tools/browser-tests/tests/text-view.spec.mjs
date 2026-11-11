@@ -26,7 +26,9 @@ async function open(page,server,raw=board(),name='text-view'){
   execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,name+'.json'),path.join(repo,'template/flowview.html'),path.join(server.root,name+'.html')]);
   await page.goto(server.origin+'/'+name+'.html');return page.locator('#docview');
 }
-const launcher=root=>root.getByRole('button',{name:'Text view',exact:true});
+// The bar launcher only: the "More page actions" item and the Contents entry share
+// its accessible name. includeHidden keeps one element when the bar hides it.
+const launcher=root=>root.locator('.text-view-launch').getByRole('button',{name:'Text view',exact:true,includeHidden:true});
 const dialogOf=root=>root.getByRole('dialog',{name:'Text view',exact:true});
 const textOf=dialog=>dialog.getByRole('tabpanel').locator('pre');
 // Fully shown: inside every overflow ancestor (across shadow hosts), inside the

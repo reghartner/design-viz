@@ -89,7 +89,8 @@ page logsearch.camera-model.query loki-main {app="device-gateway",env="${env}"} 
   shows. If the browser refuses the clipboard or has none, the text appears in a
   field below the controls to copy by hand.
 - **Escape** (while the window has focus) or **×** closes the window and returns
-  focus to the Text button. An open zoom or theme menu closes first.
+  focus to the control that opened it, else to the Contents button. An open zoom
+  or theme menu closes first.
 - Text and Search are never open together: opening one closes the other.
 - The tab and switches are remembered until the page is reloaded, and the chosen
   path while the same document is shown. When the Workbench preview redraws after

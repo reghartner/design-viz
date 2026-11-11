@@ -183,19 +183,29 @@ var FlowTopology = (function(){
     if(object(v))return '{'+Object.keys(v).sort().map(function(k){return JSON.stringify(k)+':'+telemetryCanonical(v[k]);}).join(',')+'}';
     return JSON.stringify(v===undefined?null:v);
   }
+  // What the provider's query held that the patch does not: whole keys (absent), and list items or
+  // dimensions the patch does not keep as they were (missing, or kept with another value).
+  var TELEMETRY_ITEM_NAMES={filters:['filter','filters'],calculations:['calculation','calculations'],breakdowns:['breakdown','breakdowns'],logGroups:['log group','log groups'],orders:['order','orders'],havings:['having','havings']};
+  function telemetryItem(key,x){
+    if(typeof x==='string' || typeof x==='number')return String(x);
+    if(object(x) && key==='filters' && typeof x.column==='string')return x.column+(x.op!=null?' '+x.op:'')+(x.value!==undefined?' '+(Array.isArray(x.value)?x.value.join(', '):String(x.value)):'');
+    if(object(x) && typeof x.op==='string')return x.op+(typeof x.column==='string'?'('+x.column+')':'');
+    return telemetryCanonical(x);
+  }
+  function telemetryList(items){return items.length>1?items.slice(0,-1).join(', ')+' and '+items[items.length-1]:items[0];}
   function telemetryLeftOut(inherited,patch){
-    var out=[];
+    var out={absent:[],changed:[]};
     Object.keys(inherited).forEach(function(key){
       var was=inherited[key];
       if(was==null)return;
-      if(!own(patch,key) || patch[key]==null){out.push(key);return;}
+      if(!own(patch,key) || patch[key]==null){out.absent.push(key);return;}
       var is=patch[key];
       if(Array.isArray(was) && Array.isArray(is)){
-        var missing=was.filter(function(x){return !is.some(function(y){return telemetryCanonical(y)===telemetryCanonical(x);});}).length;
-        if(missing)out.push(missing===was.length?key:missing+' of its '+key);
+        var missing=was.filter(function(x){return !is.some(function(y){return telemetryCanonical(y)===telemetryCanonical(x);});});
+        if(missing.length){var names=TELEMETRY_ITEM_NAMES[key] || [key,key];out.changed.push('the inherited '+names[missing.length>1?1:0]+' '+telemetryList(missing.map(function(x){return telemetryItem(key,x);})));}
       }else if(key==='dimensions' && object(was) && object(is)){
         var gone=Object.keys(was).filter(function(k){return !own(is,k);});
-        if(gone.length)out.push((gone.length>1?'dimensions ':'dimension ')+gone.join(', '));
+        if(gone.length)out.absent.push((gone.length>1?'dimensions ':'dimension ')+telemetryList(gone));
       }
     });
     return out;
@@ -207,11 +217,12 @@ var FlowTopology = (function(){
       if(!object(patch) || !object(was))return;
       var to=TELEMETRY_SOURCES.filter(function(s){return patch[s]!=null;})[0],from=TELEMETRY_SOURCES.filter(function(s){return was[s]!=null;})[0];
       if(!to || !from)return;
-      var at='.signals.'+name+'.'+to,who='signal '+name+' on '+carrier+': ';
-      if(to!==from){note('note',at,who+'this switches its source from '+TELEMETRY_SOURCE_NAMES[from]+' to '+TELEMETRY_SOURCE_NAMES[to]+'; later provider changes to its query no longer reach this board');return;}
-      var left=object(was[from]) && object(patch[to])?telemetryLeftOut(was[from],patch[to]):[];
-      if(left.length)note('warning',at,who+'this '+TELEMETRY_SOURCE_NAMES[to]+' patch replaces the provider\'s whole query and leaves out '+(left.length>1?left.slice(0,-1).join(', ')+' and '+left[left.length-1]:left[0])+', so the signal no longer reads what the provider defined; to replace the query, write all of it');
-      else note('note',at,who+'this '+TELEMETRY_SOURCE_NAMES[to]+' patch replaces the provider\'s whole query; later provider changes to it no longer reach this board');
+      var at='.signals.'+name+'.'+to,who='signal '+name+' on '+carrier+': ',label=TELEMETRY_SOURCE_NAMES[to];
+      if(to!==from){note('note',at,who+'this switches its source from '+TELEMETRY_SOURCE_NAMES[from]+' to '+label+'; later provider changes to its query no longer reach this board');return;}
+      var left=object(was[from]) && object(patch[to])?telemetryLeftOut(was[from],patch[to]):{absent:[],changed:[]};
+      var parts=(left.absent.length?['leaves out '+telemetryList(left.absent)]:[]).concat(left.changed.length?['leaves out or changes '+telemetryList(left.changed)]:[]);
+      if(parts.length)note('warning',at,who+'this '+label+' patch replaces the provider\'s whole query and '+parts.join(', and ')+', so the signal no longer reads what the provider defined; '+(left.absent.length?'to replace the query, write all of it':'check that this is meant'));
+      else note('note',at,who+'this '+label+' patch replaces the provider\'s whole query; later provider changes to it no longer reach this board');
     });
   }
   function applyTracking(value,addition,note,carrier){

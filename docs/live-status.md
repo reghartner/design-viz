@@ -344,9 +344,9 @@ fields, and `kind` replaces the inherited kind when set. For example
 `{"extends": true, "signals": {"lag": {"grafana": "max(lag)"}}, "hide": ["errors"]}`.
 Later provider changes still reach the consumer unless hidden or changed there. A
 signal entry that names a source replaces the inherited source, so a signal always
-has one. The validator warns at the overlay when such an entry leaves out part of the
-provider's query (Honeycomb calculations, filters or breakdowns, CloudWatch dimensions,
-Logs logGroups), naming the signal, the carrier and what is left out; a full
+has one. The validator warns at the overlay when such an entry leaves out or changes part of
+the provider's query (Honeycomb calculations, filters or breakdowns, CloudWatch
+dimensions, Logs logGroups), naming the signal, the carrier and each inherited item; a full
 restatement, a string query or a source switch is a note, because later provider
 changes to that query no longer reach this board (#1345). Hiding every signal leaves the carrier unbound in this document. A hide for
 a signal the provider no longer has is kept in case it returns. A consumer binding

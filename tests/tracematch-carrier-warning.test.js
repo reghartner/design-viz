@@ -19,6 +19,8 @@ test('traceMatch on a local node warns with the node id and points to the step',
   assert.match(found[0],/read only from steps/);
   assert.match(found[0],/node api is ignored/);
   assert.match(found[0],/step/);
+  // #1290 D22: a node or edge can declare spans instead.
+  assert.match(found[0],/Put it on the step that lights this node, or declare it under trace\.spans\.$/);
 });
 
 test('traceMatch on a local edge warns with the edge id and points to the step',()=>{
@@ -29,6 +31,7 @@ test('traceMatch on a local edge warns with the edge id and points to the step',
   assert.equal(found.length,1,JSON.stringify(result.warnings));
   assert.match(found[0],/edges\[0\]\.traceMatch/);
   assert.match(found[0],/edge api->db is ignored/);
+  assert.match(found[0],/Put it on the step that lights this edge, or declare it under trace\.spans\.$/);
 });
 
 test('traceMatch on an exported provider node warns at the provider build, not again on its imported copies',()=>{

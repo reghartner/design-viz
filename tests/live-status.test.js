@@ -5101,6 +5101,7 @@ test('#1280 follow-up: in the capped Edit list a row never lands under the bar, 
 | DC4 | The latest declaration shows "Declared <key> (<service> · <operation>) on <title>." with Undo (undoDeclare). |
 | DC5 | A span the carrier already declares is refused before the write: the board editor's reason ("Already declared as <key> on <title>.") shows beside the button, in the note and in the chooser. |
 | DC6 | (#1337 CI M5) the mapping re-renders the board: the offer of "Declare on <title> instead" survives the controller hand-over (rememberTrace / takeTrace), as the real board editor does it. |
+| DC7 | (#1337 c5) the offer ends with its mapping: once the mapping is no longer pending (Undo or Save), the offer is gone and a later pending mapping of that step does not bring it back. |
 */
 const click=(el,h)=>{el.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});if(h)runTimers(h);};
 const SPAN={serviceName:MAP_MATCH.serviceName,operation:MAP_MATCH.operation};
@@ -5192,5 +5193,22 @@ test('DC6 Declare on <title> instead survives the re-render the mapping causes',
  const instead=note.querySelector('button.dv-trace-declare-instead');assert.ok(instead,'Declare on Beta instead is still offered');
  click(instead,b.h);
  assert.deepEqual(editor.swaps,[{ref:{section:0,kind:'node',id:'b'},span:{...SPAN,role:'process'}}]);
+ b.api.destroy();
+});
+test('DC7 the Declare-instead offer ends once its mapping is no longer pending (Undo or Save)',async()=>{
+ const b=mapBoard();const s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ // A paint before the board editor has written the mapping keeps the offer.
+ b.api.setTraceShow(true);
+ b.editor.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});b.api.setTraceShow(true);
+ assert.ok(b.m.body.querySelector('.dv-trace-map-note button.dv-trace-declare-instead'),'offered while the mapping is pending');
+ // Undo (or Save): no pending mapping any more.
+ b.editor.setMapped(null);b.api.setTraceShow(true);
+ assert.ok(b.m.body.querySelector('.dv-trace-map-note')===null,'no note without a pending mapping');
+ // A later pending mapping of the same step, made without a carrier drop, offers nothing.
+ b.editor.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});b.api.setTraceShow(true);
+ assert.ok(b.m.body.querySelector('.dv-trace-map-note'),'the new mapping has its note');
+ // assert.ok, not assert.equal: a failing equal on a fake element prints the whole tree (node test runaway).
+ assert.ok(b.m.body.querySelector('.dv-trace-map-note button.dv-trace-declare-instead')===null,'the stale offer does not come back');
  b.api.destroy();
 });

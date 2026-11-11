@@ -1261,6 +1261,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // The offer ends with its mapping: once that mapping has been pending and no longer is (Undo, Save, or
     // replaced by another), it is dropped, so a later mapping of the same step never brings it back. Before
     // the board editor has written the mapping (it does so on the next tick), the offer waits.
+    // A swapped offer waits while its declaration is the newest pending trace change.
+    if(o.swapped && st && st.lastTrace==='declare')return null;
     if(!m || m.step!==o.step){if(o.seen)traceDeclareOffer=null;return null;}
     o.seen=true;
     if(st.lastTrace==='declare' || !editor.declareInstead)return null;
@@ -2405,9 +2407,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(retired || !editing() || !traceDeclareOffer || !editor.declareInstead)return false;
       var o=traceDeclareOffer,role=action && action.role || DECLARE_ROLES[o.kind][0];if(DECLARE_ROLES[o.kind].indexOf(role)<0)return false;
       if(refusedDeclare(o,role))return false;
-      traceDeclareOffer=null;traceReturnSpan=o.spanId;setTimeout(function(){if(!retired && !editor.declareInstead(o.ref,{serviceName:o.span.serviceName,operation:o.span.operation,role:role}))traceReturnSpan=null;},0);return true;
+      // The offer waits while its declaration is pending, so an Undo that brings the mapping back brings it back too.
+      o.swapped=true;traceReturnSpan=o.spanId;setTimeout(function(){if(!retired && !editor.declareInstead(o.ref,{serviceName:o.span.serviceName,operation:o.span.operation,role:role}))traceReturnSpan=null;},0);return true;
     },
     undoTraceDeclare:function(){if(retired || !editor || !editor.undoDeclare)return false;setTimeout(function(){if(!retired)editor.undoDeclare();},0);return true;},
+    clearTraceDeclareError:function(){if(retired || !traceDeclareError)return false;traceDeclareError='';paint();notify();return true;},
     cancelTraceMapChooser:function(){if(retired || !traceChooser)return;traceChooser=null;traceReturnSpan=null;paint();notify();},
     // #1177: take back the latest pending span mapping (board-edit.js undoMap); it re-renders the board.
     undoTraceMap:function(){if(retired || !editor || !editor.undoMap)return false;setTimeout(function(){if(!retired)editor.undoMap();},0);return true;},

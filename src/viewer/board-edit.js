@@ -263,7 +263,7 @@ function createBoardEditor(options){
         if(theirs){
           if(boardEditSameSpan(theirs,entry.span)){already++;return;}
           var same=theirs.serviceName===sp.serviceName && theirs.operation===sp.operation;
-          refuse('their version already declares a different span under '+sp.key+' ('+(typeof theirs.operation==='string'?spanName(theirs):theirs.serviceName+' · '+(theirs.operationPrefix || '')+'…')+(same || theirs.role!==sp.role?', role '+theirs.role:'')+'); declare yours again under another name');
+          refuse('their version already declares a different span under '+sp.key+' ('+(typeof theirs.operation==='string'?spanName(theirs):theirs.serviceName+' · '+(theirs.operationPrefix || '')+'…')+(same || theirs.role!==sp.role?', role '+theirs.role:'')+'); drop the span again to declare it; it gets a new name');
           return;
         }
         // The same span under another key in their version is already there: no second declaration.

@@ -81,8 +81,11 @@ function telemetryTraceModel(diagram,pathId,exemplar){
       if(x.spans.length)return name+' '+telemetryTraceSpanTime([{status:'matched',intervals:x.spans.map(interval)}]);
       return name+': '+(x.notRecorded.length?'attribute '+x.notRecorded.join(', ')+' not recorded':'not in this trace');
     });
-    var row={id:'carrier:'+id,kind:'carrier',nodeId:id,edgeIndex:null,status:'matched',tone:spans.some(function(s){return s.error;})?'error':'observed',duration:null,budget:undefined,
-      label:'',operation:'',service:'',alternative:null,optional:false,otherAlternatives:[],conditions:[],declarations:parts,
+    // A failed declared span is named, as step and hand-off titles say "Service error".
+    var failed=spans.filter(function(s){return s.error;});
+    var title='Declared spans: '+parts.join('; ')+(failed.length?'.':'')+failed.map(function(s){return ' Service error: '+s.serviceName+' '+s.operation+(s.statusCode?' · HTTP '+s.statusCode:'')+'.';}).join('');
+    var row={id:'carrier:'+id,kind:'carrier',nodeId:id,edgeIndex:null,status:'matched',tone:failed.length?'error':'observed',duration:null,budget:undefined,
+      label:'',operation:'',service:'',alternative:null,optional:false,otherAlternatives:[],conditions:[],declarations:parts,titleText:title,
       spanIds:spans.map(function(s){return s.id;}),intervals:spans.map(interval)};
     (nodes[id]=nodes[id] || []).push(row);
   });
@@ -297,8 +300,11 @@ function telemetryTraceCounts(model){
   var optional=n(function(r){return r.optional;}),other=n(function(r){return r.notThisFlow;}),unmapped=n(function(r){return r.status==='unmapped';});
   // Timed carriers are those timed from their declared spans (#1290), so boards without declarations read as before.
   function timed(map){return Object.keys(map || {}).filter(function(k){return map[k].some(function(r){return r.kind==='carrier' && r.status==='matched' && r.timed!==false;});}).length;}
+  // A span a node or connection row shows from its declarations is on the board, so it is not unmatched.
+  var shown=Object.create(null);
+  [model.nodes,model.edges].forEach(function(map){Object.keys(map || {}).forEach(function(k){map[k].forEach(function(r){if(r.kind==='carrier')(r.spanIds || []).forEach(function(id){shown[id]=true;});});});});
   return {matched:n(function(r){return r.status==='matched';}),total:rows.length-optional-other-unmapped,optional:optional,notThisFlow:other,unmapped:unmapped,
-    unmatched:model.mapping?model.mapping.unmatched.length:0,nodes:timed(model.nodes),edges:timed(model.edges)};
+    unmatched:model.mapping?model.mapping.unmatched.filter(function(s){return !shown[s.id];}).length:0,nodes:timed(model.nodes),edges:timed(model.edges)};
 }
 function telemetryTraceCoverage(model){
   var c=telemetryTraceCounts(model),plural=function(n,one,many){return n+' '+(n===1?one:many);};

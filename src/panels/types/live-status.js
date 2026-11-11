@@ -401,7 +401,8 @@
         // A refused declaration says why beside its button ("Already declared as … on …").
         if(info.error){var why=el(parent,'p','declare-error','dv-trace-declare-error',info.error);why.setAttribute('role','status');why.id=why.id || 'dv-trace-declare-error-'+Math.random().toString(36).slice(2,10);go.setAttribute('aria-describedby',why.id);}
         else go.removeAttribute('aria-describedby');
-        if(!sel._declareChange){sel._declareChange=function(){if(sel._declareGo)sel._declareGo._liveArgument={role:sel.value};};sel.addEventListener('change',sel._declareChange);}
+        // A refusal is about the role it was for: choosing another role clears it.
+        if(!sel._declareChange){sel._declareChange=function(){if(sel._declareGo)sel._declareGo._liveArgument={role:sel.value};var owner=host._livePanelApi;if(owner && owner.clearTraceDeclareError)owner.clearTraceDeclareError();};sel.addEventListener('change',sel._declareChange);}
         return go;
       }
       if(trace.mapped && !trace.declared){var note=el(body,'div','map-note','dv-trace-map-note');note.setAttribute('role','status');

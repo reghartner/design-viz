@@ -2465,7 +2465,9 @@ declared carriers are shared gets a plain hint below the line, for example `Step
 Worker is also part of step “Reply”, so this step shows no trace spans of its own.` A step of
 another flow paints nothing on the board. **Map this span** onto a step with a `traceScope`
 replaces the scope, and the chooser and the button say so before the click; so does the
-Workbench **Add trace match** button.
+Workbench **Add trace match** button. Undo of that mapping brings the scope back. An edge step on a
+connection that declares only `receive` owns no span and reads `Not observed`, while the
+connection itself reads `receive seen · send not in trace`.
 
 A step that may be absent from a trace (for example, its operation runs in a different
 trace) can carry `traceMatch.optional: true`; with alternatives, set it on every

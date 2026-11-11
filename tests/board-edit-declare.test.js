@@ -240,7 +240,9 @@ test('D12 Undo of Declare instead never brings back a ticket change the reader c
     assert.deepEqual(plain(b.d().steps[0].traceMatch),MATCH,order+': the mapping is back');
     assert.equal(b.e.state().pending,1,order);
     assert.equal(b.e.undoMap(),true,order);
-    assert.equal(b.e.state().pending,0,order);assert.equal(b.e.text(),b.text,order+': nothing is left changed');
+    assert.equal(b.e.state().pending,0,order);
+    // After a cancel the exact snapshots are gone, so Undo rewrites the values; the board is as it was.
+    assert.deepEqual(JSON.parse(b.e.text()),JSON.parse(b.text),order+': nothing is left changed');
   }
 });
 
@@ -275,5 +277,5 @@ test('D14 the mapping note can say the mapping replaced the step\'s trace scope'
   b.e.mapSpan({section:0,kind:'step',id:'charge'},{serviceName:'payment',operation:'Charge'});
   assert.equal(b.e.state().mapped.replacedScope,true);
   const c=await editor(local());c.e.mapSpan({section:0,kind:'step',id:'charge'},{serviceName:'payment',operation:'Charge'});
-  assert.equal(c.e.state().mapped.replacedScope,false);
+  assert.equal(c.e.state().mapped.replacedScope,undefined,'only said when true, so the note of a plain mapping is as before');
 });

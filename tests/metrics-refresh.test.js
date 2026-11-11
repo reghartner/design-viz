@@ -208,6 +208,7 @@ for(const kind of ['grafana','honeycomb'])test('R11 '+kind+': after a refresh th
 | R15 | the same boards | with Metrics off, or Over time open, Refresh now is off and makes no call | a hidden way to call |
 | R16 | the same boards with a failing query | off/on 5 s after a failed answer makes no call yet: it shows the cooldown until 60 s after that call, and the call runs then; a first Metrics on in another environment calls at once | off/on during provider errors as a fast poll |
 | R17 | the same boards | a refresh held past 61 s still ignores Refresh now until it answers | a second call while one runs |
+| R18 | the same boards with a failing query | after the failed answer, clear() or setAvailable(false) then true resets the wait: off/on calls at once | an old failure holding back a reconnect |
 */
 for(const kind of ['grafana','honeycomb']){
  test('R12 '+kind+': off/on after 5 minutes shows the cached answer at once, then refreshes it with exactly one background call',async()=>{
@@ -280,3 +281,12 @@ for(const kind of ['grafana','honeycomb']){
   }finally{h.close();}
  });
 }
+for(const kind of ['grafana','honeycomb'])for(const [label,drop] of [['clear()',h=>h.api.clear()],['setAvailable(false) then true',h=>{h.api.setAvailable(false);h.api.setAvailable(true);}]])
+ test('R18 '+kind+': after a failed answer and '+label+', off/on calls at once',async()=>{
+  let failing=true;const h=await setup(kind,{fail:()=>failing});
+  try{
+   h.api.setEnabled(true);await settle();assert.equal(h.data(),1);assert.match(h.api.status().note,/boom/);
+   h.advance(5000);h.api.setEnabled(false);drop(h);failing=false;h.api.setEnabled(true);await settle();
+   assert.equal(h.data(),2,'the cache drop resets the wait: '+label);
+  }finally{h.close();}
+ });

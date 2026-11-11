@@ -5065,3 +5065,21 @@ test('M14 the Metrics line shows Refreshing… over a shown answer and the Refre
  assert.match(text(),/ · Refresh now available at .+/,'the cooldown is visible text: '+text());assert.equal(refresh().getAttribute('aria-disabled'),'true');
  panel.destroy();h.ctl.liveStatus.destroy();
 });
+
+/* #1313 review c2: after an answer that names a failed query, off/on waits up to 60 s. Meanwhile the answered signals
+   stay on screen and the Metrics line says what is true: the last refresh failed, and when the next try is. */
+test('M15 during the wait after a failed answer, the answered values stay and the line names the failure and the next try',async()=>{
+ let calls=0;const sample={a:{signals:{lag:{value:3}}}};
+ const h=harness(telemetryPage(),{provider:()=>Promise.resolve(fixed)},{telemetry:{provider:(b,s,report)=>{calls++;report.note('a->b rate: boom');return Promise.resolve(sample);}}});
+ const panel=mountStatus(h);h.flush();h.flush();await settle();
+ const text=()=>textOf(h.view.querySelector('.dv-live-metrics-connection'));
+ h.ctl.liveStatus.setMetricsEnabled(true);await settle();h.flush();assert.equal(calls,1);assert.match(text(),/a->b rate: boom/);
+ h.ctl.liveStatus.setMetricsEnabled(false);h.ctl.liveStatus.setMetricsEnabled(true);await settle();h.flush();
+ assert.equal(calls,1,'no call during the wait');
+ assert.equal(plain(h.ctl.telemetry.snapshot().map).a?.signals?.lag?.value,3,'the signal that answered stays');
+ assert.equal(h.ctl.telemetry.status().busy,false,'no call is running');assert.notEqual(h.ctl.telemetry.status().state,'loading','never loading while nothing runs');
+ assert.doesNotMatch(text(),/connecting/,'never "connecting" while no call runs: '+text());
+ assert.match(text(),/last refresh failed at .+ · next try at .+/,'the line names the failure and the next try: '+text());
+ assert.match(text(),/a->b rate: boom/,'and the failed query');
+ panel.destroy();h.ctl.liveStatus.destroy();
+});

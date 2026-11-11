@@ -37,6 +37,11 @@
 | L12 (#1078) changing or removing a mapping a recent board edit set needs the author to confirm | agent entry 10:00; Bo mapped rates at 11:00; local changes it, removes it, or deletes the step | each: conflict, step rates, message names Bo and the time; with confirm [step:rates] → logged | an impl with no conflict check for step mappings |
 | S16 (#1078 review c2) a local traceMatch alternatives array (#1100) on the mapped step stops the pull | local rates = [currency · GetRates, currency · GetAllRates] | conflict {kind trace-match-changed, step rates}, message names both alternatives joined with " or "; CLI exit 2, file unchanged; resolve step:rates=live → the board's object, =local → the array | an impl that reads an array as "no traceMatch" and overwrites it |
 | L13 (#1078 review c2) log counts and guards alternatives arrays | (a) Bo mapped rates after the newest agent entry, local turns it into alternatives; (b) an array added to an unmapped step | (a) conflict whose message says "maps … or … to it", not "removes"; with confirm → "Changed 1 step mapping"; (b) "Added 1 step mapping" | an impl that counts an array as no mapping |
+| S17 (#1290 PR 9) a span the board declared on a node reaches the local node | Bo declared cart-checkout on beta | merged; beta.trace.spans['cart-checkout'] equals the change's span; line "cart-checkout (frontend · /cart/checkout) declared on Beta service" | an impl that drops trace-span changes or reports them unplaced |
+| S18 (#1290 PR 9) a declaration on an imported node writes the consumer overlay; one already there is kept | Bo declared audit on shared::api (no overlay entry yet) | nodeTracking.api.trace.spans.audit; a local copy with the same span is unchanged | an impl that writes the provider or duplicates |
+| S19 (#1290 PR 9) a different local span under the same key stops the pull until resolved | local beta already declares cart-checkout as something else | conflict {kind span-changed, span cart-checkout, carrier beta}, message names Bo, the time and --resolve span:beta/cart-checkout; =live takes the board's, =local keeps the local; the old span:cart-checkout form still works while unambiguous | an impl that overwrites a local declaration silently |
+| S20 (#1290 PR 9 c1) the whole declared span is compared | the local span differs only in role (or namespace) | conflict span-changed | an impl comparing service and operation only |
+| S21 (#1290 PR 9 c1) --resolve is per carrier | Bo declared process on beta and on gamma; both differ locally | span:beta/process=live and span:gamma/process=local resolve each; span:process is refused as ambiguous, naming both; the CLI accepts span: keys | one flag shared by every carrier with that key |
 | L9 (diff review c1) placing a ticket that a recent board edit took off the board is a conflict | agent entry 10:00; Bo removed CC-1 from edge 0 at 11:00; local assigns CC-1 to gamma | status conflict, conflicts[0] ticket CC-1, message names Bo; with confirm [CC-1] → logged | a check limited to the carriers the board edit named |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
@@ -523,4 +528,67 @@ test('#1192 c3 an older-engine change does not set the nodeId base; a node missi
  const out=S().pull(withRates({...A,nodeId:'alpha'}),live);assert.equal(out.status,'merged',JSON.stringify(out.conflicts));assert.deepEqual(step(out.text,'rates').traceMatch,{...B,nodeId:'beta'});
  const missing=stepsLive(s=>{d(s).nodes.delta={title:'Delta'};d(s).steps[0].traceMatch={...A,nodeId:'delta'};},[entry('2026-11-09T12:00:00Z','Bo',[mapRow({...A,nodeId:'delta'},A)])]);
  for(const resolve of [{},{'step:rates':'live'}]){const r=S().pull(withRates(A),missing,{resolve});assert.equal(r.status,'conflict',JSON.stringify(resolve));assert.match(r.conflicts[0].message,/node delta no longer exists locally/);}
+});
+
+/* #1290 PR 9: "Declare on this node/connection" saves a trace-span change. */
+const CART={key:'cart-checkout',serviceName:'frontend',operation:'/cart/checkout',role:'process'};
+const BO_DECLARE=entry('2026-11-11T09:00:00.000Z','Bo',[{op:'trace-span',path:NODE('beta'),label:'Beta service',node:'beta',span:CART}]);
+const spanOf=s=>({serviceName:s.serviceName,operation:s.operation,role:s.role});
+test('S17 a span the board declared on a node reaches the local node',()=>{
+ const live=liveText(s=>{d(s).nodes.beta.trace={spans:{'cart-checkout':spanOf(CART)}};},[BO_DECLARE]);
+ const out=S().pull(LOCAL,live);
+ assert.equal(out.status,'merged');assert.deepEqual(plain(out.conflicts),[]);assert.deepEqual(plain(out.unplaced || []),[]);
+ assert.deepEqual(d(JSON.parse(out.text)).nodes.beta.trace,{spans:{'cart-checkout':spanOf(CART)}});
+ assert.deepEqual(plain(out.edits[0].lines),['cart-checkout (frontend · /cart/checkout) declared on Beta service']);
+ assert.deepEqual(plain(V.validate(V.normalize(JSON.parse(out.text))).warnings).filter(w=>/editHistory/.test(w)),[],'the appended entry is valid');
+});
+test('S18 a declaration on an imported node writes the consumer overlay; one the local copy already has is kept',()=>{
+ const imp=['page','sections',1,'diagram','topologyImports',0],AUDIT={key:'audit',serviceName:'api',operation:'audit',role:'work'};
+ const bo=entry('2026-11-11T09:10:00Z','Bo',[{op:'trace-span',path:imp.concat(['nodeTracking','api']),node:'shared::api',label:'API',span:AUDIT}]);
+ const live=liveText(s=>{d(s,1).topologyImports[0].nodeTracking={api:{trace:{spans:{audit:spanOf(AUDIT)}}}};},[bo]);
+ let out=S().pull(LOCAL,live);
+ assert.equal(out.status,'merged');
+ assert.deepEqual(d(JSON.parse(out.text),1).topologyImports[0].nodeTracking,{api:{trace:{spans:{audit:spanOf(AUDIT)}}}});
+ const already=LOCAL.replace('"topologyImports": [{"spec": "provider", "export": "core", "as": "shared", ','"topologyImports": [{"spec": "provider", "export": "core", "as": "shared", "nodeTracking": {"api": {"trace": {"spans": {"audit": '+JSON.stringify(spanOf(AUDIT))+'}}}}, ');
+ out=S().pull(already,live);
+ assert.equal(out.status,'merged');assert.deepEqual(d(JSON.parse(out.text),1).topologyImports[0].nodeTracking,{api:{trace:{spans:{audit:spanOf(AUDIT)}}}},'kept, not duplicated');
+});
+test('S19 a different local span under the same key stops the pull until resolved',()=>{
+ { const live=liveText(s=>{d(s).nodes.beta.trace={spans:{'cart-checkout':spanOf(CART)}};},[BO_DECLARE]);
+   const mine=LOCAL.replace('"beta": {"title": "Beta service", "missingWork": true}','"beta": {"title": "Beta service", "missingWork": true, "trace": {"spans": {"cart-checkout": {"serviceName": "frontend", "operation": "/cart", "role": "process"}}}}');
+   const out=S().pull(mine,live,{resolve:{'span:beta/cart-checkout':'live'}});
+   assert.equal(out.status,'merged');assert.deepEqual(d(JSON.parse(out.text)).nodes.beta.trace.spans['cart-checkout'],spanOf(CART),'the per-carrier form resolves'); }
+ const live=liveText(s=>{d(s).nodes.beta.trace={spans:{'cart-checkout':spanOf(CART)}};},[BO_DECLARE]);
+ const mine=LOCAL.replace('"beta": {"title": "Beta service", "missingWork": true}','"beta": {"title": "Beta service", "missingWork": true, "trace": {"spans": {"cart-checkout": {"serviceName": "frontend", "operation": "/cart", "role": "process"}}}}');
+ let out=S().pull(mine,live);
+ assert.equal(out.status,'conflict');assert.equal(out.conflicts[0].kind,'span-changed');assert.equal(out.conflicts[0].span,'cart-checkout');
+ assert.match(out.conflicts[0].message,/Bo/);assert.match(out.conflicts[0].message,/2026-11-11 09:00 UTC/);assert.equal(out.conflicts[0].carrier,'beta');assert.match(out.conflicts[0].message,/--resolve span:beta\/cart-checkout=live/);
+ out=S().pull(mine,live,{resolve:{'span:cart-checkout':'live'}});
+ assert.equal(out.status,'merged');assert.deepEqual(d(JSON.parse(out.text)).nodes.beta.trace.spans['cart-checkout'],spanOf(CART));
+ out=S().pull(mine,live,{resolve:{'span:cart-checkout':'local'}});
+ assert.equal(out.status,'merged');assert.equal(d(JSON.parse(out.text)).nodes.beta.trace.spans['cart-checkout'].operation,'/cart');
+});
+test('S20 the whole declared span is compared: a role or namespace difference is a conflict',()=>{
+ const live=liveText(s=>{d(s).nodes.beta.trace={spans:{'cart-checkout':spanOf(CART)}};},[BO_DECLARE]);
+ for(const extra of ['"role": "call"','"role": "process", "namespace": "eu"']){
+  const mine=LOCAL.replace('"beta": {"title": "Beta service", "missingWork": true}','"beta": {"title": "Beta service", "missingWork": true, "trace": {"spans": {"cart-checkout": {"serviceName": "frontend", "operation": "/cart/checkout", '+extra+'}}}}');
+  const out=S().pull(mine,live);
+  assert.equal(out.status,'conflict',extra);assert.equal(out.conflicts[0].kind,'span-changed',extra);
+ }
+});
+test('S21 --resolve for a declared span is per carrier; the bare key is refused when two carriers share it',()=>{
+ const P={key:'process',serviceName:'svc',operation:'work',role:'process'};
+ const bo=entry('2026-11-11T09:20:00.000Z','Bo',[{op:'trace-span',path:NODE('beta'),label:'Beta service',node:'beta',span:P},{op:'trace-span',path:NODE('gamma'),label:'Gamma',node:'gamma',span:P}]);
+ const live=liveText(s=>{d(s).nodes.beta.trace={spans:{process:spanOf(P)}};d(s).nodes.gamma.trace={spans:{process:spanOf(P)}};},[bo]);
+ const other='{"spans": {"process": {"serviceName": "svc", "operation": "other", "role": "process"}}}';
+ const mine=LOCAL.replace('"beta": {"title": "Beta service", "missingWork": true}','"beta": {"title": "Beta service", "missingWork": true, "trace": '+other+'}').replace('"gamma": {"title": "Gamma"}','"gamma": {"title": "Gamma", "trace": '+other+'}');
+ let out=S().pull(mine,live);
+ assert.equal(out.status,'conflict');assert.deepEqual(plain(out.conflicts.map(c=>c.carrier)),['beta','gamma']);
+ out=S().pull(mine,live,{resolve:{'span:beta/process':'live','span:gamma/process':'local'}});
+ assert.equal(out.status,'merged');
+ assert.equal(d(JSON.parse(out.text)).nodes.beta.trace.spans.process.operation,'work');assert.equal(d(JSON.parse(out.text)).nodes.gamma.trace.spans.process.operation,'other');
+ assert.throws(()=>S().pull(mine,live,{resolve:{'span:process':'live'}}),/--resolve span:process names 2 nodes or connections \(beta, gamma\); use span:beta\/process or span:gamma\/process\./);
+ // The command line accepts span: keys.
+ const dir=tmp({'local.json':mine,'live.json':live});const r=run(dir,['pull','local.json','live.json','--resolve','span:beta/process=live,span:gamma/process=local']);
+ assert.equal(r.status,0,r.stderr);
 });

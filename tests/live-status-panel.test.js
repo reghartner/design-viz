@@ -297,6 +297,16 @@ test('#1180 the edit-history line names the traceMatch a mapping replaced',()=>{
  const bad=plain(C.validate(C.normalize(historyFixture([{at,changes:[change({replaces:'Quote'})]}])))).warnings;
  assert.equal(bad.length,1);assert.match(bad[0],/changes\[0\]\.replaces: /);
 });
+/* #1290 PR 9: a span declared on a node or connection in Edit mode reads "<key> (<service> · <operation>) declared on <carrier>". */
+test('#1290 the edit-history line names a declared span and its carrier; the validator accepts the change',()=>{
+ const d=C.PanelRegistry.get('edit-history'),at='2026-11-11T10:00:00Z',change={op:'trace-span',node:'store',label:'Rates store',span:{key:'get-rates',serviceName:'currency',operation:'GetRates',role:'database'}};
+ const html=d.render({},{id:'history',type:'edit-history'},{editSample:[{at,changes:[change]}]}).html;
+ assert.match(html,/get-rates \(currency · GetRates\) declared on Rates store</);
+ assert.match(html,/data-edit-op="trace-span"><span class="dv-edit-span">get-rates \(currency · GetRates\)<\/span>/);
+ assert.deepEqual(plain(C.validate(C.normalize(historyFixture([{at,changes:[change]}])))).warnings,[]);
+ const bad=plain(C.validate(C.normalize(historyFixture([{at,changes:[{...change,span:{key:'get-rates'}}]}])))).warnings;
+ assert.equal(bad.length,1);assert.match(bad[0],/changes\[0\]\.span: needs "key", "serviceName", "operation" and "role" strings/);
+});
 test('#1192 a trace-match change nodeId must be a node id; an entry without one stays valid',()=>{
  const at='2026-11-09T10:00:00Z',change=extra=>({op:'trace-match',step:'rates',label:'Resolve rates',traceMatch:{serviceName:'currency',operation:'GetRates',...extra}});
  assert.deepEqual(plain(C.validate(C.normalize(historyFixture([{at,changes:[change({})]},{at,changes:[change({nodeId:'beta'})]}])))).warnings,[]);

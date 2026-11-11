@@ -702,7 +702,14 @@ function editHistoryEntryProblem(entry){
   for(var i=0;i<entry.changes.length;i++){
     var change=entry.changes[i],at='changes['+i+']';
     if(!specObject(change))return at+': must be an object';
-    if(change.op!=='add' && change.op!=='remove' && change.op!=='clear-missing-work' && change.op!=='trace-match')return at+'.op: must be "add", "remove", "clear-missing-work" or "trace-match"';
+    if(change.op!=='add' && change.op!=='remove' && change.op!=='clear-missing-work' && change.op!=='trace-match' && change.op!=='trace-span')return at+'.op: must be "add", "remove", "clear-missing-work", "trace-match" or "trace-span"';
+    // #1290 PR 9: a span declared on a node or connection in Edit mode names its carrier and the declaration.
+    if(change.op==='trace-span'){
+      if(Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "trace-span" change has no ticket';
+      if(Object.prototype.hasOwnProperty.call(change,'step'))return at+': a "trace-span" change names a node or edge, not a step';
+      var sp=change.span;
+      if(!specObject(sp) || ['key','serviceName','operation','role'].some(function(k){return typeof sp[k]!=='string' || !sp[k];}))return at+'.span: needs "key", "serviceName", "operation" and "role" strings';
+    }
     // #1078: a span mapped to a step in Edit mode names the step and the traceMatch written there.
     if(change.op==='trace-match'){
       if(Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "trace-match" change has no ticket';
@@ -720,7 +727,7 @@ function editHistoryEntryProblem(entry){
       continue;
     }
     // #855: clearing a Missing work marker names only its carrier.
-    if(change.op==='clear-missing-work'){if(Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "clear-missing-work" change has no ticket';}
+    if(change.op==='clear-missing-work' || change.op==='trace-span'){if(change.op==='clear-missing-work' && Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "clear-missing-work" change has no ticket';}
     else if(typeof change.ticket!=='string' || !trackingKeyPattern.test(change.ticket))return at+'.ticket: must be a Jira key';
     var node=Object.prototype.hasOwnProperty.call(change,'node'),edge=Object.prototype.hasOwnProperty.call(change,'edge');
     var nodeOk=typeof change.node==='string' && change.node.length>0;

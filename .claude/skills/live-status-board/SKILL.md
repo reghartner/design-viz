@@ -342,7 +342,8 @@ the Workbench and sees no live state there.
 
 A published two-file board changes without you: editors move tickets on it in
 Edit mode (add a ticket to a node or edge, remove one, clear a Missing work
-marker, map a trace span to a step or replace its `traceMatch`). Each Save rewrites
+marker, map a trace span to a step or replace its `traceMatch`, or declare a trace span
+on a node or connection). Each Save rewrites
 the artifact's `flowspec.json` and appends one `page.editHistory` entry. Those
 are the only edits the board allows, so a local
 spec that lacks them is not broken or out of date in any other way: fold them in
@@ -357,9 +358,10 @@ and carry on. Every time you change a published board:
    - Exit 2, nothing written: the same ticket was placed differently on the
      board and in your local spec, or a board edit added a ticket to a node or
      edge your local spec no longer has, or a board edit mapped a span to a step
-     your local spec maps differently or deleted. Show the author the printed conflict, ask which placement
+     your local spec maps differently or deleted, or a board edit declared a span
+     under a key your local node or connection uses for another span. Show the author the printed conflict, ask which placement
      to keep, then rerun with `--resolve KEY=live` or `--resolve KEY=local`
-     (KEY `step:<step id>` for a step).
+     (KEY `step:<step id>` for a step, `span:<node id or from->to>/<span key>` for a declared span).
    - Exit 3, nothing written: another agent republished the board from a
      different copy. Copy `live.json` over your local spec and redo the
      requested change on it. If your local spec has changes of its own that

@@ -3826,9 +3826,12 @@ test('#1164 example traces are not selected or painted until the reader picks on
 /* #1177 Map span to step (Edit mode, desktop). An editor stand-in records mapSpan calls and carries the
    Trace view across a re-render the way board-edit.js does. */
 function mapEditor(){
- let carried=null,mapped=null;const calls=[];
- return {calls,undone:0,setMapped(v){mapped=v;},
-  state(){return {editable:true,blocked:'',active:true,pending:calls.length,saving:false,readOnly:false,notice:null,mapped};},
+ let carried=null,mapped=null,declared=null,last=null;const calls=[];
+ return {calls,undone:0,declares:[],swaps:[],undeclared:0,setMapped(v){mapped=v;last=v?'map':last;},setDeclared(v){declared=v;last=v?'declare':last;},
+  state(){return {editable:true,blocked:'',active:true,pending:calls.length,saving:false,readOnly:false,notice:null,mapped,declared,lastTrace:last};},
+  // #1290 PR 9 stand-ins: declarePreview names the key; declareSpan and declareInstead record their calls.
+  declarePreview(ref,span){return {key:'span-key'};},declareSpan(ref,span){this.declares.push(plain({ref,span}));return true;},
+  declareInstead(ref,span){this.swaps.push(plain({ref,span}));return true;},undoDeclare(){this.undeclared++;return true;},
   onChange:()=>()=>{},rememberMap(){},lastMap:()=>null,question:()=>null,endQuestion(){},removable:()=>[],missingWork:()=>null,start(){},
   rememberTrace(v){carried=v;},takeTrace(){const v=carried;carried=null;return v;},
   mapSpan(ref,match,previous){calls.push(plain({ref,match,previous:previous===undefined?null:previous}));return true;},undoMap(){this.undone++;return true;}};
@@ -5087,4 +5090,73 @@ test('#1280 follow-up: in the capped Edit list a row never lands under the bar, 
   const s=b.api.snapshot().trace.selected;assert.equal(b.api.selectTraceSpan({context:s.context,spanId:MAP_SPAN}),true);b.h.flush();
   assert.equal(list.scrollTop,-114,'the row (top -50) is brought below the bar inside the list (-50 - 56 - 8)');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;nav.remove();b.api.destroy();}
+});
+
+/* #1290 PR 9: "Declare on this node/connection" (team-lead ruling: the immediate #1177 mapping stays).
+| row | rule |
+|---|---|
+| DC1 | A node drop that maps at once leaves the "Mapped … to step …" note with a role select (node roles, process first) and "Declare on <title> instead", which swaps the pending mapping for a declaration (declareInstead); a step-chip mapping offers no Declare. |
+| DC2 | An edge drop that maps at once offers send and receive, send first. |
+| DC3 | Where the chooser opens (several steps, or none), "Declare on <title>" is one of its choices, with the role select; it calls declareSpan. |
+| DC4 | The latest declaration shows "Declared <key> (<service> · <operation>) on <title>." with Undo (undoDeclare). |
+*/
+const click=(el,h)=>{el.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});if(h)runTimers(h);};
+const SPAN={serviceName:MAP_MATCH.serviceName,operation:MAP_MATCH.operation};
+test('DC1 a node drop that maps at once offers Declare on <title> instead, with a role; a step-chip mapping does not',async()=>{
+ const b=mapBoard();const s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ assert.deepEqual(b.editor.calls.at(-1).ref,{section:0,kind:'step',id:'beta'},'the #1177 immediate mapping stays');
+ b.editor.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});b.api.setTraceShow(true);
+ const note=b.m.body.querySelector('.dv-trace-map-note');assert.ok(note);
+ const role=note.querySelector('select.dv-trace-declare-role');assert.ok(role,'a role select beside the button');
+ assert.equal(role.getAttribute('aria-label'),'Role for the span declared on Beta');
+ assert.deepEqual(role.querySelectorAll('option').map(o=>o.value),['process','database','cache','call','work']);assert.equal(role.value,'process');
+ const instead=note.querySelector('button.dv-trace-declare-instead');assert.ok(instead);assert.equal(instead.textContent,'Declare on Beta instead');
+ role.value='call';role.dispatchEvent({type:'change'});click(instead,b.h);
+ assert.deepEqual(b.editor.swaps,[{ref:{section:0,kind:'node',id:'b'},span:{...SPAN,role:'call'}}],'the pending mapping is swapped for the declaration');
+ b.api.destroy();
+ const c=mapBoard();const t=await c.focus();
+ spanDrop(c.h,c.h.view.querySelector('button.schip[data-step-source="1"]'),t.context);runTimers(c.h);
+ c.editor.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});c.api.setTraceShow(true);
+ assert.equal(c.m.body.querySelector('.dv-trace-map-note button.dv-trace-declare-instead'),null,'a step-chip mapping names no carrier');
+ c.api.destroy();
+});
+test('DC2 an edge drop that maps at once offers send and receive, send first',async()=>{
+ const b=mapBoard();const s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('path.edge[data-dv-edge="0"]'),s.context);runTimers(b.h);
+ assert.deepEqual(b.editor.calls.at(-1).ref,{section:0,kind:'step',id:'hop'});
+ b.editor.setMapped({step:'hop',label:'Hop to beta',traceMatch:MAP_MATCH});b.api.setTraceShow(true);
+ const role=b.m.body.querySelector('.dv-trace-map-note select.dv-trace-declare-role');assert.ok(role,'a role select in the note');
+ assert.deepEqual(role.querySelectorAll('option').map(o=>o.value),['send','receive']);assert.equal(role.value,'send');
+ click(b.m.body.querySelector('.dv-trace-map-note button.dv-trace-declare-instead'),b.h);
+ assert.deepEqual(b.editor.swaps,[{ref:{section:0,kind:'edge',index:0},span:{...SPAN,role:'send'}}]);
+ b.api.destroy();
+});
+test('DC3 the chooser offers Declare on <title> beside its step choices, and on a carrier no step names',async()=>{
+ let b=mapBoard({twoOnB:true});let s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ let chooser=b.m.body.querySelector('.dv-trace-map-chooser');assert.ok(chooser);
+ const declare=chooser.querySelector('button.dv-trace-map-declare');assert.ok(declare,'the chooser offers Declare on Beta');assert.equal(declare.textContent,'Declare on Beta');
+ const role=chooser.querySelector('select.dv-trace-declare-role');assert.equal(role.value,'process');role.value='database';role.dispatchEvent({type:'change'});
+ click(declare,b.h);
+ assert.deepEqual(b.editor.declares,[{ref:{section:0,kind:'node',id:'b'},span:{...SPAN,role:'database'}}]);assert.equal(b.editor.calls.length,0,'no mapping');
+ assert.equal(b.m.body.querySelector('.dv-trace-map-chooser'),null,'the chooser closes');
+ b.api.destroy();
+ b=mapBoard();s=await b.focus();
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="a"]'),s.context);runTimers(b.h);
+ chooser=b.m.body.querySelector('.dv-trace-map-chooser');assert.ok(chooser,'a carrier no step names opens the chooser');
+ assert.equal(chooser.querySelector('.dv-trace-map-prompt').textContent,'No step names Alpha. Declare '+MAP_MATCH.serviceName+' · '+MAP_MATCH.operation+' on it, or drop it on a step.');
+ click(chooser.querySelector('button.dv-trace-map-declare'),b.h);
+ assert.deepEqual(b.editor.declares.at(-1).ref,{section:0,kind:'node',id:'a'});
+ b.api.destroy();
+});
+test('DC4 the latest declaration shows a note with Undo',async()=>{
+ const b=mapBoard();await b.focus();
+ b.editor.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});
+ b.editor.setDeclared({key:'grpc-msdemo-currencyservice-getsupportedcurrencies',label:'Beta',span:{...SPAN,role:'process'}});b.api.setTraceShow(true);
+ const note=b.m.body.querySelector('.dv-trace-declare-note');assert.ok(note,'the declaration note');
+ assert.equal(note.querySelector('.dv-trace-declare-note-text').textContent,'Declared grpc-msdemo-currencyservice-getsupportedcurrencies ('+MAP_MATCH.serviceName+' · '+MAP_MATCH.operation+') on Beta.');
+ assert.equal(b.m.body.querySelector('.dv-trace-map-note'),null,'only the latest change has a note');
+ click(note.querySelector('button.dv-trace-declare-undo'),b.h);assert.equal(b.editor.undeclared,1);
+ b.api.destroy();
 });

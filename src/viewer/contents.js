@@ -130,7 +130,7 @@ function createReaderContents(ctl,nav,actions,options){
   // never feeds back into the base fit, so it cannot oscillate.
   var textPlace='none',textMenuOnly=false;
   function measureText(){
-    if(!textView)return;textView.place('measure');
+    if(!textView)return;textView.place('measure',textMenuOnly && !overflowActions);
     if(textMenuOnly){textMenuOnly=false;if(!overflowActions)pageUtilities.hidden=true;}
   }
   function fitText(fits){

@@ -208,10 +208,14 @@ function createReaderTextView(ctl,nav,actions,currentRecord,host){
     // Contents entry reaches it at every width.
     place:function(mode,trial){
       if(retired)return;
+      // trial doubles as "the ⋯ holds only Text view" for 'measure'.
       // Measuring removes the launcher from the bar for one synchronous pass. Focus
       // on the launcher, the menu item or the menu button is remembered and put
       // back when the pass places Text for good, so it never drops to the page.
-      if(mode==='measure'){var active=activeElement();if(active===toggle || active===menuItem || host.menuSummary && active===host.menuSummary)refocus=active;launch.hidden=true;return;}
+      // Only controls Text owns are tracked: the launcher, the menu item, and the ⋯
+      // button while it holds only Text view. Focus anywhere else, including the
+      // bar's own ⋯ with page actions, is left to the bar.
+      if(mode==='measure'){var active=activeElement(),ownMenu=!!trial;if(active===toggle || active===menuItem || ownMenu && host.menuSummary && active===host.menuSummary)refocus=active;launch.hidden=true;return;}
       launch.hidden=mode!=='inline';menuItem.hidden=mode!=='menu';
       // The item goes last in "More page actions", after the bar's own items.
       if(mode==='menu' && host.menu && (menuItem.parentNode!==host.menu || menuItem.nextElementSibling))host.menu.appendChild(menuItem);
@@ -219,7 +223,11 @@ function createReaderTextView(ctl,nav,actions,currentRecord,host){
       placement=mode;
       if(refocus){
         var from=refocus,order=from===menuItem?[menuItem,toggle,host.menuSummary]:from===toggle?[toggle,menuItem,host.menuSummary]:[host.menuSummary,toggle];refocus=null;
-        var target=order.find(function(node){return node && shown(node);}) || firstBarControl();if(target && activeElement()!==target)target.focus({preventScroll:true});
+        // Restore only when focus actually dropped (the bar may already have moved it).
+        var now=activeElement();
+        if(!now || now===doc.body || now===from || !shown(now)){
+          var target=order.find(function(node){return node && shown(node);}) || firstBarControl();if(target && now!==target)target.focus({preventScroll:true});
+        }
       }
     },
     // The reader's document can change while the window is open: rebuild from ctl.page.

@@ -2136,7 +2136,11 @@ mode:
   carrier's identity (section id or heading, edge endpoints and label, the import's
   provider reference), never by position. A change whose carrier is gone, or was
   not unique when it was made (two identical unlabeled parallel edges), is dropped
-  and listed, as is a clear whose carrier no longer has a marker set on this board. A change
+  and listed as "could not be (carrier moved, removed or ambiguous)". A change whose carrier
+  is there but cannot take it is named with its own reason: a clear whose carrier no longer
+  has a Missing work marker set on this board, a span mapping whose step their version maps
+  to another span, a declared span whose key their version uses for a different span
+  ("declare yours again under another name"). A change
   the winning version already has is named as already there. Nothing is published until the
   editor saves again, and the notice ends with “Save again.” only while a change is pending.
 - A read-only answer (`not_writer`, `not_granted`, `capability_disabled`,

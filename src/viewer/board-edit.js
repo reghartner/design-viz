@@ -235,11 +235,16 @@ function createBoardEditor(options){
     try{saved=JSON.parse(win.sessionStorage.getItem(stashKey) || 'null');}catch(ex){saved=null;}
     unstash();
     if(!saved || !Array.isArray(saved.ops) || !saved.ops.length)return;
-    var applied=0,already=0,dropped=[];
+    // `dropped`: changes whose carrier moved, went or is ambiguous; `refused`: changes whose carrier is there
+    // but cannot take them, each with the reason that is true for it (#1290 PR 9 review c2).
+    var applied=0,already=0,dropped=[],refused=[];
+    function spanName(sp){return sp.serviceName+' · '+sp.operation;}
     saved.ops.forEach(function(op){
       var entry=op && op.entry;if(!entry)return;
       var where=entry.label || entry.node || entry.step || (entry.edge || []).join(' → ');
-      var describe=entry.op==='clear-missing-work'?'Missing work cleared from '+where:entry.op==='trace-match'?'span mapped to '+where:entry.op==='trace-span'?'span declared on '+where:entry.ticket+' '+(entry.op==='add'?'on ':'off ')+where;
+      var tm=entry.traceMatch || {},sp=entry.span || {};
+      var describe=entry.op==='clear-missing-work'?'Missing work cleared from '+where:entry.op==='trace-match'?'span '+tm.serviceName+' · '+tm.operation+' mapped to '+where:entry.op==='trace-span'?'span '+sp.key+' ('+spanName(sp)+') declared on '+where:entry.ticket+' '+(entry.op==='add'?'on ':'off ')+where;
+      function refuse(reason){refused.push(describe+' could not be re-applied: '+reason);}
       var raw=parsed(text),paths=op.replayable?boardEditResolveChain(raw,op.chain):[];
       var ref=paths.length===1?refFor(raw,paths[0],op.kind,entry):null;
       if(!ref){dropped.push(describe);return;}
@@ -247,17 +252,28 @@ function createBoardEditor(options){
       var before=text;
       // #1290 PR 9: a declaration the winner already has (same key, service and operation) needs nothing.
       if(entry.op==='trace-span'){
-        var tt=null;try{tt=target(text,ref);}catch(ex){tt=null;}var have=tt && shownCarrier(tt),sp=have && have.trace && have.trace.spans && have.trace.spans[entry.span.key];
+        var tt=null;try{tt=target(text,ref);}catch(ex){tt=null;}var have=tt && shownCarrier(tt),theirs=have && have.trace && have.trace.spans && have.trace.spans[entry.span.key];
         // The whole declared span is compared; another span under that key keeps the winner's, and this change is dropped.
-        if(sp){if(boardEditSameSpan(sp,entry.span))already++;else dropped.push(describe);return;}
-        if(declare(ref,entry.span,entry.span.key,false))applied++;else dropped.push(describe);
+        if(theirs){
+          if(boardEditSameSpan(theirs,entry.span)){already++;return;}
+          var same=theirs.serviceName===sp.serviceName && theirs.operation===sp.operation;
+          refuse('their version already declares a different span under '+sp.key+' ('+(typeof theirs.operation==='string'?spanName(theirs):theirs.serviceName+' · '+(theirs.operationPrefix || '')+'…')+(same || theirs.role!==sp.role?', role '+theirs.role:'')+'); declare yours again under another name');
+          return;
+        }
+        if(declare(ref,entry.span,entry.span.key,false)){applied++;return;}
+        var why=tt?declaration(tt,entry.span,null):null;
+        if(why && why.error)refuse(/^Already declared as /.test(why.error)?'their version already declares it as '+why.error.replace(/^Already declared as /,'').replace(/ on .*$/,''):why.error.replace(/\.$/,'').replace(/^./,function(c){return c.toLowerCase();}));
+        else dropped.push(describe);
         return;
       }
       if(!apply(entry.op,ref,entry.ticket,null,entry.traceMatch,op.previous) && text===before){
-        // A clear with no marker of this board's left to clear is dropped (#855).
-        if(entry.op==='clear-missing-work'){dropped.push(describe);return;}
-        // A step that already has this exact traceMatch needs nothing; any other is dropped (#1078).
-        if(entry.op==='trace-match'){var step=specValueAt(parsed(text),paths[0]),m=step && step.traceMatch,want=entry.traceMatch || {};if(m && m.serviceName===want.serviceName && m.operation===want.operation)already++;else dropped.push(describe);return;}
+        // A clear with no marker of this board's left to clear is dropped (#855), saying why.
+        if(entry.op==='clear-missing-work'){var mk=null;try{mk=marker(target(text,ref));}catch(ex){mk=null;}
+          refuse(mk && !mk.clearable?'the Missing work marker on '+where+' comes from '+mk.source+' in their version':'their version has no Missing work marker on '+where+' to clear');return;}
+        // A step that already has this exact traceMatch needs nothing; any other is dropped (#1078), saying why.
+        if(entry.op==='trace-match'){var step=specValueAt(parsed(text),paths[0]),m=step && step.traceMatch,want=entry.traceMatch || {};
+          if(m && m.serviceName===want.serviceName && m.operation===want.operation){already++;return;}
+          refuse(Array.isArray(m)?'their version gives that step alternatives; edit it in Inspect':m?'their version maps that step to '+m.serviceName+' · '+m.operation:'their version removed the trace match it replaced');return;}
         // Already true in the winning version: nothing left to do for it.
         var t=target(text,ref);var has=t && authoredKeys(t).indexOf(entry.ticket)>=0;
         if(t && ((entry.op==='add')===has))already++;else dropped.push(describe);
@@ -269,7 +285,8 @@ function createBoardEditor(options){
     // #1253: a change the winning version already has is not re-applied, and "Save again" only when one is pending.
     var parts=[applied+' of your changes were re-applied'];
     if(already)parts.push(already+' '+(already===1?'was':'were')+' already in their version');
-    parts.push(dropped.length+' could not be (carrier moved, removed or ambiguous)'+(dropped.length?': '+dropped.join('; '):''));
+    if(dropped.length || !refused.length)parts.push(dropped.length+' could not be (carrier moved, removed or ambiguous)'+(dropped.length?': '+dropped.join('; '):''));
+    refused.forEach(function(text){parts.push(text);});
     notice={kind:'warn',text:'Another editor saved first. '+parts.join('; ')+'.'+(ops.length?' Save again.':'')};
     changed();
   }
@@ -319,8 +336,10 @@ function createBoardEditor(options){
   // The key: the operation's last meaningful segment (after the last "/", skipping {id}, :id and numbers;
   // the whole operation when it has no "/"), slugged and starting with a letter.
   function slug(operation){
-    var op=String(operation),parts=op.split('/').map(function(p){return p.trim();}).filter(function(p){return p && !/^\{.*\}$/.test(p) && !/^:/.test(p) && !/^\d+$/.test(p);});
-    if(op.indexOf('/')>=0 && parts.length)op=parts[parts.length-1];
+    var op=String(operation),method=/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+\//i.exec(op);
+    var parts=op.split('/').map(function(p){return p.trim();}).filter(function(p){return p && !/^\{.*\}$/.test(p) && !/^:/.test(p) && !/^\d+$/.test(p);});
+    // A leading HTTP method stays: "GET /orders" is get-orders.
+    if(op.indexOf('/')>=0 && parts.length)op=(method?method[1]+' ':'')+parts[parts.length-1].replace(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/i,'');
     var s=op.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
     if(!s)s='span';if(!/^[a-z]/.test(s))s='span-'+s;
     return s.slice(0,64).replace(/-+$/,"");

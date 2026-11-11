@@ -204,15 +204,21 @@ function createReaderTextView(ctl,nav,actions,currentRecord,host){
     isOpen:function(){return opened;},
     // 'inline' | 'menu' | 'none' from the bar's fitting pass; 'measure' hides the
     // launcher for the pass without touching an open window.
-    place:function(mode){
+    place:function(mode,trial){
       if(retired)return;
-      // Measuring removes the launcher from the bar for one synchronous pass; a
-      // focused launcher gets its focus back when the pass places it again.
-      if(mode==='measure'){if(activeElement()===toggle)refocus=toggle;launch.hidden=true;return;}
+      // Measuring removes the launcher from the bar for one synchronous pass. Focus
+      // on the launcher, the menu item or the menu button is remembered and put
+      // back when the pass places Text for good, so it never drops to the page.
+      if(mode==='measure'){var active=activeElement();if(active===toggle || active===menuItem || host.menuSummary && active===host.menuSummary)refocus=active;launch.hidden=true;return;}
       launch.hidden=mode!=='inline';menuItem.hidden=mode!=='menu';
-      if(mode==='menu' && host.menu && menuItem.parentNode!==host.menu)host.menu.appendChild(menuItem);
+      // The item goes last in "More page actions", after the bar's own items.
+      if(mode==='menu' && host.menu && (menuItem.parentNode!==host.menu || menuItem.nextElementSibling))host.menu.appendChild(menuItem);
+      if(trial)return;
       placement=mode;
-      if(refocus){var again=refocus;refocus=null;if(shown(again) && activeElement()!==again)again.focus({preventScroll:true});}
+      if(refocus){
+        var from=refocus,order=from===menuItem?[menuItem,toggle,host.menuSummary]:from===toggle?[toggle,menuItem,host.menuSummary]:[host.menuSummary,toggle];refocus=null;
+        var target=order.find(function(node){return node && shown(node);});if(target && activeElement()!==target)target.focus({preventScroll:true});
+      }
       if(mode==='none' && opened){var inside=panel.contains(activeElement());setOpen(false);if(inside)focusBar();}
     },
     // The reader's document can change while the window is open: rebuild from ctl.page.

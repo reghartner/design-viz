@@ -121,19 +121,27 @@ function createReaderContents(ctl,nav,actions,options){
   }
   // #1322 Text launcher: lowest priority in the bar. Every pass fits the bar
   // without it (exactly as before it existed), then shows it inline only if
-  // nothing else would move; otherwise it goes into "More page actions" when
-  // that menu is already shown, or is withdrawn. The decision never feeds back
-  // into the fit, so it cannot oscillate.
-  var textPlace='none';
+  // nothing else would move. Otherwise it is a "Text view" item in "More page
+  // actions": added last when the base shows that menu, or in that menu shown for
+  // Text alone when the ⋯ button fits without moving anything. Only when even
+  // that cannot fit (or on a narrow bar) is Text absent. The decision never feeds
+  // back into the base fit, so it cannot oscillate.
+  var textPlace='none',textMenuOnly=false;
+  function measureText(){
+    if(!textView)return;textView.place('measure');
+    if(textMenuOnly){textMenuOnly=false;if(!overflowActions)pageUtilities.hidden=true;}
+  }
   function fitText(fits){
     if(!textView)return;
     if(narrow){textPlace='none';textView.place('none');return;}
-    textView.place('inline');
-    textPlace=fits()?'inline':overflowActions && !pageUtilities.hidden?'menu':'none';
-    if(textPlace!=='inline')textView.place(textPlace);
+    textView.place('inline',true);if(fits()){textPlace='inline';textView.place('inline');return;}
+    if(overflowActions && !pageUtilities.hidden){textPlace='menu';textView.place('menu');return;}
+    pageUtilities.hidden=false;textView.place('menu',true);
+    if(fits()){textMenuOnly=true;textPlace='menu';textView.place('menu');return;}
+    pageUtilities.hidden=true;pageUtilities.open=false;textPlace='none';textView.place('none');
   }
   function fitToggle(width){
-    if(textView)textView.place('measure');
+    measureText();
     if(options.singleReaderToolbar){
       var root=view.getRootNode(),focused=root.activeElement || doc.activeElement,focusedView=viewStrip.contains(focused),focusedPicker=focused===viewPicker;
       if(overflowActions && width>900 && actionAttemptWidth!==width){actionAttemptWidth=width;overflowViewportActions(false);}
@@ -155,11 +163,13 @@ function createReaderContents(ctl,nav,actions,options){
       if(!overflowActions && width>900 && (top.scrollWidth>top.clientWidth+1 || overlapsCenter(actions))){overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();}
       if(needsPicker && (focusedView || focusedPicker))viewPicker.focus({preventScroll:true});
       else if(focusedPicker){var selected=viewStrip.querySelector('[aria-selected="true"]');if(selected)selected.focus({preventScroll:true});}
-      fitText(function(){var rect=actions.getBoundingClientRect(),center=centerBounds();return !(rect.right>center.left-8 && rect.left<center.right+8) && top.scrollWidth<=top.clientWidth+1;});
+      // The base's own overlap test (overlapsCenter), so Text takes exactly the room
+      // the base leaves and never more.
+      fitText(function(){return !overlapsCenter(actions) && top.scrollWidth<=top.clientWidth+1;});
       return;
     }
     var actionBounds=actions.getBoundingClientRect();
-    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,actionBounds.width,actionBounds.height,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit){if(textView)textView.place(textPlace);return;}toggleFit=key;
+    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,actionBounds.width,actionBounds.height,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit){if(textView){if(textPlace==='menu' && !overflowActions){pageUtilities.hidden=false;textMenuOnly=true;}textView.place(textPlace);}return;}toggleFit=key;
     top.classList.remove('reader-toggle-compact');if(!narrow){
     var full=top.getBoundingClientRect().height;top.classList.add('reader-toggle-compact');
     if(top.getBoundingClientRect().height>=full)top.classList.remove('reader-toggle-compact');}

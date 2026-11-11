@@ -15,7 +15,9 @@
 | I10 | Imported carriers through consumer overlays: added, hidden and overridden spans change what a step inherits; skip names the imported carrier id. |
 | I11 | canon validate: traceMatch with traceScope, root, skip, parentStepId (unknown, self, cyclic), optional, budgets and attributes are checked. Validator warnings in plain words: a skip of a span the carrier does not declare, a skip of a carrier the step does not light, a step that inherits nothing because its carriers are shared. |
 | I12 | Compatibility declares flow.trace-scope. |
-| I13 | Reader: inheriting step rows (a node step on its node), "Not this flow" and the coverage line with timed nodes and connections and the plain unmapped hint. |
+| I13 | Reader: inheriting step rows (a node step on its node), "Not this flow" and the coverage line with timed nodes and connections and the plain unmapped hint, in node and step titles. A "not this flow" row paints nothing on the canvas. |
+| I14 | An edge step owns only its edge's send spans; a declared receive is timing only, so it never collides with the receiving node's step. |
+| I15 | Mapping a span onto a scoped step (board Edit mode and the Workbench trace match form) replaces its traceScope, so the result validates; the controls say so. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const loader=require('../tools/source-loader.cjs');
@@ -180,6 +182,49 @@ test('I11 validation: shape errors, and plain-word warnings for skips and shared
     'sections[0].diagram.steps[0]: step work inherits no trace spans because worker is also lit by step reply; add a traceScope to this step to choose its spans',
     'sections[0].diagram.steps[1]: step reply inherits no trace spans because worker is also lit by step work; add a traceScope to this step to choose its spans']);
   assert.deepEqual(warnings(board()),[],'the default board inherits cleanly');
+  // With paths, the warning names the path where the step inherits nothing.
+  const branching=board([{id:'work',text:'Worker',nodes:['worker']},{id:'reply',text:'Reply',nodes:['worker']},{id:'alt',text:'Alt',nodes:['api']}]);
+  branching.paths=[{id:'a',label:'Path A',steps:['work','reply']},{id:'b',label:'Path B',steps:['work','alt']}];
+  assert.deepEqual(warnings(branching),[
+    'sections[0].diagram.steps[0]: on path Path A, step work inherits no trace spans because worker is also lit by step reply; add a traceScope to this step to choose its spans',
+    'sections[0].diagram.steps[1]: on path Path A, step reply inherits no trace spans because worker is also lit by step work; add a traceScope to this step to choose its spans']);
+});
+
+test('I14 an edge step owns only its send spans; a declared receive is timing only',()=>{
+  const d=board([{id:'submit',text:'Publish',edge:'api->worker'},{id:'work',text:'Worker handles it',nodes:['worker']}]);
+  d.edges[0].trace.spans.receive={serviceName:'worker',operation:'process orders',role:'receive'};
+  const m=map(d);
+  assert.equal(step(m,'submit').status,'matched');assert.deepEqual(plain(ids(step(m,'submit'))),['pub']);
+  assert.equal(step(m,'work').status,'matched','the receive declaration is the same span as the worker\'s process span, and nobody is ambiguous');
+  const scoped=map(board([{id:'submit',text:'Publish',edge:'api->worker',traceScope:{maxDurationMs:5}}]));
+  assert.match(step(scoped,'submit').conditions[0].label,/^Slow operation · 9 ms \/ 5 ms budget$/,'the receive still times the hand-off');
+});
+
+test('I15 mapping a span onto a scoped step replaces its trace scope and validates',async()=>{
+  const page=spec('b',board([{id:'submit',text:'Publish',edge:'api->worker'},{id:'work',text:'Worker handles it',nodes:['worker'],traceScope:{skip:{worker:['cache']}}}]));
+  const valid=raw=>assert.deepEqual(plain(T.FlowCanon.validate(raw)).filter(e=>/traceScope|traceMatch/.test(e)),[]);
+  // Board Edit mode (Map this span).
+  const store=new Map(),win={console,location:{pathname:'/board/'},addEventListener(){},removeEventListener(){},
+    sessionStorage:{getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
+    claude:{use:async name=>name==='artifact'?{publish:async()=>{}}:name==='user'?{canEdit:async()=>true,me:async()=>({id:'u1',name:'Reader'})}:null}};
+  const e=V.createBoardEditor({win,text:JSON.stringify(page,null,2),specFile:'flowspec.json',render:()=>null});
+  for(let i=0;i<12;i++)await new Promise(setImmediate);
+  e.start();assert.equal(e.mapSpan({section:0,kind:'step',id:'work'},{serviceName:'worker',operation:'process orders'}),true);
+  let raw=JSON.parse(e.text()),work=diagramOf(raw).steps[1];
+  assert.deepEqual(plain(work.traceMatch),{serviceName:'worker',operation:'process orders'});
+  assert.equal(Object.hasOwn(work,'traceScope'),false,'the mapping replaces the trace scope');
+  valid(raw);
+  // Workbench Inspect: Add trace match on a scoped step writes traceMatch and removes traceScope in one edit.
+  const W={URL,TextEncoder};vm.createContext(W);
+  vm.runInContext(loader.composeSources(['canon.js','validator.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js','workbench/commands/narrative.js']),W);
+  const text=JSON.stringify(page,null,2),plan=W.planStepTraceMatch(text,JSON.parse(text),0,1,{op:'create',serviceName:'worker',operation:'process orders'});
+  assert.equal(plan.error,undefined,plan.error);
+  raw=JSON.parse(plan.text);work=diagramOf(raw).steps[1];
+  assert.deepEqual(plain(work.traceMatch),{serviceName:'worker',operation:'process orders'});assert.equal(Object.hasOwn(work,'traceScope'),false);
+  valid(raw);
+  // The reader's Map this span chooser and the Workbench button say so before the click.
+  assert.equal(V.traceMapStepNote({traceScope:{}}),' · replaces this step\'s trace scope');
+  assert.equal(V.traceMapStepNote({}),'');
 });
 
 test('I12 compatibility declares flow.trace-scope',()=>{
@@ -200,5 +245,12 @@ test('I13 reader rows, "not this flow" and the coverage line',()=>{
   m=V.telemetryTraceModel(d,undefined,ex(SPANS()));
   assert.equal(m.rows.find(r=>r.id==='web').label,'Not this flow');
   assert.equal(V.telemetryTraceCoverage(m),'0/0 steps matched · 1 not this flow · 2 steps without a trace mapping · 8 spans unmatched · 3 nodes and 2 connections timed');
-  assert.deepEqual(plain(V.telemetryTraceHints(m)),['Step work: worker is also lit by step reply; add a trace scope to this step to choose its spans.','Step reply: worker is also lit by step work; add a trace scope to this step to choose its spans.']);
+  // Reader hints use node and step titles and reader words, not ids or field names.
+  assert.deepEqual(plain(V.telemetryTraceHints(m)),['Step “Worker”: Worker is also part of step “Reply”, so this step shows no trace spans of its own.','Step “Reply”: Worker is also part of step “Worker”, so this step shows no trace spans of its own.']);
+  // A step of another flow paints nothing on its node: no empty label, no tone, no screen-reader text.
+  const other=board([{id:'web',text:'Web',nodes:['billing'],traceScope:{root:{serviceName:'web',operation:'GET /'}}}]);
+  const ot=V.telemetryTraceModel(other,undefined,ex(SPANS().filter(x=>x.serviceName!=='billing')));
+  assert.equal(ot.rows[0].notThisFlow,true);
+  assert.deepEqual(plain(V.telemetryTraceLabel(ot.nodes.billing || [])).text,'','nothing to label');
+  assert.equal(V.telemetryTraceCountedRows(ot.nodes.billing || []).length,0,'the canvas counts no row for billing');
 });

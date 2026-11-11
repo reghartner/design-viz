@@ -69,12 +69,12 @@ test('#1253 item 23 a replay with nothing left pending does not ask to Save agai
  assert.equal(state.pending,0);assert.equal(state.active,false,'Edit mode is off');
  assert.doesNotMatch(state.notice.text,/Save again/,'nothing is pending, so there is nothing to save');
  assert.match(state.notice.text,/already in their version/,'the change already in the winning version is named as such');
- assert.doesNotMatch(state.notice.text,/1 of your changes were re-applied/,'an already-true change is not counted as re-applied');
+ assert.doesNotMatch(state.notice.text,/1 of your changes was re-applied/,'an already-true change is not counted as re-applied');
 });
 test('#1253 item 23 a replay that leaves a change pending still asks to Save again',async()=>{
  const b=await conflictThenReplay(e=>e.add(WEB,'ABC-1'),spec());
  const state=b.e.state();assert.equal(state.pending,1);assert.equal(state.active,true);
- assert.match(state.notice.text,/1 of your changes were re-applied/);assert.match(state.notice.text,/Save again\.$/);
+ assert.match(state.notice.text,/1 of your changes was re-applied/);assert.match(state.notice.text,/Save again\.$/);
 });
 test('#1253 item 3 review: a remove then an add of the same ticket cancels only with the ticket back in its place',async()=>{
  const url='https://jira.test/browse/PAY-1',raw=spec();raw.page.sections[0].diagram.nodes.pay.tickets=[url,'PAY-9'];const text=JSON.stringify(raw,null,2);

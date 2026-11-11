@@ -204,6 +204,8 @@ test('M4 desktop the Spans list scrolls itself only while Edit-mode span draggin
  m=await measure();expect([m.lists,m.capped,m.overflow],'after Done: the cap is gone').toEqual([1,false,'visible']);expect(m.scroll,'no inner scroll in the reading view').toBeLessThanOrEqual(m.client+1);
 });
 
+// A node's trace label: inside its g.node, or lifted to the svg top with data-trace-node when plated.
+const nodeLabel=(root,id)=>root.locator('g.node[data-dv-node="'+id+'"] > .dv-trace-overlay, .dv-trace-overlay[data-trace-node="'+id+'"]').first();
 test('M5 desktop Declare on this node: instead of a drop mapping, and from the chooser on an imported node; Save records trace-span changes',async({page,server})=>{
  const {root,panel}=await open(page,server,'span-declare',{},{drag:true});
  await panel.getByRole('button',{name:'Edit',exact:true}).click();
@@ -216,15 +218,19 @@ test('M5 desktop Declare on this node: instead of a drop mapping, and from the c
  await instead.click();
  await expect(panel.locator('.dv-trace-declare-note-text')).toHaveText('Declared charge (payment · grpc.msdemo.PaymentService/Charge) on Payment service.');
  await expect(panel.getByRole('button',{name:'Save 1 change',exact:true})).toBeVisible();
- // The loaded trace lights the declared node at once, before Save: its trace label reads a time.
- await expect(root.locator('.dv-trace-overlay[data-trace-node="pay"] text').first()).toHaveText(/\d+(\.\d+)?\s*(µs|ms|s)\b/);
+ // The loaded trace lights the declared node at once, before Save: its trace label reads a time and names
+ // the declared span. A node label sits inside its g.node; only a plated label that had to move out of the
+ // way is lifted to the svg top and carries data-trace-node (telemetry-step.js), so both places count.
+ await expect(nodeLabel(root,'pay')).toHaveAttribute('aria-label',/Declared spans: charge \(process\)/);
+ await expect(nodeLabel(root,'pay').locator('text')).toHaveText(/\d+(\.\d+)?\s*(µs|ms|s)\b/);
  // Onto the imported canon::store, which no step names: the chooser offers Declare with a role.
  await dragSpan(page,panel,CURRENCY,()=>nodePoint(page,root,'canon::store'));
  const chooser=panel.locator('.dv-trace-map-chooser');await expect(chooser).toBeVisible();
  await chooser.getByRole('combobox',{name:'Role for the span declared on Rates store',exact:true}).selectOption('database');
  await chooser.getByRole('button',{name:'Declare on Rates store',exact:true}).click();
  await expect(panel.locator('.dv-trace-declare-note-text')).toHaveText('Declared getsupportedcurrencies (currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies) on Rates store.');
- await expect(root.locator('.dv-trace-overlay[data-trace-node="canon::store"] text').first()).toHaveText(/\d+(\.\d+)?\s*(µs|ms|s)\b/);
+ await expect(nodeLabel(root,'canon::store')).toHaveAttribute('aria-label',/Declared spans: getsupportedcurrencies \(database\)/);
+ await expect(nodeLabel(root,'canon::store').locator('text')).toHaveText(/\d+(\.\d+)?\s*(µs|ms|s)\b/);
  const saved=JSON.parse(await save(page,panel,2)),d=saved.page.sections[0].diagram;
  expect(saved.page.editHistory.at(-1).changes.map(c=>[c.op,c.node,c.span])).toEqual([
   ['trace-span','pay',{key:'charge',...PAYMENT.match,role:'process'}],

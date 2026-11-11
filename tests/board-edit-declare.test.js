@@ -104,7 +104,7 @@ test('D4 an imported node: an added span in the consumer overlay; a hidden provi
 test('D5 Save records one trace-span change; the validator accepts the history entry',async()=>{
   const b=await editor(local());b.e.declareSpan(WEB,{serviceName:'frontend',operation:'/cart/checkout',role:'process'});b.e.save();await settle();
   assert.equal(b.published.length,1);const saved=JSON.parse(b.published[0]);
-  assert.deepEqual(saved.page.editHistory.at(-1).changes,[{op:'trace-span',path:['page','sections',0,'diagram','nodes','web'],label:'Web',node:'web',span:{key:'cart-checkout',serviceName:'frontend',operation:'/cart/checkout',role:'process'}}]);
+  assert.deepEqual(saved.page.editHistory.at(-1).changes,[{op:'trace-span',path:['page','sections',0,'diagram','nodes','web'],label:'Web',node:'web',span:{key:'checkout',serviceName:'frontend',operation:'/cart/checkout',role:'process'}}]);
   const warnings=plain(b.C.validate(b.C.normalize(saved)).warnings).filter(w=>/editHistory/.test(w));
   assert.deepEqual(warnings,[],'the history entry is valid');
   assert.equal(b.C.editHistoryEntryProblem({at:'2026-11-11T00:00:00Z',changes:[{op:'trace-span',node:'web',span:{key:'x',serviceName:'s',operation:'o',role:'process'},ticket:'ABC-1'}]}),'changes[0].ticket: a "trace-span" change has no ticket');

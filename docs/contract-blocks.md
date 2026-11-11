@@ -34,6 +34,46 @@ Use unique stable IDs rather than array positions for links that survive reorder
 The compatibility feature is `content.contracts`. All viewer hosts share this
 implementation; regenerate old exported HTML and upgrade the Backstage package.
 
+## Grid tables
+
+A block can be a grid table instead of key / value / meaning rows: scenarios as
+rows, up to 12 named columns, a short value in each cell. No diagram is needed.
+Add one from **Add to diagram → Contracts & page structure → Add grid table**, or
+**+ Add grid table** in a section's inspector. **Use columns (grid)** turns an
+existing block into a grid: `v` becomes a Value column and `g` a Notes column.
+
+```json
+"contracts": [{
+  "id": "calls", "title": "Calls per location load", "span": 12,
+  "fieldLabel": "Scenario",
+  "columns": [{"id": "yoda", "label": "Yoda", "width": 70}, {"id": "jyn", "label": "Jyn"}],
+  "fields": [{"k": "SS3 location", "cells": {"yoda": 2, "jyn": 7}, "hot": true},
+             {"k": "SS2 location", "cells": {"yoda": 3}}]
+}]
+```
+
+- `columns` makes the block a grid. Each column has a unique `id`, an optional
+  `label` (default: the id) and an optional `width` in px (at least 40; default
+  160). At most 12 columns render.
+- `fieldLabel` heads the first column (default "Field"); `k` is each row's header.
+- `cells` maps a column id to short text (120 characters or fewer; longer text
+  warns and is shown in full) or a number. A missing cell shows a dash.
+- `hot`, `link`, `delta`, `revealAt`/`hideAt` and the block `note` work as above.
+  `v` and `g` are not shown in a grid.
+- Without `columns`, a block renders exactly as before.
+- A wide grid scrolls sideways inside its block, never the page. The table is
+  named by the block title for screen readers.
+
+Warnings: a duplicate column id, more than 12 columns, a width under 40, a cell
+for an undeclared column, a cell that is not text or a number, a cell over 120
+characters, `v`/`g` beside `columns`, and `cells` without `columns`.
+
+In the Workbench (desktop), the block inspector has **First column name**,
+**Columns** (add, rename, reorder, remove, width) and **Rows** (one input per
+column; **+ Add row**). Removing a column removes its cells and says how many. Selecting a row
+edits its cells one per column. Each edit is one Undo step. The compatibility
+feature is `content.contract-grids`.
+
 The [doorbell example](../examples/contract-blocks/contract-blocks.spec.json)
 shows two half-width request/response blocks and a full-width failure block.
 See the [authoring contract](../contract/authoring-contract.md#multiple-contract-blocks-and-widths)

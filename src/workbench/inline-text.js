@@ -77,7 +77,7 @@ function createInlineTextEditor(opts){
     {kind:'contract',selector:'.cttitle > span',field:'title',value:'trimmed',html:true,label:'Contract title',help:'Enter or click outside saves. Escape cancels.'},
     {kind:'crow',selector:'.ctkey',field:'k',value:'trimmed',html:true,label:'Contract field name',help:'Enter or click outside saves. Escape cancels.',
       plan:function(c,value){return value==null?{error:'a contract row needs k — the field name'}:planSetField(c.snapshot.text,c.snapshot.raw,c.path,'k',JSON.stringify(value));}},
-    {kind:'crow',selector:'td.ctv',field:'v',value:'trimmed',html:true,htmlInside:true,label:'Contract value',help:'Enter or click outside saves. Escape cancels.'},
+    {kind:'crow',selector:'td.ctv:not(.ctcell)',field:'v',value:'trimmed',html:true,htmlInside:true,label:'Contract value',help:'Enter or click outside saves. Escape cancels.'},
     {kind:'crow',selector:'td.ctg',field:'g',markdown:true,value:'trimmed',label:'Contract meaning',help:help},
     {kind:'contract',selector:'.ctnote',field:'note',markdown:true,value:'trimmed',label:'Contract note',help:help},
     {kind:'tab',selector:'.tabbtn,.reader-tab-label',target:function(el){return el.matches('.tabbtn')?opts.targetFromEvent({target:el}):opts.tabTarget(el);},field:'label',value:'trimmed',html:true,label:'Tab label',help:'Enter or click outside saves. Escape cancels.',

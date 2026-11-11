@@ -1,20 +1,15 @@
 /* Authored contract defaults with step-specific content, layout and emphasis. */
 (function () {
-  var MAX_COLUMNS = 12, MAX_FIELDS = 64;
+  // #1304: the column and cell shape is shared with grid contract blocks (core/contracts.js).
+  var MAX_COLUMNS = CONTRACT_GRID_MAX_COLUMNS, MAX_FIELDS = 64;
   var colors = {blue:'#3b82f6', green:'#22c55e', amber:'#f59e0b', red:'#ef4444', purple:'#a855f7', teal:'#14b8a6'};
   function color(value) {
     if (typeof value !== 'string') return null;
     return panelOwn(colors, value) ? colors[value] : /^#[0-9a-f]{6}$/i.test(value) ? value : null;
   }
-  function width(value, fallback) {
-    return typeof value === 'number' && isFinite(value) && value >= 40 ? value : fallback;
-  }
-  function columns(panel) { return panelCollectionItems(panel, 'columns', MAX_COLUMNS); }
+  var width = contractGridWidth, columns = contractGridColumns, text = contractGridCellText;
   function fields(panel) { return panelCollectionItems(panel, 'fields', MAX_FIELDS); }
-  function text(value) {
-    return value === undefined ? '' : value === null ? 'null' : typeof value === 'object' ? JSON.stringify(value) : String(value);
-  }
-  function fieldLabel(value) { return typeof value === 'string' && value.trim() ? value : 'Field'; }
+  function fieldLabel(value) { return contractGridFieldLabel(value, 'Field'); }
   function labelWarnings(value, path, warnings) {
     if (value.fieldLabel !== undefined && typeof value.fieldLabel !== 'string')
       warnings.push(path + '.fieldLabel: expected text — using declared name or Field');
@@ -67,28 +62,19 @@
   function render(host, panel, state) {
     state = state || {};
     panel = content(panel, state);
-    var cols = columns(panel), rows = fields(panel), firstWidth = width(panel.fieldWidth, 180);
-    var total = cols.reduce(function (sum, col) { return sum + width(col.width, 160); }, firstWidth);
-    var h = '<div class="dcontract-scroll panel-fill-scroll" tabindex="0" role="region" aria-label="' + esc(panel.title || 'Data contract') + '">' +
-      '<table class="dcontract-table" style="width:' + total + 'px"><caption class="dcontract-caption">' + esc(panel.title || 'Data contract') +
-      '</caption><colgroup><col style="width:' + firstWidth + 'px">';
-    cols.forEach(function (col) { h += '<col style="width:' + width(col.width, 160) + 'px">'; });
-    h += '</colgroup><thead><tr><th scope="col">' + esc(fieldLabel(panel.fieldLabel)) + '</th>';
-    cols.forEach(function (col) { h += '<th scope="col">' + esc(col.label || col.id) + '</th>'; });
-    h += '</tr></thead><tbody>';
-    rows.forEach(function (field) {
-      var highlight = panelOwn(state.highlights, field.id) && panelObject(state.highlights[field.id]) ? state.highlights[field.id] : {};
-      var tint = color(highlight.color), label = typeof highlight.label === 'string' ? highlight.label : '';
-      h += '<tr data-contract-field="' + esc(field.id) + '"' + (tint ? ' class="dcontract-highlight" style="--contract-highlight:' + tint + '"' : '') +
-        '><th scope="row"><span class="dcontract-name">' + esc(field.label || field.id) + '</span>' +
-        (tint && label ? '<span class="dcontract-reason">' + esc(label) + '</span>' : '') + '</th>';
-      cols.forEach(function (col) {
-        h += '<td>' + (panelOwn(field.cells, col.id) ? esc(text(field.cells[col.id])) : '<span class="dcontract-missing">—</span>') + '</td>';
-      });
-      h += '</tr>';
-    });
-    if (!rows.length) h += '<tr><td colspan="' + (cols.length + 1) + '" class="dcontract-empty">No fields declared</td></tr>';
-    return {html:softwarePanelShell(h + '</tbody></table></div>', state)};
+    var cols = columns(panel), rows = fields(panel), title = panel.title || 'Data contract';
+    var table = contractGridTableHTML({tableClass:'dcontract-table', caption:title, captionClass:'dcontract-caption',
+      firstWidth:width(panel.fieldWidth, 180), fieldLabel:fieldLabel(panel.fieldLabel), columns:cols,
+      missing:'<span class="dcontract-missing">—</span>',
+      empty:'<tr><td colspan="' + (cols.length + 1) + '" class="dcontract-empty">No fields declared</td></tr>',
+      rows:rows.map(function (field) {
+        var highlight = panelOwn(state.highlights, field.id) && panelObject(state.highlights[field.id]) ? state.highlights[field.id] : {};
+        var tint = color(highlight.color), label = typeof highlight.label === 'string' ? highlight.label : '';
+        return {attrs:' data-contract-field="' + esc(field.id) + '"' + (tint ? ' class="dcontract-highlight" style="--contract-highlight:' + tint + '"' : ''),
+          head:'<span class="dcontract-name">' + esc(field.label || field.id) + '</span>' + (tint && label ? '<span class="dcontract-reason">' + esc(label) + '</span>' : ''),
+          cells:field.cells};
+      })});
+    return {html:softwarePanelShell('<div class="dcontract-scroll panel-fill-scroll" tabindex="0" role="region" aria-label="' + esc(title) + '">' + table + '</div>', state)};
   }
 
   function editor(context) {
@@ -135,40 +121,24 @@
       var shape = [{k:'label',label:isFields ? 'Field name' : 'Column name',req:true}];
       if (isFields) cols.forEach(function (col, index) { shape.push({k:'cell'+index,label:col.label || col.id}); });
       else shape.push({k:'width',label:'Width (px)',kind:'num'});
-      var projected = original.map(function (item, index) {
+      var projected = isFields ? original.map(function (item, index) {
         var row = {_sourceIndex:index,label:item.label || item.id};
-        if (isFields) cols.forEach(function (col, i) { row['cell'+i] = panelOwn(item.cells, col.id) ? text(item.cells[col.id]) : ''; });
-        else row.width = item.width;
+        cols.forEach(function (col, i) { row['cell'+i] = panelOwn(item.cells, col.id) ? text(item.cells[col.id]) : ''; });
         return row;
-      });
+      }) : contractGridColumnRows(original);
       var control = controls.rows(key, projected, {cols:shape,wide:true,max:isFields ? MAX_FIELDS : MAX_COLUMNS}, {
         raw:false,
         collect:function (items) {
-          var used = Object.create(null), error;
+          if (!isFields) return contractGridCollectColumns(original, items);
+          var used = Object.create(null);
           original.forEach(function (item) { used[item.id] = true; });
-          var out = items.map(function (item) {
+          return {value:items.map(function (item) {
             var base = original[item._sourceIndex], next = Object.assign(Object.create(null), base);
-            if (!base) {
-              var stem = item.label.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || (isFields ? 'field' : 'column');
-              var id = stem, suffix = 2;
-              while (used[id]) id = stem + '-' + suffix++;
-              used[id] = true; next.id = id;
-            }
+            if (!base) next.id = contractGridMintId(used, item.label, 'field');
             if (!base || item.label !== (base.label || base.id)) next.label = item.label;
-            if (isFields) {
-              next.cells = Object.assign(Object.create(null), base && base.cells);
-              cols.forEach(function (col, i) {
-                var value = item['cell'+i] || '', prior = panelOwn(base && base.cells, col.id) ? text(base.cells[col.id]) : '';
-                if (value === prior.trim()) return;
-                if (value === '') delete next.cells[col.id]; else next.cells[col.id] = value;
-              });
-            } else {
-              if (item.width !== undefined && width(item.width, null) === null) error = 'Column widths must be at least 40 pixels.';
-              if (item.width === undefined) delete next.width; else next.width = item.width;
-            }
+            next.cells = contractGridCollectCells(base && base.cells, cols, item, false);
             return next;
-          });
-          return error ? {error:error} : {value:out};
+          })};
         },
         commitValue:function (items) { return commit ? commit(items) : saveCollection(key, panel, items); }
       });
@@ -261,9 +231,7 @@
       labelWarnings(panel, path, warnings);
       if (panel.fieldWidth != null && width(panel.fieldWidth, null) === null) warnings.push(path + '.fieldWidth: use a width of at least 40 pixels — using 180');
       if (Array.isArray(panel.columns) && !panel.columns.length) { /* A field-only contract is valid. */ }
-      else panelCollectionWarnings(panel, path, warnings, 'columns', MAX_COLUMNS, function (col, at, warnings) {
-        if (col.width != null && width(col.width, null) === null) warnings.push(at + '.width: use a width of at least 40 pixels — using 160');
-      });
+      else contractGridColumnWarnings(panel, path, warnings);
       if (Array.isArray(panel.fields) && !panel.fields.length) { /* Empty while authoring. */ }
       else panelCollectionWarnings(panel, path, warnings, 'fields', MAX_FIELDS, function (field, at, warnings) {
         if (field.cells != null && !panelObject(field.cells)) warnings.push(at + '.cells: expected an object keyed by column id — cells ignored');

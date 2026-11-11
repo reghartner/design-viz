@@ -12,7 +12,7 @@
    T11 create draft follows its step | same | a + Add trace match draft on step 3 is dropped when a JSON edit removes step 1 and moves another step into its place | a draft that jumps to another step
    T12 id-less step | step 3 without an id | + Add trace match is focusable, aria-disabled and described by the visible reason; clicking it writes nothing and says the reason in the status line | a disabled control that hides its reason from keyboard users
    T6 imported node | consumer importing provider api | the Node select lists API (imported) and writes nodeId canon::api in one Undo step | imported nodes missing from the select
-   T13 declarations (#1290 PR 8) | notify and ctrl->ingest declare spans; Path A shares notify, Path B does not | the route row lists "declared on Notification service (route)" and "Step 3 · push (inherited on Path B)"; Assign marks a scoped step "replaces this step's trace scope"; the rename notice says it changes the steps' trace matches, not the declarations; Edit in Inspect opens the Trace spans fold; By element lists the node's own declarations | a declaration row that can be dragged or renamed, a rename that hides what it leaves alone */
+   T13 declarations (#1290 PR 8) | notify and ctrl->ingest declare spans; Path A shares notify, Path B does not | the route row lists "declared on Notification service (route)" and "Step 3 · push (inherited on Path B)"; Assign marks a scoped step "replaces this step's trace scope"; the rename notice says it changes the steps' trace matches, not the declarations; Edit in Inspect opens the Trace spans fold; By element lists the node's own declarations; Move onto the scoped step says its trace scope was removed | a declaration row that can be dragged or renamed, a rename that hides what it leaves alone */
 import {test,expect,paste,closeTools,pointerTo} from '../helpers/test.mjs';
 import {digest} from '../../canon/drift.mjs';
 
@@ -332,4 +332,11 @@ test('T13 declared spans: read-only rows with inheriting steps per path, a plain
   if(!await page.locator('#workspace-window-links').isVisible())await page.locator('#editor-tab-links').click();
   await panel.getByRole('button',{name:'By element',exact:true}).click();
   await expect(panel.locator('[data-links-element="node:0:notify"] .links-declaration')).toHaveText(['route · notify-svc route.event','lookup · notify-svc GET … (prefix)']);
+  // #1290 PR 9 (review c2 minor): Move onto a step with a trace scope says, after the write too, that the scope went.
+  await panel.locator('[data-links-element="step:0:1"] [data-links-trace-chip="'+KEY+'"] .links-chip-main').focus();await page.keyboard.press('Enter');
+  await page.getByRole('menu',{name:new RegExp(KEY)}).getByRole('menuitem',{name:'Move to…'}).click();
+  const picker=page.getByRole('dialog',{name:new RegExp('Move '+KEY)});await expect(picker).toBeVisible();
+  await picker.getByRole('button',{name:'Step 1 · publish (has a trace scope)',exact:true}).click();
+  await expect(page.locator('#workspace-window-links .links-status')).toContainText('; its trace scope was removed.');
+  await expect.poll(async()=>steps(await source(page))[0]).toEqual({id:'publish',text:'The controller publishes',edge:'ctrl->ingest',traceMatch:{serviceName:'notify-svc',operation:'route.event',nodeId:'notify',attributes:{'deployment.environment.name':'prod'}}});
 });

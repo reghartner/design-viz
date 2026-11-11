@@ -144,3 +144,19 @@ test('a malformed diagram renders with problem lines instead of crashing', t => 
     assert.match(out.stdout, /edges\[1\]: expected an object with from and to/);
   }
 });
+
+test('--resolve-imports accepts a folder that holds only registry.json', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'spec-text-folder-'));
+  t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
+  const registry = path.join(dir, 'providers'), work = path.join(dir, 'work');
+  fs.mkdirSync(registry);fs.mkdirSync(work);
+  for (const name of ['board.json', 'platform.json', 'registry.json']) fs.copyFileSync(path.join(FIXTURE, name), path.join(registry, name));
+  fs.copyFileSync(BOARD, path.join(work, 'board.json'));
+  const out = runIn(work, '--resolve-imports', registry, path.join(work, 'board.json'));
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(out.stderr, '');
+  assert.ok(out.stdout.includes('node delivery/platform::api origin imported tv-platform core as platform'));
+  const none = runIn(work, '--resolve-imports', work, path.join(work, 'board.json'));
+  assert.equal(none.status, 1);
+  assert.match(none.stderr, /holds no registry\.json or canon\.json/);
+});

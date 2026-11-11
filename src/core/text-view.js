@@ -21,7 +21,7 @@
      settings: [[path, value]] every authored leaf of page.tracking except
        dependencies and telemetry.lookups (listed below), paths start `tracking.`.
      dependencies: [{ticket, on, reason?}] (trackingDependencies)
-     logSearches: [{id, label, query, datasource, values, fields}] (tracking.telemetry.lookups)
+     logSearches: [{id, label, query, datasource, values, fields}] (tracking.telemetry.lookups, authored order)
      sections: [{reference, number, heading, tab, diagrams:[{imports, problems, elements, paths}]}]
        imports: [{as, spec, export, resolved, overlay:[[path, value]]}] (overlay only when unresolved)
        problems: ['edges[3]: …'] malformed entries, which are listed and otherwise skipped
@@ -30,7 +30,7 @@
                    telemetryKind, signals:[{name, source, query, unit, scope?, label?, role?,
                    window?, missingMeansZero?, showOnCard?, links?, pass:null|{min?, max?, maxRatioOf?}}],
                    telemetryLinks, card, binding, codeRefs, delta, existsWhen:null|{value, active},
-                   missingWork, link, fields:[[path, value]], steps:['<path>/<n>'],
+                   missingWork, link, presentation, fields:[[path, value]], problems:[text], steps:['<path>/<n>'],
                    edgesIn, edgesOut (nodes only), traceRules:[{step:'<path>/<n>', rule}]}]
          Nodes in authored key order, then edges in authored order. `key` is the
          flat owner id: edge ends escape `\`, `->` and `#`, and a repeated from->to
@@ -40,7 +40,7 @@
        paths: [{id, label, basedOn, steps:[{n, id, text, time, at, link, touches:[{kind, id, ordinal?, missing?}],
                 traceRules, conditions, ticketFilter:null|{keys, shown}, codeRefs,
                 panels:[{id, patch}], panelVisibility:[{id, value}],
-                failures:[{edge, mode}], delta, fields}]}]
+                tones:[{id, value}], failures:[{edge, mode}], delta, fields, problems}]}]
          touches: the step's edges (step order, failed hops included) then its nodes,
          edge endpoints included. time is the authored step time; at is the story
          clock label when the diagram declares storyTime.
@@ -62,13 +62,19 @@
      element with every query written once.
    Markdown keeps multi-line queries exact in fenced blocks. */
 
-/* Fields that only place or paint an element; every other authored field is shown. */
-var TEXT_VIEW_LAYOUT=['fromPort','toPort','curveControls','curvePoints','coinOffsets','color','tint','icon','presentation',
-  'textStyle','tone','x','y','w','h','width','height','position','labelOffset','labelPosition'];
-var TEXT_VIEW_NODE_FIELDS=['title','sub','label','tickets','prs','telemetry','binding','codeRefs','delta','deltaText','deltaLinks','existsWhen','missingWork','link'];
-var TEXT_VIEW_EDGE_FIELDS=['from','to','title','label','kind','tickets','prs','telemetry','codeRefs','delta','deltaText','deltaLinks','existsWhen','missingWork','link'];
-var TEXT_VIEW_STEP_FIELDS=['id','text','time','edge','edges','nodes','failures','panels','patch','panelVisibility','traceMatch','conditions','codeRefs',
-  'delta','deltaText','deltaLinks','link','ticketFilter'];
+/* Fields that only place or paint an element (geometry, ports, sizes, colours,
+   icons); every other authored field is shown. Step `tone` and `presentation`
+   carry meaning (state, baseline context) and are rendered. */
+var TEXT_VIEW_LAYOUT=['fromPort','toPort','curveControls','curvePoints','coinOffsets','labelOffset','labelPosition',
+  'x','y','w','h','width','height','position','color','tint','icon','textStyle'];
+/* Known fields and the type each must have; a value of another type is listed as a problem. */
+var TEXT_VIEW_NODE_FIELDS={title:'string',sub:'string',label:'string',tickets:'array',prs:'array',telemetry:'object',binding:'object',codeRefs:'array',
+  delta:'boolean',deltaText:'string',deltaLinks:'array',existsWhen:'string',missingWork:'boolean',link:'string',presentation:'string'};
+var TEXT_VIEW_EDGE_FIELDS={from:'string',to:'string',title:'string',label:'string',kind:'string',tickets:'array',prs:'array',telemetry:'object',codeRefs:'array',
+  delta:'boolean',deltaText:'string',deltaLinks:'array',existsWhen:'string',missingWork:'boolean',link:'string',presentation:'string'};
+var TEXT_VIEW_STEP_FIELDS={id:'string',text:'string',time:'string',edge:'string',edges:'array',nodes:'array',failures:'object',panels:'object',patch:'object',
+  panelVisibility:'object',traceMatch:'objects',conditions:'array',codeRefs:'array',delta:'boolean',deltaText:'string',deltaLinks:'array',link:'string',
+  ticketFilter:'array',tone:'object'};
 var TEXT_VIEW_IMPORT_LAYOUT=['position','nodePositions'];
 
 function textViewOwn(o,k){return !!o && Object.prototype.hasOwnProperty.call(o,k);}
@@ -92,7 +98,31 @@ function textViewLeaves(value,prefix,out){
 function textViewOtherFields(value,handled){
   var out=[];
   Object.keys(value).sort().forEach(function(k){
-    if(handled.indexOf(k)<0 && TEXT_VIEW_LAYOUT.indexOf(k)<0)textViewLeaves(value[k],k,out);
+    if(!textViewOwn(handled,k) && TEXT_VIEW_LAYOUT.indexOf(k)<0)textViewLeaves(value[k],k,out);
+  });
+  return out;
+}
+function textViewTyped(v,type){
+  if(type==='array')return Array.isArray(v);
+  if(type==='object')return specObject(v);
+  if(type==='objects')return specObject(v) || Array.isArray(v);
+  return typeof v===type;
+}
+/* Problems with known fields: a value of the wrong type, and entries the shared
+   accessors skip, each with the authored JSON so nothing disappears silently. */
+function textViewFieldProblems(value,fields){
+  var out=[];
+  Object.keys(fields).sort().forEach(function(k){
+    if(textViewOwn(value,k) && value[k]!=null && !textViewTyped(value[k],fields[k]))out.push(k+': expected '+(fields[k]==='objects'?'an object or array':fields[k]==='array'?'an array':fields[k]==='object'?'an object':'a '+fields[k])+' '+textViewStable(value[k]));
+  });
+  ['codeRefs','deltaLinks','conditions'].forEach(function(k){
+    if(Array.isArray(value[k]))value[k].forEach(function(entry,i){
+      if(!specObject(entry) || k==='deltaLinks' && !deltaLinkUrl(entry.url))out.push(k+'['+i+']: not shown '+textViewStable(entry===undefined?null:entry));
+    });
+  });
+  if(Array.isArray(value.traceMatch))value.traceMatch.forEach(function(entry,i){if(!specObject(entry))out.push('traceMatch['+i+']: not shown '+textViewStable(entry===undefined?null:entry));});
+  ['edges','nodes'].forEach(function(k){
+    if(Array.isArray(value[k]) && fields===TEXT_VIEW_STEP_FIELDS)value[k].forEach(function(entry,i){if(typeof entry!=='string' || !entry)out.push(k+'['+i+']: expected an id '+textViewStable(entry===undefined?null:entry));});
   });
   return out;
 }
@@ -124,9 +154,11 @@ function textViewOrigin(d,kind,id){
 function textViewEnd(id){return String(id).replace(/\\/g,'\\\\').replace(/->/g,'-\\>').replace(/#/g,'\\#');}
 function textViewPart(id){return String(id).replace(/\\/g,'\\\\').replace(/\//g,'\\/');}
 function textViewCarrier(d,kind,id,value,templates,ordinal){
-  var refs=trackingRefs(value),binding=carrierTelemetry(value,templates),raw=value.telemetry,urls={};
+  var problems=textViewFieldProblems(value,kind==='node'?TEXT_VIEW_NODE_FIELDS:TEXT_VIEW_EDGE_FIELDS);
+  var refs=trackingRefs(value,function(field,index){if(index!==null)problems.push(field+'['+index+']: not a valid entry '+textViewStable(value[field][index]===undefined?null:value[field][index]));});
+  var binding=carrierTelemetry(value,templates,function(at,message){problems.push('telemetry'+at+': '+message);}),raw=value.telemetry,urls={};
   (Array.isArray(value.tickets)?value.tickets:[]).forEach(function(t){var ticket=trackingTicket(t);if(ticket && ticket.url && !urls[ticket.key])urls[ticket.key]=ticket.url;});
-  var out={kind:kind,id:id,key:kind==='edge'?textViewEnd(value.from)+'->'+textViewEnd(value.to)+(ordinal>1?'#'+ordinal:''):String(id),ordinal:ordinal,
+  var out={kind:kind,id:id,key:kind==='edge'?textViewEnd(value.from)+'->'+textViewEnd(value.to)+(ordinal>1?'#'+ordinal:''):String(id).replace(/\\/g,'\\\\'),ordinal:ordinal,
     title:typeof value.title==='string'?value.title:null,sub:typeof value.sub==='string'?value.sub:null,
     label:typeof value.label==='string'?value.label:null,edgeKind:kind==='edge' && typeof value.kind==='string'?value.kind:null,
     from:kind==='edge'?value.from:null,to:kind==='edge'?value.to:null,origin:textViewOrigin(d,kind==='node'?'nodes':'edges',id),
@@ -137,12 +169,10 @@ function textViewCarrier(d,kind,id,value,templates,ordinal){
     delta:textViewDelta(value),
     existsWhen:typeof value.existsWhen==='string'?{value:value.existsWhen,active:trackingExistsWhen(value)===value.existsWhen}:null,
     missingWork:value.missingWork===true,link:typeof value.link==='string'?value.link:null,
+    presentation:typeof value.presentation==='string'?value.presentation:null,
     fields:textViewOtherFields(value,kind==='node'?TEXT_VIEW_NODE_FIELDS:TEXT_VIEW_EDGE_FIELDS),
-    steps:[],traceRules:[]};
-  if(kind==='node'){
-    out.edgesIn=[];out.edgesOut=[];
-    (d.edges || []).forEach(function(e){var key=e.from+'->'+e.to;if(e.to===id)out.edgesIn.push(key);if(e.from===id)out.edgesOut.push(key);});
-  }
+    problems:problems,steps:[],traceRules:[]};
+  if(kind==='node'){out.edgesIn=[];out.edgesOut=[];}
   return out;
 }
 function textViewStep(d,page,st,n,story,index,elementOf){
@@ -151,10 +181,13 @@ function textViewStep(d,page,st,n,story,index,elementOf){
   var nodes=carriers.filter(function(c){return edges.indexOf(c)<0;});
   edges.sort(function(a,b){return keys.indexOf(a.id)-keys.indexOf(b.id);});
   var patch=stepPanelPatch(st),failures=stepFailures(st),visibility=specObject(st.panelVisibility)?st.panelVisibility:{};
-  var time=typeof st.time==='string'?st.time:null,filter=trackingStepFilter(st);
+  var time=typeof st.time==='string'?st.time:null,problems=textViewFieldProblems(st,TEXT_VIEW_STEP_FIELDS);
+  var filter=trackingStepFilter(st,function(index){if(index!==null)problems.push('ticketFilter['+index+']: not a ticket key '+textViewStable(st.ticketFilter[index]===undefined?null:st.ticketFilter[index]));});
+  var tone=stepTonePatch(st) || {};
+  keys=keys.filter(function(k){return typeof k==='string' && k;});
   // Ids the step names that this diagram does not hold (an unresolved import, a typo).
   var missing=keys.filter(function(k,i){return keys.indexOf(k)===i && !edges.some(function(c){return c.id===k;});}).map(function(k){return {kind:'edge',id:k,missing:true};})
-    .concat(stepNodes(st).filter(function(id,i){return stepNodes(st).indexOf(id)===i && !textViewOwn(d.nodes,id);}).map(function(id){return {kind:'node',id:id,missing:true};}));
+    .concat(stepNodes(st).filter(function(id,i){return typeof id==='string' && id && stepNodes(st).indexOf(id)===i && !textViewOwn(d.nodes,id);}).map(function(id){return {kind:'node',id:id,missing:true};}));
   function touch(kind){return function(c){var el=elementOf(c.value),out={kind:kind,id:c.id};if(el && el.ordinal>1)out.ordinal=el.ordinal;return out;};}
   return {n:n,id:typeof st.id==='string'?st.id:null,text:typeof st.text==='string'?st.text:'',time:time,
     at:time!=null && story && story.times[index]!=null?storyTimeLabel(story.times[index],story.config):null,
@@ -167,7 +200,8 @@ function textViewStep(d,page,st,n,story,index,elementOf){
     panels:Object.keys(patch || {}).map(function(id){return {id:id,patch:textViewClone(patch[id])};}),
     panelVisibility:Object.keys(visibility).map(function(id){return {id:id,value:textViewClone(visibility[id])};}),
     failures:Object.keys(failures).map(function(edge){return {edge:edge,mode:failures[edge]};}),
-    delta:textViewDelta(st),fields:textViewOtherFields(st,TEXT_VIEW_STEP_FIELDS)};
+    tones:Object.keys(tone).map(function(id){return {id:id,value:textViewClone(tone[id])};}),
+    delta:textViewDelta(st),fields:textViewOtherFields(st,TEXT_VIEW_STEP_FIELDS),problems:problems};
 }
 function textViewTouched(elements,t){return elements.filter(function(e){return e.kind===t.kind && e.id===t.id && e.ordinal===(t.ordinal || 1);})[0] || null;}
 function textViewImports(d){
@@ -188,6 +222,9 @@ function textViewImports(d){
 }
 function textViewDiagram(raw,page,templates){
   var problems=[],nodes={},edges=[],steps=[];
+  ['nodes','edges','steps','paths'].forEach(function(k){
+    if(raw[k]!=null && !textViewTyped(raw[k],k==='nodes'?'object':'array'))problems.push(k+': expected '+(k==='nodes'?'an object':'an array')+' '+textViewStable(raw[k]));
+  });
   Object.keys(specObject(raw.nodes)?raw.nodes:{}).forEach(function(id){
     if(specObject(raw.nodes[id]))Object.defineProperty(nodes,id,{value:raw.nodes[id],enumerable:true,writable:true,configurable:true});
     else problems.push('nodes.'+id+': expected an object '+textViewStable(raw.nodes[id]));
@@ -209,6 +246,9 @@ function textViewDiagram(raw,page,templates){
   edges.forEach(function(edge){
     var id=edge.from+'->'+edge.to;seen[id]=(seen[id] || 0)+1;
     var el=textViewCarrier(d,'edge',id,edge,templates,seen[id]);elements.push(el);values.push(edge);
+    var name=textViewElementName(el);
+    if(byKey['node '+edge.from])byKey['node '+edge.from].edgesOut.push(name);
+    if(byKey['node '+edge.to])byKey['node '+edge.to].edgesIn.push(name);
   });
   var paths=(steps.length?diagramPathList(d):[]).map(function(p){
     var projected=diagramForPath(d,p.id),story=storyTimeSequence(projected);
@@ -241,7 +281,7 @@ function textViewModel(input){
       templates:Object.keys(templates).reduce(function(out,name){out[name]={params:templates[name].params.slice()};return out;},{})},
     settings:textViewLeaves(tracking,'tracking').filter(function(leaf){return leaf[0]!=='tracking';}),
     dependencies:trackingDependencies(page),
-    logSearches:Object.keys(lookups).sort().map(function(id){
+    logSearches:Object.keys(lookups).map(function(id){
       var l=lookups[id];return {id:id,label:l.label,query:l.query,datasource:l.datasource || null,values:(l.values || []).slice(),fields:textViewClone(l.fields)};
     }),
     sections:records.map(function(r){
@@ -295,10 +335,14 @@ function textViewFlat(model){
   var out=[];
   // Owner ids and touch targets arrive already escaped (textViewPart, textViewEnd);
   // only their line breaks and spaces are escaped here.
+  // A repeated fact (the same owner, key and value twice) takes #<n> on its key.
+  var seen=Object.create(null);
   function add(kind,owner,key,value,escaped){
-    var line=kind+(owner==null?'':' '+textViewOwnerToken(owner))+' '+textViewToken(key);
-    if(value!=null && value!=='')line+=' '+(escaped?textViewOwnerToken(value).replace(/\\u0020/g,' '):textViewEscape(value));
-    out.push(line);
+    var head=kind+(owner==null?'':' '+textViewOwnerToken(owner))+' ',tail='';
+    if(value!=null && value!=='')tail=' '+(escaped?textViewOwnerToken(value).replace(/\\u0020/g,' '):textViewEscape(value));
+    var line=head+textViewToken(key)+tail;
+    seen[line]=(seen[line] || 0)+1;
+    out.push(seen[line]>1?head+textViewToken(key)+'#'+seen[line]+tail:line);
   }
   function leaves(kind,owner,prefix,list){list.forEach(function(leaf){add(kind,owner,prefix+leaf[0],leaf[1]);});}
   function codeRefs(kind,owner,refs){
@@ -316,18 +360,16 @@ function textViewFlat(model){
     if(d.text)add(kind,owner,'delta.text',d.text);
     d.links.forEach(function(l){add(kind,owner,'delta.link',l.url+' '+l.label);});
   }
-  function counted(kind,owner,key,texts){
-    var seen=Object.create(null);
-    texts.forEach(function(text){seen[text]=(seen[text] || 0)+1;add(kind,owner,key,text+(seen[text]>1?' #'+seen[text]:''));});
-  }
   if(model.title)add('page',null,'title',model.title);
   model.settings.forEach(function(leaf){add('page',null,leaf[0],leaf[1]);});
   model.dependencies.forEach(function(dep){add('page',null,'dependency',dep.ticket+' on '+dep.on+(dep.reason?' — '+dep.reason:''));});
-  model.logSearches.forEach(function(l){
+  model.logSearches.forEach(function(l,i){
     var at='logsearch.'+l.id+'.';
     add('page',null,at+'label',l.label);
     add('page',null,at+'query',(l.datasource || 'loki')+' '+l.query);
-    l.values.forEach(function(v){add('page',null,at+'value',v);});
+    // The reader offers searches and suggested values in authored order, so both keep it.
+    add('page',null,at+'order',String(i+1));
+    l.values.forEach(function(v,j){add('page',null,at+'value['+j+']',v);});
     Object.keys(l.fields || {}).forEach(function(k){add('page',null,at+'fields.'+k,l.fields[k]);});
   });
   model.sections.forEach(function(sec){
@@ -349,6 +391,7 @@ function textViewFlat(model){
         el.prs.forEach(function(u){add(kind,owner,'pr',u);});
         if(el.existsWhen)add(kind,owner,'existsWhen',el.existsWhen.value+(el.existsWhen.active?'':' (inactive: needs a valid ticket)'));
         if(el.missingWork)add(kind,owner,'missingWork','true');
+        if(el.presentation)add(kind,owner,'presentation',el.presentation);
         if(el.telemetryKind)add(kind,owner,'telemetry.kind',el.telemetryKind);
         if(el.use)add(kind,owner,'telemetry.use',el.use);
         Object.keys(el.telemetryLinks).forEach(function(k){add(kind,owner,'telemetry.link.'+k,el.telemetryLinks[k]);});
@@ -366,6 +409,7 @@ function textViewFlat(model){
         codeRefs(kind,owner,el.codeRefs);
         delta(kind,owner,el.delta);
         leaves(kind,owner,'',el.fields);
+        el.problems.forEach(function(p){add(kind,owner,'problem',p);});
       });
       d.paths.forEach(function(p){
         var pathOwner=prefix+textViewPart(p.id);
@@ -379,23 +423,25 @@ function textViewFlat(model){
           if(st.at)add('step',owner,'at',st.at);
           if(st.link)add('step',owner,'link',st.link);
           st.touches.forEach(function(x){var el=textViewTouched(d.elements,x);add('step',owner,'touches',x.kind+' '+(el?el.key:x.id)+(x.missing?' (not in this diagram)':''),true);});
-          counted('step',owner,'trace',st.traceRules.map(textViewRuleText));
-          counted('step',owner,'condition',st.conditions.map(textViewConditionText));
+          st.traceRules.forEach(function(rule){add('step',owner,'trace',textViewRuleText(rule));});
+          st.conditions.forEach(function(c){add('step',owner,'condition',textViewConditionText(c));});
           if(st.ticketFilter){
             st.ticketFilter.keys.forEach(function(k){add('step',owner,'ticketFilter',k+(st.ticketFilter.shown.indexOf(k)<0?' (not lit, ignored)':''));});
           }
           codeRefs('step',owner,st.codeRefs);
           st.panels.forEach(function(x){add('step',owner,'panel.'+x.id,textViewStable(x.patch));});
           st.panelVisibility.forEach(function(x){add('step',owner,'panelVisibility.'+x.id,textViewStable(x.value));});
+          st.tones.forEach(function(x){add('step',owner,'tone.'+x.id,typeof x.value==='string'?x.value:textViewStable(x.value));});
           st.failures.forEach(function(f){add('step',owner,'failure',f.edge+' '+f.mode);});
           delta('step',owner,st.delta);
           leaves('step',owner,'',st.fields);
+          st.problems.forEach(function(p){add('step',owner,'problem',p);});
         });
       });
     });
   });
   out.sort(function(a,b){return a<b?-1:a>b?1:0;});
-  return out.filter(function(line,i){return !i || line!==out[i-1];}).join('\n')+(out.length?'\n':'');
+  return out.join('\n')+(out.length?'\n':'');
 }
 
 /* ---- markdown helpers ---- */
@@ -440,13 +486,14 @@ function textViewRefText(ref){
 function textViewElementName(el){return el.id+(el.ordinal>1?' #'+el.ordinal:'');}
 function textViewElementHead(el){
   var name=el.title || el.label;
-  return el.kind+' `'+textViewElementName(el)+'`'+(name?' '+textViewOneLine(name):'')+(el.origin?' · imported ('+textViewOriginText(el.origin)+')':'');
+  return el.kind+' '+textViewCode(textViewElementName(el))+(name?' '+textViewOneLine(name):'')+(el.origin?' · imported ('+textViewOriginText(el.origin)+')':'');
 }
-function textViewImportText(imp){return '`'+imp.as+'` from '+imp.spec+' export '+imp.export+(imp.resolved?'':' (not resolved)');}
+function textViewImportText(imp){return textViewCode(imp.as)+' from '+imp.spec+' export '+imp.export+(imp.resolved?'':' (not resolved)');}
 function textViewStatusBits(el){
   var bits=[];
   if(el.existsWhen)bits.push('exists when '+el.existsWhen.value+(el.existsWhen.active?'':' (inactive)'));
   if(el.missingWork)bits.push('missing work');
+  if(el.presentation)bits.push('presentation '+el.presentation);
   return bits;
 }
 function textViewPageBlock(model,full){
@@ -460,7 +507,7 @@ function textViewPageBlock(model,full){
   if(model.logSearches.length){
     out.push('## Log searches','');
     model.logSearches.forEach(function(l){
-      out.push('- `'+l.id+'` '+l.label+' ('+(l.datasource || 'loki')+')'+(l.values.length?' · values '+l.values.join(', '):''));
+      out.push('- '+textViewCode(l.id)+' '+l.label+' ('+(l.datasource || 'loki')+')'+(l.values.length?' · values '+l.values.join(', '):''));
       if(full){
         out.push.apply(out,textViewValue('  ','query',l.query));
         Object.keys(l.fields || {}).forEach(function(k){out.push('  - fields.'+k+': '+l.fields[k]);});
@@ -487,13 +534,13 @@ function textViewSteps(model,options){
       out.push.apply(out,textViewDiagramHead(model,sec,d));
       if(!d.paths.length){out.push('_No steps._','');return;}
       var path=d.paths.filter(function(p){return p.id===options.pathId;})[0] || d.paths[0];
-      out.push('Path: '+path.label+' (`'+path.id+'`)'+(d.paths.length>1?' · other paths: '+d.paths.filter(function(p){return p!==path;}).map(function(p){return p.label+' (`'+p.id+'`)';}).join(', '):''),'');
+      out.push('Path: '+path.label+' ('+textViewCode(path.id)+')'+(path.basedOn?' · based on '+textViewCode(path.basedOn):'')+(d.paths.length>1?' · other paths: '+d.paths.filter(function(p){return p!==path;}).map(function(p){return p.label+' ('+textViewCode(p.id)+')';}).join(', '):''),'');
       path.steps.forEach(function(st){
         var when=st.time?' · '+st.time+(st.at?' ('+st.at+')':''):'';
-        out.push('### '+st.n+'.'+(st.id?' `'+st.id+'`':'')+when+(st.delta && st.delta.marked?' · changed':''),'');
+        out.push('### '+st.n+'.'+(st.id?' '+textViewCode(st.id):'')+when+(st.delta && st.delta.marked?' · changed':''),'');
         if(st.text)out.push(st.text,'');
         st.touches.forEach(function(t){
-          var el=textViewTouched(d.elements,t);if(!el){out.push('- '+t.kind+' `'+t.id+'` (not in this diagram)');return;}
+          var el=textViewTouched(d.elements,t);if(!el){out.push('- '+t.kind+' '+textViewCode(t.id)+' (not in this diagram)');return;}
           var bits=[textViewElementHead(el)];
           if(el.tickets.length)bits.push('tickets '+el.tickets.join(', '));
           bits=bits.concat(textViewStatusBits(el));
@@ -515,10 +562,12 @@ function textViewSteps(model,options){
         st.codeRefs.forEach(function(ref){out.push('- code '+textViewRefText(ref));});
         st.panels.forEach(function(x){out.push('- panel '+x.id+': '+textViewCode(textViewStable(x.patch)));});
         st.panelVisibility.forEach(function(x){out.push('- panel '+x.id+' visibility: '+textViewCode(textViewStable(x.value)));});
-        st.failures.forEach(function(f){out.push('- failure `'+f.edge+'` '+f.mode);});
+        st.tones.forEach(function(x){out.push('- tone '+textViewCode(x.id)+': '+(typeof x.value==='string'?x.value:textViewCode(textViewStable(x.value))));});
+        st.failures.forEach(function(f){out.push('- failure '+textViewCode(f.edge)+' '+f.mode);});
         if(st.delta && st.delta.text)out.push('- delta '+textViewOneLine(st.delta.text));
         if(st.delta)st.delta.links.forEach(function(l){out.push('- delta link '+l.label+': '+l.url);});
         st.fields.forEach(function(leaf){out.push('- '+leaf[0]+': '+textViewCode(leaf[1]));});
+        st.problems.forEach(function(p){out.push('- problem: '+textViewOneLine(p));});
         out.push('');
       });
     });
@@ -552,10 +601,11 @@ function textViewElements(model){
         if(el.existsWhen)out.push('- Exists when: '+el.existsWhen.value+(el.existsWhen.active?'':' (inactive: needs a valid ticket)'));
         if(el.missingWork)out.push('- Missing work: yes');
         if(el.link)out.push('- Link: '+el.link);
+        if(el.presentation)out.push('- Presentation: '+el.presentation);
         if(el.binding)out.push('- Binding: '+textViewLeaves(el.binding,'').map(function(leaf){return leaf[0]+' '+leaf[1];}).join(' · '));
         if(el.kind==='node'){
-          if(el.edgesOut.length)out.push('- Edges out: '+el.edgesOut.map(function(k){return '`'+k+'`';}).join(', '));
-          if(el.edgesIn.length)out.push('- Edges in: '+el.edgesIn.map(function(k){return '`'+k+'`';}).join(', '));
+          if(el.edgesOut.length)out.push('- Edges out: '+el.edgesOut.map(textViewCode).join(', '));
+          if(el.edgesIn.length)out.push('- Edges in: '+el.edgesIn.map(textViewCode).join(', '));
         }
         if(el.signals.length){
           out.push('- Telemetry: '+el.telemetryKind+(el.use?' · template '+el.use:''),'');
@@ -563,7 +613,7 @@ function textViewElements(model){
           el.signals.forEach(function(s){out.push('| '+[s.name,s.source,s.unit,textViewPass(s.pass)].map(textViewCell).join(' | ')+' |');});
           out.push('');
           el.signals.forEach(function(s){
-            out.push('- `'+s.name+'`'+textViewSignalMeta(s).map(function(b){return ' · '+b;}).join(''));
+            out.push('- '+textViewCode(s.name)+textViewSignalMeta(s).map(function(b){return ' · '+b;}).join(''));
             out.push.apply(out,textViewQueryLines(s,'  '));
           });
           Object.keys(el.telemetryLinks).forEach(function(k){out.push('- Telemetry link '+k+': '+el.telemetryLinks[k]);});
@@ -579,6 +629,7 @@ function textViewElements(model){
           el.delta.links.forEach(function(l){out.push('  - '+l.label+': '+l.url);});
         }
         el.fields.forEach(function(leaf){out.push('- '+leaf[0]+': '+textViewCode(leaf[1]));});
+        el.problems.forEach(function(p){out.push('- Problem: '+textViewOneLine(p));});
         out.push('');
       });
     });

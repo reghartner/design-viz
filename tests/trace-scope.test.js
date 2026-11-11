@@ -15,7 +15,7 @@
 | I10 | Imported carriers through consumer overlays: added, hidden and overridden spans change what a step inherits; skip names the imported carrier id. |
 | I11 | canon validate: traceMatch with traceScope, root, skip, parentStepId (unknown, self, cyclic; a loop closed by a traceScope parent is reported under traceScope), optional, budgets and attributes are checked. Validator warnings in plain words: a skip of a span the carrier does not declare, a skip of a carrier the step does not light, a step that inherits nothing because its carriers are shared. |
 | I12 | Compatibility declares flow.trace-scope. |
-| I13 | Reader: inheriting step rows (a node step on its node), "Not this flow" and the coverage line with timed nodes and connections and the plain unmapped hint, in node and step titles. A "not this flow" row paints nothing on the canvas. |
+| I13 | Reader: inheriting step rows (a node step on its node), "Not this flow" and the coverage line with timed nodes and connections and the plain unmapped hint, in node and step titles. A "not this flow" row paints nothing on the canvas. A span drawn on a declared node or connection is not counted as unmatched (whole-branch review m3). |
 | I14 | An edge step owns only its edge's send spans; a declared receive is timing only, so it never collides with the receiving node's step. |
 | I15 | Mapping a span onto a scoped step (board Edit mode and the Workbench trace match form) replaces its traceScope, so the result validates; the controls say so. |
 | I17 | (review minor) An edge step whose send span has no receiver says its time is the send span's own, not a hand-off. |
@@ -263,12 +263,12 @@ test('I13 reader rows, "not this flow" and the coverage line',()=>{
   const work=m.rows.find(r=>r.id==='work');
   assert.equal(work.status,'matched');assert.equal(work.nodeId,'worker','a node step annotates its node');
   assert.ok(m.nodes.worker.some(r=>r.id==='work'));
-  assert.equal(V.telemetryTraceCoverage(m),'3/3 steps matched · 2 spans unmatched · 3 nodes and 2 connections timed','req and bill belong to no step');
+  assert.equal(V.telemetryTraceCoverage(m),'3/3 steps matched · 0 spans unmatched · 3 nodes and 2 connections timed','req and bill belong to no step but are drawn on their declared nodes, so they are not unmatched');
   // Shared carriers without a scope, and a step in another flow.
   const d=board([{id:'work',text:'Worker',nodes:['worker']},{id:'reply',text:'Reply',nodes:['worker']},{id:'web',text:'Web',nodes:['billing'],traceScope:{root:{serviceName:'web',operation:'GET /'}}}]);
   m=V.telemetryTraceModel(d,undefined,ex(SPANS()));
   assert.equal(m.rows.find(r=>r.id==='web').label,'Not this flow');
-  assert.equal(V.telemetryTraceCoverage(m),'0/0 steps matched · 1 not this flow · 2 steps without a trace mapping · 8 spans unmatched · 3 nodes and 2 connections timed');
+  assert.equal(V.telemetryTraceCoverage(m),'0/0 steps matched · 1 not this flow · 2 steps without a trace mapping · 0 spans unmatched · 3 nodes and 2 connections timed','every span is drawn on a declared node or connection');
   // Reader hints use node and step titles and reader words, not ids or field names.
   assert.deepEqual(plain(V.telemetryTraceHints(m)),['Step “Worker”: Worker is also part of step “Reply”, so this step shows no trace spans of its own.','Step “Reply”: Worker is also part of step “Worker”, so this step shows no trace spans of its own.']);
   // A step of another flow paints nothing on its node: no empty label, no tone, no screen-reader text.

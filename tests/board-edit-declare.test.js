@@ -19,6 +19,7 @@
 | D12 | (whole-branch review M1) Undo of Declare instead never restores a ticket change the reader cancelled after the swap (add first or map first). |
 | D13 | (M2) A replayed mapping is refused, with the reason, when their version gave the step a trace scope or changed the one the mapping replaced; it replays when the scope is unchanged. |
 | D14 | (m2) state().mapped.replacedScope says whether the mapping replaced the step's trace scope. |
+| D15 | (whole-branch review m7) The replay refusal for a key their version uses tells the reader what to do in board Edit, where keys are automatic: "drop the span again to declare it; it gets a new name". |
 | D9 | A span the carrier already declares under another key (same service, operation and role) is refused: "Already declared as <key> on <title>." |
 | D7 | Declare on <title> instead (team-lead ruling: the immediate mapping stays): declareInstead swaps the pending mapping for the declaration, one pending change; its Undo restores the mapping as it was; Save records only the trace-span. |
 */
@@ -137,14 +138,14 @@ test('D8 a replay compares the whole declared span: the same key with another ro
   first.e.declareSpan(WEB,{serviceName:'frontend',operation:'/cart/checkout',role:'process'});first.e.save();await settle();
   const winner=local();winner.page.sections[0].diagram.nodes.web.trace={spans:{checkout:{serviceName:'frontend',operation:'/cart/checkout',role:'call'}}};
   const next=await editor(winner,{store,start:false});
-  assert.equal(next.e.state().notice.text,'Another editor saved first. 0 of your changes were re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/checkout, role call); declare yours again under another name.');
+  assert.equal(next.e.state().notice.text,'Another editor saved first. 0 of your changes were re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/checkout, role call); drop the span again to declare it; it gets a new name.');
   assert.deepEqual(plain(next.d().nodes.web.trace),{spans:{checkout:{serviceName:'frontend',operation:'/cart/checkout',role:'call'}}},'the winner\'s span stays; nothing under a new key');
   // Two declarations on one carrier: the one that clashes is named, the other is re-applied.
   const store2=new Map(),two=await editor(local(),{store:store2,reject:'conflict'});
   two.e.declareSpan(WEB,{serviceName:'frontend',operation:'/cart/checkout',role:'process'});two.e.declareSpan(WEB,{serviceName:'frontend',operation:'Refund',role:'process'});two.e.save();await settle();
   const w2=local();w2.page.sections[0].diagram.nodes.web.trace={spans:{checkout:{serviceName:'frontend',operation:'/cart/view',role:'process'}}};
   const again=await editor(w2,{store:store2,start:false});
-  assert.equal(again.e.state().notice.text,'Another editor saved first. 1 of your changes was re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/view); declare yours again under another name. Save again.');
+  assert.equal(again.e.state().notice.text,'Another editor saved first. 1 of your changes was re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/view); drop the span again to declare it; it gets a new name. Save again.');
   assert.deepEqual(Object.keys(again.d().nodes.web.trace.spans),['checkout','refund']);
 });
 
@@ -173,7 +174,7 @@ test('D10 every replay-drop reason is true for its case',async()=>{
   first.e.declareSpan(WEB,{serviceName:'frontend',operation:'/cart/checkout',role:'process'});first.e.clearMissingWork(WEB);first.e.save();await settle();
   winner=local();winner.page.sections[0].diagram.nodes.web.trace={spans:{checkout:{serviceName:'frontend',operation:'/cart/view',role:'process'}}};
   next=await editor(winner,{store,start:false});
-  assert.equal(next.e.state().notice.text,'Another editor saved first. 0 of your changes were re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/view); declare yours again under another name. Missing work cleared from Web could not be re-applied: their version has no Missing work marker on Web to clear.');
+  assert.equal(next.e.state().notice.text,'Another editor saved first. 0 of your changes were re-applied. Span checkout (frontend · /cart/checkout) declared on Web could not be re-applied: their version already declares a different span under checkout (frontend · /cart/view); drop the span again to declare it; it gets a new name. Missing work cleared from Web could not be re-applied: their version has no Missing work marker on Web to clear.');
   // With nothing dropped, no "0 could not be" clause; one change reads "was".
   store=new Map();first=await editor(local(),{store,reject:'conflict'});first.e.add(WEB,'WEB-1');first.e.save();await settle();
   next=await editor(local(),{store,start:false});

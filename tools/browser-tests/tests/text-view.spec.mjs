@@ -8,6 +8,7 @@ import {createRequire} from 'node:module';
 import vm from 'node:vm';
 import path from 'node:path';
 import {test,expect,paste,closeTools} from '../helpers/test.mjs';
+import {editorSpec} from '../fixtures/editor-spec.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 const require=createRequire(import.meta.url);
@@ -58,19 +59,78 @@ for(const width of [1440,1024])test('Text sits beside Search in the top bar at '
   await dialog.getByRole('button',{name:'Close text view',exact:true}).click();await expect(dialog).toBeHidden();expect(await isFocused(button)).toBe(true);
 });
 
-test('Escape leaves Contents open, closes an open zoom menu first, and arrow keys in the window do not move the diagram step',async({page,server})=>{
-  await page.setViewportSize({width:1440,height:900});const root=await open(page,server,board(),'text-view-keys');
-  const contents=root.locator('.reader-contents');await expect(contents).toBeVisible();
-  const stepState=()=>root.locator('#section-delivery').evaluate(sec=>({current:Array.from(sec.querySelectorAll('[aria-current="true"]')).map(n=>n.getAttribute('data-step-source') || n.textContent.trim()),text:Array.from(sec.querySelectorAll('.step-text')).map(n=>n.textContent)}));
-  const before=await stepState();
+test('arrow keys in the window do not step the diagram even in Present mode, where the page steps on any arrow key',async({page,server})=>{
+  // A plain Standard step diagram, where Present mode steps on arrow keys.
+  const simple={page:{title:'Keys',sections:[{id:'flow',heading:'Flow',diagram:{view:'step',autoplay:false,nodes:{a:{title:'Source'},b:{title:'Destination'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],
+    steps:[{id:'first',text:'First step',edge:'a->b'},{id:'second',text:'Second step',edge:'a->b'},{id:'third',text:'Third step',nodes:['b']}]}}]}};
+  await page.setViewportSize({width:1440,height:900});const root=await open(page,server,simple,'text-view-keys');
+  const stepState=()=>root.locator('#section-flow').evaluate(sec=>({current:Array.from(sec.querySelectorAll('.schip')).map(n=>n.getAttribute('aria-current')),text:Array.from(sec.querySelectorAll('.step-text')).map(n=>n.textContent)}));
   await launcher(root).click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();
+  // Present mode: the document keydown handler steps on ArrowRight/ArrowLeft whatever the target.
+  await page.evaluate(()=>document.body.classList.add('presenting'));
+  const before=await stepState();
   await dialog.getByRole('tab',{name:'Steps'}).focus();await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowLeft');
-  await textOf(dialog).focus();for(const key of ['ArrowRight','ArrowLeft','ArrowDown',' '])await page.keyboard.press(key);
+  await expect(dialog.getByRole('tab',{name:'Steps'})).toHaveAttribute('aria-selected','true');
+  await textOf(dialog).focus();for(const key of ['ArrowRight','ArrowRight','ArrowLeft','ArrowDown'])await page.keyboard.press(key);
   expect(await stepState()).toEqual(before);
-  const zoom=root.getByRole('button',{name:'Zoom',exact:true}).or(root.locator('.reader-zoom-menu>summary')).first();await zoom.click();
-  await expect(root.locator('.reader-zoom-menu')).toHaveAttribute('open','');
-  await page.keyboard.press('Escape');await expect(root.locator('.reader-zoom-menu')).not.toHaveAttribute('open','');await expect(dialog).toBeVisible();
-  await dialog.getByRole('tab',{name:'Steps'}).focus();await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(contents).toBeVisible();
+  // Control: the same key outside the window does step, so the check above can fail.
+  await page.evaluate(()=>{let a=document.activeElement;while(a && a.shadowRoot && a.shadowRoot.activeElement)a=a.shadowRoot.activeElement;if(a)a.blur();});
+  await page.keyboard.press('ArrowRight');await expect.poll(stepState).not.toEqual(before);
+  await page.evaluate(()=>document.body.classList.remove('presenting'));
+});
+
+test('Escape with a bar menu open closes the menu first even when focus is in the window, then closes the window and leaves Contents open',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});const root=await open(page,server,board(),'text-view-escape');
+  const contents=root.locator('.reader-contents');await expect(contents).toBeVisible();
+  await launcher(root).click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();
+  const zoom=root.locator('.reader-zoom-menu');await zoom.locator(':scope>summary').click();await expect(zoom).toHaveJSProperty('open',true);
+  const steps=dialog.getByRole('tab',{name:'Steps'});await steps.focus();expect(await focusInside(dialog)).toBe(true);await expect(zoom).toHaveJSProperty('open',true);
+  await page.keyboard.press('Escape');await expect(zoom).toHaveJSProperty('open',false);await expect(dialog).toBeVisible();
+  await steps.focus();await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await expect(contents).toBeVisible();
+});
+
+// #1322 review: the Text launcher is the lowest-priority bar control. Every other
+// control stays where the bar puts it without Text (the "base"); Text is inline,
+// a "Text view" item in "More page actions" (only when the base shows that menu),
+// or absent. Widths below come from base measurements on these fixtures.
+function crowdedStory(){
+  const raw=editorSpec(),section=raw.page.blocks[0];section.id='delivery';
+  section.diagram.layouts[0].presentation='explore';section.diagram.layouts[0].name='Engineering';
+  section.diagram.layouts.push({...structuredClone(section.diagram.layouts[0]),id:'standard',name:'Overview',presentation:'standard'});
+  const base=section.diagram.layouts[0];
+  section.diagram.layouts.push(...Array.from({length:5},(_,i)=>({...structuredClone(base),id:'extra-'+i,name:i===0?'Complete product journey and implementation review with supporting source context':'Additional review choice '+(i+1),presentation:i%2?'standard':'explore'})));
+  return raw;
+}
+const pageActionsInline=async nav=>{await expect(nav.locator('.reader-page-utilities')).toBeHidden();await expect(nav.getByRole('button',{name:'Expand diagram view',exact:true})).toBeVisible();};
+test('native crowded bar at 1024 keeps page actions inline and shows no Text launcher',async({page,server})=>{
+  await page.setViewportSize({width:1024,height:900});
+  await writeFile(path.join(server.root,'text-fit-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+  await writeFile(path.join(server.root,'text-fit-native.html'),'<style>body{margin:0}#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./text-fit-native.js";window.mount=mountNativeViewer;</script>');
+  await page.goto(server.origin+'/text-fit-native.html');await page.waitForFunction(()=>!!window.mount);
+  await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw);},crowdedStory());await page.evaluate(()=>document.fonts.ready);
+  const nav=page.locator('#host .reader-navigation');await pageActionsInline(nav);
+  await expect(launcher(page.locator('#host'))).toHaveCount(0);await expect(nav.locator('.text-view-launch')).toBeHidden();await expect(nav.locator('.text-view-menu-item')).toBeHidden();
+  await page.setViewportSize({width:1440,height:900});await expect(launcher(page.locator('#host'))).toBeVisible();await pageActionsInline(nav);
+});
+test('standalone crowded bar keeps page actions inline at 1280 (no Text) and shows Text inline at 1440',async({page,server})=>{
+  await page.setViewportSize({width:1280,height:900});const root=await open(page,server,crowdedStory(),'text-fit-crowded');await page.evaluate(()=>document.fonts.ready);
+  const nav=root.locator('.reader-navigation');await pageActionsInline(nav);await expect(nav.locator('.text-view-launch')).toBeHidden();
+  await page.setViewportSize({width:1440,height:900});await pageActionsInline(nav);await expect(launcher(root)).toBeVisible();expect(await shown(launcher(root))).toBe('ok');
+  await page.setViewportSize({width:1280,height:900});await pageActionsInline(nav);await expect(nav.locator('.text-view-launch')).toBeHidden();
+});
+test('where the base already shows More page actions, a Text launcher without room becomes a menu item that opens the window',async({page,server})=>{
+  await page.setViewportSize({width:1024,height:900});const root=await open(page,server,crowdedStory(),'text-fit-menu');await page.evaluate(()=>document.fonts.ready);
+  const nav=root.locator('.reader-navigation'),utilities=nav.locator('.reader-page-utilities');
+  await expect(utilities).toBeVisible();await expect(launcher(root)).toBeVisible();
+  // Force a launcher too wide for the bar: the menu exists on the base, so Text moves into it.
+  await page.addStyleTag({content:'body .reader-navigation .text-view-launch .reader-button{min-width:420px}'});
+  await page.setViewportSize({width:1023,height:900});await page.setViewportSize({width:1024,height:900});
+  await expect(nav.locator('.text-view-launch')).toBeHidden();await expect(utilities).toBeVisible();
+  await utilities.locator(':scope>summary').click();const item=utilities.getByRole('button',{name:'Text view',exact:true});await expect(item).toBeVisible();
+  await item.click();const dialog=dialogOf(root);await expect(dialog).toBeVisible();await expect(textOf(dialog)).toContainText('steps');
+  await page.keyboard.press('Escape');await expect(dialog).toBeHidden();
+  // At 1440 the base shows no menu: the same over-wide launcher is withdrawn, not turned into a new menu.
+  await page.setViewportSize({width:1440,height:900});await expect(utilities).toBeHidden();await expect(nav.locator('.text-view-launch')).toBeHidden();await pageActionsInline(nav);
 });
 
 test('Text and Search never overlap: opening one closes the other',async({page,server})=>{
@@ -199,6 +259,9 @@ test('desktop Workbench preview offers the Text window and reopens it with rebui
   await page.locator('#editor-tab-json').click();raw.page.title='Doorbell delivery renamed';await page.locator('#src').fill(JSON.stringify(raw));await page.locator('#go').click();
   await expect(textOf(dialog)).toContainText('# Doorbell delivery renamed — steps');await expect(dialog).toBeVisible();
   await expect(launcher(root)).toHaveAttribute('aria-expanded','true');expect(await shown(textOf(dialog))).toBe('ok');
+  // A different document in the same preview does not reopen the window.
+  const other=board();other.page.canon.id='tv-board-other';await page.locator('#src').fill(JSON.stringify(other));await page.locator('#go').click();
+  await expect(launcher(root)).toHaveAttribute('aria-expanded','false');await expect(dialog).toBeHidden();
 });
 
 test('the Text window uses readable theme colours in all nine skins',async({page,server})=>{

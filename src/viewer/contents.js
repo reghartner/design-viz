@@ -119,7 +119,21 @@ function createReaderContents(ctl,nav,actions,options){
       if(restore){reopenNestedMenus(entry.node);restore.focus({preventScroll:true});}else if(summaryFocused && !pageUtilitySummary.checkVisibility({visibilityProperty:true})){var target=Array.from(entry.node.querySelectorAll('summary,button,[href],select')).find(function(control){return !control.disabled && control.checkVisibility({visibilityProperty:true});});if(target)target.focus({preventScroll:true});}
     }
   }
+  // #1322 Text launcher: lowest priority in the bar. Every pass fits the bar
+  // without it (exactly as before it existed), then shows it inline only if
+  // nothing else would move; otherwise it goes into "More page actions" when
+  // that menu is already shown, or is withdrawn. The decision never feeds back
+  // into the fit, so it cannot oscillate.
+  var textPlace='none';
+  function fitText(fits){
+    if(!textView)return;
+    if(narrow){textPlace='none';textView.place('none');return;}
+    textView.place('inline');
+    textPlace=fits()?'inline':overflowActions && !pageUtilities.hidden?'menu':'none';
+    if(textPlace!=='inline')textView.place(textPlace);
+  }
   function fitToggle(width){
+    if(textView)textView.place('measure');
     if(options.singleReaderToolbar){
       var root=view.getRootNode(),focused=root.activeElement || doc.activeElement,focusedView=viewStrip.contains(focused),focusedPicker=focused===viewPicker;
       if(overflowActions && width>900 && actionAttemptWidth!==width){actionAttemptWidth=width;overflowViewportActions(false);}
@@ -141,13 +155,16 @@ function createReaderContents(ctl,nav,actions,options){
       if(!overflowActions && width>900 && (top.scrollWidth>top.clientWidth+1 || overlapsCenter(actions))){overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();}
       if(needsPicker && (focusedView || focusedPicker))viewPicker.focus({preventScroll:true});
       else if(focusedPicker){var selected=viewStrip.querySelector('[aria-selected="true"]');if(selected)selected.focus({preventScroll:true});}
+      fitText(function(){var rect=actions.getBoundingClientRect(),center=centerBounds();return !(rect.right>center.left-8 && rect.left<center.right+8) && top.scrollWidth<=top.clientWidth+1;});
       return;
     }
     var actionBounds=actions.getBoundingClientRect();
-    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,actionBounds.width,actionBounds.height,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit)return;toggleFit=key;
-    top.classList.remove('reader-toggle-compact');if(narrow)return;
+    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,actionBounds.width,actionBounds.height,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit){if(textView)textView.place(textPlace);return;}toggleFit=key;
+    top.classList.remove('reader-toggle-compact');if(!narrow){
     var full=top.getBoundingClientRect().height;top.classList.add('reader-toggle-compact');
-    if(top.getBoundingClientRect().height>=full)top.classList.remove('reader-toggle-compact');
+    if(top.getBoundingClientRect().height>=full)top.classList.remove('reader-toggle-compact');}
+    var settled=top.getBoundingClientRect().height;
+    fitText(function(){return top.getBoundingClientRect().height<=settled+.5 && top.scrollWidth<=top.clientWidth+1;});
   }
   function title(rec){var record=rec && rec.viewOwner && rec.viewOwner.records.find(function(r){return r.runtime===rec;});return record && record.section.heading || rec && rec.sectionEl.querySelector('.sec-h')?.textContent || 'Section';}
   // An open drill-down stays inside its root section; name each open level.
@@ -360,7 +377,8 @@ function createReaderContents(ctl,nav,actions,options){
     if(themeMenu.open && ['ArrowDown','ArrowUp','Home','End'].indexOf(ev.key)>=0 && themeMenu.contains(ev.target)){ev.preventDefault();var nodes=Array.from(themeOptions.querySelectorAll('button')),index=nodes.indexOf(ev.target);index=ev.key==='Home'?0:ev.key==='End'?nodes.length-1:(index+(ev.key==='ArrowDown'?1:-1)+nodes.length)%nodes.length;nodes[index].focus();}
   }
   search=createDocumentSearch(ctl,nav,top,actions,documentPages,choose,function(){if(search){drawParts();drawTree();geometry();}});
-  textView=typeof createReaderTextView==='function'?createReaderTextView(ctl,nav,actions,function(){return current;}):null;
+  textView=typeof createReaderTextView==='function'?createReaderTextView(ctl,nav,actions,function(){return current;},{menu:pageUtilityBody,closeMenu:function(){pageUtilities.open=false;},menuSummary:pageUtilitySummary}):null;
+  if(textView){toggleFit=null;geometry();}
   if(opened!==null)setOpen(opened,false,false);
   var initialFrame=requestAnimationFrame(function(){if(retired)return;(ctl.views?ctl.views.owners:[]).forEach(function(item){expandedTabs.add(item.path);});drawTree();});
   nav.addEventListener('keydown',keydown,true);view.addEventListener('reader-skin-change',updateTheme);view.addEventListener('viewer-presentation-changing',release);view.addEventListener('reader-zoom-change',updateZoom);window.addEventListener('resize',geometry);window.addEventListener('scroll',geometry,true);

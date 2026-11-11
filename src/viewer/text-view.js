@@ -7,12 +7,17 @@
    this page load only (no URL hash, no storage). A reader rebuilt in the same
    host (a Workbench preview rerender) reopens an open window on its tab and
    scroll position; the chosen path is kept while the same document is shown.
-   Opening it closes Search and the reverse ('reader-window-open' on the view). */
+   Opening it closes Search and the reverse ('reader-window-open' on the view).
+   Placement is decided by the bar's fitting pass (contents.js fitText): the
+   launcher is the lowest-priority control, shown inline, as a "Text view" item
+   in "More page actions", or not at all; place() applies that decision. */
 var TEXT_VIEW_TABS=[{id:'steps',label:'Steps'},{id:'elements',label:'Elements'},{id:'flat',label:'Flat lines'}];
 var textViewSession={tab:'steps',queries:'names',wrap:false};
 var textViewSequence=0;
 var textViewHosts=typeof WeakMap==='function'?new WeakMap():null;
-function textViewDocKey(page){return page && (page.canon && page.canon.id || page.title) || '';}
+/* The document's identity: its canon id or documentLinks.id (as documentReference
+   uses), else its title. Without an id a title edit counts as another document. */
+function textViewDocKey(page){return page && (page.canon && page.canon.id || page.documentLinks && page.documentLinks.id || page.title) || '';}
 
 /* state: {tab, queries:'names'|'full', pathId}; copy: true for the copied text,
    which always carries full queries. */
@@ -35,7 +40,8 @@ function textViewReaderPath(paths,readerPath,chosen){
   return has(chosen)?chosen:has(readerPath)?readerPath:paths.length?paths[0].id:null;
 }
 
-function createReaderTextView(ctl,nav,actions,currentRecord){
+function createReaderTextView(ctl,nav,actions,currentRecord,host){
+  host=host || {};
   var doc=ctl.view.ownerDocument,view=ctl.view,win=doc.defaultView || window,retired=false,opened=false,chosenPath=null,model=null,copyGen=0;
   var id='flowview-text-view-'+(++textViewSequence),docKey=textViewDocKey(ctl.page);
   var memory=textViewHosts && textViewHosts.get(view) || {};if(textViewHosts)textViewHosts.set(view,memory);
@@ -45,6 +51,10 @@ function createReaderTextView(ctl,nav,actions,currentRecord){
   if(searchLaunch)searchLaunch.after(launch);else actions.prepend(launch);
   var toggle=button('Text view','Text',launch,function(){setOpen(!opened,{focus:true});});
   toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-haspopup','dialog');toggle.title='Text view: read this document as text';
+  // The same action as an item of the bar's "More page actions" menu.
+  var menuItem=button('Text view','Text view',null,function(){if(host.closeMenu)host.closeMenu();setOpen(true,{focus:true});});
+  menuItem.classList.add('text-view-menu-item');menuItem.setAttribute('aria-haspopup','dialog');menuItem.hidden=true;
+  var placement='none',refocus=null;launch.hidden=true;
 
   var panel=el('section','text-view',null,nav);panel.id=id;panel.hidden=true;panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','false');
   toggle.setAttribute('aria-controls',id);
@@ -79,8 +89,10 @@ function createReaderTextView(ctl,nav,actions,currentRecord){
     if(retired)return;
     var tab=TEXT_VIEW_TABS.some(function(def){return def.id===textViewSession.tab;})?textViewSession.tab:'steps',steps=tab==='steps';textViewSession.tab=tab;
     tabs.forEach(function(item){var on=item.id===tab;item.tab.setAttribute('aria-selected',String(on));item.tab.tabIndex=on?0:-1;panels[item.id].body.hidden=!on;});
-    var paths=model?textViewReaderPaths(model):[],current=state();
-    pathSelect.replaceChildren();paths.forEach(function(p){var o=el('option','',p.label,pathSelect);o.value=p.id;o.selected=p.id===current.pathId;});
+    var paths=model?textViewReaderPaths(model):[],current=state(),options=JSON.stringify(paths);
+    // Rebuilding the options would close an open dropdown; only do it when they change.
+    if(pathSelect._textViewOptions!==options){pathSelect._textViewOptions=options;pathSelect.replaceChildren();paths.forEach(function(p){var o=el('option','',p.label,pathSelect);o.value=p.id;});}
+    if(current.pathId!=null && pathSelect.value!==current.pathId)pathSelect.value=current.pathId;
     pathField.hidden=paths.length<2;pathSelect.disabled=!steps;
     names.setAttribute('aria-pressed',String(textViewSession.queries!=='full'));full.setAttribute('aria-pressed',String(textViewSession.queries==='full'));
     names.disabled=full.disabled=!steps;queries.title=steps?'':'Elements and Flat lines always show full queries.';
@@ -114,6 +126,7 @@ function createReaderTextView(ctl,nav,actions,currentRecord){
   // Focus the launcher, or the first visible bar control when the bar hides it.
   function focusBar(){
     if(shown(toggle)){toggle.focus();return;}
+    if(placement==='menu' && host.menuSummary && shown(host.menuSummary)){host.menuSummary.focus();return;}
     var target=Array.from(nav.querySelectorAll('.reader-top :is(button,summary,select)')).find(function(node){return !panel.contains(node) && !node.disabled && shown(node);});
     if(target)target.focus();
   }
@@ -178,19 +191,36 @@ function createReaderTextView(ctl,nav,actions,currentRecord){
   function barChanged(){if(retired || !opened || !nav.classList.contains('reader-narrow') || shown(toggle))return;var inside=panel.contains(activeElement());setOpen(false);if(inside)focusBar();}
   var bar=typeof MutationObserver==='function'?new MutationObserver(barChanged):null;if(bar)bar.observe(nav,{attributes:true,attributeFilter:['class']});
   render();
+  // Reopen only for the same document in the same host.
+  if(memory.open && memory.docKey!==docKey)memory.open=false;
   if(memory.open){
     var reopen=memory;memory.open=false;
     setOpen(true,{scroll:reopen.tab===textViewSession.tab?reopen.scroll:null,focus:reopen.focus});
     if(reopen.scroll && reopen.tab===textViewSession.tab)requestAnimationFrame(function(){if(!opened || retired)return;var pre=panels[textViewSession.tab].pre;pre.scrollTop=reopen.scroll.top;pre.scrollLeft=reopen.scroll.left;});
   }
+  // A reader built on an already narrow bar never sees the class change.
+  barChanged();
   return {
     isOpen:function(){return opened;},
+    // 'inline' | 'menu' | 'none' from the bar's fitting pass; 'measure' hides the
+    // launcher for the pass without touching an open window.
+    place:function(mode){
+      if(retired)return;
+      // Measuring removes the launcher from the bar for one synchronous pass; a
+      // focused launcher gets its focus back when the pass places it again.
+      if(mode==='measure'){if(activeElement()===toggle)refocus=toggle;launch.hidden=true;return;}
+      launch.hidden=mode!=='inline';menuItem.hidden=mode!=='menu';
+      if(mode==='menu' && host.menu && menuItem.parentNode!==host.menu)host.menu.appendChild(menuItem);
+      placement=mode;
+      if(refocus){var again=refocus;refocus=null;if(shown(again) && activeElement()!==again)again.focus({preventScroll:true});}
+      if(mode==='none' && opened){var inside=panel.contains(activeElement());setOpen(false);if(inside)focusBar();}
+    },
     // The reader's document can change while the window is open: rebuild from ctl.page.
     refresh:function(){if(opened && !retired)render(build());},
     destroy:function(){
       if(opened){var pre=panels[textViewSession.tab].pre;memory.open=true;memory.tab=textViewSession.tab;memory.scroll={top:pre.scrollTop,left:pre.scrollLeft};memory.focus=panel.contains(activeElement());}
       memory.path=chosenPath;memory.docKey=docKey;
-      retired=true;opened=false;if(bar)bar.disconnect();view.removeEventListener('keydown',keydown,true);view.removeEventListener('dv:pathchange',pathChanged);view.removeEventListener('reader-window-open',otherWindow);win.removeEventListener('resize',position);win.removeEventListener('scroll',position,true);panel.remove();launch.remove();
+      retired=true;opened=false;if(bar)bar.disconnect();view.removeEventListener('keydown',keydown,true);view.removeEventListener('dv:pathchange',pathChanged);view.removeEventListener('reader-window-open',otherWindow);win.removeEventListener('resize',position);win.removeEventListener('scroll',position,true);panel.remove();launch.remove();menuItem.remove();
     }
   };
 }

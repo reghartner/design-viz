@@ -7,11 +7,17 @@ to them. Use it to read a step diagram as a list, to check node → metric, log 
 connection links, or to copy the text into a review or a diff. Nothing in the
 window edits the document.
 
-The button appears wherever the reader top bar appears: the standalone page, the
-Workbench preview, the library reader, each compare pane and the Backstage native
-viewer. The Confluence (Forge) viewer has no top bar and no Text button. When
-the reader bar is 670 px wide or less (a phone, or a narrow compare pane) the
-button is hidden together with Search; an open window then closes.
+The button can appear wherever the reader top bar appears: the standalone page,
+the Workbench preview, the library reader, each compare pane and the Backstage
+native viewer. The Confluence (Forge) viewer has no top bar and no Text button.
+
+Text is the lowest-priority control in the bar; it never moves another control.
+When the bar has room it shows the **Text** button next to Search. When it has no
+room and the bar already shows **More page actions** (⋯), Text is a **Text view**
+item in that menu. Otherwise it is not shown at that width (for example a crowded
+Backstage bar at 1024 px). When the reader bar is 670 px wide or less (a phone, or
+a narrow compare pane) it is hidden together with Search. An open window closes
+when Text is withdrawn from the bar; it stays open when Text moves into the menu.
 
 The text is built from the page the reader shows, with shared-topology imports
 already resolved, when the window opens. Imported nodes and connections carry an

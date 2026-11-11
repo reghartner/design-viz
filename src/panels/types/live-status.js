@@ -624,8 +624,11 @@
       if(!metrics.available && metrics.note)metricsText=metrics.note;
       // #1293: a refresh over a shown answer keeps the answer and says so.
       if(answered && metrics.busy)metricsText+=' · Refreshing…';
-      // #1313: the Refresh now cooldown, as visible text (role=status) and not only in the button's tooltip.
-      if(metrics.refreshNow && metrics.refreshNow.state==='cooldown' && metrics.refreshNow.untilText)metricsText+=' · Refresh now available at '+metrics.refreshNow.untilText;
+      // #1313: the Refresh now cooldown, as visible text (role=status) and not only in the button's tooltip. While off/on
+      // waits after a failed answer, the line says that, and when the next try is, never "connecting".
+      var waiting=metrics.refreshNow && metrics.refreshNow.waiting;
+      if(waiting){metricsState='error';metricsConnection.setAttribute('data-state','error');metricsText=(metrics.source?metrics.source+' last':'Metrics: last')+' refresh failed at '+metrics.refreshNow.failedAtText+' · next try at '+metrics.refreshNow.nextTryText+(metrics.note?' · '+metrics.note:'');}
+      else if(metrics.refreshNow && metrics.refreshNow.state==='cooldown' && metrics.refreshNow.untilText)metricsText+=' · Refresh now available at '+metrics.refreshNow.untilText;
       if(metrics.environment)metricsText+=' · '+metrics.environment;
       el(metricsConnection,'span','text','',metricsText);metricsConnection.title=metricsText;
       metricsConnection.hidden=!metrics.available && !metrics.note;

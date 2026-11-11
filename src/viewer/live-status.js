@@ -1277,7 +1277,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var state=typeof telemetry.refreshNowState==='function'?telemetry.refreshNowState():{state:'off'};
     var title=state.state==='busy'?'Refreshing…':state.state==='cooldown'?'Refresh now is available again at '+clockTime(state.until)+' · Honeycomb allows 10 query results a minute':
       state.refreshedAt?'Refresh now (last updated '+clockTime(state.refreshedAt)+')':'Refresh now';
-    return {state:state.state,until:state.until || null,untilText:state.until?clockTime(state.until):'',title:title};
+    return {state:state.state,until:state.until || null,untilText:state.until?clockTime(state.until):'',title:title,
+      waiting:!!state.waiting,failedAtText:state.waiting && state.failedAt?clockTime(state.failedAt):'',nextTryText:state.waiting && state.nextTry?clockTime(state.nextTry):''};
   }
   function snapshot(){
     refreshDependencies();

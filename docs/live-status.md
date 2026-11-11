@@ -1319,8 +1319,11 @@ a click within 60 s of any refresh makes no call, and the Metrics line says when
 it is available again. A Refresh now that turning Metrics off interrupted still
 holds its cooldown, since the request may already have reached the provider.
 After an answer that names a failed query, turning Metrics off and on waits until
-60 s after that call. A reuse under five minutes keeps its example traces; an
-overdue one searches them again. It is hidden while Metrics is off and in Over time. A rejection reports the error and keeps the previous map. Turning
+60 s after that call; meanwhile the answered values stay and the Metrics line
+reads "last refresh failed at HH:MM:SS · next try at HH:MM:SS". A host provider
+that rejects without a note owns its transport and its retry pacing, so it is not
+held back. A reuse under five minutes keeps its example traces; an overdue one
+searches them again. It is hidden while Metrics is off and in Over time. A rejection reports the error and keeps the previous map. Turning
 Metrics off or destroying the page aborts the signal, stops the timer and drops any
 late answer; turning it off also clears the map. `report.note(text)` attaches a note
 to that answer, such as a query that failed while the others answered; it becomes

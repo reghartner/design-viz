@@ -204,15 +204,33 @@ test('I15 mapping a span onto a scoped step replaces its trace scope and validat
   const page=spec('b',board([{id:'submit',text:'Publish',edge:'api->worker'},{id:'work',text:'Worker handles it',nodes:['worker'],traceScope:{skip:{worker:['cache']}}}]));
   const valid=raw=>assert.deepEqual(plain(T.FlowCanon.validate(raw)).filter(e=>/traceScope|traceMatch/.test(e)),[]);
   // Board Edit mode (Map this span).
-  const store=new Map(),win={console,location:{pathname:'/board/'},addEventListener(){},removeEventListener(){},
+  const newWin=()=>{const store=new Map();return {console,location:{pathname:'/board/'},addEventListener(){},removeEventListener(){},
     sessionStorage:{getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},
-    claude:{use:async name=>name==='artifact'?{publish:async()=>{}}:name==='user'?{canEdit:async()=>true,me:async()=>({id:'u1',name:'Reader'})}:null}};
-  const e=V.createBoardEditor({win,text:JSON.stringify(page,null,2),specFile:'flowspec.json',render:()=>null});
+    claude:{use:async name=>name==='artifact'?{publish:async()=>{}}:name==='user'?{canEdit:async()=>true,me:async()=>({id:'u1',name:'Reader'})}:null}};};
+  const e=V.createBoardEditor({win:newWin(),text:JSON.stringify(page,null,2),specFile:'flowspec.json',render:()=>null});
   for(let i=0;i<12;i++)await new Promise(setImmediate);
   e.start();assert.equal(e.mapSpan({section:0,kind:'step',id:'work'},{serviceName:'worker',operation:'process orders'}),true);
   let raw=JSON.parse(e.text()),work=diagramOf(raw).steps[1];
   assert.deepEqual(plain(work.traceMatch),{serviceName:'worker',operation:'process orders'});
   assert.equal(Object.hasOwn(work,'traceScope'),false,'the mapping replaces the trace scope');
+  valid(raw);
+  // Undo brings the trace scope back, right after the mapping and after a later edit.
+  const scope={skip:{worker:['cache']},maxDurationMs:50};
+  const scopedPage=spec('b',board([{id:'submit',text:'Publish',edge:'api->worker'},{id:'work',text:'Worker handles it',nodes:['worker'],traceScope:scope}]));
+  scopedPage.page.tracking={jira:{site:'https://jira.test'}};
+  async function editor(){const ed=V.createBoardEditor({win:newWin(),text:JSON.stringify(scopedPage,null,2),specFile:'flowspec.json',render:()=>null});for(let i=0;i<12;i++)await new Promise(setImmediate);ed.start();return ed;}
+  let ed=await editor();
+  assert.equal(ed.mapSpan({section:0,kind:'step',id:'work'},{serviceName:'worker',operation:'process orders'}),true);
+  assert.equal(ed.undoMap(),true);
+  work=diagramOf(JSON.parse(ed.text())).steps[1];
+  assert.deepEqual(work.traceScope===undefined?'(no traceScope)':plain(work.traceScope),scope,'Undo right after the mapping restores the scope');assert.equal(Object.hasOwn(work,'traceMatch'),false);
+  ed=await editor();
+  assert.equal(ed.mapSpan({section:0,kind:'step',id:'work'},{serviceName:'worker',operation:'process orders'}),true);
+  assert.equal(ed.add({section:0,kind:'node',id:'api'},'ORD-1'),true,'a later board edit');
+  assert.equal(ed.undoMap(),true);
+  raw=JSON.parse(ed.text());work=diagramOf(raw).steps[1];
+  assert.deepEqual(work.traceScope===undefined?'(no traceScope)':plain(work.traceScope),scope,'Undo after a later edit restores the scope too');assert.equal(Object.hasOwn(work,'traceMatch'),false);
+  assert.deepEqual(plain(diagramOf(raw).nodes.api.tickets),['ORD-1'],'the later edit stays');
   valid(raw);
   // Workbench Inspect: Add trace match on a scoped step writes traceMatch and removes traceScope in one edit.
   const W={URL,TextEncoder};vm.createContext(W);

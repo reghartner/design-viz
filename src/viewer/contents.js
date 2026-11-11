@@ -11,7 +11,7 @@ function createReaderContents(ctl,nav,actions,options){
   var expandedTabs=new Set(),collapsedViews=new Set(),standardZoom=new Map(),moved=[],overflowActions=null,actionAttemptWidth=null;
   // Closed Contents leaves a numbered rail; hovering it floats the panel over the page
   // and clicking a marker goes to that part with Contents still closed.
-  var search=null;
+  var search=null,textView=null;
   var hovering=false,overlayTabs=new Set(),intentTimer=0,leaveTimer=0,partCount=0,RAIL_WIDTH=44,toggleFit=null;
   function element(tag,cls,text,parent){var el=doc.createElement(tag);el.className=cls;if(text)el.textContent=text;if(parent)parent.appendChild(el);return el;}
   function button(label,text,parent,fn){var el=element('button','reader-button',text,parent);el.type='button';el.setAttribute('aria-label',label);el.title=label;
@@ -58,6 +58,9 @@ function createReaderContents(ctl,nav,actions,options){
     var copy=button('Copy '+(item.kind==='claude'?'Claude link':'internal site link'),'Copy',row,function(){});bindCopyControl(window,copy,function(){return item.url;});
   });
   destinations.hidden=!destinations.children.length;
+  // #1322: a "Text view" row of its own, outside the tree and the document links,
+  // so the text view is reachable at every bar width (filled by createReaderTextView).
+  var textEntry=element('div','reader-text-view-entry',null,sidebar);
   var footer=element('div','reader-theme-footer',null,sidebar);element('span','reader-theme-label','Theme',footer);
   var themeMenu=element('details','reader-theme-menu',null,footer),themeSummary=element('summary','reader-button',null,themeMenu);themeSummary.setAttribute('aria-label','Choose theme');
   var themeOptions=element('div','reader-theme-options',null,themeMenu);themeOptions.setAttribute('role','menu');themeOptions.setAttribute('aria-label','Themes');
@@ -125,7 +128,32 @@ function createReaderContents(ctl,nav,actions,options){
       if(restore){reopenNestedMenus(entry.node);restore.focus({preventScroll:true});}else if(summaryFocused && !pageUtilitySummary.checkVisibility({visibilityProperty:true})){var target=Array.from(entry.node.querySelectorAll('summary,button,[href],select')).find(function(control){return !control.disabled && control.checkVisibility({visibilityProperty:true});});if(target)target.focus({preventScroll:true});}
     }
   }
+  // #1322 Text launcher: lowest priority in the bar; no other control ever moves.
+  // Every pass fits the bar without it (exactly as before it existed), then:
+  // inline if it fits; else the last item of "More page actions" when the base
+  // shows that menu; else a ⋯ menu for Text alone if that fits; else nothing in
+  // the bar. The Contents panel always has a "Text view" entry. The decision
+  // never feeds back into the base fit, so it cannot oscillate.
+  var textPlace='none',textMenuOnly=false;
+  function measureText(){
+    if(!textView)return;textView.place('measure',textMenuOnly && !overflowActions);
+    if(textMenuOnly){textMenuOnly=false;if(!overflowActions)pageUtilities.hidden=true;}
+  }
+  function fitText(fits){
+    if(!textView)return;
+    if(narrow)textPlace='none';
+    else{
+      textView.place('inline',true);
+      if(fits())textPlace='inline';
+      else if(overflowActions && !pageUtilities.hidden)textPlace='menu';
+      else{pageUtilities.hidden=false;textView.place('menu',true);if(fits()){textMenuOnly=true;textPlace='menu';}else{pageUtilities.hidden=true;textPlace='none';}}
+    }
+    // A ⋯ that is hidden is closed, so it never reappears already open.
+    if(pageUtilities.hidden)pageUtilities.open=false;
+    textView.place(textPlace);
+  }
   function fitToggle(width){
+    measureText();
     if(options.singleReaderToolbar){
       var root=view.getRootNode(),focused=root.activeElement || doc.activeElement,focusedView=viewStrip.contains(focused),focusedPicker=focused===viewPicker;
       if(overflowActions && width>900 && actionAttemptWidth!==width){actionAttemptWidth=width;overflowViewportActions(false);}
@@ -145,15 +173,20 @@ function createReaderContents(ctl,nav,actions,options){
       }
       var needsPicker=settle();
       if(!overflowActions && width>900 && (top.scrollWidth>top.clientWidth+1 || overlapsCenter(actions))){overflowViewportActions(true);actionAttemptWidth=width;needsPicker=settle();}
+      // The base's own overlap test (overlapsCenter), so Text takes exactly the room
+      // the base leaves and never more.
+      fitText(function(){return !overlapsCenter(actions) && top.scrollWidth<=top.clientWidth+1;});
       if(needsPicker && (focusedView || focusedPicker))viewPicker.focus({preventScroll:true});
       else if(focusedPicker){var selected=viewStrip.querySelector('[aria-selected="true"]');if(selected)selected.focus({preventScroll:true});}
       return;
     }
     var actionBounds=actions.getBoundingClientRect();
-    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,actionBounds.width,actionBounds.height,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit)return;toggleFit=key;
-    top.classList.remove('reader-toggle-compact');if(narrow)return;
+    var key=[width,narrow,tabLabel.textContent,viewStrip.textContent,toggleCount.textContent,actionBounds.width,actionBounds.height,doc.fonts && doc.fonts.status].join('|');if(key===toggleFit){if(textView){if(textPlace==='menu' && !overflowActions){pageUtilities.hidden=false;textMenuOnly=true;}textView.place(textPlace);}return;}toggleFit=key;
+    top.classList.remove('reader-toggle-compact');if(!narrow){
     var full=top.getBoundingClientRect().height;top.classList.add('reader-toggle-compact');
-    if(top.getBoundingClientRect().height>=full)top.classList.remove('reader-toggle-compact');
+    if(top.getBoundingClientRect().height>=full)top.classList.remove('reader-toggle-compact');}
+    var settled=top.getBoundingClientRect().height;
+    fitText(function(){return top.getBoundingClientRect().height<=settled+.5 && top.scrollWidth<=top.clientWidth+1;});
   }
   function title(rec){var record=rec && rec.viewOwner && rec.viewOwner.records.find(function(r){return r.runtime===rec;});return record && record.section.heading || rec && rec.sectionEl.querySelector('.sec-h')?.textContent || 'Section';}
   // An open drill-down stays inside its root section; name each open level.
@@ -344,11 +377,11 @@ function createReaderContents(ctl,nav,actions,options){
     release();
     if(!options.singleShareAction && !options.skipTabShare && owner && owner.tabBlock){var block=ctl.tabBlocks[owner.tabBlock-1],copy=block.copyButtons[owner.tab];if(copy){var anchor=doc.createComment('reader tab copy');copy.before(anchor);actions.prepend(copy);moved.push({node:copy,anchor:anchor});}}
     if(options.singleReaderToolbar){var pageActions=actions.querySelector(':scope > .viewport-actions');if(pageActions)Array.from(actions.querySelectorAll(':scope > .embedcopy')).filter(function(node){return node!==copy;}).forEach(function(node){var anchor=doc.createComment('reader page action');node.before(anchor);pageActions.appendChild(node);moved.push({node:node,anchor:anchor});});}
-    Array.from(actions.children).filter(function(node){return node!==utilities && !node.classList.contains('viewport-actions') && !node.classList.contains('document-search-launch');}).forEach(function(node){var anchor=doc.createComment('reader utility');node.before(anchor);utilityBody.appendChild(node);moved.push({node:node,anchor:anchor});});
+    Array.from(actions.children).filter(function(node){return node!==utilities && !node.classList.contains('viewport-actions') && !node.classList.contains('document-search-launch') && !node.classList.contains('text-view-launch');}).forEach(function(node){var anchor=doc.createComment('reader utility');node.before(anchor);utilityBody.appendChild(node);moved.push({node:node,anchor:anchor});});
     if(!options.singleReaderToolbar){var expand=actions.querySelector('.viewport-expand');if(expand){var anchor=doc.createComment('reader expand');expand.before(anchor);utilityBody.appendChild(expand);moved.push({node:expand,anchor:anchor});}}
     utilities.hidden=!utilityBody.children.length;
     scrollHeld=true;cancelAnimationFrame(holdFrame);holdFrame=requestAnimationFrame(function(){scrollHeld=false;pinnedTop=current && current.sectionEl.getBoundingClientRect().top;});
-    drawViews();drawTree();updateZoom();updateTheme();geometry();if(search)search.refresh();
+    drawViews();drawTree();updateZoom();updateTheme();geometry();if(search)search.refresh();if(textView)textView.refresh();
   }
   function keydown(ev){
     if(viewStrip.contains(ev.target) && (ev.key==='Enter' || ev.key===' '))ev.stopPropagation();
@@ -367,10 +400,15 @@ function createReaderContents(ctl,nav,actions,options){
     if(themeMenu.open && ['ArrowDown','ArrowUp','Home','End'].indexOf(ev.key)>=0 && themeMenu.contains(ev.target)){ev.preventDefault();var nodes=Array.from(themeOptions.querySelectorAll('button')),index=nodes.indexOf(ev.target);index=ev.key==='Home'?0:ev.key==='End'?nodes.length-1:(index+(ev.key==='ArrowDown'?1:-1)+nodes.length)%nodes.length;nodes[index].focus();}
   }
   search=createDocumentSearch(ctl,nav,top,actions,documentPages,choose,function(){if(search){drawParts();drawTree();geometry();}});
+  textView=typeof createReaderTextView==='function'?createReaderTextView(ctl,nav,actions,function(){return current;},{menu:pageUtilityBody,closeMenu:function(){pageUtilities.open=false;},menuSummary:pageUtilitySummary,
+    entry:textEntry,contentsButton:toggle,
+    // A narrow Contents panel is a modal overlay with a focus trap: close it before the window opens.
+    closeContents:function(){if(narrow && opened)setOpen(false,false,true);}}):null;
+  if(textView){toggleFit=null;geometry();}
   if(opened!==null)setOpen(opened,false,false);
   var initialFrame=requestAnimationFrame(function(){if(retired)return;(ctl.views?ctl.views.owners:[]).forEach(function(item){expandedTabs.add(item.path);});drawTree();});
   nav.addEventListener('keydown',keydown,true);view.addEventListener('reader-skin-change',updateTheme);view.addEventListener('viewer-presentation-changing',release);view.addEventListener('reader-zoom-change',updateZoom);window.addEventListener('resize',geometry);window.addEventListener('scroll',geometry,true);
   function snapshot(){return {opened:opened,expanded:Array.from(expandedTabs),collapsed:Array.from(collapsedViews),zoom:(ctl.views?ctl.views.owners:[]).flatMap(function(item){return item.views.map(function(definition){return {owner:item.path,id:definition.id,section:definition.members[0].record.reference,value:standardZoom.get(definition) || 1};});})};}
   function restore(saved){if(!saved)return;cancelAnimationFrame(initialFrame);expandedTabs=new Set(saved.expanded || []);collapsedViews=new Set(saved.collapsed || []);(saved.zoom || []).forEach(function(entry){var item=ctl.views && ctl.views.owners.find(function(item){return item.path===entry.owner;}),definition=item && item.views.find(function(definition){return definition.id===entry.id && (!entry.section || definition.members[0].record.reference===entry.section);});if(definition)standardZoom.set(definition,entry.value);});setOpen(saved.opened===true,false,false);refresh(current,viewportRecord);}
-  return {zoom:zoom,setZoom:setZoom,snapshot:snapshot,restore:restore,setOpen:function(value){setOpen(value,false,false);},refresh:refresh,geometry:geometry,release:release,retainScroll:function(){if(scrollHeld)return true;if(pinnedTop===null || !current)return false;if(Math.abs(current.sectionEl.getBoundingClientRect().top-pinnedTop)<1)return true;pinnedTop=null;return false;},destroy:function(){retired=true;if(search)search.destroy();hideOverlay(true);cancelAnimationFrame(initialFrame);cancelAnimationFrame(holdFrame);release();view.removeEventListener('reader-skin-change',updateTheme);view.removeEventListener('viewer-presentation-changing',release);view.removeEventListener('reader-zoom-change',updateZoom);nav.removeEventListener('keydown',keydown,true);window.removeEventListener('resize',geometry);window.removeEventListener('scroll',geometry,true);view.classList.remove('has-reader-contents','reader-contents-open');if(workspaceCanvas)workspaceCanvas.classList.remove('workspace-docview-contents');view.style.removeProperty('--reader-inset');view.style.removeProperty('--reader-left');view.style.removeProperty('--reader-width');if(insetHost){insetHost._readerContentsUsers--;Promise.resolve().then(function(){if(!insetHost._readerContentsUsers)insetHost.style.removeProperty('--reader-host-inset');});}ctl.sections.forEach(function(rec){rec.sectionEl.style.removeProperty('zoom');});}};
+  return {zoom:zoom,setZoom:setZoom,snapshot:snapshot,restore:restore,setOpen:function(value){setOpen(value,false,false);},refresh:refresh,geometry:geometry,release:release,retainScroll:function(){if(scrollHeld)return true;if(pinnedTop===null || !current)return false;if(Math.abs(current.sectionEl.getBoundingClientRect().top-pinnedTop)<1)return true;pinnedTop=null;return false;},destroy:function(){retired=true;if(search)search.destroy();if(textView)textView.destroy();hideOverlay(true);cancelAnimationFrame(initialFrame);cancelAnimationFrame(holdFrame);release();view.removeEventListener('reader-skin-change',updateTheme);view.removeEventListener('viewer-presentation-changing',release);view.removeEventListener('reader-zoom-change',updateZoom);nav.removeEventListener('keydown',keydown,true);window.removeEventListener('resize',geometry);window.removeEventListener('scroll',geometry,true);view.classList.remove('has-reader-contents','reader-contents-open');if(workspaceCanvas)workspaceCanvas.classList.remove('workspace-docview-contents');view.style.removeProperty('--reader-inset');view.style.removeProperty('--reader-left');view.style.removeProperty('--reader-width');if(insetHost){insetHost._readerContentsUsers--;Promise.resolve().then(function(){if(!insetHost._readerContentsUsers)insetHost.style.removeProperty('--reader-host-inset');});}ctl.sections.forEach(function(rec){rec.sectionEl.style.removeProperty('zoom');});}};
 }

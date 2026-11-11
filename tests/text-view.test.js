@@ -180,35 +180,80 @@ test('the Elements renderer has an index table and one sheet per element with ev
 
 /* ---- review cycle 1: every attachment kind, in every layout that shows it ---- */
 
-// Layout-only fields: they place or paint an element and are the only authored
-// leaves the text view leaves out. Keep this list equal to TEXT_VIEW_LAYOUT.
-const LAYOUT_ONLY = ['fromPort', 'toPort', 'curveControls', 'curvePoints', 'coinOffsets', 'color', 'tint', 'icon', 'presentation',
-  'textStyle', 'tone', 'x', 'y', 'w', 'h', 'width', 'height', 'position', 'labelOffset', 'labelPosition'];
+// Layout-only fields: geometry, ports, sizes, colours and icons. They are the only
+// authored leaves the text view leaves out. Keep this list equal to TEXT_VIEW_LAYOUT.
+const LAYOUT_ONLY = ['fromPort', 'toPort', 'curveControls', 'curvePoints', 'coinOffsets', 'labelOffset', 'labelPosition',
+  'x', 'y', 'w', 'h', 'width', 'height', 'position', 'color', 'tint', 'icon', 'textStyle'];
 const IMPORT_LAYOUT_ONLY = ['position', 'nodePositions'];
 const flatEscape = v => String(v).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
-function authoredLeaves(page){
+// Which flat key a leaf of each authored field lands on.
+const FIELD_KEYS = {tickets: k => k === 'ticket', prs: k => k === 'pr', telemetry: k => /^(metric|telemetry)\./.test(k),
+  binding: k => k.startsWith('binding.'), codeRefs: k => k.startsWith('code.'), deltaText: k => k === 'delta.text', deltaLinks: k => k === 'delta.link',
+  edge: k => k === 'touches', edges: k => k === 'touches', nodes: k => k === 'touches', failures: k => k === 'failure',
+  panels: k => k.startsWith('panel.'), patch: k => k.startsWith('panel.'), panelVisibility: k => k.startsWith('panelVisibility.'),
+  traceMatch: k => k === 'trace', conditions: k => k === 'condition', tone: k => k.startsWith('tone.')};
+const keyFor = field => FIELD_KEYS[field] || (k => k === field || k.startsWith(field + '.') || k.startsWith(field + '['));
+function parseFlat(text){
+  return lines(text).map(line => {
+    const parts = line.split(' ');
+    return parts[0] === 'page' ? {kind: 'page', owner: null, key: parts[1], value: parts.slice(2).join(' ')}
+      : {kind: parts[0], owner: parts[1], key: parts[2], value: parts.slice(3).join(' ')};
+  });
+}
+/* Every string, number and boolean leaf of the authored nodes, edges, steps, imports and tracking,
+   with the flat owner and key it must appear under. */
+function authoredLeaves(page, model){
   const out = [], skip = new Set(LAYOUT_ONLY.concat(IMPORT_LAYOUT_ONLY));
-  const walk = (v, at) => {
-    if (Array.isArray(v)) v.forEach((x, i) => walk(x, at + '[' + i + ']'));
-    else if (v && typeof v === 'object') Object.keys(v).forEach(k => { if (!skip.has(k)) walk(v[k], at + '.' + k); });
-    else if ((typeof v === 'string' && v) || typeof v === 'number') out.push([at, v]);
+  const walk = (v, at, place) => {
+    if (Array.isArray(v)) v.forEach((x, i) => walk(x, at + '[' + i + ']', place));
+    else if (v && typeof v === 'object') Object.keys(v).forEach(k => { if (!skip.has(k)) walk(v[k], at + '.' + k, place); });
+    else if ((typeof v === 'string' && v) || typeof v === 'number' || typeof v === 'boolean') out.push(Object.assign({at, value: v}, place));
   };
   C.sectionRecords(page).forEach(r => {
     const d = r.section && r.section.diagram;
     if (!d) return;
-    for (const key of ['nodes', 'edges', 'steps', 'topologyImports']) walk(d[key], r.reference + '.' + key);
+    const prefix = model.multi ? r.reference + '/' : '';
+    const diagram = model.sections.find(sec => sec.reference === r.reference).diagrams[0];
+    Object.keys(d.nodes || {}).forEach(id => Object.keys(d.nodes[id]).forEach(field => {
+      if (!skip.has(field)) walk(d.nodes[id][field], r.reference + '.nodes.' + id + '.' + field, {kind: 'node', owners: [prefix + id], key: keyFor(field)});
+    }));
+    (d.edges || []).forEach((e, i) => Object.keys(e).forEach(field => {
+      const owner = prefix + e.from + '->' + e.to;
+      if (field === 'from' || field === 'to') out.push({at: r.reference + '.edges[' + i + '].' + field, value: e[field], kind: 'edge', owners: [owner], key: () => true, inOwner: true});
+      else if (!skip.has(field)) walk(e[field], r.reference + '.edges[' + i + '].' + field, {kind: 'edge', owners: [owner], key: keyFor(field)});
+    }));
+    (d.steps || []).forEach((st, i) => {
+      const owners = diagram.paths.flatMap(p => p.steps.filter(x => x.id === st.id).map(x => prefix + p.id + '/' + x.n));
+      Object.keys(st).forEach(field => { if (!skip.has(field)) walk(st[field], r.reference + '.steps[' + i + '].' + field, {kind: 'step', owners, key: keyFor(field)}); });
+    });
+    (d.topologyImports || []).forEach((imp, i) => Object.keys(imp).forEach(field => {
+      const resolved = diagram.imports.find(x => x.as === imp.as).resolved;
+      // A resolved import's overlays are checked on the carriers they resolve into.
+      if (resolved && !['spec', 'export', 'as'].includes(field)) return;
+      if (!skip.has(field)) walk(imp[field], r.reference + '.imports[' + i + '].' + field, {kind: 'section', owners: [r.reference],
+        key: ['spec', 'export', 'as'].includes(field) ? (k => k === 'import') : (k => k.startsWith('import.' + imp.as + '.' + field))});
+    }));
   });
-  walk(page.tracking, 'tracking');
+  const tracking = page.tracking || {};
+  Object.keys(tracking).forEach(field => {
+    if (field === 'dependencies') walk(tracking.dependencies, 'tracking.dependencies', {kind: 'page', owners: [null], key: k => k === 'dependency'});
+    else if (field === 'telemetry') Object.keys(tracking.telemetry).forEach(t => {
+      if (t === 'lookups') Object.keys(tracking.telemetry.lookups).forEach(id => walk(tracking.telemetry.lookups[id], 'tracking.telemetry.lookups.' + id, {kind: 'page', owners: [null], key: k => k.startsWith('logsearch.' + id + '.')}));
+      else walk(tracking.telemetry[t], 'tracking.telemetry.' + t, {kind: 'page', owners: [null], key: k => k.startsWith('tracking.telemetry.' + t)});
+    });
+    else walk(tracking[field], 'tracking.' + field, {kind: 'page', owners: [null], key: k => k.startsWith('tracking.' + field)});
+  });
   return out;
 }
 
-test('every authored leaf of nodes, edges, steps, imports and tracking reaches the flat lines', () => {
+test('every authored leaf reaches a flat line of its own owner and field', () => {
   assert.deepEqual(plain(C.TEXT_VIEW_LAYOUT), LAYOUT_ONLY, 'the module and this test share one layout-only list');
   for (const [name, page] of [['resolved', resolvedPage()], ['unresolved', C.normalize(read('board.json'))], ['provider', C.normalize(read('platform.json'))]]){
-    const flat = C.textViewFlat(C.textViewModel(page)), leaves = authoredLeaves(page);
+    const model = C.textViewModel(page), facts = parseFlat(C.textViewFlat(model)), leaves = authoredLeaves(page, model);
     assert.ok(leaves.length > (name === 'provider' ? 15 : 150), name + ' fixture is rich');
-    const missing = leaves.filter(([, v]) => !flat.includes(flatEscape(v)));
-    assert.deepEqual(missing, [], name + ': authored data missing from the flat lines');
+    const missing = leaves.filter(leaf => !facts.some(f => f.kind === leaf.kind && leaf.owners.includes(f.owner) && leaf.key(f.key) &&
+      (leaf.inOwner ? f.owner.includes(String(leaf.value)) : (' ' + f.value + ' ').includes(flatEscape(leaf.value)))));
+    assert.deepEqual(missing.map(l => l.at + ' = ' + l.value), [], name + ': authored data missing from its owner and field');
   }
 });
 
@@ -275,7 +320,24 @@ test('each attachment kind appears in each layout that shows it', () => {
     ['telemetry settings', 'page tracking.telemetry.refreshMs 300000', ['happy', '- tracking.telemetry.variables.region: `us-east-1`'], '- tracking.telemetry.honeycomb.dataset: `doorbell`'],
     ['environment profile override', 'page tracking.telemetry.environments.prd.grafana.prometheus prom-prd', ['happy', '- tracking.telemetry.environments.prd.grafana.prometheus: `prom-prd`'], null],
     ['template definition', 'page tracking.telemetry.templates.kafka-topic.params group', null, '- tracking.telemetry.templates.kafka-topic.params: `topic`'],
-    ['log search', 'page logsearch.camera-model.value DB-300', ['happy', '  - query: `{app="device-gateway",env="${env}"} |= "camera_model" | json | camera_model="$value"`'], '  - fields.traceId: trace_id'],
+    ['log search', 'page logsearch.camera-model.value[1] DB-300', ['happy', '  - query: `{app="device-gateway",env="${env}"} |= "camera_model" | json | camera_model="$value"`'], '  - fields.traceId: trace_id'],
+    ['step delta text', 'step delivery/happy/2 delta.text Publishes now carry the firmware version.', ['happy', '- delta Publishes now carry the firmware version.'], null],
+    ['metric table', null, null, '- Telemetry: service\n\n| Metric | Source | Unit | Pass rule |\n|---|---|---|---|\n| rate | grafana | req/h | min 10 |'],
+    ['page title', 'page title Doorbell delivery as text', ['happy', '# Doorbell delivery as text — steps'], '# Doorbell delivery as text — elements'],
+    ['section heading', 'section delivery heading Press to notification', ['happy', '## Press to notification (section delivery)'], '## Press to notification (section delivery)'],
+    ['path label', 'path delivery/happy label Connected', ['happy', 'Path: Connected (`happy`)'], null],
+    ['log search fields', 'page logsearch.camera-model.fields.spanId span_id', ['happy', '  - fields.spanId: span_id'], '  - fields.spanId: span_id'],
+    ['page settings heading', null, ['happy', '\n## Page settings\n\n- '], '\n## Page settings\n\n- '],
+    ['section tab', 'section ops tab Ops', ['happy', '## On-call check (section ops, tab Ops)'], '## On-call check (section ops, tab Ops)'],
+    ['path basedOn', 'path delivery/refused basedOn happy', ['refused', 'Path: Refused publish (`refused`) · based on `happy` · other paths: Connected (`happy`)'], null],
+    ['panel visibility', 'step delivery/refused/2 panelVisibility.proof false', ['refused', '- panel proof visibility: `false`'], null],
+    ['step tone', 'step delivery/refused/2 tone.iot alert', ['refused', '- tone `iot`: alert'], null],
+    ['node presentation', 'node delivery/queue presentation baseline', ['refused', '- node `queue` Staging SQS · presentation baseline'], '- Presentation: baseline'],
+    ['edge presentation', 'edge delivery/iot->queue presentation baseline', ['refused', '- edge `iot->queue` rule · tickets IOT-3 · presentation baseline'], null],
+    ['log search entry', 'page logsearch.camera-model.label Camera model logs', ['happy', '- `camera-model` Camera model logs (loki-main) · values DB-200, DB-300'], '- `camera-model` Camera model logs (loki-main) · values DB-200, DB-300'],
+    ['subtitle', 'node delivery/device sub Firmware', null, '- Subtitle: Firmware'],
+    ['edge title and label', 'edge delivery/device->ingest title Event intake call', ['happy', '- edge `device->ingest` Event intake call'], '### edge `device->ingest` Event intake call\n\n- Label: event\n- Kind: https'],
+    ['edges out', null, null, '- Edges out: `device->ingest`, `device->iot`'],
     ['import', 'section delivery import platform tv-platform core', ['happy', 'Imports: `platform` from tv-platform export core'], 'Imports: `platform` from tv-platform export core'],
   ];
   const all = lines(flat);
@@ -361,4 +423,79 @@ test('flat keys of code references and trace rules survive an insertion before t
 test('page settings are printed only when the spec sets them', () => {
   const all = lines(C.textViewFlat(C.textViewModel(C.normalize({sections: [{diagram: {nodes: {a: {title: 'A'}}, rows: [['a']]}}]}))));
   assert.ok(!all.some(line => line.startsWith('page ')), all.join('\n'));
+});
+
+test('markdown keeps its block shape: headings and tables stand apart, no doubled blank lines', () => {
+  const model = C.textViewModel(resolvedPage());
+  const empty = C.textViewModel({sections: [{id: 'a', diagram: {nodes: {n: {title: 'N'}}, rows: [['n']], edges: [null]}}, {id: 'b', diagram: {nodes: {}, rows: [[]]}}]});
+  const texts = [C.textViewSteps(model), C.textViewSteps(model, {queries: 'full', pathId: 'refused'}), C.textViewElements(model), C.textViewSteps(empty), C.textViewElements(empty)];
+  assert.ok(texts[3].includes('_No steps._') && texts[4].includes('_No elements._'));
+  assert.ok(texts[3].includes('- problem: edges[0]: expected an object with from and to null\n\n'), 'a blank line follows the problems');
+  for (const text of texts){
+    const rows = text.split('\n');
+    rows.forEach((row, i) => {
+      if (/^#{1,3} /.test(row)){
+        assert.equal(rows[i + 1], '', 'blank after: ' + row);
+        if (i) assert.equal(rows[i - 1], '', 'blank before: ' + row);
+      }
+      if (row.startsWith('| ') && !(rows[i - 1] || '').startsWith('|')) assert.equal(rows[i - 1], '', 'blank before table: ' + row);
+      if (row.startsWith('|') && rows[i + 1] !== undefined && !rows[i + 1].startsWith('|')) assert.equal(rows[i + 1], '', 'blank after table: ' + row);
+      if (row === '' && i) assert.notEqual(rows[i - 1], '', 'doubled blank line at ' + i);
+      if (row === '_No steps._' || row === '_No elements._' || /^(Path|Imports): /.test(row)) assert.equal(rows[i + 1], '', 'blank after: ' + row);
+      if (/^\S/.test(row) && !/^(#|\||- |_|Path: |Imports: )/.test(row) && rows[i - 1] !== undefined) assert.ok(rows[i - 1] === '' || /^\S/.test(rows[i - 1]) && !/^(- |#|\|)/.test(rows[i - 1]), 'prose stands apart: ' + row);
+    });
+    assert.ok(text.endsWith('\n') && !text.endsWith('\n\n'), 'ends with one newline');
+  }
+});
+
+test('wrong-typed known fields and skipped entries become problem lines', () => {
+  const page = {sections: [{id: 's', diagram: {
+    nodes: {a: {title: 'A', tickets: 'ABC-1', telemetry: 'x', binding: 'svc', delta: 'yes', codeRefs: [null]}, b: {title: 'B', tickets: ['ok', 'AB-2']}},
+    rows: [['a', 'b']], edges: [{from: 'a', to: 'b', prs: 'nope'}],
+    steps: [{id: 'one', text: 'One', time: 5, edges: [null, 'a->b'], ticketFilter: 'AB-2', traceMatch: [null]}]}}]};
+  const model = C.textViewModel(page), all = lines(C.textViewFlat(model));
+  for (const expected of [
+    'node a problem tickets: expected an array "ABC-1"', 'node a problem telemetry: expected an object "x"', 'node a problem binding: expected an object "svc"',
+    'node a problem delta: expected a boolean "yes"', 'node a problem codeRefs[0]: not shown null', 'node b problem tickets[0]: not a valid entry "ok"',
+    'edge a->b problem prs: expected an array "nope"', 'step happy/1 problem time: expected a string 5', 'step happy/1 problem edges[0]: expected an id null',
+    'step happy/1 problem ticketFilter: expected an array "AB-2"', 'step happy/1 problem traceMatch[0]: not shown null', 'step happy/1 touches edge a->b'])
+    assert.ok(all.includes(expected), expected + '\n' + all.join('\n'));
+  assert.ok(!all.some(line => line.includes('touches edge null')));
+  assert.match(C.textViewElements(model), /- Problem: tickets: expected an array "ABC-1"/);
+  assert.match(C.textViewSteps(model), /- problem: time: expected a string 5/);
+  const arrays = lines(C.textViewFlat(C.textViewModel({sections: [{id: 's', diagram: {nodes: ['x'], rows: [[]]}}]})));
+  assert.ok(arrays.includes('section s problem nodes: expected an object ["x"]'), arrays.join('\n'));
+  const telemetry = lines(C.textViewFlat(C.textViewModel({sections: [{diagram: {nodes: {a: {telemetry: {kind: 'call', signals: {r: {grafana: ''}}}}}, rows: [['a']]}}]})));
+  assert.ok(telemetry.some(line => line.startsWith('node a problem telemetry.signals.r: ')), telemetry.join('\n'));
+});
+
+test('repeated facts stay distinct lines and node ids escape like edge ends', () => {
+  const page = {sections: [{diagram: {nodes: {'d\\ne': {title: 'Backslash', group: 'g', tags: ['x', 'x']}, 'd\ne': {title: 'Newline'}, 'tick`id': {title: 'Tick'}},
+    rows: [['d\\ne', 'd\ne', 'tick`id']], edges: [{from: 'd\\ne', to: 'tick`id'}, {from: 'd\\ne', to: 'tick`id', label: 'again'}]}}]};
+  const model = C.textViewModel(page), all = lines(C.textViewFlat(model));
+  assert.ok(all.includes('node d\\\\ne title Backslash'), all.join('\n'));
+  assert.ok(all.includes('node d\\ne title Newline'));
+  assert.ok(all.includes('node d\\\\ne tags x') && all.includes('node d\\\\ne tags#2 x'), 'a repeated value is a second line');
+  const once = lines(C.textViewFlat(C.textViewModel({sections: [{diagram: {nodes: {n: {tags: ['x']}}, rows: [['n']]}}]})));
+  assert.ok(!once.some(line => line.includes('tags#2')));
+  const elements = C.textViewElements(model);
+  assert.ok(elements.includes('### node `` tick`id `` Tick'), elements);
+  assert.ok(elements.includes('- Edges out: `` d\\ne->tick`id ``, `` d\\ne->tick`id #2 ``'), elements);
+  assert.ok(elements.includes('- Edges in: `` d\\ne->tick`id ``, `` d\\ne->tick`id #2 ``'));
+});
+
+test('log searches and their suggested values keep authored order in the flat lines', () => {
+  const before = lines(C.textViewFlat(C.textViewModel(resolvedPage())));
+  assert.ok(before.includes('page logsearch.camera-model.order 1'));
+  const board = read('board.json'), lookups = board.page.tracking.telemetry.lookups;
+  lookups['camera-model'].values.reverse();
+  const after = lines(C.textViewFlat(C.textViewModel(resolvedPage(board))));
+  assert.deepEqual(before.filter(l => !after.includes(l)), ['page logsearch.camera-model.value[0] DB-200', 'page logsearch.camera-model.value[1] DB-300']);
+  assert.deepEqual(after.filter(l => !before.includes(l)), ['page logsearch.camera-model.value[0] DB-300', 'page logsearch.camera-model.value[1] DB-200']);
+  lookups.aaa = {label: 'First added', query: '{app="x"} |= "$value"'};
+  const orders = lines(C.textViewFlat(C.textViewModel(resolvedPage(board)))).filter(l => / logsearch\.[^.]+\.order /.test(l));
+  assert.deepEqual(orders, ['page logsearch.aaa.order 2', 'page logsearch.camera-model.order 1']);
+  // Tickets stay a set: reordering them changes nothing.
+  const tickets = read('board.json');tickets.page.blocks[0].diagram.nodes.ingest.tickets.reverse();
+  assert.deepEqual(lines(C.textViewFlat(C.textViewModel(resolvedPage(tickets)))), before);
 });

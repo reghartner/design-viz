@@ -100,6 +100,15 @@ function registryCandidates(file){
   return dirs.map(registryAt).filter(candidate => candidate && !seen.has(path.resolve(candidate)) && seen.add(path.resolve(candidate)));
 }
 
+// A folder names the registry.json or canon.json it holds (the help's promise);
+// local-imports itself would read canon.json only.
+function explicitRegistry(location){
+  let stat;
+  try { stat = fs.statSync(location); } catch (error){ fail('--resolve-imports ' + location + ': ' + error.message); }
+  if (!stat.isDirectory()) return location;
+  return registryAt(location) || fail('--resolve-imports ' + location + ': the folder holds no registry.json or canon.json');
+}
+
 async function resolve(C, file, raw, options){
   let providers;
   try { providers = C.FlowTopology.dependencies(raw); } catch (error){ fail(file + ': ' + error.message); }
@@ -107,7 +116,7 @@ async function resolve(C, file, raw, options){
     try { return C.FlowTopology.resolveSource(raw, null); } catch (error){ fail(file + ': ' + error.message); }
   }
   if (options.noResolve) return raw;
-  const candidates = options.registry ? [options.registry] : registryCandidates(file), reasons = [];
+  const candidates = options.registry ? [explicitRegistry(options.registry)] : registryCandidates(file), reasons = [];
   for (const location of candidates){
     let context;
     try { context = await (await import('./canon/local-imports.mjs')).resolveLocalImports(file, location); }

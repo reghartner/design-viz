@@ -102,3 +102,8 @@ echo '*.spec.json diff=flowview' >> .git/info/attributes
 
 `--no-resolve-imports` gives both sides of the diff the same unresolved form, because
 git hands the old version to the tool as a temporary file where no registry is found.
+
+Not printed: page protocols (the legend), diagram panel definitions (only steps'
+panel patches and visibility are), group definitions (a node's group name is),
+section prose, and layout fields (positions, ports, sizes, colours, icons). An
+empty text diff does not mean an unchanged spec.

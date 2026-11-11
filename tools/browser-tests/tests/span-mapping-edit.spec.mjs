@@ -7,7 +7,7 @@
 |---|---|---|---|
 | M1 map + save | steps accept (traceMatch), rates (edge on the imported canon::api → canon::store), charge (local edge web → pay) | Edit in the Trace view; the currency span and then the payment span each map through "Map this span to a step"; the loaded trace and focused span survive each re-render and the span then maps to its step; Save 2 → steps rates/charge carry exactly {serviceName, operation}, accept and the topology import are unchanged; history has two trace-match changes; after Save the same spans still map to those steps | writing to the import overlay or the provider; losing the trace on re-render; inexact strings |
 | M2 not outside Edit mode | same board; canEdit false, then an editor before Edit and after Done | no "Map this span to a step" group for an unmapped span; the read-only viewer has no Edit | offering the mapping to readers or outside Edit mode |
-| M5 declare (#1290 PR 9) | drag fixture: node pay has one unmapped step; the imported node canon::store has none | a span dropped on pay maps at once (as M3), and "Declare on Payment service instead" swaps it for a declaration (one pending change); a span dropped on canon::store opens the chooser and "Declare on Rates store" with role database writes the consumer overlay; Save records two trace-span changes and the Edit history reads them | a swap that leaves two pending changes, a declaration written on the provider |
+| M5 declare (#1290 PR 9) | drag fixture: node pay has one unmapped step; the imported node canon::store has none | a span dropped on pay maps at once (as M3), and "Declare on Payment service instead" swaps it for a declaration (one pending change); a span dropped on canon::store opens the chooser and "Declare on Rates store" with role database writes the consumer overlay; the declared node shows its trace label at once; Save records two trace-span changes and the Edit history reads them | a swap that leaves two pending changes, a declaration written on the provider |
 Flip: drop the Trace-view Edit controls → M1 cannot start editing. */
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -214,20 +214,23 @@ test('M5 desktop Declare on this node: instead of a drop mapping, and from the c
  const instead=panel.getByRole('button',{name:'Declare on Payment service instead',exact:true});
  const box=await instead.boundingBox();expect(box.height,'at least 24px').toBeGreaterThanOrEqual(24);
  await instead.click();
- await expect(panel.locator('.dv-trace-declare-note-text')).toHaveText('Declared grpc-msdemo-paymentservice-charge (payment · grpc.msdemo.PaymentService/Charge) on Payment service.');
+ await expect(panel.locator('.dv-trace-declare-note-text')).toHaveText('Declared charge (payment · grpc.msdemo.PaymentService/Charge) on Payment service.');
  await expect(panel.getByRole('button',{name:'Save 1 change',exact:true})).toBeVisible();
+ // The loaded trace lights the declared node at once, before Save: its trace label reads a time.
+ await expect(root.locator('.dv-trace-overlay[data-trace-node="pay"] text').first()).toHaveText(/\d+(\.\d+)?\s*(µs|ms|s)\b/);
  // Onto the imported canon::store, which no step names: the chooser offers Declare with a role.
  await dragSpan(page,panel,CURRENCY,()=>nodePoint(page,root,'canon::store'));
  const chooser=panel.locator('.dv-trace-map-chooser');await expect(chooser).toBeVisible();
  await chooser.getByRole('combobox',{name:'Role for the span declared on Rates store',exact:true}).selectOption('database');
  await chooser.getByRole('button',{name:'Declare on Rates store',exact:true}).click();
- await expect(panel.locator('.dv-trace-declare-note-text')).toHaveText('Declared grpc-msdemo-currencyservice-getsupportedcurrencies (currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies) on Rates store.');
+ await expect(panel.locator('.dv-trace-declare-note-text')).toHaveText('Declared getsupportedcurrencies (currency · grpc.msdemo.CurrencyService/GetSupportedCurrencies) on Rates store.');
+ await expect(root.locator('.dv-trace-overlay[data-trace-node="canon::store"] text').first()).toHaveText(/\d+(\.\d+)?\s*(µs|ms|s)\b/);
  const saved=JSON.parse(await save(page,panel,2)),d=saved.page.sections[0].diagram;
  expect(saved.page.editHistory.at(-1).changes.map(c=>[c.op,c.node,c.span])).toEqual([
-  ['trace-span','pay',{key:'grpc-msdemo-paymentservice-charge',...PAYMENT.match,role:'process'}],
-  ['trace-span','canon::store',{key:'grpc-msdemo-currencyservice-getsupportedcurrencies',...CURRENCY.match,role:'database'}]]);
+  ['trace-span','pay',{key:'charge',...PAYMENT.match,role:'process'}],
+  ['trace-span','canon::store',{key:'getsupportedcurrencies',...CURRENCY.match,role:'database'}]]);
  expect(d.steps.find(s=>s.id==='settle').traceMatch,'the swapped mapping is gone').toBeUndefined();
- expect(d.nodes.pay.trace.spans['grpc-msdemo-paymentservice-charge']).toEqual({...PAYMENT.match,role:'process'});
- expect(d.topologyImports[0].nodeTracking.store.trace.spans['grpc-msdemo-currencyservice-getsupportedcurrencies']).toEqual({...CURRENCY.match,role:'database'});
- await expect(root.locator('.dv-edit-first').first()).toHaveText('grpc-msdemo-paymentservice-charge (payment · grpc.msdemo.PaymentService/Charge) declared on Payment service');
+ expect(d.nodes.pay.trace.spans.charge).toEqual({...PAYMENT.match,role:'process'});
+ expect(d.topologyImports[0].nodeTracking.store.trace.spans.getsupportedcurrencies).toEqual({...CURRENCY.match,role:'database'});
+ await expect(root.locator('.dv-edit-first').first()).toHaveText('charge (payment · grpc.msdemo.PaymentService/Charge) declared on Payment service');
 });

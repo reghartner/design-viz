@@ -5099,6 +5099,7 @@ test('#1280 follow-up: in the capped Edit list a row never lands under the bar, 
 | DC2 | An edge drop that maps at once offers send and receive, send first. |
 | DC3 | Where the chooser opens (several steps, or none), "Declare on <title>" is one of its choices, with the role select; it calls declareSpan. |
 | DC4 | The latest declaration shows "Declared <key> (<service> · <operation>) on <title>." with Undo (undoDeclare). |
+| DC5 | A span the carrier already declares is refused before the write: the board editor's reason ("Already declared as <key> on <title>.") shows beside the button, in the note and in the chooser. |
 */
 const click=(el,h)=>{el.dispatchEvent({type:'click',preventDefault(){},stopPropagation(){}});if(h)runTimers(h);};
 const SPAN={serviceName:MAP_MATCH.serviceName,operation:MAP_MATCH.operation};
@@ -5158,5 +5159,23 @@ test('DC4 the latest declaration shows a note with Undo',async()=>{
  assert.equal(note.querySelector('.dv-trace-declare-note-text').textContent,'Declared grpc-msdemo-currencyservice-getsupportedcurrencies ('+MAP_MATCH.serviceName+' · '+MAP_MATCH.operation+') on Beta.');
  assert.equal(b.m.body.querySelector('.dv-trace-map-note'),null,'only the latest change has a note');
  click(note.querySelector('button.dv-trace-declare-undo'),b.h);assert.equal(b.editor.undeclared,1);
+ b.api.destroy();
+});
+test('DC5 a span the carrier already declares is refused beside the button, in the note and in the chooser',async()=>{
+ let b=mapBoard();let s=await b.focus();
+ b.editor.declarePreview=()=>({error:'Already declared as charge on Beta.'});
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ b.editor.setMapped({step:'beta',label:'Show beta',traceMatch:MAP_MATCH});b.api.setTraceShow(true);
+ const instead=b.m.body.querySelector('.dv-trace-map-note button.dv-trace-declare-instead');assert.ok(instead,'Declare on Beta instead');click(instead,b.h);
+ assert.deepEqual(b.editor.swaps,[],'nothing is swapped');
+ const why=b.m.body.querySelector('.dv-trace-map-note .dv-trace-declare-error');assert.ok(why,'the reason shows in the note');
+ assert.equal(why.textContent,'Already declared as charge on Beta.');assert.equal(why.getAttribute('role'),'status');
+ assert.equal(b.m.body.querySelector('.dv-trace-map-note button.dv-trace-declare-instead').getAttribute('aria-describedby'),why.id,'the button is described by it');
+ b.api.destroy();
+ b=mapBoard({twoOnB:true});s=await b.focus();b.editor.declarePreview=()=>({error:'Already declared as charge on Beta.'});
+ spanDrop(b.h,b.h.view.querySelector('g.node[data-dv-node="b"]'),s.context);runTimers(b.h);
+ click(b.m.body.querySelector('.dv-trace-map-chooser button.dv-trace-map-declare'),b.h);
+ assert.deepEqual(b.editor.declares,[]);
+ assert.equal((b.m.body.querySelector('.dv-trace-map-chooser .dv-trace-declare-error') || {}).textContent,'Already declared as charge on Beta.','the chooser stays open and says why');
  b.api.destroy();
 });

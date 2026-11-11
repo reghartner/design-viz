@@ -47,7 +47,7 @@ function telemetryTraceModel(diagram,pathId,exemplar){
   var nodes=Object.create(null),edges=Object.create(null),rows=[];
   if(mapping)mapping.steps.forEach(function(match){
     // #1290: an inheriting step has no selector; its traceScope holds its budget.
-    var step=(diagram.steps || []).find(function(s){return s.id===match.stepId;}),selector=FlowTraceMatch.selector(step,match) || (match.inherited && step.traceScope) || {},keys=stepDeliveredKeys(step);
+    var step=typeof match.stepIndex==='number' && (diagram.steps || [])[match.stepIndex] || (diagram.steps || []).find(function(s){return s.id===match.stepId;}),selector=FlowTraceMatch.selector(step,match) || (match.inherited && step.traceScope) || {},keys=stepDeliveredKeys(step);
     var exact=(diagram.edges || []).filter(function(e){return keys.indexOf(e.from+'->'+e.to)>=0 && (!match.nodeId || e.to===match.nodeId);});
     var duration=match.status!=='matched'?null:match.durationMs!=null?match.durationMs:Math.max.apply(null,match.spans.map(function(s){return s.durationMs;}));
     var kinds=match.conditions.map(function(c){return c.kind;}),tone=match.status!=='matched'?'unknown':kinds.some(function(k){return k==='service-error' || k==='delivery-failed';})?'error':kinds.some(function(k){return ['slow','database-slow','queue-buildup','backpressure'].indexOf(k)>=0;})?'warning':'observed';
@@ -81,8 +81,11 @@ function telemetryTraceModel(diagram,pathId,exemplar){
       if(x.spans.length)return name+' '+telemetryTraceSpanTime([{status:'matched',intervals:x.spans.map(interval)}]);
       return name+': '+(x.notRecorded.length?'attribute '+x.notRecorded.join(', ')+' not recorded':'not in this trace');
     });
-    var row={id:'carrier:'+id,kind:'carrier',nodeId:id,edgeIndex:null,status:'matched',tone:spans.some(function(s){return s.error;})?'error':'observed',duration:null,budget:undefined,
-      label:'',operation:'',service:'',alternative:null,optional:false,otherAlternatives:[],conditions:[],declarations:parts,
+    // A failed declared span is named, as step and hand-off titles say "Service error".
+    var failed=spans.filter(function(s){return s.error;});
+    var title='Declared spans: '+parts.join('; ')+(failed.length?'.':'')+failed.map(function(s){return ' Service error: '+s.serviceName+' '+s.operation+(s.statusCode?' · HTTP '+s.statusCode:'')+'.';}).join('');
+    var row={id:'carrier:'+id,kind:'carrier',nodeId:id,edgeIndex:null,status:'matched',tone:failed.length?'error':'observed',duration:null,budget:undefined,
+      label:'',operation:'',service:'',alternative:null,optional:false,otherAlternatives:[],conditions:[],declarations:parts,titleText:title,
       spanIds:spans.map(function(s){return s.id;}),intervals:spans.map(interval)};
     (nodes[id]=nodes[id] || []).push(row);
   });
@@ -107,7 +110,7 @@ function telemetryTraceHandoffRows(diagram,trace,carriers,rows,edges){
     if((diagram.edges || []).filter(function(e){return e.from+'->'+e.to===key;}).length!==1)return;
     var own=spansOf(list,'receive'),declaresReceive=list.some(function(x){return x.role==='receive';});
     var sends=spansOf(list,'send'),receivers=declaresReceive?own:spansOf(carriers.nodes[edge.to],'process');
-    var pairs=FlowTraceMatch.handoffs(trace,sends,receivers),paired=pairs.filter(function(p){return p.receive;}),text='',title='',ids=[];
+    var pairs=FlowTraceMatch.handoffs(trace,sends,receivers),paired=pairs.filter(function(p){return p.receive;}),text='',title='',ids=[],untimed=false;
     if(paired.length){
       var intervals=paired.map(function(p){return {id:p.send.id+'>'+p.receive.id,startMs:p.send.startMs,durationMs:Math.max(0,p.receive.startMs-p.send.startMs)};});
       var time=telemetryTraceSpanTime([{status:'matched',intervals:intervals}]).replace(/ across (\d+) spans$/,' across $1 hand-offs');
@@ -128,7 +131,8 @@ function telemetryTraceHandoffRows(diagram,trace,carriers,rows,edges){
       title='No receiver found in this trace; showing the send span\'s own time ('+own_+').';
       ids=sends.map(function(s){return s.id;});
     }else if(declaresReceive && own.length){
-      text='receive seen · send not in trace';
+      // No send in the trace: a label, but no hand-off time, so it is not counted as timed (review M3).
+      untimed=true;text='receive seen · send not in trace';
       title='The receiving span ('+names(own)+') is in this trace but no send span is, so there is no hand-off time.';
       ids=own.map(function(s){return s.id;});
     }else return;
@@ -142,7 +146,7 @@ function telemetryTraceHandoffRows(diagram,trace,carriers,rows,edges){
       if(ranks[r.tone]>ranks[tone])tone=r.tone;conditions=conditions.concat(r.conditions || []);
     });
     edges[key]=[{id:'carrier:'+key,kind:'carrier',nodeId:null,edgeIndex:index,status:'matched',duration:null,label:text,text:text,titleText:title,operation:'',service:'',alternative:null,optional:false,otherAlternatives:[],conditions:conditions,
-      tone:tone,spanIds:ids,intervals:[]}];
+      tone:tone,spanIds:ids,intervals:[],timed:!untimed}];
   });
 }
 /* #1185: each trace carrier's highlight level against the focused span: "current" (the focused
@@ -285,18 +289,22 @@ function telemetryTraceRowTitle(r){
    inherits through a traceScope replaces that scope. */
 function traceMapStepNote(step){return step && step.traceScope && typeof step.traceScope==='object' && !Array.isArray(step.traceScope)?' · replaces this step\'s trace scope':'';}
 function telemetryTraceReaderHint(diagram,step,shared){
-  function stepTitle(id){var st=(diagram.steps || []).find(function(x){return x && x.id===id;});return '“'+String(st && st.text || id).replace(/\s+/g,' ').trim()+'”';}
+  // A step named by its id, or (an id-less step) by its index in the diagram's steps, as mapTrace names it.
+  function stepTitle(id){var steps=diagram.steps || [],st=steps.find(function(x){return x && x.id===id;}) || (/^\d+$/.test(String(id))?steps[Number(id)]:null);return '“'+String(st && st.text || id).replace(/\s+/g,' ').trim()+'”';}
   var nodeTitle=function(id){var n=(diagram.nodes || {})[id];return n && n.title || id;},parts=shared.id.split('->');
   var carrier=shared.kind==='node'?nodeTitle(shared.id):nodeTitle(parts[0])+' → '+nodeTitle(parts[1]);
-  return 'Step '+stepTitle(step.id)+': '+carrier+' is also part of '+(shared.steps.length>1?'steps ':'step ')+shared.steps.map(stepTitle).join(', ')+', so this step shows no trace spans of its own.';
+  return 'Step “'+String(step && (step.text || step.id) || '').replace(/\s+/g,' ').trim()+'”: '+carrier+' is also part of '+(shared.steps.length>1?'steps ':'step ')+shared.steps.map(stepTitle).join(', ')+', so this step shows no trace spans of its own.';
 }
 function telemetryTraceCounts(model){
   var rows=model.rows || [],n=function(f){return rows.filter(f).length;};
   var optional=n(function(r){return r.optional;}),other=n(function(r){return r.notThisFlow;}),unmapped=n(function(r){return r.status==='unmapped';});
   // Timed carriers are those timed from their declared spans (#1290), so boards without declarations read as before.
-  function timed(map){return Object.keys(map || {}).filter(function(k){return map[k].some(function(r){return r.kind==='carrier' && r.status==='matched';});}).length;}
+  function timed(map){return Object.keys(map || {}).filter(function(k){return map[k].some(function(r){return r.kind==='carrier' && r.status==='matched' && r.timed!==false;});}).length;}
+  // A span a node or connection row shows from its declarations is on the board, so it is not unmatched.
+  var shown=Object.create(null);
+  [model.nodes,model.edges].forEach(function(map){Object.keys(map || {}).forEach(function(k){map[k].forEach(function(r){if(r.kind==='carrier')(r.spanIds || []).forEach(function(id){shown[id]=true;});});});});
   return {matched:n(function(r){return r.status==='matched';}),total:rows.length-optional-other-unmapped,optional:optional,notThisFlow:other,unmapped:unmapped,
-    unmatched:model.mapping?model.mapping.unmatched.length:0,nodes:timed(model.nodes),edges:timed(model.edges)};
+    unmatched:model.mapping?model.mapping.unmatched.filter(function(s){return !shown[s.id];}).length:0,nodes:timed(model.nodes),edges:timed(model.edges)};
 }
 function telemetryTraceCoverage(model){
   var c=telemetryTraceCounts(model),plural=function(n,one,many){return n+' '+(n===1?one:many);};

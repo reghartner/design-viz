@@ -285,10 +285,10 @@ function createBuilderInteractions(opts){
       return;
     }
     commitCascade(function(raw){ return deletePlanFor(t, raw); },
-      {after: function(){
+      {after: function(plan){
         session.target = null; setSelected(null);
         if (t.kind === 'section') session.insertSection = 0;
-        inspectorMessage(t.kind + ' deleted — undo restores it');
+        inspectorMessage(plan && plan.message ? plan.message + ' Undo restores it.' : t.kind + ' deleted — undo restores it');
       }});
   }
 

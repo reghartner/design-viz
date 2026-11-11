@@ -12,11 +12,22 @@ function planDeleteStep(text, raw, sectionIdx, stepIdx){
     if (got.d.paths.some(function(p){return p.steps.length === 1 && p.steps[0] === id;}))
       return {error:'This is the only step in a path. Remove that path or add another step first.'};
   }
+  var orphans=[];
   var plan=builderRewrite(text, raw, got.path, function(d){
     d.steps.splice(stepIdx,1);
     (d.paths || []).forEach(function(p){p.steps=p.steps.filter(function(ref){return ref!==id;});});
     (d.layouts || []).forEach(function(v){if(Array.isArray(v.steps))v.steps=v.steps.filter(function(ref){return ref!==id;});});
+    // #1290: a trace parent step that names the deleted step is removed in the same edit,
+    // so the board stays valid and one Undo brings both back.
+    if(id)(d.steps || []).forEach(function(st){
+      if(!st || typeof st!=='object')return;
+      var hit=false;
+      [].concat(st.traceMatch || []).forEach(function(m){if(m && typeof m==='object' && m.parentStepId===id){delete m.parentStepId;hit=true;}});
+      if(st.traceScope && typeof st.traceScope==='object' && st.traceScope.parentStepId===id){delete st.traceScope.parentStepId;hit=true;}
+      if(hit)orphans.push(st.id || st.text || 'untitled');
+    });
   });
+  if(!plan.error && orphans.length)plan.message='Step deleted. '+(orphans.length===1?'Step “'+orphans[0]+'” used it as its trace parent step; that parent is removed.':'Steps '+orphans.map(function(n){return '“'+n+'”';}).join(', ')+' used it as their trace parent step; those parents are removed.');
   return builderDetailCascade(plan,sectionIdx,function(detail,owner,target){
     if(target===sectionIdx && detail.step===id)delete detail.step;
     if(detail.stepMap){
@@ -635,7 +646,8 @@ function planStepTraceScope(text,raw,sectionIdx,stepIdx,edit,opts){
   var st=got.st,op=edit && edit.op,had=Object.prototype.hasOwnProperty.call(st,'traceScope');
   if(op==='create'){
     if(typeof st.id!=='string' || !st.id.trim())return {error:'A trace scope needs a stable step ID. Enter one in Step ID above, then add the scope.',field:'create'};
-    if(had && traceScopeObject(st.traceScope))return {noop:true};
+    if(had && traceScopeObject(st.traceScope))
+      return Object.prototype.hasOwnProperty.call(st,'traceMatch')?planSetField(text,raw,got.path,'traceMatch',null):{noop:true};
     return Object.prototype.hasOwnProperty.call(st,'traceMatch')?planSetFields(text,raw,got.path,[['traceScope','{}'],['traceMatch',null]]):planSetField(text,raw,got.path,'traceScope','{}');
   }
   if(op==='remove')return had?planSetField(text,raw,got.path,'traceScope',null):{noop:true};

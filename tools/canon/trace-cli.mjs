@@ -16,7 +16,15 @@ try{
     if(flag('out') && await physical(flag('out'))===await physical(flag('spec')))throw new Error('--out names the authored spec; write the output to another file.');
     // The resolved copy is used for mapping and validation only; outputs keep the authored form.
     spec=(await resolveLocalImports(flag('spec'),imports).catch(e=>{throw new Error('--resolve-imports '+imports+': '+e.message);})).resolved;
-  }else if(command!=='compare' && (declares(spec) || C.sections(spec).some(s=>declares(s?.diagram))))throw new Error(flag('spec')+': unresolved topology declarations. To resolve them, pass '+IMPORTS+'.');
+  }else if(declares(spec) || C.sections(spec).some(s=>declares(s?.diagram))){
+    // compare may run on an import board unresolved when no reference step can inherit an imported
+    // carrier's declarations, which exist only resolved (#1290). Incident steps an earlier compare wrote
+    // are not reference steps, and a local node or connection declares its spans in this file.
+    const d=C.sections(spec)[Number(flag('section') || 0)]?.diagram,aliases=(Array.isArray(d?.topologyImports)?d.topologyImports:[]).map(i=>i && i.as).filter(a=>typeof a==='string');
+    const imported=id=>typeof id==='string' && id.split('->').some(part=>aliases.some(a=>part.startsWith(a+'::')));
+    const inherits=!!d && C.traceMatch.baseSteps(d).some(st=>st && !st.traceMatch && [st.edge].concat(st.edges || [],st.nodes || []).some(imported));
+    if(command!=='compare' || inherits)throw new Error(flag('spec')+': unresolved topology declarations. To resolve them, pass '+IMPORTS+'.');
+  }
   const trace=JSON.parse(await readFile(flag('trace'),'utf8')),section=Number(flag('section') || 0);
   let output;
   if(command==='preview')output=referencePreview(spec,trace,section);

@@ -868,7 +868,7 @@ function traceSpansControls(){
       });
       var acts=actionGroup('Span '+key+' actions','trace-span-actions');
       if(inherited){
-        var hide=checkboxControl(false,function(on){return commit({op:'hide',name:key,value:on},{any:null});});named(hide.firstChild,key+' hidden for this document','Hide this inherited span in this document only. '+state.providerTitle+' keeps it.');
+        var hide=checkboxControl(false,function(on){return commit({op:'hide',name:key,value:on},{any:null});});named(hide.firstChild,key+' hidden for this document','Hide this inherited span in this document only. '+state.providerTitle+' keeps it.'+(changed?' Hiding drops your changes to this span; Undo brings them back.':''));
         var cap=document.createElement('span');cap.className='fnote';cap.textContent=' Hidden for this document';hide.appendChild(cap);acts.appendChild(hide);
         if(changed)acts.appendChild(named(actionButton('Revert '+key+' to inherited',function(){return commit({op:'revert',name:key},{any:null});}),'Revert '+key+' to inherited','Remove your changes to this span; it follows '+state.providerTitle+' again.'));
       }else acts.appendChild(named(actionButton('Remove span '+key,function(){return commit({op:'remove',name:key},{any:null});}),'Remove span '+key));
@@ -885,7 +885,7 @@ function traceSpansControls(){
     if(state.kind==='edge' && state.receiver && !state.receiver.declared && !state.receiver.process.length){
       // No process span on the receiver: the hand-off cannot end anywhere until a receive span is declared.
       el('p','fnote trace-span-receiver','The receiving node '+state.receiver.title+' declares no process span, so this connection reads send only. Declare a receive span here to time the hand-off.');
-      askReceive=actionButton('Declare receive span here',function(){newName.value='receive';newRole.value='receive';TRACE_SPAN_DRAFTS.set('add:name','receive');newService.focus();return true;});
+      askReceive=actionButton('Declare receive span here',function(){newName.value='receive';newRole.value='receive';TRACE_SPAN_DRAFTS.set('add:name','receive');TRACE_SPAN_DRAFTS.set('add:role','receive');newService.focus();return true;});
       askReceive.title='Starts a receive span in Add span below: enter its service and operation.';el('div','iacts').appendChild(askReceive);
     }
     if(state.kind==='edge' && state.receiver && !state.receiver.declared && state.receiver.process.length){
@@ -908,10 +908,12 @@ function traceSpansControls(){
     var newService=row(add,'Service',draftInput('New span service','order-worker','service','The span service.name, exactly as the trace shows it.'));
     var newMatch=row(add,'Match',select(modes,'operation','New span match'));
     var newValue=row(add,'Value',draftInput('New span value','process orders','value','The operation, its start for Prefix, or name=value for Attributes only.'));
-    var newRole=row(add,'Role',select(roleOptions,state.roles[0],'New span role'));
+    // The chosen role is a draft too, so a re-render before Add span keeps it.
+    var roleDraft=TRACE_SPAN_DRAFTS.get('add:role'),newRole=row(add,'Role',select(roleOptions,state.roles.indexOf(roleDraft)>=0?roleDraft:state.roles[0],'New span role'));
+    listen(newRole,'change',function(){TRACE_SPAN_DRAFTS.set('add:role',newRole.value);});
     function addSpan(){
       var ok=commit({op:'add',name:newName.value,serviceName:newService.value,mode:newMatch.value,value:newValue.value,role:newRole.value},{name:newName,serviceName:newService,value:newValue,role:newRole});
-      if(ok!==false)['name','service','value'].forEach(function(k){TRACE_SPAN_DRAFTS.delete('add:'+k);});
+      if(ok!==false)['name','service','value','role'].forEach(function(k){TRACE_SPAN_DRAFTS.delete('add:'+k);});
       return ok;
     }
     [newName,newService,newValue].forEach(function(input){listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addSpan();}});});
@@ -1590,9 +1592,11 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
     // Parent step.
     var parent=document.createElement('select');parent.className='fctl';named(parent,'Parent step','Spans this step inherits must descend from that step’s spans. Spans whose ancestry is not in the trace are kept and marked.');
     var none=document.createElement('option');none.value='';none.textContent='None';parent.appendChild(none);
-    steps.forEach(function(s,i){if(i===t.index || !s || typeof s.id!=='string' || !s.id)return;var o=document.createElement('option');o.value=s.id;o.textContent=stepTitle(s)+' ('+s.id+')';parent.appendChild(o);});
+    // Only a step on a path with this one can be its parent: elsewhere it always reads missing.
+    function sharesPath(i){return routes.some(function(route){return route.indices.indexOf(i)>=0;});}
+    steps.forEach(function(s,i){if(i===t.index || !s || typeof s.id!=='string' || !s.id || !sharesPath(i))return;var o=document.createElement('option');o.value=s.id;o.textContent=stepTitle(s)+' ('+s.id+')';parent.appendChild(o);});
     var current=typeof scope.parentStepId==='string'?scope.parentStepId:'';
-    if(current && !steps.some(function(s,i){return i!==t.index && s && s.id===current;})){var u=document.createElement('option');u.value=current;u.textContent=current+' (unknown)';parent.appendChild(u);}
+    if(current && !steps.some(function(s,i){return i!==t.index && s && s.id===current && sharesPath(i);})){var known=steps.some(function(s,i){return i!==t.index && s && s.id===current;}),u=document.createElement('option');u.value=current;u.textContent=current+(known?' (not on this step’s path)':' (unknown)');parent.appendChild(u);}
     parent.value=current;
     listen(parent,'change',function(){if(commit({op:'parent',value:parent.value},{parent:parent,any:parent})===false)parent.value=current;});
     box.appendChild(frow('Parent step',parent));slot(box,parent);placed.parent.forEach(function(m){parent._scopeNote(m);});

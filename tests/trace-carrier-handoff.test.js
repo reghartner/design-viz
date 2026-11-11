@@ -13,7 +13,7 @@
 | H5 | No receiver: "send only · 2 ms", and the title says no receiver was found and that the send span's own time is shown. |
 | H6 | A connection's own receive declaration replaces the receiving node's process span. |
 | H7 | A receiver descending from another send never pairs with this one. |
-| H8 | A receive with no send: a label only when the connection itself declares receive (Chuck 2026-11-10 default a). |
+| H8 | A receive with no send: a label only when the connection itself declares receive (Chuck 2026-11-10 default a); it has no hand-off time, so the coverage line does not count it as timed (#1290 whole-branch review M3); its spans are drawn, so they are not unmatched, while a span nothing shows is (m3). |
 | H9 | A step traceMatch row for a declared connection moves into the title with its time, budget and conditions, and the label keeps its worst tone; undeclared connections keep today's step rows. |
 | H10 | A consumer connection into an imported node pairs with the provider's process declaration; an imported connection follows the consumer's send patch; nested re-exports too. |
 | H11 | Focus levels and outlines include connection rows; a board with declarations only on connections draws connection labels. |
@@ -109,6 +109,8 @@ test('H4 H6 H8 several hand-offs; a declared receive; a receive with no send',()
   t=edgeLabel(model(board({send:own}),noSend),'api->worker');
   assert.equal(t.text,'receive seen · send not in trace');
   assert.match(t.title,/^The receiving span \(worker orders receive\) is in this trace but no send span is, so there is no hand-off time\./);
+  assert.equal(V.telemetryTraceCoverage(model(board({send:own}),noSend)),'0/0 steps matched · 0 spans unmatched · 1 node timed','a connection without a hand-off time is not timed; its spans are drawn, so not unmatched');
+  assert.equal(V.telemetryTraceCoverage(model(board({send:own}),noSend.concat([span('cron',null,'scheduler','tick',1,1)]))),'0/0 steps matched · 1 spans unmatched · 1 node timed','a span no step, node or connection shows is unmatched');
   assert.equal(model(board(),[span('proc',null,'worker','process orders',109,40)]).edges['api->worker'],undefined,'a receiver inferred from the node\'s process span alone draws nothing');
 });
 

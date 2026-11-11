@@ -67,6 +67,12 @@ function boardEditSameSpan(a,b){
   var attrs=function(x){var v=x.attributes && typeof x.attributes==='object'?x.attributes:{};return JSON.stringify(Object.keys(v).sort().map(function(k){return [k,v[k]];}));};
   return ['serviceName','operation','operationPrefix','role','namespace'].every(function(k){return (a[k]===undefined?null:a[k])===(b[k]===undefined?null:b[k]);}) && attrs(a)===attrs(b);
 }
+// Key-order-independent JSON for comparing authored values (arrays keep their order).
+function boardEditCanonical(v){
+  if(Array.isArray(v))return '['+v.map(boardEditCanonical).join(',')+']';
+  if(v && typeof v==='object')return '{'+Object.keys(v).sort().map(function(k){return JSON.stringify(k)+':'+boardEditCanonical(v[k]);}).join(',')+'}';
+  return JSON.stringify(v===undefined?null:v);
+}
 function boardEditSamePrefix(path,prefix){return prefix.every(function(part,i){return path[i]===part;});}
 
 function createBoardEditor(options){
@@ -166,7 +172,9 @@ function createBoardEditor(options){
     var entry={op:op};if(ticket!=null)entry.ticket=ticket;entry.path=t.path.slice();entry.label=t.label;
     if(t.kind==='step'){entry.step=t.step;entry.traceMatch={serviceName:match.serviceName,operation:match.operation};
       // The change describes the full span mapping that results: a nodeId written now or kept from the step (#1192).
-      var nodeId=typeof match.nodeId==='string' && match.nodeId?match.nodeId:t.previous && !Array.isArray(t.previous) && typeof t.previous.nodeId==='string' && t.previous.nodeId?t.previous.nodeId:null;if(nodeId)entry.traceMatch.nodeId=nodeId;if(t.previous){entry.replaces={serviceName:t.previous.serviceName,operation:t.previous.operation};if(typeof t.previous.nodeId==='string' && t.previous.nodeId)entry.replaces.nodeId=t.previous.nodeId;}}
+      var nodeId=typeof match.nodeId==='string' && match.nodeId?match.nodeId:t.previous && !Array.isArray(t.previous) && typeof t.previous.nodeId==='string' && t.previous.nodeId?t.previous.nodeId:null;if(nodeId)entry.traceMatch.nodeId=nodeId;if(t.previous){entry.replaces={serviceName:t.previous.serviceName,operation:t.previous.operation};if(typeof t.previous.nodeId==='string' && t.previous.nodeId)entry.replaces.nodeId=t.previous.nodeId;}
+      // #1290: the traceScope the mapping replaced, so board-sync pull can tell whether a local copy changed it.
+      if(t.local && Object.prototype.hasOwnProperty.call(t.local,'traceScope'))entry.replacesScope=JSON.parse(JSON.stringify(t.local.traceScope));}
     else if(t.kind==='node')entry.node=t.node;else entry.edge=t.edge.slice();
     return entry;
   }
@@ -195,7 +203,9 @@ function createBoardEditor(options){
     // The pending list changes before the render, so the re-rendered board shows the new count at once (#1253);
     // a refused render puts it back.
     var entry=record(t,op,ticket,match),chain=boardEditChain(t.raw,t.path),kept=ops.slice(),befores=ops.map(function(o){return o.before;});
-    if(inverse>=0 && carrierTickets(next,t.path)===ops[inverse].tickets){ops.splice(inverse,1);ops.slice(inverse).forEach(function(o){o.before=undefined;});}
+    // Every exact-text snapshot taken after the cancelled op still holds it: drop them all, so no Undo brings it
+    // back (#1290 whole-branch review M1: a swap's restore text and its swapped mapping's before).
+    if(inverse>=0 && carrierTickets(next,t.path)===ops[inverse].tickets){ops.splice(inverse,1);ops.slice(inverse).forEach(function(o){o.before=undefined;o.restore=undefined;if(o.swapped)o.swapped.before=undefined;});}
     else{
       var made={entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,previous:op==='trace-match'?t.previous:undefined,before:op==='trace-match'?before:undefined};
       // #1290: the traceScope a mapping replaced, so its Undo can put it back in any edit order.
@@ -217,7 +227,9 @@ function createBoardEditor(options){
   }
   // The text from before a mapping (for its Undo) stays out of the stash, and so does a replaced
   // traceScope: replaying a mapping reads it again from the step it is applied to.
-  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops.map(function(o){return {entry:o.entry,chain:o.chain,replayable:o.replayable,kind:o.kind,previous:o.previous};})}));}catch(ex){}}
+  // A mapping also stashes the traceScope it replaced (or that there was none), so a replay can refuse when
+  // their version gave the step a scope or changed that one (#1290 whole-branch review M2).
+  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops.map(function(o){var s={entry:o.entry,chain:o.chain,replayable:o.replayable,kind:o.kind,previous:o.previous};if(o.entry.op==='trace-match'){s.hadScope=o.scope!==undefined;if(s.hadScope)s.scope=o.scope;}return s;})}));}catch(ex){}}
   function unstash(){try{win.sessionStorage.removeItem(stashKey);}catch(ex){}}
   function history(source,entry){
     var raw=parsed(source),owner=raw && raw.page?['page']:[],page=specValueAt(raw,owner),list=page && page.editHistory,itemText=JSON.stringify(entry,null,2);
@@ -257,7 +269,7 @@ function createBoardEditor(options){
         if(theirs){
           if(boardEditSameSpan(theirs,entry.span)){already++;return;}
           var same=theirs.serviceName===sp.serviceName && theirs.operation===sp.operation;
-          refuse('their version already declares a different span under '+sp.key+' ('+(typeof theirs.operation==='string'?spanName(theirs):theirs.serviceName+' · '+(theirs.operationPrefix || '')+'…')+(same || theirs.role!==sp.role?', role '+theirs.role:'')+'); declare yours again under another name');
+          refuse('their version already declares a different span under '+sp.key+' ('+(typeof theirs.operation==='string'?spanName(theirs):theirs.serviceName+' · '+(theirs.operationPrefix || '')+'…')+(same || theirs.role!==sp.role?', role '+theirs.role:'')+'); drop the span again to declare it; it gets a new name');
           return;
         }
         // The same span under another key in their version is already there: no second declaration.
@@ -268,6 +280,12 @@ function createBoardEditor(options){
         if(why && why.error)refuse(/^Already declared as /.test(why.error)?'their version already declares it as '+why.error.replace(/^Already declared as /,'').replace(/ on .*$/,''):why.error.replace(/\.$/,'').replace(/^./,function(c){return c.toLowerCase();}));
         else dropped.push(describe);
         return;
+      }
+      // A mapping removes the step's traceScope: never one their version added or changed (#1290 review M2).
+      if(entry.op==='trace-match'){
+        var at_=specValueAt(parsed(text),paths[0]),theirScope=at_ && typeof at_==='object'?at_.traceScope:undefined;
+        if(theirScope!==undefined && (!op.hadScope || boardEditCanonical(theirScope)!==boardEditCanonical(op.scope))){
+          refuse(op.hadScope?'their version changed that step\'s trace scope; edit it in Inspect':'their version gives that step a trace scope; edit it in Inspect');return;}
       }
       if(!apply(entry.op,ref,entry.ticket,null,entry.traceMatch,op.previous) && text===before){
         // A clear with no marker of this board's left to clear is dropped (#855), saying why.
@@ -444,7 +462,7 @@ function createBoardEditor(options){
   function declared(){var at=lastDeclaration();if(at<0 || readOnly)return null;var e=ops[at].entry;return {key:e.span.key,label:e.label,span:{serviceName:e.span.serviceName,operation:e.span.operation,role:e.span.role}};}
 
   // The latest pending span mapping, for the result note and its Undo (#1177).
-  function mapped(){var at=lastMapping();if(at<0 || readOnly)return null;var e=ops[at].entry;return {step:e.step,label:e.label,traceMatch:{serviceName:e.traceMatch.serviceName,operation:e.traceMatch.operation}};}
+  function mapped(){var at=lastMapping();if(at<0 || readOnly)return null;var e=ops[at].entry,out={step:e.step,label:e.label,traceMatch:{serviceName:e.traceMatch.serviceName,operation:e.traceMatch.operation}};if(ops[at].scope!==undefined)out.replacedScope=true;return out;}
   var api={
     state:function(){
       return {editable:canEdit && !!artifact && !readOnly,blocked:fallback?"Editing is off: this board couldn't load its latest version, so saving would overwrite newer changes.":'',

@@ -35,12 +35,18 @@ function mapTrace(d,trace,pathId){
   const named=m=>trace.spans.filter(s=>s.serviceName===m.serviceName && s.operation===m.operation &&
     (!m.namespace || s.attributes['service.namespace']===m.namespace) &&
     Object.entries(m.attributes || {}).every(([k,v])=>s.attributes[k]===v));
+  // #1290 whole-branch review: results and sharing are keyed by the step itself, never by its id,
+  // so id-less steps and steps sharing an id each get their own result. Messages name an id-less step
+  // by its index in the diagram's steps, as the validator does.
+  const stepName=st=>st && typeof st.id==='string' && st.id?st.id:String((d.steps || []).indexOf(st));
+  // The step's index rides along unseen (not enumerable), so mapping output and its JSON stay as they were.
+  const placed=(r,st)=>{if(r && typeof r==='object' && !Object.prototype.hasOwnProperty.call(r,'stepIndex'))Object.defineProperty(r,'stepIndex',{value:(d.steps || []).indexOf(st),enumerable:false,writable:true});};
   function match(step){
-    if(results.has(step.id))return results.get(step.id);
+    if(results.has(step))return results.get(step);
     if(visiting.has(step.id))throw new Error('Cyclic traceMatch.parentStepId.');
     visiting.add(step.id);
     const m=step.traceMatch;
-    if(!m || Array.isArray(m) && !m.length){const inherited=inherit(step);visiting.delete(step.id);results.set(step.id,inherited);return inherited;}
+    if(!m || Array.isArray(m) && !m.length){const inherited=inherit(step);visiting.delete(step.id);placed(inherited,step);results.set(step,inherited);return inherited;}
     // Alternatives are tried in order; the first match wins. Without a match the
     // first ambiguous result is kept (it needs a selector fix), else the last
     // applicable one. An alternative whose parent step is not on this path ranks last.
@@ -53,7 +59,7 @@ function mapTrace(d,trace,pathId){
     // alternative's selector is present but its parent step's mapping is missing or ambiguous,
     // since nothing tells whose span it is. Matched or ambiguous is unchanged.
     if(result.status==='missing' && [].concat(m).every(a=>a && a.optional===true) && !tried.some(r=>unattributed.has(r)))Object.assign(result,{detail:'Optional, not in this trace.'+(result.detail?' '+result.detail:''),conditions:[],optional:true});
-    visiting.delete(step.id);results.set(step.id,result);return result;
+    visiting.delete(step.id);placed(result,step);results.set(step,result);return result;
   }
   // The conditions of a matched step: errors, delivery, budget on durationMs, queue, backpressure, retries.
   function conditions(result,candidates,m,durationMs,retries,database){
@@ -82,7 +88,7 @@ function mapTrace(d,trace,pathId){
      ancestry is not in the trace are kept, rule 7), optional and budgets. */
   let declared=null;
   const litBy=new Map();
-  steps.forEach(st=>{if(!st)return;const lit=litCarriers(st);lit.nodes.map(id=>'node:'+id).concat(lit.edges.map(k=>'edge:'+k)).forEach(key=>{if(!litBy.has(key))litBy.set(key,[]);if(!litBy.get(key).includes(st.id))litBy.get(key).push(st.id);});});
+  steps.forEach(st=>{if(!st)return;const lit=litCarriers(st);lit.nodes.map(id=>'node:'+id).concat(lit.edges.map(k=>'edge:'+k)).forEach(key=>{if(!litBy.has(key))litBy.set(key,[]);if(!litBy.get(key).includes(st))litBy.get(key).push(st);});});
   const spanName=x=>x.serviceName+' '+x.operation;
   function unknownAncestry(span){
     const seen=new Set(),queue=[span.parentId,...(span.links || [])];
@@ -95,7 +101,7 @@ function mapTrace(d,trace,pathId){
     let used=lit.nodes.filter(id=>c.nodes[id]).map(id=>({kind:'node',id,list:c.nodes[id]})).concat(lit.edges.filter(k=>c.edges[k]).map(k=>({kind:'edge',id:k,list:c.edges[k]})));
     // An unmapped step annotates nothing, as before.
     if(!used.length)return Object.assign(base,{status:'unmapped',inherited:false,nodeId:null});
-    const others=x=>(litBy.get(x.kind+':'+x.id) || []).filter(id=>id!==step.id),notes=[];
+    const others=x=>(litBy.get(x.kind+':'+x.id) || []).filter(st=>st!==step).map(stepName),notes=[];
     if(!scope){
       const shared=used.filter(x=>others(x).length);used=used.filter(x=>!others(x).length);
       if(!used.length){const o=others(shared[0]);return Object.assign(base,{status:'unmapped',nodeId:null,shared:{kind:shared[0].kind,id:shared[0].id,steps:o},hint:shared[0].id+' is also lit by '+(o.length>1?'steps ':'step ')+o.join(', ')+'; add a trace scope to this step to choose its spans.'});}
@@ -139,6 +145,8 @@ function mapTrace(d,trace,pathId){
           handoffs(trace,sends,receivers).forEach(p=>{if(p.receive)intervals.push({startMs:p.send.startMs,durationMs:Math.max(0,p.receive.startMs-p.send.startMs)});});
         });
         durationMs=intervals.length?unionMs(intervals):unionMs(spans);
+        // #1290: no receiver paired, so the time (and any budget) is the send span's own, not a hand-off.
+        if(!intervals.length)result.detail=(result.detail?result.detail+' ':'')+'No receiving span pairs with the send span, so its own time is shown, not a hand-off.';
       }else durationMs=unionMs(spans);
       result.durationMs=durationMs;
       conditions(result,spans,{maxDurationMs:scope?scope.maxDurationMs:undefined,maxQueueDepth:scope?scope.maxQueueDepth:undefined,nodeId:result.nodeId},durationMs,false,roles.length>0 && roles.every(r=>r==='database'));
@@ -182,7 +190,7 @@ function mapTrace(d,trace,pathId){
   const shared=new Set();for(const items of owners.values())if(items.length>1)items.forEach(item=>shared.add(item));
   for(const item of shared){
     const span=item.spans.find(sp=>owners.get(sp.id).length>1),with_=owners.get(span.id).filter(x=>x!==item);
-    const label=item.inherited || with_.some(x=>x.inherited)?spanName(span)+' is also matched by '+(with_.length>1?'steps ':'step ')+with_.map(x=>x.stepId).join(', ')+'; add a trace scope (root, parent step or attributes) to separate them.':'One span matches multiple authored steps; refine the selectors.';
+    const label=item.inherited || with_.some(x=>x.inherited)?spanName(span)+' is also matched by '+(with_.length>1?'steps ':'step ')+with_.map(x=>x.stepId || String(x.stepIndex)).join(', ')+'; add a trace scope (root, parent step or attributes) to separate them.':'One span matches multiple authored steps; refine the selectors.';
     item.status='ambiguous';item.conditions=[{kind:'ambiguous',nodeId:item.nodeId,label,spanIds:item.spans.map(s=>s.id)}];
   }
   const used=new Set(mapped.filter(r=>r.status==='matched').flatMap(r=>r.spans.map(s=>s.id)));
@@ -250,7 +258,9 @@ function effectiveSelector(d,step,steps){
   lit.edges.forEach(key=>{
     const edge=(d.edges || []).find(e=>e && e.from+'->'+e.to===key);if(!edge)return;
     const spans=declared(edge),to=declared((d.nodes || {})[edge.to]) || {},receiver={};
-    Object.keys(to).forEach(k=>{if(object(to[k]) && to[k].role==='process')receiver[k]=to[k];});
+    // The receiving node's process spans time the hand-off only when the edge declares no receive of its own.
+    const ownReceive=spans && Object.keys(spans).some(k=>object(spans[k]) && spans[k].role==='receive');
+    if(!ownReceive)Object.keys(to).forEach(k=>{if(object(to[k]) && to[k].role==='process')receiver[k]=to[k];});
     if(spans || Object.keys(receiver).length)carriers.push({edge:key,spans:spans || {},receiver});
   });
   const out={id:step.id,traceMatch:null};

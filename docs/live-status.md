@@ -2154,8 +2154,8 @@ mode:
   and listed as "could not be (carrier moved, removed or ambiguous)". A change whose carrier
   is there but cannot take it is named with its own reason: a clear whose carrier no longer
   has a Missing work marker set on this board, a span mapping whose step their version maps
-  to another span, a declared span whose key their version uses for a different span
-  ("declare yours again under another name"), a ticket the provider of an imported node or
+  to another span or gave a trace scope (or changed the one the mapping replaced), a declared span whose key their version uses for a different span
+  ("drop the span again to declare it; it gets a new name"), a ticket the provider of an imported node or
   connection now carries. Each such change is its own sentence. A declared span their version
   already has, under any key, counts as already there. A change
   the winning version already has is named as already there. Nothing is published until the
@@ -2183,9 +2183,11 @@ them in is mechanical; the agent asks the author only about a real conflict.
    them into the local file: the tickets and Missing work markers on the nodes and edges
    those edits touched, the `traceMatch` of each step a board edit mapped (found by
    section and step id; a local step that already maps the same service and operation
-   keeps its own), each span the board declared on a node or connection (the consumer
-   overlay for an imported one; a local span under the same key that is the same in every
-   field, service, operation or prefix, role, namespace and attributes, is kept), plus their
+   keeps its own; the mapping removes the step's `traceScope` when the local scope is the
+   one the board's mapping replaced), each span the board declared on a node or connection
+   (found as tickets are, so a locally relabeled connection still matches; the consumer
+   overlay for an imported one; a local span that is the same in every field, service,
+   operation or prefix, role, namespace and attributes, under that key or another, is kept), plus their
    `page.editHistory` entries. Every other line stays as
    written and changes made only in the local copy are kept. Tell the author the listed
    lines.
@@ -2194,13 +2196,16 @@ them in is mechanical; the agent asks the author only about a real conflict.
      local copy no longer has. (A board edit that removed a ticket from, or cleared the
      marker of, a node or edge the local copy deleted needs no question: both sides agree
      the ticket is not there.) A board edit that mapped a span to a step is a conflict
-     when the local step maps a different span or was deleted. A board edit that declared a
-     span is a conflict when the local node or connection declares something else under the
-     same key, or no longer exists. Ask the author, then rerun with `--resolve KEY=live` (keep the board's
+     when the local step maps a different span, has a trace scope the board's mapping did
+     not replace, or was deleted. A board edit that declared a span is a conflict when the
+     local node or connection declares something else under the same key, hides that key,
+     or no longer exists (for an imported one, also when its import is gone or renamed).
+     Ask the author, then rerun with `--resolve KEY=live` (keep the board's
      placement) or `--resolve KEY=local` (keep the local one, after placing the ticket
      where the author says). For a step, KEY is `step:<step id>`; for a declared span,
-     `span:<carrier>/<span key>` (the node id, or `from->to` for a connection; plain
-     `span:<span key>` works only while one node or connection has that key).
+     `span:<carrier>/<span key>` (the node id, or `from->to` for a connection, so quote it:
+     `--resolve 'span:api->worker/send=live'`; plain `span:<span key>` works only while the
+     board's new declarations use that key on one node or connection).
    - Exit 3, nothing written: the live board was republished by an agent from another
      copy, so its structure may differ. Start again from `live.json`: copy it over the
      local file and redo the requested change. If the local file has changes of its own
@@ -2214,8 +2219,10 @@ them in is mechanical; the agent asks the author only about a real conflict.
    newest agent entry added, moved or removed that ticket; the message names who made the
    board edit, when, and what it did. It also refuses when the change maps a different
    span to a step, removes its `traceMatch` or deletes the step, and a board edit saved
-   after the newest agent entry mapped that step (KEY `step:<step id>`); the summary
-   counts added, changed and removed step mappings. Ask the
+   after the newest agent entry mapped that step (KEY `step:<step id>`), or when it removes
+   or changes a span such an edit declared on a node or connection, or deletes that node or
+   connection (KEY `'span:<carrier>/<span key>'`); the summary counts added, changed and
+   removed step mappings and span declarations. Ask the
    author and rerun with `--confirm KEY` once they agree. Board edits older than the
    newest agent entry were already in front of the author and need no question
    (Chuck 2026-11-04). Exit 3: pull first.
@@ -2384,7 +2391,8 @@ carrier (and the optional `path` and `label`), never a `ticket`. A `"trace-match
 change records a span mapped to a step in Edit mode (#1078): it carries `step` (the
 step id) and `traceMatch` (`serviceName` and `operation` strings, plus the resulting `nodeId` when the step has one after the mapping), the optional
 `path` and `label` (the step text), `replaces` (the `serviceName`, `operation` and any `nodeId` it
-replaced, #1180) when it replaced a mapping, and no `ticket`, `node` or `edge`; the panel
+replaced, #1180) when it replaced a mapping, `replacesScope` (the step's `traceScope` object the
+mapping removed, #1290) when it replaced a trace scope, and no `ticket`, `node` or `edge`; the panel
 reads it as "payment · grpc.msdemo.PaymentService/Charge mapped to step Charge the
 card", with "(replaced <service> · <operation>)" after a replacement. `board-sync pull`
 sets a step's newest board mapping where the local step still equals the `replaces` of
@@ -2553,7 +2561,7 @@ Steps that inherit declared spans (`traceScope`, see
 [provider traces](provider-traces.md#trace-spans-declared-on-nodes-and-connections-1290)) count
 in the coverage line like `traceMatch` steps. A step of another flow reads `Not this flow` and
 is left out, like a missing optional step; the line ends with the carriers timed from their
-declarations (`· 3 nodes and 2 connections timed`). A step left without a mapping because its
+declarations (`· 3 nodes and 2 connections timed`; a connection that only reads "receive seen · send not in trace" has no time and is not counted). A step left without a mapping because its
 declared carriers are shared gets a plain hint below the line, for example `Step “Worker”:
 Worker is also part of step “Reply”, so this step shows no trace spans of its own.` A step of
 another flow paints nothing on the board. **Map this span** onto a step with a `traceScope`
@@ -3484,7 +3492,7 @@ Status → Trace can load one exact trace ID or a supported provider link using 
 
 Selecting a span in the loaded trace shows its exact **Service** and **Operation** (#1078), the strings a step's `traceMatch.serviceName` and `traceMatch.operation` must match; copy them from there. A span that no step maps says "No authored step maps this span. Add a traceMatch to a step to map this span." and links to [Make an existing diagram Trace-ready](trace-ready-authoring.md). On a shared board in Edit mode, that span also offers **Map this span to a step**, which writes the two values to a step that has no `traceMatch` yet ([Edit mode](#edit-mode-on-the-shared-board-828)); add `nodeId`, `parentStepId` or `attributes` in the Workbench when one span name is not enough.
 
-**Map a span by drag, chooser or dropdown (#1177).** In Edit mode (desktop) a span row in the waterfall drags onto a step (its step button or coin), which maps that step, or onto a node or edge. A carrier named by exactly one step that has no `traceMatch` maps that step; otherwise a chooser lists the carrier's steps, marking those already mapped ("mapped, replaces"), and the reader picks one or presses Esc. Drop targets highlight during the drag. The **Step to map** dropdown preselects nothing, lists only steps without a `traceMatch`, and its button reads "Map to step: <step>". A mapping from a drop on a node, directly or by a chooser pick after it, also writes `nodeId` for that node when the step names only that node (no `edge` or `edges`), so the node lights up at once. Mapping a step that already has a single `traceMatch` replaces its `serviceName` and `operation`, sets `nodeId` to the dropped node under that same rule and otherwise keeps the existing one, and keeps its other fields (`parentStepId`, `attributes`, `maxDurationMs`, `optional`), without a confirm; Undo covers it, and the change records the replaced pair as `replaces` (#1180). A step whose `traceMatch` is an alternatives array is shown disabled ("has alternatives; edit in Inspect"). Only the trace's own section takes a drop. The chooser names the dragged span; Esc or Cancel returns focus to the span row. After every mapping the panel says "Mapped <service> · <operation> to step <step>." with **Undo**, which takes back the latest pending mapping (one click each, newest first) until the next Save. Each mapping is one `trace-match` change on Save; an undone one leaves none. The re-render after a mapping, or any other Edit-mode change, keeps the loaded trace and the picked example trace (the pick stays selected), the selected span and its focus, and returns focus to the dragged span row. When live evidence for the picked carrier arrives with the same trace it takes over the pick; with another trace (a fresh default) it is listed beside the pick, marked "(your pick)", until the reader selects something else. A step button whose `traceMatch` is an alternatives array takes no drop and says "Has alternatives; edit in Inspect". When the mapped step keeps a `parentStepId`, `attributes`, `namespace` or `occurrence` that leaves the span missing, the note says nothing lights (`nodeId` only picks the node to annotate). **Declare on this node or connection (#1290).** A drop on a node or connection that maps a step at once leaves the "Mapped … to step …" note with a role select (a node: process, database, cache, call or work; a connection: send or receive) and **Declare on <title> instead**, which swaps the pending mapping for a declaration (`trace.spans.<key>` with the span's service, exact operation and the role; one pending change, and its Undo brings the mapping back). Where the chooser opens (several steps, or none), **Declare on <title>** is one of its choices. The key is a slug of the operation's last meaningful segment (`charge` for `grpc.msdemo.PaymentService/Charge`, `insert-orders` for `INSERT orders`), unique on that node or connection (a provider span this board hides keeps its name). A span the node or connection already declares under another key (same service, operation and role) is refused beside the button: "Already declared as <key> on <title>." An imported node or connection gets the span in this board's `nodeTracking` / `edgeTracking` overlay. The note then reads "Declared <key> (<service> · <operation>) on <title>." with Undo.
+**Map a span by drag, chooser or dropdown (#1177).** In Edit mode (desktop) a span row in the waterfall drags onto a step (its step button or coin), which maps that step, or onto a node or edge. A carrier named by exactly one step that has no `traceMatch` maps that step; otherwise a chooser lists the carrier's steps, marking those already mapped ("mapped, replaces"), and the reader picks one or presses Esc. Drop targets highlight during the drag. The **Step to map** dropdown preselects nothing, lists only steps without a `traceMatch`, and its button reads "Map to step: <step>". A mapping from a drop on a node, directly or by a chooser pick after it, also writes `nodeId` for that node when the step names only that node (no `edge` or `edges`), so the node lights up at once. Mapping a step that already has a single `traceMatch` replaces its `serviceName` and `operation`, sets `nodeId` to the dropped node under that same rule and otherwise keeps the existing one, and keeps its other fields (`parentStepId`, `attributes`, `maxDurationMs`, `optional`), without a confirm; Undo covers it, and the change records the replaced pair as `replaces` (#1180). A step whose `traceMatch` is an alternatives array is shown disabled ("has alternatives; edit in Inspect"). Only the trace's own section takes a drop. The chooser names the dragged span; Esc or Cancel returns focus to the span row. After every mapping the panel says "Mapped <service> · <operation> to step <step>." with **Undo**, which takes back the latest pending mapping (one click each, newest first) until the next Save. Each mapping is one `trace-match` change on Save; an undone one leaves none. The re-render after a mapping, or any other Edit-mode change, keeps the loaded trace and the picked example trace (the pick stays selected), the selected span and its focus, and returns focus to the dragged span row. When live evidence for the picked carrier arrives with the same trace it takes over the pick; with another trace (a fresh default) it is listed beside the pick, marked "(your pick)", until the reader selects something else. A step button whose `traceMatch` is an alternatives array takes no drop and says "Has alternatives; edit in Inspect". When the mapped step keeps a `parentStepId`, `attributes`, `namespace` or `occurrence` that leaves the span missing, the note says nothing lights (`nodeId` only picks the node to annotate). **Declare on this node or connection (#1290).** A drop on a node or connection that maps a step at once leaves the "Mapped … to step …" note with a role select (a node: process, database, cache, call or work; a connection: send or receive) and **Declare on <title> instead**, which swaps the pending mapping for a declaration (`trace.spans.<key>` with the span's service, exact operation and the role; one pending change, and its Undo brings the mapping back). Where the chooser opens (several steps, or none), **Declare on <title>** is one of its choices. The key is a slug of the operation's last meaningful segment (`charge` for `grpc.msdemo.PaymentService/Charge`, `insert-orders` for `INSERT orders`), unique on that node or connection (a provider span this board hides keeps its name). A span the node or connection already declares under another key (same service, operation and role) is refused beside the button: "Already declared as <key> on <title>." An imported node or connection gets the span in this board's `nodeTracking` / `edgeTracking` overlay. The note then reads "Declared <key> (<service> · <operation>) on <title>." with Undo. A mapping that replaced the step's trace scope says "…; its trace scope was replaced."
 
 ### A loaded trace sets the day
 

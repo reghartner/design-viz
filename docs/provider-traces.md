@@ -322,7 +322,7 @@ its identity and warnings without asserting missing operations.
 
 For duplicate calls, first use a verified parent/link or retained attribute.
 `occurrence:1` is only valid for fully timed, non-overlapping serial calls;
-concurrent calls remain ambiguous. `repeat:"attempts"` requires distinct numeric
+concurrent calls remain ambiguous. `repeat:"attempts"` requires distinct whole-number
 `retry.attempt` values and a common parent; do not combine it with `occurrence`.
 One span matching two steps is ambiguous. Do not silence ambiguity by renaming
 nodes, taking the first span or inventing attributes. Leave the unresolved

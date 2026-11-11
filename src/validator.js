@@ -742,6 +742,8 @@ function editHistoryEntryProblem(entry){
       var was=change.replaces;
       if(Object.prototype.hasOwnProperty.call(change,'replaces') && (!specObject(was) || typeof was.serviceName!=='string' || !was.serviceName || typeof was.operation!=='string' || !was.operation))return at+'.replaces: needs "serviceName" and "operation" strings';
       if(specObject(was) && Object.prototype.hasOwnProperty.call(was,'nodeId') && (typeof was.nodeId!=='string' || !was.nodeId))return at+'.replaces.nodeId: must be a node id';
+      // #1290: the traceScope a mapping replaced (board Edit removes it).
+      if(Object.prototype.hasOwnProperty.call(change,'replacesScope') && !specObject(change.replacesScope))return at+'.replacesScope: must be the traceScope object the mapping replaced';
       continue;
     }
     // #855: clearing a Missing work marker names only its carrier.
@@ -818,10 +820,22 @@ function traceScopeWarnings(d,DP,warnings){
       var spans=declared(hit.kind,id) || [];
       list.forEach(function(entry){
         if(typeof entry!=='string')return;
-        if(entry.indexOf('role:')===0){var role=entry.slice(5);if(!spans.some(function(x){return x.role===role;}))warnings.push(where+': '+id+' declares no trace span with role '+role+'; that skip is ignored');}
+        if(entry.indexOf('role:')===0){var role=entry.slice(5);if(!spans.some(function(x){return x.role===role;}))warnings.push(where+': '+id+' declares no trace span with role '+role+'; that skip is ignored');
+          // #1290: a step on a connection only ever takes its send spans, so skipping anything else does nothing.
+          else if(hit.kind==='edge' && role!=='send')warnings.push(where+': a step on a connection takes only its send spans, so skipping role:'+role+' does nothing');}
         else if(!spans.some(function(x){return x.key===entry;}))warnings.push(where+': '+id+' declares no trace span named '+entry+'; that skip is ignored');
+        else if(hit.kind==='edge' && !spans.some(function(x){return x.key===entry && x.role==='send';}))warnings.push(where+': a step on a connection takes only its send spans, so skipping '+entry+' does nothing');
       });
     });
+    // #1290: a parent step on no path with this step is never found, so the step always reads missing.
+    if(specObject(st.traceScope) && typeof st.traceScope.parentStepId==='string' && st.traceScope.parentStepId!==st.id){
+      var pj=steps.findIndex(function(x){return specObject(x) && x.id===st.traceScope.parentStepId;});
+      if(pj>=0 && !paths.some(function(path){return path.indices.indexOf(i)>=0 && path.indices.indexOf(pj)>=0;}))
+        warnings.push(at+'.traceScope.parentStepId: parent step '+st.traceScope.parentStepId+' is on no path with step '+(st.id || i)+', so this step always reads missing');
+    }
+    // #1290: a budget on a step that lights nothing with declared spans is never checked.
+    if(specObject(st.traceScope) && !carriers.length && (st.traceScope.maxDurationMs!=null || st.traceScope.maxQueueDepth!=null))
+      warnings.push(at+'.traceScope: step '+(st.id || i)+' lights no node or connection that declares trace spans, so its budget is never checked');
     if(st.traceScope!=null || !carriers.length || warned[i])return;
     // The first path that holds this step where every declared carrier it lights is shared; the
     // warning names that path when the diagram has authored paths.
@@ -836,7 +850,7 @@ function traceScopeWarnings(d,DP,warnings){
       });
       if(free.length || !shared)return false;
       warned[i]=true;
-      warnings.push(at+': '+(named?'on path '+path.label+', ':'')+'step '+(st.id || i)+' inherits no trace spans because '+shared.id+' is also lit by '+(others.length>1?'steps ':'step ')+others.join(', ')+'; add a traceScope to this step to choose its spans');
+      warnings.push(at+': '+(named?'on path '+path.label+', ':'')+'step '+(st.id || i)+' inherits no trace spans because '+shared.id+' is also lit by '+(others.length>1?'steps ':'step ')+others.join(', ')+'; add a traceScope to this step to choose its spans (skip the ones another step owns, or both steps claim them)');
       return true;
     });
   });

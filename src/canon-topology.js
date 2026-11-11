@@ -545,7 +545,7 @@ var FlowTopology = (function(){
       // dropped above. Only those exact messages are set aside.
       var spanErrors=new Set(FlowCanon.traceCarrierErrors(spec));
       if(typeof sectionRecords==='function')sectionRecords(spec.page).forEach(function(record){traceFindings(record.section.diagram,record.path+'.diagram').errors.forEach(function(e){spanErrors.add(e);});});
-      var errors=FlowCanon.validate(spec).concat(validate(normalize(spec)).errors).filter(function(e){return !spanErrors.has(e);});
+      var errors=Array.from(new Set(FlowCanon.validate(spec).concat(validate(normalize(spec)).errors))).filter(function(e){return !spanErrors.has(e);});
       if(errors.length)fail(spec.page.canon.id,'invalid materialized spec: '+errors.join('; '));
     });
     return copies;

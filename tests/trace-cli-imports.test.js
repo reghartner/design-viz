@@ -165,3 +165,43 @@ test('compare --resolve-imports on an inheriting board: no edit and an unlit edi
   edit(d=>{d.edges[0].trace.spans.send.operation='publish orders v3';});
   run=compare();assert.equal(run.status,1);assert.match(run.stderr,/Trace mappings changed; approve the reference again\./);
 });
+
+test('compare without --resolve-imports on a board whose steps inherit refuses with the unresolved-imports message (#1290 whole-branch review)',t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'trace-cli-compare-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  for(const name of fs.readdirSync(TOPOLOGY))fs.copyFileSync(path.join(TOPOLOGY,name),path.join(dir,name));
+  const s=(id,parent,service,name,startMs,ms,extra={})=>({'trace.trace_id':'orders-1','trace.span_id':id,'trace.parent_id':parent || '','service.name':service,name,startMs,duration_ms:ms,'deployment.environment.name':'demo',...extra});
+  const order=path.join(dir,'order.json');
+  fs.writeFileSync(order,JSON.stringify({spans:[s('post',null,'shop-web','POST /orders',10,5),s('api','post','order-api','POST /orders',12,60),
+    s('pub','api','order-api','publish orders',30,2,{'service.namespace':'eu'}),s('proc','pub','order-worker','process orders v2',40,30)]}));
+  const registry=path.join(dir,'registry.json'),board=path.join(dir,'orders-board.json'),approved=path.join(dir,'approved.json');
+  assert.equal(cli('reference','--spec',board,'--trace',order,'--resolve-imports',registry,'--reason','Reviewed orders','--out',approved).status,0);
+  const run=cli('compare','--spec',approved,'--trace',order);
+  assert.equal(run.status,1);
+  assert.equal(run.stderr.trim(),approved+': unresolved topology declarations. To resolve them, pass --resolve-imports <repository folder or registry JSON>.','never "Trace mappings changed"');
+});
+
+test('compare without --resolve-imports counts only reference steps that light imported carriers (#1290 whole-branch review c2)',t=>{
+  const h=setup(t),approved=path.join(h.dir,'approved.json'),first=path.join(h.dir,'incident-1.json');
+  // A reference step without traceMatch on the local client node declares nothing imported: it needs no resolution.
+  const d=h.raw.page.sections[0].diagram;
+  d.steps.push({id:'browse',text:'The client browses',nodes:['client']});
+  if(Array.isArray(d.paths) && d.paths.length)d.paths[0].steps.push('browse');
+  const spec=h.write('local-step.spec.json',h.raw);
+  assert.equal(cli('reference','--spec',spec,'--trace',h.happy,'--resolve-imports',REGISTRY,'--reason','Reviewed','--out',approved).status,0);
+  const one=cli('compare','--spec',approved,'--trace',h.failed,'--out',first);
+  assert.equal(one.status,0,one.stderr);
+  const incident=JSON.parse(fs.readFileSync(first,'utf8')).page.sections[0].diagram;
+  assert.ok(incident.steps.some(st=>!st.traceMatch && (st.nodes || []).some(n=>n.startsWith('platform::'))),'the incident path lights an imported node without a traceMatch');
+  // A second compare on the incident output: its incident steps are not reference steps.
+  const other=h.write('failed-2.json',{spans:trace({error:true,statusCode:503}).spans.map(x=>({...x,traceId:'checkout-2'}))});
+  const two=cli('compare','--spec',first,'--trace',other),resolved=cli('compare','--spec',first,'--trace',other,'--resolve-imports',REGISTRY);
+  assert.equal(two.status,0,two.stderr);
+  assert.equal(two.stdout,resolved.stdout,'the same incident overlay as with the option');
+  // A reference step without traceMatch on an imported node still needs the option.
+  d.steps.push({id:'store',text:'The store writes',nodes:['platform::store']});
+  if(Array.isArray(d.paths) && d.paths.length)d.paths[0].steps.push('store');
+  const inheriting=h.write('inheriting.spec.json',h.raw),run=cli('compare','--spec',inheriting,'--trace',h.failed);
+  assert.equal(run.status,1);
+  assert.equal(run.stderr.trim(),inheriting+': unresolved topology declarations. To resolve them, pass --resolve-imports <repository folder or registry JSON>.');
+  h.unchanged();
+});

@@ -358,10 +358,12 @@ and carry on. Every time you change a published board:
    - Exit 2, nothing written: the same ticket was placed differently on the
      board and in your local spec, or a board edit added a ticket to a node or
      edge your local spec no longer has, or a board edit mapped a span to a step
-     your local spec maps differently or deleted, or a board edit declared a span
-     under a key your local node or connection uses for another span. Show the author the printed conflict, ask which placement
-     to keep, then rerun with `--resolve KEY=live` or `--resolve KEY=local`
-     (KEY `step:<step id>` for a step, `span:<node id or from->to>/<span key>` for a declared span).
+     your local spec maps differently, scopes differently or deleted, or a board
+     edit declared a span on a node or connection your local spec no longer has
+     (or whose import is gone), hides, or uses that key for another span. Show the
+     author the printed conflict, ask which to keep, then rerun with
+     `--resolve KEY=live` or `--resolve KEY=local` (KEY `step:<step id>` for a step,
+     `'span:<node id or from->to>/<span key>'` for a declared span; keep the quotes).
    - Exit 3, nothing written: another agent republished the board from a
      different copy. Copy `live.json` over your local spec and redo the
      requested change on it. If your local spec has changes of its own that
@@ -378,7 +380,10 @@ and carry on. Every time you change a published board:
    and your change puts that ticket somewhere else, removes it, puts it back,
    or deletes its node or edge; or a board edit mapped a span to a step and your
    change maps another span, removes the `traceMatch` or deletes the step
-   (`--confirm step:<step id>`). This is the one case
+   (`--confirm step:<step id>`); or a board edit declared a span on a node or
+   connection and your change removes or changes that span, or deletes that node
+   or connection (`--confirm 'span:<carrier>/<span key>'`, quoted: an edge
+   carrier's `->` is a shell redirection unquoted). This is the one case
    to stop and ask the author, quoting the printed line. Rerun with
    `--confirm KEY` once they agree; if they do not, put that ticket back where
    the board has it and rerun. Do not ask about board edits older than the

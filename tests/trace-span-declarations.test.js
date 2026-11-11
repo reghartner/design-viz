@@ -308,6 +308,10 @@ test('S11 overlay findings name the overlay and say what happened',()=>{
   const hc=providerSpec({spans:{orders:{serviceName:'worker',attributes:{'order.count':2,'order.vip':true},role:'process'}}});hc.page.tracking={telemetry:{traceConnections:{hc:honeycomb}}};
   const hcWarnings=plain(C.FlowCanon.traceWarnings(hc)).filter(w=>/trace\.spans/.test(w));
   assert.deepEqual(hcWarnings,['nodes.worker.trace.spans.orders.attributes.order.count: Honeycomb table cells are text; a number value never matches','nodes.worker.trace.spans.orders.attributes.order.vip: Honeycomb table cells are text; a boolean value never matches']);
+  // #1290 whole-branch review: a step's traceScope.attributes warns the same way.
+  const hcStep=providerSpec();hcStep.page.tracking={telemetry:{traceConnections:{hc:honeycomb}}};
+  diagramOf(hcStep).steps=[{id:'work',text:'Work',nodes:['worker'],traceScope:{attributes:{'order.count':2}}}];
+  assert.deepEqual(plain(C.FlowCanon.traceWarnings(hcStep)).filter(w=>/traceScope/.test(w)),['steps.work.traceScope.attributes.order.count: Honeycomb table cells are text; a number value never matches']);
   // A resolved snapshot edit gets the full declaration check.
   const before=resolved(fixtures());
   for(const bad of [{hide:['cache'],spans:{}},{spans:{process:{operation:'x'}}}]){

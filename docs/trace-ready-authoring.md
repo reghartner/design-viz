@@ -76,13 +76,13 @@ Other tags, payload fields and request IDs are dropped (profiles may keep
 selectors against them. Prefer stable instrumentation meaning to timings.
 
 `occurrence:1` is only for serial, fully timed calls; `repeat:"attempts"` needs
-distinct `retry.attempt` values and one parent; never combine them. One span
+distinct whole-number `retry.attempt` values and one parent; never combine them. One span
 matching two steps is ambiguous. Do not silence ambiguity by renaming nodes,
 taking the first span or inventing attributes; report what instrumentation is
 missing ([more](provider-traces.md#duplicate-calls-and-retries)).
 
 Only uniquely matched delivered edges receive operation-duration annotations.
-Multiple steps claiming the same edge cannot supply one exact edge duration.
+Several steps claiming one edge cannot give one exact duration.
 These durations are not network latency. Add `maxDurationMs` or `maxQueueDepth`
 only from an explicit existing requirement or user-approved budget, with its
 source in the ledger. Missing spans mean **not observed / outcome unknown**;

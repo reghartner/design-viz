@@ -165,3 +165,17 @@ test('compare --resolve-imports on an inheriting board: no edit and an unlit edi
   edit(d=>{d.edges[0].trace.spans.send.operation='publish orders v3';});
   run=compare();assert.equal(run.status,1);assert.match(run.stderr,/Trace mappings changed; approve the reference again\./);
 });
+
+test('compare without --resolve-imports on a board whose steps inherit refuses with the unresolved-imports message (#1290 whole-branch review)',t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'trace-cli-compare-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  for(const name of fs.readdirSync(TOPOLOGY))fs.copyFileSync(path.join(TOPOLOGY,name),path.join(dir,name));
+  const s=(id,parent,service,name,startMs,ms,extra={})=>({'trace.trace_id':'orders-1','trace.span_id':id,'trace.parent_id':parent || '','service.name':service,name,startMs,duration_ms:ms,'deployment.environment.name':'demo',...extra});
+  const order=path.join(dir,'order.json');
+  fs.writeFileSync(order,JSON.stringify({spans:[s('post',null,'shop-web','POST /orders',10,5),s('api','post','order-api','POST /orders',12,60),
+    s('pub','api','order-api','publish orders',30,2,{'service.namespace':'eu'}),s('proc','pub','order-worker','process orders v2',40,30)]}));
+  const registry=path.join(dir,'registry.json'),board=path.join(dir,'orders-board.json'),approved=path.join(dir,'approved.json');
+  assert.equal(cli('reference','--spec',board,'--trace',order,'--resolve-imports',registry,'--reason','Reviewed orders','--out',approved).status,0);
+  const run=cli('compare','--spec',approved,'--trace',order);
+  assert.equal(run.status,1);
+  assert.equal(run.stderr.trim(),approved+': unresolved topology declarations. To resolve them, pass --resolve-imports <repository folder or registry JSON>.','never "Trace mappings changed"');
+});

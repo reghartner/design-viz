@@ -18,6 +18,10 @@
 | I13 | Reader: inheriting step rows (a node step on its node), "Not this flow" and the coverage line with timed nodes and connections and the plain unmapped hint, in node and step titles. A "not this flow" row paints nothing on the canvas. |
 | I14 | An edge step owns only its edge's send spans; a declared receive is timing only, so it never collides with the receiving node's step. |
 | I15 | Mapping a span onto a scoped step (board Edit mode and the Workbench trace match form) replaces its traceScope, so the result validates; the controls say so. |
+| I17 | (review minor) An edge step whose send span has no receiver says its time is the send span's own, not a hand-off. |
+| I18 | (review minor) The approval digest leaves out the receiving node's process spans when the connection declares its own receive span (mapTrace never uses them then). |
+| I19 | (review minor) Validator warnings for skips that do nothing on a connection step (role:receive, a receive span) and for a budget on a step that lights nothing declared. |
+| I16 | (#1290 whole-branch review, core M1) Steps are told apart by their place, not their id: id-less steps and steps sharing an id each get their own result, sharing is counted per step, and messages name an id-less step by its index (as the validator does). The reader finds each row's own step. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const loader=require('../tools/source-loader.cjs');
@@ -179,15 +183,15 @@ test('I11 validation: shape errors, and plain-word warnings for skips and shared
     'sections[0].diagram.steps[1].traceScope.skip.api: step work does not light api; that skip is ignored']);
   const shared=board([{id:'work',text:'Worker',nodes:['worker']},{id:'reply',text:'Reply',nodes:['worker']}]);
   assert.deepEqual(warnings(shared),[
-    'sections[0].diagram.steps[0]: step work inherits no trace spans because worker is also lit by step reply; add a traceScope to this step to choose its spans',
-    'sections[0].diagram.steps[1]: step reply inherits no trace spans because worker is also lit by step work; add a traceScope to this step to choose its spans']);
+    'sections[0].diagram.steps[0]: step work inherits no trace spans because worker is also lit by step reply; add a traceScope to this step to choose its spans (skip the ones another step owns, or both steps claim them)',
+    'sections[0].diagram.steps[1]: step reply inherits no trace spans because worker is also lit by step work; add a traceScope to this step to choose its spans (skip the ones another step owns, or both steps claim them)']);
   assert.deepEqual(warnings(board()),[],'the default board inherits cleanly');
   // With paths, the warning names the path where the step inherits nothing.
   const branching=board([{id:'work',text:'Worker',nodes:['worker']},{id:'reply',text:'Reply',nodes:['worker']},{id:'alt',text:'Alt',nodes:['api']}]);
   branching.paths=[{id:'a',label:'Path A',steps:['work','reply']},{id:'b',label:'Path B',steps:['work','alt']}];
   assert.deepEqual(warnings(branching),[
-    'sections[0].diagram.steps[0]: on path Path A, step work inherits no trace spans because worker is also lit by step reply; add a traceScope to this step to choose its spans',
-    'sections[0].diagram.steps[1]: on path Path A, step reply inherits no trace spans because worker is also lit by step work; add a traceScope to this step to choose its spans']);
+    'sections[0].diagram.steps[0]: on path Path A, step work inherits no trace spans because worker is also lit by step reply; add a traceScope to this step to choose its spans (skip the ones another step owns, or both steps claim them)',
+    'sections[0].diagram.steps[1]: on path Path A, step reply inherits no trace spans because worker is also lit by step work; add a traceScope to this step to choose its spans (skip the ones another step owns, or both steps claim them)']);
 });
 
 test('I14 an edge step owns only its send spans; a declared receive is timing only',()=>{
@@ -271,4 +275,65 @@ test('I13 reader rows, "not this flow" and the coverage line',()=>{
   assert.equal(ot.rows[0].notThisFlow,true);
   assert.deepEqual(plain(V.telemetryTraceLabel(ot.nodes.billing || [])).text,'','nothing to label');
   assert.equal(V.telemetryTraceCountedRows(ot.nodes.billing || []).length,0,'the canvas counts no row for billing');
+});
+
+test('I16 id-less steps, and steps sharing an id, each get their own result and sharing is counted per step',()=>{
+  const decl=(svc,op)=>({title:svc.toUpperCase(),trace:{spans:{p:{serviceName:svc,operation:op,role:'process'}}}});
+  const AB=[s('ra',null,'a','A',0,10),s('rb','ra','b','B',2,5)];
+  // scen5: three id-less steps light a, b and a, no paths.
+  let d={nodes:{a:decl('a','A'),b:decl('b','B')},rows:[['a','b']],edges:[],steps:[{text:'one',nodes:['a']},{text:'two',nodes:['b']},{text:'three',nodes:['a']}]};
+  let m=map(d,AB);
+  assert.ok(m.steps[0]!==m.steps[1] && m.steps[1]!==m.steps[2],'one result per step');
+  assert.deepEqual(plain(m.steps.map(r=>[r.status,ids(r)])),[['unmapped',[]],['matched',['rb']],['unmapped',[]]],'a is shared by steps 0 and 2; b is step 1\'s alone');
+  assert.equal(m.steps[0].hint,'a is also lit by step 2; add a trace scope to this step to choose its spans.','an id-less step is named by its index, as the validator does');
+  // scen2: two id-less steps on different declared nodes each inherit their own.
+  d={nodes:{a:decl('a','POST /x'),w:decl('w','work')},rows:[['a','w']],edges:[],steps:[{text:'one',nodes:['a']},{text:'two',nodes:['w']}]};
+  m=map(d,[s('r',null,'a','POST /x',0,100),s('wk','r','w','work',30,40)]);
+  assert.deepEqual(plain(m.steps.map(r=>[r.status,ids(r)])),[['matched',['r']],['matched',['wk']]]);
+  // scen3: an id-less intro step does not stop a later id-less step from inheriting.
+  d={nodes:{a:{title:'A'},w:decl('w','work')},rows:[['a','w']],edges:[{from:'a',to:'w'}],steps:[{text:'intro'},{text:'worker runs',nodes:['w']}]};
+  m=map(d,[s('r',null,'a','POST /x',0,100),s('wk','r','w','work',30,40)]);
+  assert.deepEqual(plain(m.steps.map(r=>[r.status,ids(r)])),[['unmapped',[]],['matched',['wk']]]);
+  // Two steps sharing an id on different nodes.
+  d={nodes:{a:decl('a','A'),b:decl('b','B')},rows:[['a','b']],edges:[],steps:[{id:'same',text:'one',nodes:['a']},{id:'same',text:'two',nodes:['b']}]};
+  m=map(d,AB);
+  assert.deepEqual(plain(m.steps.map(r=>[r.status,ids(r)])),[['matched',['ra']],['matched',['rb']]],'a shared id never merges two steps');
+  // An ambiguity between two id-less steps names the other step, never a blank.
+  d={nodes:{a:decl('a','A')},rows:[['a']],edges:[],steps:[{text:'one',nodes:['a'],traceScope:{}},{text:'two',nodes:['a'],traceScope:{}}]};
+  m=map(d,AB);
+  assert.deepEqual(plain(m.steps.map(r=>r.status)),['ambiguous','ambiguous']);
+  assert.match(m.steps[0].conditions[0].label,/is also matched by step 1;/);
+  // The reader finds each row's own step: the second id-less step's row is on node b.
+  d={nodes:{a:decl('a','A'),b:decl('b','B')},rows:[['a','b']],edges:[],steps:[{text:'one',nodes:['a']},{text:'two',nodes:['b']}]};
+  const model=V.telemetryTraceModel(d,undefined,{traceId:'t1',spans:[{id:'ra',parentId:null,service:'a',name:'A',startMs:0,ms:10,error:false,attributes:{},links:[]},{id:'rb',parentId:'ra',service:'b',name:'B',startMs:2,ms:5,error:false,attributes:{},links:[]}],warnings:[]});
+  assert.deepEqual(plain(model.rows.map(r=>[r.status,r.nodeId])),[['matched','a'],['matched','b']]);
+});
+
+test('I17 an edge step without a receiver says its time is the send span\'s own',()=>{
+  const d=board([{id:'submit',text:'API publishes the order',edge:'api->worker',traceScope:{maxDurationMs:1}}]);
+  const m=map(d,[s('req',null,'api','POST /orders',0,300),s('pub','req','api','publish orders',100,2)]);
+  const r=step(m,'submit');
+  assert.equal(r.status,'matched');assert.equal(r.durationMs,2);
+  assert.match(r.detail,/No receiving span pairs with the send span, so its own time is shown, not a hand-off\./);
+  assert.equal(step(map(board([{id:'submit',text:'API publishes the order',edge:'api->worker'}])),'submit').detail,'','a paired hand-off has no such note');
+});
+
+test('I18 the digest of an edge step with its own receive span ignores the receiving node\'s process spans',()=>{
+  const d=board([{id:'submit',text:'API publishes the order',edge:'api->worker'}]);
+  d.edges[0].trace.spans.receive={serviceName:'worker',operation:'orders receive',role:'receive'};
+  const digest=x=>JSON.stringify(V.FlowTraceMatch.effectiveSelector(x,x.steps[0],x.steps));
+  const before=digest(d);d.nodes.worker.trace.spans.process.operation='process orders v2';
+  assert.equal(digest(d),before,'a process span change cannot change this step\'s mapping');
+  delete d.edges[0].trace.spans.receive;const own=digest(d);d.nodes.worker.trace.spans.process.operation='process orders v3';
+  assert.notEqual(digest(d),own,'without its own receive, the receiver\'s process spans still count');
+});
+
+test('I19 skips that do nothing and budgets that are never checked warn in plain words',()=>{
+  const d=board([{id:'submit',text:'API publishes the order',edge:'api->worker',traceScope:{skip:{'api->worker':['role:receive','recv']}}},{id:'idle',text:'Nothing declared',nodes:['note'],traceScope:{maxDurationMs:50}}]);
+  d.nodes.note={title:'Note'};d.rows[0].push('note');
+  d.edges[0].trace.spans.recv={serviceName:'worker',operation:'orders receive',role:'receive'};
+  const w=plain(T.validate(T.normalize(spec('b',d))).warnings).filter(x=>/traceScope/.test(x));
+  assert.ok(w.includes('sections[0].diagram.steps[0].traceScope.skip.api->worker: a step on a connection takes only its send spans, so skipping role:receive does nothing'),w.join('\n'));
+  assert.ok(w.includes('sections[0].diagram.steps[0].traceScope.skip.api->worker: a step on a connection takes only its send spans, so skipping recv does nothing'),w.join('\n'));
+  assert.ok(w.includes('sections[0].diagram.steps[1].traceScope: step idle lights no node or connection that declares trace spans, so its budget is never checked'),w.join('\n'));
 });

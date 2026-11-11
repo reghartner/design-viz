@@ -26,6 +26,7 @@ var FlowviewCompatibility = (function(){
     'layout.controls-scale':['Whole step-control sizing in both placements','0.2.0'],
     'layout.playback-position':['Play buttons above or beside steps','0.2.0'],
     'content.edge-json-contracts':['Edge JSON contracts and step replacements','0.2.0'],
+    'content.contract-grids':['Contract blocks as grid tables (columns and cells)','0.2.0'],
     'media.node-styles':['Preset node styles','0.2.0'],
     'content.deviceapp-badges':['Optional and custom Device app tile badges','0.2.0'],
     'document.tab-views':['Legacy Tab-owned Views and section membership','0.2.0'],
@@ -189,7 +190,10 @@ var FlowviewCompatibility = (function(){
       if(!object(s))return;
       if(Array.isArray(s.views)){used['document.section-views']=true;if(s.views.some(function(v){return v && v.presentation==='explore';}))used['layout.explore']=true;}
       if(Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null)used['content.contracts']=true;
-      [s.contract].concat(Array.isArray(s.contracts)?s.contracts:[]).forEach(function(ct){if(object(ct) && Array.isArray(ct.wires) && ct.wires.length)used['content.wire-contracts']=true;});
+      [s.contract].concat(Array.isArray(s.contracts)?s.contracts:[]).forEach(function(ct){
+        if(object(ct) && Array.isArray(ct.wires) && ct.wires.length)used['content.wire-contracts']=true;
+        if(object(ct) && Array.isArray(ct.columns))used['content.contract-grids']=true;
+      });
       var prose=typeof s.text==='string'?s.text.length>0:Array.isArray(s.text) && s.text.some(function(text){return typeof text==='string' && text.length>0;});
       if((prose || Array.isArray(s.bullets) && s.bullets.length) && s.diagram && Array.isArray(s.diagram.layouts) &&
         s.diagram.layouts.some(function(v){return v && v.presentation==='explore';}))used['layout.explore-prose']=true;

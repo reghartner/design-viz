@@ -240,7 +240,7 @@ var BUILDER_GUIDES = {
   contract: {
     title:'Contract block — size and content',
     how:'Choose half width for two blocks side by side, or full width to stack. Blocks fill in source order and stack automatically in narrow embeds. Click a field row to edit it.',
-    fields:[['title','block heading'],['span','4 = third, 6 = half, 8 = two-thirds, 12 = full (default)'],['id','optional stable ID for links'],['wires','step/edge bindings with optional path scope; hover previews, click pins'],['source','source permalink'],['note','prose below the fields; supports code spans and fenced code'],['fields','k/v/g rows, each with optional step reveal timing']]
+    fields:[['title','block heading'],['span','4 = third, 6 = half, 8 = two-thirds, 12 = full (default)'],['id','optional stable ID for links'],['wires','step/edge bindings with optional path scope; hover previews, click pins'],['source','source permalink'],['note','prose below the fields; supports code spans and fenced code'],['fields','k/v/g rows, each with optional step reveal timing'],['columns','makes the block a grid table: up to 12 {id, label, width}; rows then hold cells (Use columns (grid) converts a block)'],['fieldLabel','grid only: the first column name']]
   },
   crow: {
     title: 'Contract field — one "on the wire" row',
@@ -249,6 +249,7 @@ var BUILDER_GUIDES = {
       ['k', 'field name (required)'],
       ['v', 'sample value'],
       ['g', 'gloss — what the field means'],
+      ['cells', 'grid blocks only: one short value per column, replacing v and g'],
       ['hot', 'true highlights the row'],
       ['delta', 'added | removed | changed badge'],
       ['link', 'permalink URL — arrow beside the name'],

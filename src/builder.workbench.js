@@ -1191,7 +1191,8 @@ function initWorkbenchBuilder(opts){
 
   /* #1243: the Links window reads the same session and writes through applyPlan (one Undo step per edit). */
   var linksView=typeof initWorkbenchLinksView==='function'?initWorkbenchLinksView({document:document,window:window,view:view,session:session,apply:applyPlan,
-    inspectStep:function(t){selectTarget(Object.assign({},t,{el:findTargetEl(t)}),true);}}):null;
+    inspectStep:function(t){selectTarget(Object.assign({},t,{el:findTargetEl(t)}),true);},
+    inspectTarget:function(t){selectTarget(Object.assign({},t,{el:findTargetEl(t)}),true);}}):null;
   if(linksView)life.own(linksView.destroy);
   /* The step list shares this builder's selection, render and undo pipeline. */
   var stepList = typeof initWorkbenchStepList === 'function' ? initWorkbenchStepList({
@@ -1360,12 +1361,13 @@ function initWorkbenchBuilder(opts){
     'add-paragraph': ['para',planAddParagraph],
     'add-bullet': ['bullet',planAddBullet],
     'add-section': ['section', planAddSection],
-    'add-contract': ['contract',planAddContract]
+    'add-contract': ['contract',planAddContract],
+    'add-grid-table': ['contract',function(text,raw,section){return planAddContract(text,raw,section,null,{grid:true});}]
   };
   Object.keys(addButtons).forEach(function(id){
     var btn = document.getElementById(id);
     if (btn) life.listen(btn,'click', function(){
-      confirmAddition(function(){runInsert(addButtons[id][0], addButtons[id][1]);},id==='add-paragraph' || id==='add-bullet'?'prose':id==='add-section' || id==='add-contract');
+      confirmAddition(function(){runInsert(addButtons[id][0], addButtons[id][1]);},id==='add-paragraph' || id==='add-bullet'?'prose':id==='add-section' || id==='add-contract' || id==='add-grid-table');
     });
   });
   /* + edge draws by clicking source then target (Esc cancels) */

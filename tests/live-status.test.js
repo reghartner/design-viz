@@ -2055,7 +2055,9 @@ test('M6 the Metrics overlay switch is in the shared header, off by default; on 
  assert.ok(!metrics.classList.contains('tbtn'),'#1131 a switch, not a button that looks like a third view');
  assert.equal(metrics.getAttribute('aria-checked'),'false','M6 off by default');assert.equal(calls,0,'M6 no provider call while off');
  const top=header.querySelector('.dv-status-top'),controls=head.querySelector('.dv-live-controls');
- assert.ok(top.children.filter(c=>!c.hidden).at(-1)===metrics,'#1131 the switch ends the visible top row (#1293: Refresh now follows it only while Metrics is on)');assert.ok(top.children.at(-1).classList.contains('dv-live-metrics-refresh') && top.children.at(-1).hidden,'#1293 Refresh now is hidden while Metrics is off');assert.ok(header.children.indexOf(top)<header.children.indexOf(live.parentElement),'#1131 Live | Over time is the row below');
+ const style=top.querySelector('.dv-live-metrics-style'),refresh=top.querySelector('.dv-live-metrics-refresh');
+ assert.ok(top.children.at(-3)===metrics && top.children.at(-2)===refresh && top.children.at(-1)===style,'#1131 the switch ends the top row, followed only by its #1293 Refresh now and its #1294 Metrics style choice');
+ assert.ok(top.children.filter(c=>!c.hidden).at(-1)===metrics,'#1131 the switch ends the visible top row while the overlay is off');assert.ok(refresh.hidden===true,'#1293 Refresh now is hidden while Metrics is off');assert.ok(style.hidden===true,'#1294 the style choice is hidden while the overlay is off');assert.ok(header.children.indexOf(top)<header.children.indexOf(live.parentElement),'#1131 Live | Over time is the row below');
  assert.ok(head.children.indexOf(controls)<head.children.indexOf(head.querySelector('.dv-live-status')),'M6 controls precede status text');
  assert.ok(conn,'M6 metrics connector text');assert.ok(!conn.classList.contains('dv-live-connection'),'M6 distinct connector');
  assert.equal(head.querySelectorAll('.dv-live-connection').length,1);
@@ -3313,6 +3315,33 @@ async function paintedCard(nodes){
  h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
  return {h,card:h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]')};
 }
+/* Follow-up to #1294 (Outline review c4): a Tab after a touch shows the carrier's card on focus again,
+   and the visible board an Outline card is placed in is also cut to the window. */
+test('#1294 follow-up: after a touch, Tab onto an Outline carrier shows its card on focus',async()=>{
+ const {h}=await paintedCard({a:{},b:{}});
+ h.ctl.liveStatus.setMetricsStyle('outline');h.flush();await settle();h.flush();
+ const halo=h.view.querySelector('path.dv-metrics-outline'),card=halo && halo._metricsCard;
+ assert.ok(!!halo && !!card,'the Outline halo and its hidden card are painted');
+ const ev=(type,extra)=>Object.assign({type,target:halo,preventDefault(){},stopPropagation(){}},extra);
+ h.view.dispatchEvent(ev('pointerdown',{pointerType:'touch'}));
+ h.view.dispatchEvent(ev('focusin'));
+ assert.ok(card.classList.contains('dv-metrics-peek')===false,'a focus right after a touch does not open the card over the board');
+ h.view.dispatchEvent(ev('keydown',{key:'Tab',shiftKey:false,altKey:false,ctrlKey:false,metaKey:false}));
+ h.view.dispatchEvent(ev('focusin'));
+ assert.ok(card.classList.contains('dv-metrics-peek')===true,'Tab is keyboard navigation: focus shows the card again');
+ h.ctl.liveStatus.destroy();
+});
+test('#1294 follow-up: the visible board for an Outline card is cut to the window',()=>{
+ const h=harness();
+ h.C.DOMPoint=class{constructor(x,y){this.x=x;this.y=y;}matrixTransform(m){return {x:m.a*this.x+m.c*this.y+m.e,y:m.b*this.x+m.d*this.y+m.f};}};
+ const identity={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;}};
+ const svg={viewBox:{baseVal:{x:0,y:0,width:1000,height:1000}},getScreenCTM:()=>identity,getBoundingClientRect:()=>({left:0,top:0,right:1000,bottom:1000}),parentElement:null,
+  ownerDocument:{defaultView:{innerWidth:400,innerHeight:300,getComputedStyle:()=>({overflowX:'visible',overflowY:'visible'})}}};
+ const rect=h.C.telemetryFrameBoxes(svg).rect;
+ assert.ok(rect.x===0 && rect.y===0,'starts at the board origin, got '+rect.x+','+rect.y);
+ assert.ok(rect.width===400 && rect.height===300,'cut to the 400x300 window, got '+rect.width+'x'+rect.height);
+ h.ctl.liveStatus.destroy();
+});
 function workPresentation(h,card){
  h.view.dispatchEvent({type:'click',target:card,button:0,preventDefault(){},stopPropagation(){}});
  const pop=h.view.querySelector('.dv-live-popover');
@@ -5082,4 +5111,43 @@ test('M15 during the wait after a failed answer, the answered values stay and th
  assert.match(text(),/last refresh failed at .+ · next try at .+/,'the line names the failure and the next try: '+text());
  assert.match(text(),/a->b rate: boom/,'and the failed query');
  panel.destroy();h.ctl.liveStatus.destroy();
+});
+/* Follow-up to #1280 (review c9 minor 1): the page's top edge is the reader's bar where it is now (sticky in a native mount,
+   fixed in the published reader), read live from the view's .explore-navigation. --flowview-navigation-bottom is measured
+   only at a nav resize or font load, so it can be stale; it is only the fallback. */
+test('#1280 follow-up: the page top edge is the bar\'s live bottom, not a stale --flowview-navigation-bottom',async()=>{
+ const {h,api}=await stage2Loaded();
+ h.view.classList.add('docview');const nav=new Element('nav',{class:'explore-navigation'});h.view.appendChild(nav);
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,view=h.doc.defaultView,scroller={scrollTop:0};
+ proto.getClientRects=function(){return [1];};
+ proto.getBoundingClientRect=function(){if(this===nav)return {top:0,bottom:56,left:0,right:1000,width:1000,height:56};if(this.classList.contains('dv-trace-span-item'))return {top:100,bottom:130,left:0,right:100,width:100,height:30};return bound.call(this);};
+ // The variable still says where the bar was when it was last measured: bottom 356 (+8).
+ h.doc.scrollingElement=scroller;h.doc.defaultView={getComputedStyle:()=>({overflowY:'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:name=>name==='--flowview-navigation-bottom'?'364px':''}),innerHeight:900};
+ try{
+  const t=api.snapshot().trace.selected;assert.equal(api.selectTraceSpan({context:t.context,spanId:t.exemplar.spans[20].id}),true);h.flush();
+  assert.equal(scroller.scrollTop,0,'the row at 100-130 is below the live bar (56): visible, so nothing moves');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;nav.remove();api.destroy();}
+});
+/* Follow-up to #1280 (review c9 minor 2): the capped Edit-mode list scrolled up under the bar. A row revealed inside the
+   list lands below the bar (top edge max(list top, bar bottom)), and the cap's measured top is clamped to the bar. */
+test('#1280 follow-up: in the capped Edit list a row never lands under the bar, and the cap top is clamped to it',async()=>{
+ const editor=mapEditor();editor.state=()=>({editable:true,blocked:'',active:true,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
+ const b=mapBoard({editor});b.h.view.classList.add('docview');const nav=new Element('nav',{class:'explore-navigation'});b.h.view.appendChild(nav);
+ const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect;
+ proto.getClientRects=function(){return [1];};
+ proto.getBoundingClientRect=function(){
+  if(this===nav)return {top:0,bottom:56,left:0,right:1000,width:1000,height:56};
+  if(this.classList.contains('dv-trace-waterfall'))return {top:-100,bottom:600,left:0,right:100,width:100,height:700};
+  if(this.classList.contains('dv-trace-span-item') && this.querySelector('.dv-trace-span[data-span-id="'+MAP_SPAN+'"]'))return {top:-50,bottom:-20,left:0,right:100,width:100,height:30};
+  return bound.call(this);};
+ b.h.doc.defaultView={addEventListener(){},removeEventListener(){},requestAnimationFrame:f=>f(),innerHeight:900,
+  getComputedStyle:el=>({overflowY:el.classList && el.classList.contains('dv-trace-waterfall-edit')?'auto':'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+ try{
+  assert.ok(await b.api.loadDirectTrace(false));b.h.flush();
+  const list=b.m.body.querySelector('.dv-trace-waterfall');assert.ok(list.classList.contains('dv-trace-waterfall-edit'),'the cap is on');
+  assert.equal(list.style.getPropertyValue('--dv-trace-list-top'),'56px','the cap\'s top is clamped to the bar\'s bottom, not to 0');
+  list.scrollHeight=2000;list.clientHeight=700;list.scrollTop=0;
+  const s=b.api.snapshot().trace.selected;assert.equal(b.api.selectTraceSpan({context:s.context,spanId:MAP_SPAN}),true);b.h.flush();
+  assert.equal(list.scrollTop,-114,'the row (top -50) is brought below the bar inside the list (-50 - 56 - 8)');
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;nav.remove();b.api.destroy();}
 });

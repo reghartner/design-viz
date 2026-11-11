@@ -537,10 +537,13 @@
       if(top>=edgeTop && bottom<=edgeBottom)return 0;
       return top<edgeTop || bottom-top>edgeBottom-edgeTop-16?top-edgeTop-8:bottom-edgeBottom+8;
     }
-    // The page's top edge sits below the reader's fixed navigation bar: the engine publishes its bottom (+8 px) as
-    // --flowview-navigation-bottom on the view, which this panel inherits. Without a bar it is 0.
+    // The page's top edge sits below the reader's navigation bar (fixed in the published reader, sticky in a native mount).
+    // It is read live from the view's .explore-navigation, which is right whether the bar is stuck or not; the engine's
+    // --flowview-navigation-bottom (its bottom + 8, measured at a nav resize or font load) is only the fallback. No bar: 0.
     function pageTop(view){
-      var style=view.getComputedStyle?view.getComputedStyle(host):null,value=style && style.getPropertyValue?parseFloat(style.getPropertyValue('--flowview-navigation-bottom')):NaN;
+      var docview=host.closest && host.closest('.docview'),bar=docview && Array.prototype.find.call(docview.children || [],function(child){return child.classList && child.classList.contains('explore-navigation');});
+      if(bar && bar.getClientRects && bar.getClientRects().length)return Math.max(0,bar.getBoundingClientRect().bottom);
+      var style=view && view.getComputedStyle?view.getComputedStyle(host):null,value=style && style.getPropertyValue?parseFloat(style.getPropertyValue('--flowview-navigation-bottom')):NaN;
       return isFinite(value)?Math.max(0,value-8):0;
     }
     /* What a span focus shows: from the item's top (its row) to the opened detail's own bottom. The item's trailing space
@@ -554,7 +557,8 @@
     // box: the part of `node` to show ({top, bottom} in viewport px); default its whole rect.
     function revealInView(node,pageOff,box){
       var holder=scrollHolder(node),ib=box || node.getBoundingClientRect(),view=doc.defaultView || (typeof window!=='undefined'?window:null),page=doc.scrollingElement,delta;
-      if(holder){var hb=holder.getBoundingClientRect();delta=revealDelta(ib.top,ib.bottom,hb.top,hb.bottom);if(delta)holder.scrollTop+=delta;return;}
+      // A holder scrolled up under the bar shows rows only below it.
+      if(holder){var hb=holder.getBoundingClientRect();delta=revealDelta(ib.top,ib.bottom,Math.max(hb.top,pageTop(view)),hb.bottom);if(delta)holder.scrollTop+=delta;return;}
       if(pageOff)return;
       if(page && view && view.innerHeight){delta=revealDelta(ib.top,ib.bottom,pageTop(view),view.innerHeight);if(delta)page.scrollTop+=delta;}
       else if(node.scrollIntoView)node.scrollIntoView({block:'nearest',inline:'nearest'});
@@ -568,7 +572,7 @@
     // the screen by scrolling the list alone wherever the page is scrolled. The listeners exist only while the cap is on.
     function measureListCap(list){
       if(!list.getBoundingClientRect || !list.style || !list.style.setProperty)return;
-      var top=Math.max(0,Math.round(list.getBoundingClientRect().top))+'px';if(list._traceCapTop===top)return;
+      var view=doc.defaultView || (typeof window!=='undefined'?window:null),top=Math.round(Math.max(pageTop(view),list.getBoundingClientRect().top))+'px';if(list._traceCapTop===top)return;
       list._traceCapTop=top;list.style.setProperty('--dv-trace-list-top',top);
     }
     function watchListCap(list){
@@ -675,6 +679,13 @@
       if(refreshNow.state==='busy')refreshControl.setAttribute('aria-busy','true');else refreshControl.removeAttribute('aria-busy');
       refreshControl.title=refreshNow.title || 'Refresh now';
       if(!refreshControl._liveClick){refreshControl._liveClick=function(){var owner=host._livePanelApi;if(owner && refreshControl.getAttribute('aria-disabled')!=='true' && typeof owner.refreshMetricsNow==='function')owner.refreshMetricsNow();};refreshControl.addEventListener('click',refreshControl._liveClick);}
+      // #1294: how the overlay draws, only while it is on: Cards (default) or Outline.
+      var styleGroup=el(top,'div','metrics-style','dv-status-segmented dv-live-metrics-style');styleGroup.setAttribute('role','group');styleGroup.setAttribute('aria-label','Metrics style');
+      styleGroup.hidden=!(metrics.available && metrics.enabled && metrics.styleChoice);
+      [['cards','Cards','A metric card beside each connection'],['outline','Outline','Outline each carrier in its metric colour. Hover or focus shows its card; click, Enter or Space opens the details']].forEach(function(item){
+        var choice=button(styleGroup,item[0],'reader-button dv-live-metrics-style-choice',item[1],'setMetricsStyle');choice._liveArgument=item[0];choice.title=item[2];
+        choice.setAttribute('aria-pressed',String((metrics.style || 'cards')===item[0]));
+      });
       var available=value && value.available,hasData=available && value.hasData;
       // Live and Over time are the two modes (#929, Chuck 2026-11-04), in a row of their own. The selected one is filled. Live returns from a past day; while selected it still turns colors off (D6).
       var over=value && value.overTime,past=!!(over && over.active);
@@ -888,7 +899,7 @@
 @media(prefers-reduced-motion:reduce){.dv-live-switch-track,.dv-live-switch-thumb{transition:none}}
 .dv-status-header>.dv-live-over-time-status{margin:0;font:11px/1.5 'IBM Plex Mono',monospace}
 .dv-status-header>.dv-live-day-row{margin-top:0}
-.pt-live-status .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
+.pt-live-status .dv-live-metrics-style .tbtn[aria-pressed="true"],.pt-live-status .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
 .dv-live-trace{font-size:12px}.dv-live-trace p{margin:6px 0;overflow-wrap:anywhere}.dv-trace-mode-status:empty{display:none}
 .dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-check-label{display:flex;align-items:center;gap:6px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
 .dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{margin-left:.4em;color:var(--dfaint)}.dv-trace-request{margin:6px 0}.dv-trace-request>summary{cursor:pointer;overflow-wrap:anywhere;font-weight:600}.dv-trace-log-search,.dv-trace-log-typed{margin:8px 0;padding:8px;border:1px solid var(--explore-border);border-radius:6px;min-width:0}.dv-trace-log-search-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 8px;min-width:0}.dv-trace-log-search-controls>.dv-trace-input-label{flex:1 1 160px;min-width:0;margin:0}.dv-trace-log-name,.dv-trace-log-label{font-weight:600;overflow-wrap:anywhere}.dv-trace-log-name{flex:1 1 auto;align-self:center;min-width:0}.dv-trace-log-typed>summary{cursor:pointer;font-weight:600;padding:2px 0}.dv-trace-log-find[aria-busy=true]{cursor:progress}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}

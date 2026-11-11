@@ -33,6 +33,9 @@ function linksTraceValue(list,many){
   return list.length===1 && !many?list[0]:list;
 }
 function linksTraceSetPlan(text,raw,got,value){
+  // #1290: a step has traceMatch or traceScope, never both: writing a trace match replaces the scope
+  // in the same edit, as the Inspect form and Map this span do.
+  if(value!=null && got.st && Object.prototype.hasOwnProperty.call(got.st,'traceScope'))return planSetFields(text,raw,got.path,[['traceMatch',JSON.stringify(value)],['traceScope',null]]);
   return planSetField(text,raw,got.path,'traceMatch',value==null?null:JSON.stringify(value));
 }
 
@@ -74,6 +77,7 @@ function linksTraceModel(text,raw,context){
       });
       var caption=typeof st.text==='string'?st.text:'',occurrence=stepEls.filter(function(x){return x.caption===caption;}).length;
       var el={kind:'step',section:section,index:index,stepId:typeof st.id==='string'?st.id:null,label:label,caption:caption,occurrence:occurrence,matches:matches,form:alts!==null,
+        scoped:st.traceMatch==null && !!st.traceScope && typeof st.traceScope==='object' && !Array.isArray(st.traceScope),
         edgeKeys:stepKeys(st).concat(Object.keys(stepFailures(st))),editable:true};
       if(alts===null)el.reason=label+'’s traceMatch is not a selector object or a list of them. Fix it in JSON or Inspect first.';
       // Static drop checks look a source step up through its model.
@@ -163,6 +167,8 @@ function planLinksTraceMove(text,raw,from,to,mode,copy,context){
 /* + Assign step: give a step {serviceName, operation} (as an alternative when it
    already has another match), or remove every alternative with that key. */
 function planLinksTraceAssign(text,raw,group,step,remove,context){
+  if(!group || typeof group.serviceName!=='string' || typeof group.operation!=='string')
+    return {error:(group && group.key || 'This group')+' is not an exact operation, so it cannot be a step\'s trace match. Steps inherit it from the node or connection that declares it.'};
   var got=linksTraceStepAt(raw,step.section,step.index);if(!got)return {error:'Step not found. Render and try again.'};
   if(!got.alternatives)return {error:got.label+'’s traceMatch is not a selector object or a list of them. Fix it in JSON first.'};
   var key=linksTraceKey(group),has=got.alternatives.filter(function(m){return linksTraceKey(m)===key;}).length>0,list=builderClone(got.alternatives);

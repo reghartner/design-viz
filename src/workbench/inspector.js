@@ -44,6 +44,9 @@ function createBuilderInspector(opts){
   function beginForm(identity){
     var same=identity===inspectorScrollKey;
     var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0,sizes:same?captureTextareaSizes():null,disclosures:same?captureDisclosures():null};
+    // A Links "Edit in Inspect" request is for the very next render of that carrier (#1290 PR 8):
+    // rendering anything else first drops it, so a later ordinary click opens nothing.
+    if(REVEAL_TRACE_SPANS && REVEAL_TRACE_SPANS!==revealKey(session.target))REVEAL_TRACE_SPANS=null;
     if(!same){
       OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_SPAN_DRAFTS.clear();TRACE_SCOPE_VIEW.clear();TRACE_MATCH_REVEALED.clear();
       OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;

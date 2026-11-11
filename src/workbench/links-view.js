@@ -561,10 +561,11 @@ function initWorkbenchLinksView(opts){
   }
   function traceDropText(d){
     var to=d.target.element,has=to.matches && to.matches.length;
-    if(!d.from)return 'Drop to give '+to.label+' '+d.key+(has?' as an alternative (it already has '+to.matches.map(function(u){return u.key;}).join(', ')+')':'')+'.';
-    return 'Drop to '+(d.copy?'copy ':'move ')+d.key+(d.copy?'':' from '+d.from.label)+' to '+to.label+(has?'; you choose Replace or Add as alternative next':'')+(d.copy?'':' · hold ⌥ to copy')+'.';
+    var scope=to.scoped?' · replaces this step\'s trace scope':'';
+    if(!d.from)return 'Drop to give '+to.label+' '+d.key+(has?' as an alternative (it already has '+to.matches.map(function(u){return u.key;}).join(', ')+')':'')+scope+'.';
+    return 'Drop to '+(d.copy?'copy ':'move ')+d.key+(d.copy?'':' from '+d.from.label)+' to '+to.label+(has?'; you choose Replace or Add as alternative next':'')+scope+(d.copy?'':' · hold ⌥ to copy')+'.';
   }
-  function assignText(to,key){return 'Gave '+to.label+' '+key+(to.matches && to.matches.length?' as an alternative':'')+'. Undo restores it.';}
+  function assignText(to,key){return 'Gave '+to.label+' '+key+(to.matches && to.matches.length?' as an alternative':'')+(to.scoped?'; its trace scope was removed':'')+'. Undo restores it.';}
   function traceDrop(d){
     var to=d.target.element;
     if(!d.from){var g=traceGroup(d.key);if(g)commit(function(text,raw,ctx){return planLinksTraceAssign(text,raw,g,stepRef(to),false,ctx);},{ok:assignText(to,d.key)});return;}
@@ -896,16 +897,16 @@ function initWorkbenchLinksView(opts){
       var id=linksElementId(x),note=x.matches.length?x.matches.map(function(u){return u.key;}).join(', '):'';
       if(spec.type==='trace-assign'){
         var on=x.matches.some(function(u){return u.key===spec.key;}),needsId=!on && !x.stepId?x.label+LINKS_TRACE_NEEDS_ID:null;
-        var assignNote=!on && x.matches.length?'adds an alternative to '+note:note;
+        var assignNote=!on && x.scoped?'replaces this step\'s trace scope':!on && x.matches.length?'adds an alternative to '+note:note;
         body.appendChild(option(id,sectionPrefix(x)+x.label,on,x.form?needsId:x.reason,function(checked){
           if(!g)return false;return commit(function(text,raw,ctx){return planLinksTraceAssign(text,raw,g,stepRef(x),!checked,ctx);},{ok:checked?assignText(x,spec.key):'Removed '+spec.key+' from '+x.label+'. Undo restores it.'});
         },assignNote));
       }else{
-        body.appendChild(pickTarget(sectionPrefix(x)+x.label,id,why[id],function(){
+        body.appendChild(pickTarget(sectionPrefix(x)+x.label+(x.scoped?' (has a trace scope)':''),id,why[id],function(){
           var f=spec.from,c=spec.copy,src=spec.opener;
           if(x.matches.length){traceChoose(f,x,spec.key,c,src);return;}
           closePopover(false);traceMove(f,x,spec.key,null,c);
-        },note,spec.copy));
+        },x.scoped?'replaces this step\'s trace scope':note,spec.copy));
       }
     });
     popover.appendChild(el('p','links-pop-hint',spec.type==='trace-move'?'↑↓ move · Enter picks · a step with a match asks Replace or Add as alternative · Esc closes':'↑↓ move · Space ticks or unticks · Esc closes · each tick is one Undo step'));

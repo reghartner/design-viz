@@ -579,8 +579,9 @@ assigned. Each declaration lists the steps that inherit it, by the same per-path
 as the step trace scope form ("Step 3 · push (inherited on Path B)"). **By element**: a node or
 connection lists its own declarations. Declaration rows are read only; **Edit in Inspect** opens
 that node or connection's Trace spans fold. A group **Rename** changes the steps' trace matches
-only, never the declarations, and says so. Imported nodes and connections show their merged
-declarations.
+only, never the declarations, and says so. Assigning, dropping or moving a trace match onto
+a step with a trace scope replaces the scope in the same edit; the Assign and Move lists and the
+drop text say so first. Imported nodes and connections show their merged declarations.
 A value that is not selector objects keeps the **Trace match JSON** box.
 
 ### Query progress

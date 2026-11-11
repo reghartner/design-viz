@@ -838,7 +838,7 @@ function planCarrierTraceSpans(text,raw,target,edit,context){
     if(op==='revertAll')overlay=null;
     else if(op==='hide' || op==='revert'){
       var hiddenNow=state.hidden.indexOf(edit.name)>=0;
-      if(!telemetryOwn(state.inherited,edit.name) && !(op==='hide' && !edit.value && hiddenNow))return {error:'Span '+edit.name+' is not inherited from '+state.provider+'.'};
+      if(!telemetryOwn(state.inherited,edit.name) && !(op==='hide' && !edit.value && hiddenNow))return {error:'Span '+edit.name+' is not inherited from '+state.providerTitle+'.'};
       var after=telemetryClone(state.spans);
       if(op==='hide' && edit.value)delete after[edit.name];
       else if(telemetryOwn(state.inherited,edit.name))after[edit.name]=telemetryClone(state.inherited[edit.name]);

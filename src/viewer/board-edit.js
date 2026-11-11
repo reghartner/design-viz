@@ -208,8 +208,9 @@ function createBoardEditor(options){
     if(error){if(win.console)console.warn('flowspec: board edit refused: '+error);return false;}
     text=next;return true;
   }
-  // The text from before a mapping (for its Undo) stays out of the stash.
-  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops.map(function(o){return {entry:o.entry,chain:o.chain,replayable:o.replayable,kind:o.kind,previous:o.previous,scope:o.scope};})}));}catch(ex){}}
+  // The text from before a mapping (for its Undo) stays out of the stash, and so does a replaced
+  // traceScope: replaying a mapping reads it again from the step it is applied to.
+  function stash(){try{win.sessionStorage.setItem(stashKey,JSON.stringify({ops:ops.map(function(o){return {entry:o.entry,chain:o.chain,replayable:o.replayable,kind:o.kind,previous:o.previous};})}));}catch(ex){}}
   function unstash(){try{win.sessionStorage.removeItem(stashKey);}catch(ex){}}
   function history(source,entry){
     var raw=parsed(source),owner=raw && raw.page?['page']:[],page=specValueAt(raw,owner),list=page && page.editHistory,itemText=JSON.stringify(entry,null,2);

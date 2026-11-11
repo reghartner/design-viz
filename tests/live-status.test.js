@@ -3321,7 +3321,8 @@ async function paintedCard(nodes){
    outline and keeps its open card open with the new values; a carrier gone after the repaint moves focus to
    its remaining button, else to its board, never to the page. Local and imported carriers. */
 async function outlineBoard(raw,samples,tickets){
- const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve(JSON.parse(JSON.stringify(samples)))}}),matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+ const state={samples};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve(JSON.parse(JSON.stringify(state.samples)))}}),matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
  h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
  // Focus is tracked on the document, as a browser does; a removed element keeps it until something else takes it.
  const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;},focus(){h.doc.activeElement=this;h.view.dispatchEvent({type:'focusin',target:this});}});
@@ -3331,7 +3332,7 @@ async function outlineBoard(raw,samples,tickets){
  if(tickets)h.ctl.liveStatus.apply(tickets);
  h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
  h.ctl.liveStatus.setMetricsStyle('outline');h.flush();await settle();h.flush();
- return h;
+ h.state=state;return h;
 }
 const outlineOf=(h,id)=>h.view.querySelector('.dv-metrics-outline[data-metrics-carrier="'+id+'"]');
 const cardText=card=>card.querySelectorAll('text,tspan').map(t=>t.textContent||'').join(' ');
@@ -3387,6 +3388,24 @@ test('#1324 focus on a link inside an open Outline card returns to the same link
  assert.ok(!!now && now.isConnected!==false && after._metricsCard.contains(now) && now.getAttribute('data-signal')==='rate','focus is on the same link in the repainted card');
  h.ctl.liveStatus.destroy();
 });
+test('#1324 a Refresh now repaint keeps the hover card open and keyboard focus on its carrier',async()=>{
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
+ const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});
+ assert.ok(typeof h.ctl.liveStatus.refreshMetricsNow==='function','Refresh now is on main');
+ const halo=outlineOf(h,'a->b');halo.focus();h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',target:halo});
+ h.state.samples={'a->b':{signals:{rate:{value:888},errors:{value:0}}}};
+ // Past the Refresh now cooldown in the viewer's clock.
+ vm.runInContext('(function(){var real=Date.now;Date.now=function(){return real()+120000;};globalThis.__restoreNow=function(){Date.now=real;};})()',h.C);
+ try{
+  assert.ok(h.ctl.liveStatus.refreshMetricsNow()===true,'Refresh now starts a call');
+  for(let i=0;i<6;i++)await settle();h.flush();
+ }finally{vm.runInContext('__restoreNow()',h.C);}
+ const after=outlineOf(h,'a->b');
+ assert.ok(h.doc.activeElement===after,'keyboard focus stays on the same carrier outline');
+ assert.ok(after._metricsCard.classList.contains('dv-metrics-peek')===true,'the card stays open');
+ assert.ok(/888/.test(cardText(after._metricsCard)),'it shows the refreshed value');
+ h.ctl.liveStatus.destroy();
+});
 test('#1324 a carrier gone after an Outline repaint moves focus to its remaining button, else its board, never the page',async()=>{
  const raw=tickets=>({page:{tracking:{jira:{site:'https://jira.test'},telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',...(tickets?{tickets:['AA-1']}:{}),telemetry:TCALL()}]}}]}});
  // A ticketed connection keeps its Jira label button when the overlay goes away.
@@ -3405,6 +3424,7 @@ test('#1324 a carrier gone after an Outline repaint moves focus to its remaining
  now=h.doc.activeElement;
  assert.ok(!!now && now!==before && h.view.contains(now),'focus left the removed outline for an element on the board');
  assert.ok(now.tagName==='section','focus is on the carrier\'s board section, got '+(now && now.tagName));
+ assert.ok(!!(now.getAttribute('aria-label') || now.getAttribute('aria-labelledby')),'the section focus lands on has an accessible name');
  h.ctl.liveStatus.destroy();
 });
 test('#1294 follow-up: after a touch, Tab onto an Outline carrier shows its card on focus',async()=>{

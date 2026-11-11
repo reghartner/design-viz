@@ -287,7 +287,14 @@ environment and service version changes are reported. Changed selectors or budge
 require reference reapproval. Unmatched spans are reported and never assigned
 invented nodes, outcomes or root causes.
 
-`diagram.referenceTrace` holds the approved mapping and reference.
+`diagram.referenceTrace` holds the approved mapping and reference. For steps that inherit
+declared trace spans (#1290, `docs/provider-traces.md`) the approval also covers the step's
+`traceScope` and the declarations of every carrier it lights (and, for a connection, the
+receiving node's `process` spans), so a provider or overlay change to those spans asks for a
+new approval; boards without declarations keep their approvals unchanged. Inheriting steps
+count as measured; ambiguous ones block approval, and steps of another flow are left out. With
+an approved reference trace, a declared operation or prefix that no span in it matches warns
+(attribute-only declarations are not checked), naming the provider for an imported carrier.
 `diagram.incidents` holds portable comparison provenance. Generated divergent
 steps have unique IDs, `evidence`, and `conditions`. Conditions accept
 `service-error`, `delivery-failed`, `slow`, `database-slow`, `queue-buildup`,

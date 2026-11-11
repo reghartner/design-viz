@@ -239,5 +239,24 @@ function handoffs(trace,sends,receivers){
     return {send,receive,orphan};
   });
 }
-return {baseSteps:baseSteps,mapTrace:mapTrace,selector:selector,carrierSpans:carrierSpans,handoffs:handoffs};
+/* #1290: what a reference approval digests for one step (D20). A step with traceMatch digests it
+   as before; a step that inherits digests its traceScope and the declarations of every declared
+   carrier it lights (shared or not), plus, for a connection, the receiving node's process
+   declarations that time its hand-off. A step with neither digests {id, traceMatch:null}, as before. */
+function effectiveSelector(d,step){
+  if(step.traceMatch)return {id:step.id,traceMatch:step.traceMatch};
+  const lit=litCarriers(step),carriers=[],declared=v=>object(v) && object(v.trace) && object(v.trace.spans)?v.trace.spans:null;
+  lit.nodes.forEach(id=>{const spans=declared((d.nodes || {})[id]);if(spans)carriers.push({node:id,spans});});
+  lit.edges.forEach(key=>{
+    const edge=(d.edges || []).find(e=>e && e.from+'->'+e.to===key);if(!edge)return;
+    const spans=declared(edge),to=declared((d.nodes || {})[edge.to]) || {},receiver={};
+    Object.keys(to).forEach(k=>{if(object(to[k]) && to[k].role==='process')receiver[k]=to[k];});
+    if(spans || Object.keys(receiver).length)carriers.push({edge:key,spans:spans || {},receiver});
+  });
+  const out={id:step.id,traceMatch:null};
+  if(object(step.traceScope))out.traceScope=step.traceScope;
+  if(carriers.length)out.carriers=carriers;
+  return out;
+}
+return {baseSteps:baseSteps,mapTrace:mapTrace,selector:selector,carrierSpans:carrierSpans,handoffs:handoffs,effectiveSelector:effectiveSelector};
 })();

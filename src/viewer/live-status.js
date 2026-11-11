@@ -2217,7 +2217,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       // #1253: an open popover stays open through the repaint, the post-drop question too (rebuilt in place).
       var openId=active && active.getAttribute('data-live-carrier'),openBinding=active && bindings.find(function(binding){return binding.el.contains(active);}),openMetrics=!!(active && active._liveCarrier && active._liveCarrier.metricsOnly);
       // #1324: an Outline card open on hover, focus or tap, and focus on a link inside it, survive the repaint.
-      var peekCard=view.querySelector('.dv-metrics-card.dv-metrics-peek'),peekOutline=peekCard && peekCard._metricsOutline,peekId=peekOutline && peekOutline.getAttribute('data-metrics-carrier');
+      var peekCard=view.querySelector('.dv-metrics-card.dv-metrics-peek'),peekOutline=peekCard && peekCard._metricsOutline,peekId=peekOutline && peekOutline.getAttribute('data-metrics-carrier'),peekClosing=!!peekTimer;
       var peekBinding=peekOutline && bindings.find(function(binding){return binding.el.contains(peekOutline);}),peekSignal=focused && peekCard && peekCard.contains(focused) && focused.getAttribute('data-signal');
       if(!focusBinding && peekSignal){focusCarrier=peekId;focusBinding=peekBinding;}
       syncBindings();clearTargets();refreshDependencies();
@@ -2247,6 +2247,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         else if(focused && focused.isConnected===false && focusBinding.el.isConnected!==false)focusBoard(focusBinding);
       }
       if(peekNow && !peekLink)metricsPeek(peekNow);
+      // A close already due when the repaint came (the pointer or focus had left) still happens.
+      if(peekNow && peekClosing)metricsUnpeek();
       if(active){
         var target=openBinding && openBinding.el.isConnected && Array.from(openBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===openId && !el.classList.contains('dv-metrics-label-hidden') && !!(el._liveCarrier && el._liveCarrier.metricsOnly)===openMetrics;});
         if(target){active=target;refreshPopover();}else close(false);
@@ -2258,11 +2260,14 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(traceRecheck){traceRecheck=false;traceLabelsResized();}
     if(!retired && editor){focusEditedCarrier();askPending();}
   }
-  /* #1324: focus for a carrier that is gone after a repaint: its board section, named for screen readers. */
+  /* #1324: focus for a carrier that is gone after a repaint: its diagram's .board, already focusable and named
+     (engine.js). Without a board the section takes focus for this moment only. */
   function focusBoard(binding){
-    var el=binding.el;if(!el || typeof el.focus!=='function')return;
-    if(el.getAttribute('tabindex')==null)el.setAttribute('tabindex','-1');
-    if(!el.getAttribute('aria-label') && !el.getAttribute('aria-labelledby'))el.setAttribute('aria-label',String(binding.section && (binding.section.heading || binding.section.title) || binding.page && binding.page.title || 'Diagram'));
+    var el=binding.el,board=el && el.querySelector && el.querySelector('.board');
+    if(board && typeof board.focus==='function'){board.focus({preventScroll:true});return;}
+    if(!el || typeof el.focus!=='function')return;
+    var added=el.getAttribute('tabindex')==null;if(added)el.setAttribute('tabindex','-1');
+    if(added)el.addEventListener('blur',function drop(){el.removeEventListener('blur',drop);el.removeAttribute('tabindex');});
     el.focus({preventScroll:true});
   }
   function schedule(){if(retired || painting || frame)return;frame=requestAnimationFrame(function(){frame=0;paint();notify();});}

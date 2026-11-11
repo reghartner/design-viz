@@ -209,6 +209,7 @@ for(const kind of ['grafana','honeycomb'])test('R11 '+kind+': after a refresh th
 | R16 | the same boards with a failing query | off/on 5 s after a failed answer makes no call yet: it shows the cooldown until 60 s after that call, and the call runs then; a first Metrics on in another environment calls at once | off/on during provider errors as a fast poll |
 | R17 | the same boards | a refresh held past 61 s still ignores Refresh now until it answers | a second call while one runs |
 | R18 | the same boards with a failing query | after the failed answer, clear() or setAvailable(false) then true resets the wait: off/on calls at once | an old failure holding back a reconnect |
+| R19 | a board with environments qa and stg | stg answers cleanly, qa's answer names a failure and off/on waits in qa; switching to stg shows stg healthy (no wait, no failure time) and back to qa shows qa's wait again | one environment's wait shown on another |
 */
 for(const kind of ['grafana','honeycomb']){
  test('R12 '+kind+': off/on after 5 minutes shows the cached answer at once, then refreshes it with exactly one background call',async()=>{
@@ -290,3 +291,16 @@ for(const kind of ['grafana','honeycomb'])for(const [label,drop] of [['clear()',
    assert.equal(h.data(),2,'the cache drop resets the wait: '+label);
   }finally{h.close();}
  });
+for(const kind of ['grafana','honeycomb'])test('R19 '+kind+': the wait after a failed answer belongs to its environment',async()=>{
+ let failing=false;const h=await setup(kind,{fail:()=>failing,environments:true});
+ try{
+  assert.equal(typeof h.api.refreshNowState,'function','refreshNowState exists');
+  assert.equal(h.api.setEnvironment('stg'),true);h.api.setEnabled(true);await settle();assert.equal(h.data(),1);assert.equal(h.api.status().note,'','stg answers cleanly');
+  h.advance(1000);failing=true;h.api.setEnvironment('qa');await settle();assert.equal(h.data(),2);assert.match(h.api.status().note,/boom/,'qa names a failure');
+  h.advance(5000);h.api.setEnabled(false);h.api.setEnabled(true);await settle();assert.equal(h.data(),2);
+  assert.equal(h.api.refreshNowState().waiting,true,'off/on waits in qa');
+  h.advance(5000);h.api.setEnvironment('stg');await settle();assert.equal(h.data(),2,'stg reuses its clean answer');
+  const stg=h.api.refreshNowState();assert.equal(stg.waiting,false,'stg shows no wait');assert.equal(stg.failedAt,null);assert.equal(stg.nextTry,null);assert.equal(h.api.status().note,'');
+  h.advance(5000);h.api.setEnvironment('qa');await settle();assert.equal(h.data(),2,'back in qa the wait still holds');assert.equal(h.api.refreshNowState().waiting,true,'and shows again');
+ }finally{h.close();}
+});

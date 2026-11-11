@@ -350,3 +350,12 @@ test('example traces are searched again on an overdue off/on and on Refresh now,
  clock.now+=61000;assert.equal(h.api.refreshNow(),true);await settle();assert.equal(searches(),3,'Refresh now searches again');
  assert.ok(h.api.snapshot().map.a?.exemplars?.[0],'and the new example trace is listed');
 });
+
+/* #1313 review c3: during the wait after a failed answer, a host provider's example trace stays, as it does on a reuse. */
+test('during the wait after a failed answer a host provider\'s example trace stays',async()=>{
+ const {C}=context(),p=C.normalize(pageSpec()),e=plain(envelope(C));let calls=0;
+ const api=C.createTelemetry(p,{provider:async(b,s,report)=>{calls++;report.note('a other: boom');return {a:{signals:{},exemplars:[e]}};},canChooseExemplar:()=>true,chooseExemplar:async()=>e},{carriers:fn=>C.sectionRecords(p).forEach(r=>{const d=r.section.diagram||{};Object.keys(d.nodes||{}).forEach(id=>fn(d.nodes[id],id,p));})});
+ api.setEnabled(true);await settle();assert.equal(calls,1);assert.match(api.status().note,/boom/);
+ api.setEnabled(false);api.setEnabled(true);await settle();assert.equal(calls,1,'the wait: no call');
+ assert.equal(api.refreshNowState().waiting,true);assert.equal(api.snapshot().map.a?.exemplars?.[0]?.traceId,e.traceId,'the host\'s example trace stays');api.destroy();
+});

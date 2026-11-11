@@ -14,6 +14,7 @@
 | X12 | (#1345) A consumer signal patch that names the inherited source with an object query and leaves out part of it warns at the overlay, naming the signal, the carrier and what is left out: absent keys (Honeycomb calculations, breakdowns; CloudWatch dimensions) and each inherited list item the patch leaves out or changes, by name (a filter as column op value, a calculation as OP(column), a log group). Only absent keys get "write all of it"; a changed item asks the author to check it is meant. | provider node, edge and store with Honeycomb, CloudWatch and CloudWatch Logs signals | warnings exactly | silently broken signals |
 | X13 | (#1345) A patch that keeps all of the provider's query (a restatement), a string query, or a source switch is a note, not a warning; a field patch and a local binding give nothing. | same provider | notes exactly; no warnings | notes that fail builds, or findings on plain field patches |
 | X14 | (#1345) Nested and twice-imported carriers: each overlay's findings sit at its own document and import; a middle diagram's finding is its own, not its importer's. | provider → middle → consumer; one provider imported twice | warnings and notes per document | findings at the wrong import or leaking across documents |
+| X15 | (#1347 review c2 wording) Named items read in full: a Honeycomb having as "COUNT > 10", an order with its direction ("COUNT descending"), an in filter with bracketed values ("code in [E1, E2]"); more than three items read "a, b, c and N more". | provider with havings, orders and many filters | warnings exactly | unreadable or endless item lists |
 | X6 | Validator: a merge overlay produces no telemetry warnings; a malformed `hide` warns at its overlay path. Compatibility declares `flow.telemetry-merge` only for merge overlays. | consumer docs | warnings; features | warnings on valid merges; silent malformed filters; older runtimes treating merges as replaces |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
@@ -250,4 +251,19 @@ test('#1345 X14 nested and twice-imported carriers: findings stay with their own
   assert.deepEqual(findings(both,{version:1,id:'consumer',specs:[provider,both]}),{
     warnings:['sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.signals.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query and leaves out calculations, so the signal no longer reads what the provider defined; to replace the query, write all of it'],
     notes:['sections[0].diagram.topologyImports[1].nodeTracking.api.telemetry.signals.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query; later provider changes to it no longer reach this board']});
+});
+
+test('#1345 X15 named items read in full; long lists are capped',()=>{
+  const q={dataset:'orders',calculations:[{op:'COUNT'},{op:'P99',column:'duration_ms'}],
+    filters:[{column:'code',op:'in',value:['E1','E2']},{column:'region',op:'in',value:['eu','us']},{column:'a',op:'=',value:'1'},{column:'b',op:'=',value:'2'},{column:'c',op:'exists'}],
+    havings:[{calculate_op:'COUNT',op:'>',value:10},{calculate_op:'P99',column:'duration_ms',op:'<',value:500}],orders:[{op:'COUNT',order:'descending'},{column:'region'}]};
+  const provider=spec('provider',{nodes:{api:{title:'API',telemetry:{kind:'service',signals:{received:{honeycomb:q}}}}},rows:[['api']],topologyExports:{core:{nodes:['api'],edges:[]}}});
+  const run=patch=>{const consumer=consumerOf([{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{telemetry:{extends:true,signals:{received:{honeycomb:patch}}}}}}]);return findings(consumer,{version:1,id:'consumer',specs:[provider,consumer]}).warnings;};
+  const at='sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.signals.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query and ';
+  const end=', so the signal no longer reads what the provider defined; check that this is meant';
+  assert.deepEqual(run({...q,havings:[],orders:[q.orders[1]],filters:q.filters.slice(2)}),
+    [at+'leaves out or changes the inherited filters code in [E1, E2] and region in [eu, us], the inherited havings COUNT > 10 and P99(duration_ms) < 500 and the inherited order COUNT descending'+end]);
+  assert.deepEqual(run({...q,filters:[{column:'x',op:'=',value:'y'}]}),
+    [at+'leaves out or changes the inherited filters code in [E1, E2], region in [eu, us], a = 1 and 2 more'+end],'more than three items are capped');
+  assert.deepEqual(run({...q,orders:[{op:'COUNT',order:'ascending'},q.orders[1]]}),[at+'leaves out or changes the inherited order COUNT descending'+end]);
 });

@@ -179,3 +179,29 @@ test('compare without --resolve-imports on a board whose steps inherit refuses w
   assert.equal(run.status,1);
   assert.equal(run.stderr.trim(),approved+': unresolved topology declarations. To resolve them, pass --resolve-imports <repository folder or registry JSON>.','never "Trace mappings changed"');
 });
+
+test('compare without --resolve-imports counts only reference steps that light imported carriers (#1290 whole-branch review c2)',t=>{
+  const h=setup(t),approved=path.join(h.dir,'approved.json'),first=path.join(h.dir,'incident-1.json');
+  // A reference step without traceMatch on the local client node declares nothing imported: it needs no resolution.
+  const d=h.raw.page.sections[0].diagram;
+  d.steps.push({id:'browse',text:'The client browses',nodes:['client']});
+  if(Array.isArray(d.paths) && d.paths.length)d.paths[0].steps.push('browse');
+  const spec=h.write('local-step.spec.json',h.raw);
+  assert.equal(cli('reference','--spec',spec,'--trace',h.happy,'--resolve-imports',REGISTRY,'--reason','Reviewed','--out',approved).status,0);
+  const one=cli('compare','--spec',approved,'--trace',h.failed,'--out',first);
+  assert.equal(one.status,0,one.stderr);
+  const incident=JSON.parse(fs.readFileSync(first,'utf8')).page.sections[0].diagram;
+  assert.ok(incident.steps.some(st=>!st.traceMatch && (st.nodes || []).some(n=>n.startsWith('platform::'))),'the incident path lights an imported node without a traceMatch');
+  // A second compare on the incident output: its incident steps are not reference steps.
+  const other=h.write('failed-2.json',{spans:trace({error:true,statusCode:503}).spans.map(x=>({...x,traceId:'checkout-2'}))});
+  const two=cli('compare','--spec',first,'--trace',other),resolved=cli('compare','--spec',first,'--trace',other,'--resolve-imports',REGISTRY);
+  assert.equal(two.status,0,two.stderr);
+  assert.equal(two.stdout,resolved.stdout,'the same incident overlay as with the option');
+  // A reference step without traceMatch on an imported node still needs the option.
+  d.steps.push({id:'store',text:'The store writes',nodes:['platform::store']});
+  if(Array.isArray(d.paths) && d.paths.length)d.paths[0].steps.push('store');
+  const inheriting=h.write('inheriting.spec.json',h.raw),run=cli('compare','--spec',inheriting,'--trace',h.failed);
+  assert.equal(run.status,1);
+  assert.equal(run.stderr.trim(),inheriting+': unresolved topology declarations. To resolve them, pass --resolve-imports <repository folder or registry JSON>.');
+  h.unchanged();
+});

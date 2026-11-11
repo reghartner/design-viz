@@ -6,6 +6,17 @@ var LIVE_STATUS_APPEARANCES = LIVE_STATUS_STATES.concat(['unchanged']);
 /* Proof presentation consumes one normalized controller snapshot. It neither
    resolves bindings nor judges evidence: proofVerdicts remains the only engine.
    No clock, page walk, queries, or mutations belong in this presentation seam. */
+// #1348: the reason a signal is not shown (it cannot be narrowed safely, or a variable is unset).
+function telemetryNotShown(binding){
+  var names=Object.keys(binding && binding.signals || {}).filter(function(n){return binding.signals[n].error;});
+  return names.length?binding.signals[names[0]].error:'';
+}
+// #1348: the narrowing applied to this carrier's signals, verbatim ("Narrowed: event_code = FULL_CHARGE").
+function telemetryNarrowNote(binding){
+  var names=Object.keys(binding && binding.signals || {}).filter(function(n){return Array.isArray(binding.signals[n].narrow) && binding.signals[n].narrow.length;});
+  if(!names.length)return '';
+  return 'Narrowed: '+names.map(function(n){return (names.length>1?n+' ':'')+binding.signals[n].narrow.join('; ');}).join(' · ');
+}
 function liveStatusLogDetails(snapshot,window){
   var out=[];
   if(!snapshot.enabled || snapshot.historical)return out;
@@ -105,16 +116,16 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
     // #1201: an error signal outside its limit names the row ERROR, after the Jira state when there is one.
     if(telemetryErrorFailing(binding,result).length)label=label.indexOf(' · ')>0?label.split(' · ')[0]+' · ERROR':['done','active','testing','todo','blocked','missing'].indexOf(result.verdict)>=0?label+' · ERROR':'ERROR';
     return {id:binding.id,title:binding.title,kind:binding.kind,tickets:binding.tickets.slice(),jira:result.jira || 'No tickets',
-      loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,error:telemetryErrorFailing(binding,result).length>0,label:loading && !measured?'Loading…':label,predicate:predicate(binding,null,measured)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):''),failing:result.failing.slice(),
+      loading:loading,initialLoading:loading && !measured,telemetry:result.telemetry,verdict:result.verdict,error:telemetryErrorFailing(binding,result).length>0,label:loading && !measured?'Loading…':label,predicate:predicate(binding,null,measured)+(telemetryCountNote(binding)?' · '+telemetryCountNote(binding):'')+(telemetrySignalScope(binding.signals[primary])?' · '+telemetrySignalScope(binding.signals[primary]):'')+(telemetryNarrowNote(binding)?' · '+telemetryNarrowNote(binding):''),failing:result.failing.slice(),
       primary:primary,kpis:telemetryMetricRows(binding,sample,waiting,window).map(function(kpi){var own=plot(kpi.name);return Object.assign(kpi,{chart:{points:own.points,line:own.line}});}),
       since:since.join(' · ') || 'unavailable',url:url,
       linkLabel:primary && binding.signals[primary].source==='grafana'?'Open in Grafana':primary && binding.signals[primary].source==='honeycomb'?'Open in Honeycomb':'Open telemetry',
       explanation:result.failing.length?'Outside proof threshold: '+result.failing.map(function(name){return (errorSignal(name)?'error signal '+name+' is outside its limit: ':name+' is ')+telemetryCardValue(binding,sample,name,null,window)+'; requires '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
-        result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':result.telemetry==='unmeasured'?'Traffic proof requires an observed signal with an authored minimum.':'Observed signals meet the authored proof thresholds.',
+        result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?(telemetryNotShown(binding)?'Not shown: '+telemetryNotShown(binding):'Evidence is missing or incomplete.'):result.telemetry==='unmeasured'?'Traffic proof requires an observed signal with an authored minimum.':'Observed signals meet the authored proof thresholds.',
       // #1153: the Trace view's metrics popup states the metric evidence alone, with no Jira state or proof words.
       metrics:{label:loading && !measured?'Loading…':telemetryErrorFailing(binding,result).length?'ERROR':result.telemetry==='silent'?'SILENT':result.telemetry==='degraded'?'DEGRADED':measured?(result.telemetry==='unobserved'?'OBSERVED · evidence incomplete':'OBSERVED'):'UNOBSERVED',
         explanation:result.failing.length?'Outside limit: '+result.failing.map(function(name){return (errorSignal(name)?'error signal '+name+' is outside its limit: ':name+' is ')+telemetryCardValue(binding,sample,name,null,window)+'; limit '+predicate(binding,[name]);}).join('. ')+(loading?'. Another query is loading.':''):loading?(measured?'Refreshing queried evidence.':'Waiting for queried evidence.'):
-          result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?'Evidence is missing or incomplete.':
+          result.telemetry==='silent'?'No traffic observed in this window.':result.telemetry==='unobserved'?(telemetryNotShown(binding)?'Not shown: '+telemetryNotShown(binding):'Evidence is missing or incomplete.'):
           // unmeasured: no observed signal has an authored minimum, so traffic is not judged.
           result.telemetry==='unmeasured'?(limited?'Observed signals are within their authored limits; no traffic minimum is authored.':'Observed signals; no authored limits.'):'Observed signals are within their authored limits.'},
       chart:{pending:!!waiting[primary],observedAt:measuredAt,points:main.points,line:main.line,

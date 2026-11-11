@@ -145,6 +145,8 @@ var FlowTopology = (function(){
         if(!object(entry))return;
         var current=object(target[key])?target[key]:{};
         if(rules.entry)rules.entry(field,current,entry);
+        // rules.patch(field, current, patch) may return the patch to apply; the authored overlay is never changed.
+        if(rules.patch)entry=rules.patch(field,current,entry);
         var merged=patchFields(current,entry);
         if(Object.keys(merged).length)target[key]=merged;else delete target[key];
       });
@@ -161,6 +163,24 @@ var FlowTopology = (function(){
     entry:function(field,current,patch){
       if(field!=='signals' || !TELEMETRY_SOURCES.some(function(source){return patch[source]!=null;}))return;
       TELEMETRY_SOURCES.forEach(function(source){if(!own(patch,source))delete current[source];});
+    },
+    // #1348: narrow appends to the inherited fragments and needsNarrow only adds up; neither can be
+    // removed. A board that narrows an inherited signal no longer gets the provider's query link
+    // (it opens the unnarrowed query) unless it sets its own.
+    patch:function(field,current,patch){
+      if(field!=='signals' || !(own(patch,'narrow') || own(patch,'needsNarrow')))return patch;
+      var out=Object.assign({},patch);
+      if(own(patch,'narrow')){
+        var merged=telemetryNarrowMerge(current.narrow,patch.narrow);
+        if(merged)out.narrow=merged;else delete out.narrow;
+        var adds=telemetryNarrowMerge(null,patch.narrow);
+        if(adds && object(current.links) && own(current.links,'query') && !(object(patch.links) && own(patch.links,'query'))){
+          var links=Object.assign({},current.links,object(patch.links)?patch.links:{});delete links.query;
+          out.links=Object.keys(links).length?links:null;
+        }
+      }
+      if(own(patch,'needsNarrow')){var needs=telemetryNeedsMerge(current.needsNarrow,patch.needsNarrow);if(needs)out.needsNarrow=needs;else delete out.needsNarrow;}
+      return out;
     }};
   function mergeTelemetry(inherited,overlay){return mergeOverlay(inherited,overlay,TELEMETRY_OVERLAY_RULES);}
   // #1290: trace spans always merge. A span names spans one way, so a patch that sets
@@ -224,6 +244,12 @@ var FlowTopology = (function(){
     Object.keys(patches).forEach(function(name){
       var patch=patches[name],was=have[name];
       if(!object(patch) || !object(was))return;
+      // #1348: no widening. A null for an inherited narrowing, or for needsNarrow, is ignored.
+      var inheritedNarrow=telemetryNarrowMerge(was.narrow,null);
+      if(own(patch,'narrow') && inheritedNarrow && (patch.narrow===null || object(patch.narrow) && Object.keys(inheritedNarrow).some(function(k){return own(patch.narrow,k) && patch.narrow[k]===null;})))
+        note('warning','.signals.'+name+'.narrow','signal '+name+' on '+carrier+': a board cannot remove a narrowing the provider set — ignored');
+      if(own(patch,'needsNarrow') && was.needsNarrow!=null && (patch.needsNarrow===null || patch.needsNarrow===false))
+        note('warning','.signals.'+name+'.needsNarrow','signal '+name+' on '+carrier+': a board cannot drop the provider\'s needsNarrow — ignored');
       var to=TELEMETRY_SOURCES.filter(function(s){return patch[s]!=null;})[0],from=TELEMETRY_SOURCES.filter(function(s){return was[s]!=null;})[0];
       if(!to || !from)return;
       var at='.signals.'+name+'.'+to,who='signal '+name+' on '+carrier+': ',label=TELEMETRY_SOURCE_NAMES[to];

@@ -8,6 +8,7 @@
     "core/navigation.js",
     "core/document.js",
     "core/contracts.js",
+    "core/telemetry-narrow.js",
     "core/tracking.js",
     "core/trace-connections.js",
     "core/paths.js",
@@ -382,6 +383,7 @@
     },
     "iconLibrary": "icons/library.js",
     "autoArrangeWorker": [
+      "core/telemetry-narrow.js",
       "core/tracking.js",
       "core/geometry.js",
       "core/text-box.js",

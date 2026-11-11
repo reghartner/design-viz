@@ -158,37 +158,25 @@ successful empty results into zero. Malformed/error results never become zero.
 
 ### Named environment variables and counting scope
 
-Put shared string defaults in `tracking.telemetry.variables`, with per-profile
-`environments.<id>.variables` overrides. `${iotAccount}` and `${queueAccount}`
-can appear in **any signal string value**: Logs ARNs/query/region, metric
-dimensions/account, PromQL, LogQL, SQL, Honeycomb filters, Tempo, `unit` and
-`scope`. `$account` / `${account}` still uses effective `grafana.accountId`;
-`$env` / `${env}` uses the selected deployment. `account` and `env` are reserved
-variable names. `$__interval`, `$__rate_interval` and literal `$aws` stay intact.
+Shared string defaults go in `tracking.telemetry.variables`, per-profile overrides in
+`environments.<id>.variables`. Any signal string may use `${name}` (`env` and `account`
+are reserved); an unset one blocks that signal with a reason. A signal may author
+`scope`; without it, CloudWatch `RuleName`, `QueueName` and account-wide AuthError
+metrics name their own scope. Full rules:
+[details](../../../docs/live-status.md#named-environment-variables-and-counting-scope).
 
-Template parameters expand first (declared parameters win their original
-template occurrences); parameter values may intentionally contain environment
-references. Then one environment pass resolves shared variables overridden by
-the active profile, consistently for local and imported templates. Carrier
-signal overrides use that same environment pass. Arbitrary environment names
-require `${name}`; only legacy `$env` and `$account` also accept bare syntax.
-Inserted environment-variable values are literal and never recursively expanded.
-Unknown `${name}` blocks the affected query with a configuration reason. When
-only an optional Logs `breakdown` is affected, the scalar still refreshes; a
-missing variable in the scalar or shared signal fields blocks the whole signal.
-Never interpolate user secrets; profiles and queries are shipped in the artifact.
-The source and authored default environment stay unchanged when readers switch.
-The desktop editor's shared/profile variables JSON and structured query controls
-round-trip with one Undo/Redo per edit.
+### Narrowing an imported signal
 
-A signal may author `scope: "topic $aws/rules/camera_message_power_state · account ${iotAccount}"`.
-Scope is displayed on the card and in Proof and uses the active environment.
-Without explicit scope, CloudWatch `RuleName` means “this rule only”, `QueueName`
-means “queue only”, and AWS/IoT PublishIn.AuthError / Connect.AuthError with only
-account/protocol dimensions mean “all topics / whole account” / “all connections /
-whole account”. Other dimensions, edge titles and arbitrary Logs query text never
-establish topic scope. Use `unit: "refused publishes"` to read “15 refused publishes”
-with the card’s “24h window” context.
+Narrow an inherited signal in its provider's own language under `narrow`, keyed by the
+signal's source, in the import's `extends` overlay; never restate the provider's query:
+- Honeycomb: `"narrow": {"honeycomb": {"filters": [{"column": "event_code", "op": "=", "value": "FULL_CHARGE"}]}}`
+- CloudWatch: `"narrow": {"cloudwatch": {"dimensions": {"NotificationType": "FULL_CHARGE"}}}`
+
+Flowview appends it and never translates it. A provider signal with
+`needsNarrow: ["event_code"]` (or `true`) is not shown until a board narrows it.
+Narrowing only adds up; another language, SQL, Tempo, an OR query or a dimension
+conflict is not shown, with a reason. LogQL, PromQL and Logs Insights cannot be
+narrowed yet ([details](../../../docs/live-status.md#narrowing-inherited-signals)).
 
 ### CloudWatch Logs Insights
 

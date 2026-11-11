@@ -281,6 +281,25 @@ function telemetryQueryUrl(value){
   if(!telemetryConfigUrl(value))return null;
   var url=new URL(value);return /(?:^|\.)honeycomb\.io$/.test(url.hostname) && /(?:query_results|trace_results)(?:\/|$)/.test(url.pathname)?null:value;
 }
+/* #1348: shape warnings for a signal's narrow (keyed by source) as written. source is the
+   signal's own source, or null for a field patch whose inherited source is not known here. */
+function telemetryNarrowWarnings(narrow,source,warn,at){
+  if(narrow===null)return;
+  if(!telemetryObject(narrow)){warn(at,'must be an object keyed by the signal\'s source, such as {"honeycomb": {"filters": [ … ]}} — signal not shown');return;}
+  Object.keys(narrow).forEach(function(key){
+    var where=at+'.'+key,value=narrow[key];
+    if(value===null)return;
+    if(TELEMETRY_SOURCES.indexOf(key)<0){warn(where,'is not a metric source; key a narrowing by the signal\'s source'+(source?' ('+source+')':'')+' — signal not shown');return;}
+    if(source && key!==source){warn(where,'this signal reads from '+TELEMETRY_NARROW_LABELS[source]+', so a '+TELEMETRY_NARROW_LABELS[key]+' narrowing cannot apply — signal not shown');return;}
+    if(key==='sql' || key==='tempo'){warn(where,TELEMETRY_NARROW_LABELS[key]+' signals cannot be narrowed; use a ${name} variable in the provider\'s query — signal not shown');return;}
+    if(TELEMETRY_NARROW_STRUCTURED.indexOf(key)<0){warn(where,'Flowview cannot narrow '+TELEMETRY_NARROW_LABELS[key]+' signals yet — signal not shown');return;}
+    telemetryNarrowList(value).forEach(function(fragment,i){
+      var problem=telemetryNarrowFragmentProblem(key,fragment);
+      if(problem)warn(where+(Array.isArray(value)?'['+i+']':'')+problem.at,problem.message+' — signal not shown');
+    });
+  });
+}
+function telemetryNeedsNarrowValid(v){return v===true || Array.isArray(v) && v.length>0 && v.every(function(f){return typeof f==='string' && f.trim().length>0;});}
 function telemetrySignal(name,value,warn){
   var at='.signals.'+name;
   if(!telemetryNamePattern.test(name)){warn(at,'signal names start with a letter and use letters, digits, - and _ — signal ignored');return null;}
@@ -320,7 +339,13 @@ function telemetrySignal(name,value,warn){
     if(!telemetryObject(value.links))warn(at+'.links','must be an object {query?} — ignored');
     else {out.links={};telemetryUnknown(value.links,['query'],warn,at+'.links');if(telemetryOwn(value.links,'query')){if(telemetryQueryUrl(value.links.query))out.links.query=value.links.query;else warn(at+'.links.query','must be an absolute HTTP(S) URL without credentials — ignored');}}
   }
-  telemetryUnknown(value,[source,'unit','scope','label','showOnCard','role','missingMeansZero','links','window'],warn,at);
+  // #1348: a narrowing is kept as written (even when it is broken, so the signal fails closed).
+  if(telemetryOwn(value,'narrow') && value.narrow!==null){telemetryNarrowWarnings(value.narrow,source,warn,at+'.narrow');out.narrow=telemetryClone(value.narrow);}
+  if(telemetryOwn(value,'needsNarrow') && value.needsNarrow!==null){
+    if(telemetryNeedsNarrowValid(value.needsNarrow))out.needsNarrow=telemetryClone(value.needsNarrow);
+    else warn(at+'.needsNarrow','must be true or a list of the field names a board must narrow by — ignored');
+  }
+  telemetryUnknown(value,[source,'unit','scope','label','showOnCard','role','missingMeansZero','links','window','narrow','needsNarrow'],warn,at);
   return out;
 }
 /* One proof entry for a known signal. Returns the cleaned entry or null. */
@@ -489,7 +514,12 @@ function telemetryMergeOverlayWarnings(overlay,invalid,inheritedNames){
       var whole={};Object.keys(entry).forEach(function(key){if(entry[key]!==null)whole[key]=entry[key];});
       var one={};one[name]=whole;
       carrierTelemetry({telemetry:{kind:kind,signals:one}},{},function(path,message){if(path.indexOf(prefix)===0)warn(path,message);});
-    }else telemetryUnknown(entry,TELEMETRY_SOURCES.concat(['unit','scope','label','showOnCard','role','missingMeansZero','links','window']),warn,prefix);
+    }else{
+      telemetryUnknown(entry,TELEMETRY_SOURCES.concat(['unit','scope','label','showOnCard','role','missingMeansZero','links','window','narrow','needsNarrow']),warn,prefix);
+      // #1348: the inherited source is not known in the authored document; each fragment is checked by its own key.
+      if(telemetryOwn(entry,'narrow'))telemetryNarrowWarnings(entry.narrow,null,warn,prefix+'.narrow');
+      if(telemetryOwn(entry,'needsNarrow') && entry.needsNarrow!==null && !telemetryNeedsNarrowValid(entry.needsNarrow))warn(prefix+'.needsNarrow','must be true or a list of the field names a board must narrow by — ignored');
+    }
   });
   // A limit needs its signal: an added one here, or (when the provider's names are known) an inherited one.
   if(telemetryObject(overlay.proof))Object.keys(overlay.proof).forEach(function(name){
@@ -551,6 +581,12 @@ function carrierTelemetry(obj,templates,invalid,environment){
     if(errors[name])signals[name].error=errors[name];
     if(breakdownErrors[name])signals[name].breakdownError=breakdownErrors[name];
     if(trendErrors[name])signals[name].trendError=trendErrors[name];
+    // #1348: narrowing is applied once, here, to the query that is sent; it fails closed with a reason.
+    if(telemetryOwn(entry,'narrow') || telemetryOwn(entry,'needsNarrow')){
+      var narrowed=telemetryNarrowQuery(source,signals[name].query,entry.narrow,entry.needsNarrow);
+      if(narrowed.error){if(!signals[name].error)signals[name].error=narrowed.error;signals[name].narrowFailure=narrowed.kind;if(narrowed.written)signals[name].narrowWritten=true;}
+      else{signals[name].query=narrowed.query;if(narrowed.fragments.length)signals[name].narrow=narrowed.fragments;}
+    }
   });
   return {kind:clean.kind,signals:signals,proof:clean.proof || {},links:clean.links || {},card:clean.card || null};
 }

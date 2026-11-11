@@ -132,7 +132,7 @@ function createTelemetryTraces(page,win,now,bound){
   function canChoose(id,token,traceId){
     var entry=entries.get(id);return !!(entry && entry.token===token && active(entry.epoch) && contracts[entry.job.signal.source] && entry.key===JSON.stringify([ctl.telemetry.bindings().find(function(b){return b.id===id;}),telemetryProviderConfig(current,ctl)]) && entry.candidates.some(function(c){return c.traceId===traceId;}));
   }
-  return {options:{environmentChanged:function(){invalidate();var e=epoch,mine=ctl;discover().catch(function(error){if(ctl===mine && e===epoch){fail(error);if(ctl===mine)ctl.telemetry.setAvailable(false);}});},provider:provider,chooseExemplar:choose,canChooseExemplar:canChoose,restoreExemplars:restore,available:false,source:'Traces'},attach:function(next,nextPage){
+  return {options:{environmentChanged:function(){invalidate();var e=epoch,mine=ctl;discover().catch(function(error){if(ctl===mine && e===epoch){fail(error);if(ctl===mine)ctl.telemetry.setAvailable(false);}});},provider:provider,chooseExemplar:choose,canChooseExemplar:canChoose,restoreExemplars:restore,forgetExemplars:function(){if(!retired)invalidate();},available:false,source:'Traces'},attach:function(next,nextPage){
     ctl=next;current=nextPage || current;invalidate();var mine=ctl,attachedEpoch=epoch;discover().catch(function(e){if(ctl===mine && attachedEpoch===epoch){fail(e);if(ctl===mine)ctl.telemetry.setAvailable(false);}});
     off=ctl.telemetry.onChange(function(s){if(!s.enabled && entries.size)invalidate();});
     return {destroy:function(){if(ctl!==mine)return;invalidate();if(off)off();off=null;ctl=null;namespace=null;}};

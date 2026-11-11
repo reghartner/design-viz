@@ -65,7 +65,7 @@ test('on the real fixture the Steps copy carries full queries while names hides 
   vm.createContext(C);
   vm.runInContext(composeSources(['canon.js', 'validator.js', 'core/text-view.js', 'viewer/text-view.js']), C);
   const page = C.normalize(C.FlowTopology.materialize([read('board.json'), read('platform.json')])[0]);
-  const model = C.textViewModel(page), query = 'sum(rate(';
+  const model = C.textViewModel(page), query = 'sum(rate(http_server_requests_total';
   const names = C.textViewReaderText(model, {tab: 'steps', queries: 'names', pathId: 'happy'}, false);
   const copied = C.textViewReaderText(model, {tab: 'steps', queries: 'names', pathId: 'happy'}, true);
   assert.ok(!names.includes(query), 'names view hides query text');

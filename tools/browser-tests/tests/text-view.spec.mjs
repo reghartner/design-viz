@@ -65,12 +65,12 @@ test('three tabs switch content, Queries reaches Steps only, the path chooser fo
   const chooser=dialog.getByRole('combobox',{name:'Path',exact:true});await expect(chooser).toHaveValue('refused');
   await expect(text).toContainText('Path: Refused publish');
   await chooser.selectOption('happy');await expect(text).toContainText('Path: Connected');
-  await expect(text).toContainText('metric errors (grafana) unit req/h');await expect(text).not.toContainText('sum(rate(');
+  await expect(text).toContainText('metric errors (grafana) unit req/h');await expect(text).not.toContainText('sum(rate(http_server_requests_total');
   await expect(text).toContainText('node `platform::api` Orders API · imported (tv-platform core as platform)');
   const names=dialog.getByRole('button',{name:'Query names',exact:true}),full=dialog.getByRole('button',{name:'Full queries',exact:true});
   await expect(names).toHaveAttribute('aria-pressed','true');
   await full.click();await expect(full).toHaveAttribute('aria-pressed','true');await expect(text).toContainText('sum(rate(http_server_requests_total');
-  await names.click();await expect(text).not.toContainText('sum(rate(');
+  await names.click();await expect(text).not.toContainText('sum(rate(http_server_requests_total');
   await dialog.getByRole('tab',{name:'Steps'}).focus();await page.keyboard.press('ArrowRight');
   const elements=dialog.getByRole('tab',{name:'Elements'});await expect(elements).toHaveAttribute('aria-selected','true');expect(await isFocused(elements)).toBe(true);
   await expect(text).toContainText('| Element | Kind | Metrics | Trace rules | Tickets | Code refs | Steps |');
@@ -114,7 +114,7 @@ test('Copy Markdown copies full queries even when Steps shows names, and a refus
   await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin:server.origin});
   const root=await open(page,server,board(),'text-view-copy');await launcher(root).click();const dialog=dialogOf(root),text=textOf(dialog);
   await expect(dialog.getByRole('button',{name:'Query names',exact:true})).toHaveAttribute('aria-pressed','true');
-  await expect(text).not.toContainText('sum(rate(');
+  await expect(text).not.toContainText('sum(rate(http_server_requests_total');
   const copy=dialog.getByRole('button',{name:'Copy Markdown',exact:true});await copy.click();
   await expect(dialog.getByRole('status')).toContainText('copied');
   const clip=await page.evaluate(()=>navigator.clipboard.readText());

@@ -547,6 +547,25 @@ to one returns the single object; **Remove trace match** removes it. Other keys
 stay in each selector's **Advanced (JSON)** box and survive form edits unchanged;
 step `conditions` stay in **Runtime conditions JSON**. Each edit is one Undo step.
 Validator messages for the step's `traceMatch` show beside the field they name.
+
+### Step trace scope
+
+The same fold has two modes (desktop): **Own span (trace match)** is the form above, and
+**From its nodes and connections (trace scope)** edits the step's `traceScope`
+([provider traces](provider-traces.md)). The radios change only the view; a step opens on its
+trace match when it has one, otherwise on its nodes and connections when they declare spans.
+A line says what the step inherits, naming a shared node or connection and the other step by
+title. **Use its nodes and connections (removes this step's trace match)**, **Add trace
+scope**, **Remove trace scope** and **Add trace match (replaces this step's trace scope)**
+are one Undo step each. With a scope, each span of each lit node or connection has a checkbox
+labelled with its name, service and operation: checked counts for the step, clearing it writes
+`skip`; role boxes write `role:<role>`. A connection lists its `send` spans; a `receive` span
+only times the hand-off. Then **Trace root** (service and operation together), **Parent step**,
+**Attributes** (the board's allowlist, with a type), **Optional**, **Time budget (ms)** and
+**Max queue depth**. A skip that no longer applies is listed with its reason and **Remove**.
+A step needs a Step ID before it can take a scope; **Go to Step ID** moves to that field.
+Imported nodes and connections list their merged spans. Refusals and validator messages show
+beside the field.
 A value that is not selector objects keeps the **Trace match JSON** box.
 
 ### Query progress

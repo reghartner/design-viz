@@ -1,0 +1,665 @@
+{
+ "page": {
+  "title": "Doorbell delivery as text",
+  "canon": {
+   "version": 1,
+   "id": "tv-board",
+   "kind": "design",
+   "owner": "group:default/home-team"
+  },
+  "tracking": {
+   "telemetry": {
+    "window": "24h",
+    "grafana": {
+     "prometheus": "prom-main",
+     "loki": "loki-main",
+     "cloudwatch": "cw-main",
+     "tempo": "tempo-main",
+     "sql": "sql-main"
+    },
+    "environment": "stg",
+    "environments": {
+     "stg": {
+      "variables": {
+       "iotAccount": "646998985045",
+       "queueAccount": "551960222585"
+      }
+     },
+     "prd": {
+      "variables": {
+       "iotAccount": "139648982912",
+       "queueAccount": "970642438387"
+      },
+      "grafana": {
+       "prometheus": "prom-prd"
+      }
+     }
+    },
+    "templates": {
+     "kafka-topic": {
+      "kind": "queue",
+      "params": [
+       "topic",
+       "group"
+      ],
+      "signals": {
+       "in": {
+        "grafana": "sum(rate(kafka_server_brokertopicmetrics_messagesin_total{topic=\"${topic}\"}[5m]))*3600",
+        "unit": "msg/h"
+       },
+       "lag": {
+        "grafana": "max(kafka_consumergroup_lag{topic=\"${topic}\",group=\"${group}\"}) or vector(0)",
+        "unit": "msgs"
+       }
+      },
+      "proof": {
+       "lag": {
+        "max": 500
+       }
+      }
+     }
+    },
+    "lookups": {
+     "camera-model": {
+      "label": "Camera model logs",
+      "datasource": "loki-main",
+      "query": "{app=\"device-gateway\",env=\"${env}\"} |= \"camera_model\" | json | camera_model=\"$value\"",
+      "values": [
+       "DB-200",
+       "DB-300"
+      ]
+     }
+    },
+    "refreshMs": 300000,
+    "honeycomb": {
+     "environment": "prod",
+     "dataset": "doorbell"
+    },
+    "variables": {
+     "region": "us-east-1"
+    }
+   },
+   "jira": {
+    "site": "https://acme.atlassian.net",
+    "epic": "DOOR-100"
+   },
+   "dependencies": [
+    {
+     "ticket": "BE-68",
+     "on": "BE-67",
+     "reason": "needs the validated event contract"
+    }
+   ]
+  },
+  "blocks": [
+   {
+    "id": "delivery",
+    "heading": "Press to notification",
+    "diagram": {
+     "storyTime": {
+      "start": "2026-09-24T22:30",
+      "clock": "24h",
+      "date": "iso"
+     },
+     "topologyImports": [
+      {
+       "spec": "tv-platform",
+       "export": "core",
+       "as": "platform",
+       "nodeTracking": {
+        "api": {
+         "tickets": [
+          "PLAT-7"
+         ],
+         "telemetry": {
+          "extends": true,
+          "signals": {
+           "errors": {
+            "grafana": "sum(rate(http_server_requests_total{service=\"orders-api\",route=\"/v1/orders\",code=~\"5..\"}[5m]))*3600",
+            "unit": "req/h"
+           }
+          },
+          "proof": {
+           "errors": {
+            "maxRatioOf": "rate",
+            "max": 0.02
+           }
+          }
+         }
+        }
+       },
+       "nodeCodeRefs": {
+        "api": [
+         {
+          "id": "orders-api.create",
+          "label": "createOrder",
+          "repository": "https://github.com/fictional-home/doorbell-services",
+          "path": "src/orders-api.js",
+          "revision": "2222222222222222222222222222222222222222",
+          "anchor": {
+           "start": "// flow:createOrder:start",
+           "end": "// flow:createOrder:end"
+          },
+          "startLine": 10,
+          "endLine": 24,
+          "purpose": "Creates the order record."
+         }
+        ]
+       },
+       "edgeTracking": {
+        "api->store": {
+         "tickets": [
+          "PLAT-8"
+         ],
+         "existsWhen": "tickets-done"
+        }
+       },
+       "edgeOverrides": {
+        "api->store": {
+         "label": "Persist order"
+        }
+       }
+      }
+     ],
+     "nodes": {
+      "device": {
+       "title": "Doorbell device",
+       "sub": "Firmware",
+       "tickets": [
+        "FW-45"
+       ],
+       "delta": true,
+       "deltaText": "Debounce moved to firmware.",
+       "codeRefs": [
+        {
+         "id": "firmware.press",
+         "label": "debouncePress",
+         "repository": "https://github.com/fictional-home/doorbell-services",
+         "path": "fw/press.c",
+         "revision": "2222222222222222222222222222222222222222",
+         "anchor": {
+          "start": "// flow:debouncePress:start",
+          "end": "// flow:debouncePress:end"
+         },
+         "startLine": 3,
+         "endLine": 18,
+         "purpose": "Debounces the button press."
+        }
+       ],
+       "link": "https://github.com/fictional-home/firmware/blob/main/press.c#L3",
+       "deltaLinks": [
+        {
+         "label": "Firmware change",
+         "url": "https://github.com/fictional-home/firmware/pull/12"
+        }
+       ],
+       "group": "hardware"
+      },
+      "ingest": {
+       "title": "Event ingest",
+       "tickets": [
+        "BE-67",
+        "https://acme.atlassian.net/browse/BE-70"
+       ],
+       "binding": {
+        "entityRef": "component:default/event-ingest",
+        "label": "Event ingest",
+        "owner": "group:default/backend",
+        "catalogUrl": "https://backstage.example.test/catalog/default/component/event-ingest"
+       },
+       "telemetry": {
+        "kind": "service",
+        "signals": {
+         "rate": {
+          "grafana": "sum(rate(http_server_requests_total{service=\"event-ingest\",route=\"/v1/events\"}[5m]))*3600",
+          "unit": "req/h"
+         },
+         "errors": {
+          "grafana": "sum(rate(http_server_requests_total{service=\"event-ingest\",route=\"/v1/events\",code=~\"5..\"}[5m]))*3600",
+          "unit": "req/h"
+         },
+         "p95": {
+          "grafana": "histogram_quantile(0.95, sum by (le)(rate(http_server_request_duration_seconds_bucket{service=\"event-ingest\"}[5m])))",
+          "unit": "s"
+         },
+         "traces": {
+          "tempo": "{ resource.service.name = \"event-ingest\" && span.http.route = \"/v1/events\" && status = error }",
+          "unit": "spans",
+          "window": "1h",
+          "role": "error",
+          "label": "Error spans"
+         },
+         "backlog": {
+          "sql": "select count(*) as n\nfrom device_events\nwhere status = 'pending' and received_at > now() - interval '1 hour'",
+          "unit": "rows",
+          "showOnCard": false
+         },
+         "spans": {
+          "honeycomb": {
+           "calculations": [
+            {
+             "op": "COUNT"
+            }
+           ],
+           "filters": [
+            {
+             "column": "service.name",
+             "op": "=",
+             "value": "event-ingest"
+            }
+           ]
+          },
+          "unit": "spans"
+         }
+        },
+        "proof": {
+         "rate": {
+          "min": 10
+         },
+         "errors": {
+          "maxRatioOf": "rate",
+          "max": 0.01
+         },
+         "p95": {
+          "max": 0.5
+         }
+        },
+        "links": {
+         "dashboard": "https://grafana.example.test/d/event-ingest"
+        }
+       },
+       "codeRefs": [
+        {
+         "id": "ingest.accept",
+         "label": "acceptEvent",
+         "repository": "https://github.com/fictional-home/doorbell-services",
+         "path": "src/ingest.js",
+         "revision": "2222222222222222222222222222222222222222",
+         "anchor": {
+          "start": "// flow:acceptEvent:start",
+          "end": "// flow:acceptEvent:end"
+         },
+         "startLine": 40,
+         "endLine": 72,
+         "purpose": "Validates the device event."
+        }
+       ],
+       "prs": [
+        "https://github.com/fictional-home/doorbell-services/pull/91"
+       ],
+       "existsWhen": "tickets-done"
+      },
+      "iot": {
+       "title": "AWS IoT",
+       "telemetry": {
+        "kind": "call",
+        "signals": {
+         "refused": {
+          "cloudwatchLogs": {
+           "logGroups": [
+            "arn:aws:logs:us-east-1:${iotAccount}:log-group:AWSIotLogsV2"
+           ],
+           "query": "filter eventType = \"Publish-In\" and status = \"Failure\" and reason = \"AUTHORIZATION_FAILURE\" and topicName = \"$aws/rules/camera_message_power_state\" | stats count() as n",
+           "region": "us-east-1",
+           "valueField": "n",
+           "breakdown": {
+            "query": "filter eventType = \"Publish-In\" and status = \"Failure\" and reason = \"AUTHORIZATION_FAILURE\" and topicName = \"$aws/rules/camera_message_power_state\" | stats count() as n, latest(reason) as sampleReason by clientId | sort n desc | limit 20",
+            "labelField": "clientId",
+            "valueField": "n",
+            "title": "Publish failures by client",
+            "labelTitle": "Client ID",
+            "valueTitle": "Failures",
+            "columns": [
+             {
+              "field": "sampleReason",
+              "label": "Latest reason"
+             }
+            ],
+            "limit": 20
+           }
+          },
+          "unit": "refused publishes"
+         }
+        },
+        "proof": {
+         "refused": {
+          "max": 0
+         }
+        }
+       }
+      },
+      "queue": {
+       "title": "Staging SQS",
+       "telemetry": {
+        "kind": "queue",
+        "signals": {
+         "sent": {
+          "cloudwatch": {
+           "namespace": "AWS/SQS",
+           "metric": "NumberOfMessagesSent",
+           "dimensions": {
+            "QueueName": "camera_message_power_state_${env}"
+           },
+           "statistic": "Sum",
+           "region": "us-east-1",
+           "accountId": "${queueAccount}"
+          },
+          "unit": "messages"
+         }
+        }
+       },
+       "presentation": "baseline"
+      },
+      "notify": {
+       "title": "Notification service",
+       "tickets": [
+        "BE-68"
+       ],
+       "telemetry": {
+        "use": "kafka-topic",
+        "topic": "device-events",
+        "group": "notify-consumers",
+        "signals": {
+         "consumed": {
+          "loki": "sum(count_over_time({app=\"notify\",env=\"${env}\"} |= \"event consumed\" [5m]))",
+          "unit": "events",
+          "missingMeansZero": true,
+          "links": {
+           "query": "https://grafana.example.test/explore?notify"
+          }
+         }
+        }
+       },
+       "missingWork": true
+      }
+     },
+     "rows": [
+      [
+       "device",
+       "iot",
+       "queue"
+      ],
+      [
+       "ingest",
+       "notify"
+      ]
+     ],
+     "edges": [
+      {
+       "from": "device",
+       "to": "ingest",
+       "label": "event",
+       "kind": "https",
+       "tickets": [
+        "FW-46"
+       ],
+       "telemetry": {
+        "kind": "call",
+        "signals": {
+         "rate": {
+          "grafana": "sum(rate(http_server_requests_total{service=\"event-ingest\",route=\"/v1/events\",client=\"doorbell\"}[5m]))*3600",
+          "unit": "req/h"
+         }
+        },
+        "card": {
+         "title": "Event intake",
+         "side": "below"
+        }
+       },
+       "title": "Event intake call"
+      },
+      {
+       "from": "device",
+       "to": "iot",
+       "label": "publish"
+      },
+      {
+       "from": "iot",
+       "to": "queue",
+       "label": "rule",
+       "tickets": [
+        "IOT-3"
+       ],
+       "presentation": "baseline"
+      },
+      {
+       "from": "ingest",
+       "to": "notify",
+       "label": "route",
+       "telemetry": {
+        "use": "kafka-topic",
+        "topic": "device-events",
+        "group": "notify-consumers"
+       },
+       "tickets": [
+        "BE-68",
+        "BE-69"
+       ]
+      },
+      {
+       "from": "ingest",
+       "to": "platform::api",
+       "label": "order",
+       "kind": "https"
+      }
+     ],
+     "panels": [
+      {
+       "id": "outcome",
+       "type": "state",
+       "title": "What the resident knows",
+       "states": [
+        "Quiet",
+        "Pressed",
+        "Notified",
+        "Lost"
+       ],
+       "initial": {
+        "state": "Quiet"
+       }
+      },
+      {
+       "id": "proof",
+       "type": "live-status",
+       "title": "Live evidence"
+      }
+     ],
+     "steps": [
+      {
+       "id": "press",
+       "nodes": [
+        "device"
+       ],
+       "text": "The visitor presses the doorbell."
+      },
+      {
+       "id": "publish",
+       "edge": "device->ingest",
+       "time": "+1m",
+       "text": "Firmware publishes the press event.\nIngest validates it.",
+       "panels": {
+        "outcome": {
+         "state": "Pressed"
+        }
+       },
+       "codeRefs": [
+        {
+         "id": "ingest.route",
+         "label": "routeEvent",
+         "repository": "https://github.com/fictional-home/doorbell-services",
+         "path": "src/ingest.js",
+         "revision": "2222222222222222222222222222222222222222",
+         "anchor": {
+          "start": "// flow:routeEvent:start",
+          "end": "// flow:routeEvent:end"
+         },
+         "startLine": 80,
+         "endLine": 96,
+         "purpose": "Routes the validated event."
+        }
+       ],
+       "traceMatch": {
+        "serviceName": "event-ingest",
+        "operation": "POST /v1/events",
+        "maxDurationMs": 500,
+        "nodeId": "ingest"
+       },
+       "link": "https://wiki.example.test/doorbell/publish",
+       "lane": "FW",
+       "deltaLinks": [
+        {
+         "label": "Publish design",
+         "url": "https://wiki.example.test/doorbell/publish-v2"
+        }
+       ],
+       "delta": true,
+       "deltaText": "Publishes now carry the firmware version."
+      },
+      {
+       "id": "route",
+       "edge": "ingest->notify",
+       "time": "+30s",
+       "text": "Ingest routes the event to notifications.",
+       "panels": {
+        "outcome": {
+         "state": "Notified"
+        }
+       },
+       "traceMatch": [
+        {
+         "serviceName": "notify",
+         "operation": "consume device-events",
+         "parentStepId": "publish"
+        },
+        {
+         "serviceName": "notify",
+         "operation": "retry device-events",
+         "parentStepId": "publish"
+        }
+       ],
+       "ticketFilter": [
+        "BE-69"
+       ]
+      },
+      {
+       "id": "persist",
+       "edges": [
+        "ingest->platform::api",
+        "platform::api->platform::store"
+       ],
+       "text": "The order is stored.",
+       "panelVisibility": {
+        "proof": true
+       }
+      },
+      {
+       "id": "refused",
+       "edge": "device->iot",
+       "failures": {
+        "iot->queue": "dropped"
+       },
+       "time": "23:00",
+       "text": "IoT refuses the publish; the queue never sees it.",
+       "panels": {
+        "outcome": {
+         "state": "Lost"
+        }
+       },
+       "delta": true,
+       "conditions": [
+        {
+         "kind": "service-error",
+         "label": "IoT authorization refused",
+         "nodeId": "iot"
+        }
+       ],
+       "tone": {
+        "iot": "alert"
+       },
+       "panelVisibility": {
+        "proof": false
+       }
+      }
+     ],
+     "paths": [
+      {
+       "id": "happy",
+       "label": "Connected",
+       "steps": [
+        "press",
+        "publish",
+        "route",
+        "persist"
+       ]
+      },
+      {
+       "id": "refused",
+       "label": "Refused publish",
+       "steps": [
+        "press",
+        "refused"
+       ],
+       "basedOn": "happy"
+      }
+     ],
+     "groups": {
+      "hardware": {
+       "label": "Hardware"
+      }
+     }
+    }
+   },
+   {
+    "tabs": [
+     {
+      "label": "Ops",
+      "sections": [
+       {
+        "id": "ops",
+        "heading": "On-call check",
+        "diagram": {
+         "nodes": {
+          "pager": {
+           "title": "Pager",
+           "tickets": [
+            "OPS-1"
+           ]
+          },
+          "oncall": {
+           "title": "On-call engineer"
+          }
+         },
+         "rows": [
+          [
+           "pager",
+           "oncall"
+          ]
+         ],
+         "edges": [
+          {
+           "from": "pager",
+           "to": "oncall",
+           "label": "page"
+          }
+         ],
+         "steps": [
+          {
+           "id": "page",
+           "edge": "pager->oncall",
+           "text": "The pager wakes the on-call engineer."
+          }
+         ]
+        }
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "lanes": {
+   "FW": {
+    "color": "#38bdf8"
+   }
+  }
+ }
+}

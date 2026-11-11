@@ -323,7 +323,8 @@ For a spec with `topologyImports`, add
 only. `reference` and `compare` output the authored spec, imports kept, with the
 approved reference or the incident overlay; `--out` may not name the authored
 spec. Without the option, `preview` and `reference` stop with an error naming it, and so
-does `compare` when a step can inherit declared spans (it has no `traceMatch`).
+does `compare` when a reference step without a `traceMatch` lights an imported node or
+connection (it can inherit the provider's declared spans). Incident steps don't count.
 
 These commands write proposed files; committing a reference or incident into the
 central repository remains a reviewed change. See the

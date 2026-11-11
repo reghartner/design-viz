@@ -15,7 +15,7 @@
 | S10 | Only the exact declaration messages are set aside during resolution: a span name with a colon still only warns for consumers; any other error still fails. |
 | S11 | Overlay findings name the overlay: a hide or null entry for a span the provider lacks warns; a patch key the provider lacks says so; hide plus patch warns and the hide wins; an allowlist drop names the attribute and this board's allowedAttributes; a nested patch that cannot restore a dropped span still warns; Honeycomb number/boolean attribute values warn; a snapshot edit gets the full declaration check. |
 | S8 | The example pair examples/canon/topology/orders-platform.json + orders-board.json resolves to the documented spans. |
-| S9 | (#1290 PR 10) The example board has a step that inherits through a traceScope: it is valid, needs flow.trace-scope, inherits the worker (shared or not) and skips the span it names. |
+| S9 | (#1290 PR 10) examples/canon/topology/orders-scoped.json: two steps light the imported worker; the one with a traceScope inherits it (a shared carrier needs a scope), skips the cache span and has a budget; the other inherits nothing. Valid, needs flow.trace-scope. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const loader=require('../tools/source-loader.cjs');
@@ -316,16 +316,16 @@ test('S11 overlay findings name the overlay and say what happened',()=>{
   }
 });
 
-test('S9 the example board shows a step that inherits through a traceScope',()=>{
+test('S9 the scoped example: a shared worker is inherited only by the step with a traceScope, which skips its cache span',()=>{
   const read=id=>JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/canon/topology/'+id+'.json'),'utf8'));
-  const board=read('orders-board'),platform=read('orders-platform');
-  const work=diagramOf(board).steps.find(s=>s.traceScope);
-  assert.ok(work,'a step with a traceScope');
-  assert.deepEqual(plain(work),{id:'work',text:'The worker handles the order',nodes:['orders::worker'],traceScope:{skip:{'orders::worker':['audit']},maxDurationMs:250}});
-  const page=C.FlowTopology.resolveSource(board,{version:1,id:'orders-board',specs:[platform,board]});
-  assert.deepEqual(plain(C.validate(C.normalize(page)).errors),[]);assert.deepEqual(plain(C.validate(C.normalize(page)).warnings),[]);
+  const board=read('orders-scoped'),platform=read('orders-platform');
+  assert.deepEqual(plain(diagramOf(board).steps),[
+    {id:'receive',text:'The worker takes the order',nodes:['orders::worker']},
+    {id:'work',text:'The worker processes it',nodes:['orders::worker'],traceScope:{skip:{'orders::worker':['role:cache']},maxDurationMs:250}}]);
+  const page=C.FlowTopology.resolveSource(board,{version:1,id:'orders-scoped',specs:[platform,board]});
+  assert.deepEqual(plain(C.validate(C.normalize(page)).errors),[]);
   assert.ok(plain(C.FlowviewCompatibility.detect(board)).includes('flow.trace-scope'),'the page needs flow.trace-scope');
-  const d=diagramOf(page),eff=C.FlowTraceMatch.effectiveSelector(d,d.steps.find(s=>s.id==='work'),d.steps);
-  assert.deepEqual(plain(eff.inherits),['orders::worker']);
-  assert.deepEqual(plain(eff.traceScope.skip),{'orders::worker':['audit']});
+  const d=diagramOf(page),eff=id=>plain(C.FlowTraceMatch.effectiveSelector(d,d.steps.find(s=>s.id===id),d.steps));
+  assert.deepEqual(eff('work').inherits,['orders::worker'],'the scope inherits the shared worker');
+  assert.deepEqual(eff('receive').inherits,[],'without a scope a shared carrier is not inherited');
 });

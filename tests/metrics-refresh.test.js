@@ -209,6 +209,7 @@ for(const kind of ['grafana','honeycomb'])test('R11 '+kind+': after a refresh th
 | R16 | the same boards with a failing query | off/on 5 s after a failed answer makes no call yet: it shows the cooldown until 60 s after that call, and the call runs then; a first Metrics on in another environment calls at once | off/on during provider errors as a fast poll |
 | R17 | the same boards | a refresh held past 61 s still ignores Refresh now until it answers | a second call while one runs |
 | R18 | the same boards with a failing query | after the failed answer, clear() or setAvailable(false) then true resets the wait: off/on calls at once | an old failure holding back a reconnect |
+| R20 | the same boards with a failing query | a call that starts during the wait (Retry here; a binding change or closing Over time with new carriers do the same) clears the wait, and its clean answer shows with no "last refresh failed" | a stale failure line over a fresh answer |
 | R19 | a board with environments qa and stg | stg answers cleanly, qa's answer names a failure and off/on waits in qa; switching to stg shows stg healthy (no wait, no failure time) and back to qa shows qa's wait again | one environment's wait shown on another |
 */
 for(const kind of ['grafana','honeycomb']){
@@ -302,5 +303,14 @@ for(const kind of ['grafana','honeycomb'])test('R19 '+kind+': the wait after a f
   h.advance(5000);h.api.setEnvironment('stg');await settle();assert.equal(h.data(),2,'stg reuses its clean answer');
   const stg=h.api.refreshNowState();assert.equal(stg.waiting,false,'stg shows no wait');assert.equal(stg.failedAt,null);assert.equal(stg.nextTry,null);assert.equal(h.api.status().note,'');
   h.advance(5000);h.api.setEnvironment('qa');await settle();assert.equal(h.data(),2,'back in qa the wait still holds');assert.equal(h.api.refreshNowState().waiting,true,'and shows again');
+ }finally{h.close();}
+});
+for(const kind of ['grafana','honeycomb'])test('R20 '+kind+': a call that starts during the wait clears it',async()=>{
+ let failing=true;const h=await setup(kind,{fail:()=>failing});
+ try{
+  h.api.setEnabled(true);await settle();assert.match(h.api.status().note,/boom/);
+  h.advance(5000);h.api.setEnabled(false);h.api.setEnabled(true);await settle();assert.equal(h.api.refreshNowState().waiting,true,'off/on waits');
+  failing=false;h.advance(1000);h.api.retry();await settle();assert.equal(h.data(),2,'a call starts during the wait');
+  assert.equal(h.api.status().note,'','its answer is clean');const state=h.api.refreshNowState();assert.equal(state.waiting,false,'the wait is cleared');assert.equal(state.failedAt,null);assert.equal(state.nextTry,null);
  }finally{h.close();}
 });

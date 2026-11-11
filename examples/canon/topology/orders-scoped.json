@@ -1,0 +1,19 @@
+{
+  "page": {
+    "title": "Order worker steps with a trace scope",
+    "canon": {"version":1,"id":"orders-scoped","kind":"canonical","owner":"group:default/commerce"},
+    "sections": [{
+      "id": "board", "heading": "Working an order",
+      "diagram": {
+        "topologyImports": [{"spec":"orders-platform", "export":"core", "as":"orders"}],
+        "nodes": {},
+        "rows": [["orders::api", "orders::worker"]],
+        "steps": [
+          {"id":"receive", "text":"The worker takes the order", "nodes":["orders::worker"]},
+          {"id":"work", "text":"The worker processes it", "nodes":["orders::worker"],
+           "traceScope":{"skip":{"orders::worker":["role:cache"]}, "maxDurationMs":250}}
+        ]
+      }
+    }]
+  }
+}

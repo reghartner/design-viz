@@ -32,6 +32,10 @@
     {
       "id": "orders-board",
       "path": "orders-board.json"
+    },
+    {
+      "id": "orders-scoped",
+      "path": "orders-scoped.json"
     }
   ]
 }

@@ -1718,7 +1718,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   /* #1294 Outline: hover or focus on a carrier shows its card beside it; a click, Enter or Space opens the
      detail. On touch the first tap shows the card and a second tap (or a tap on the card) opens the detail. */
-  var peekTimer=0,lastPointer='mouse';
+  // hoverHold: after a repaint, the pointer position then; a browser re-fires pointerover under a pointer that has not moved,
+  // which must not reopen a card. A real move clears it.
+  var peekTimer=0,lastPointer='mouse',pointerAt=null,hoverHold=null;
   function metricsOutlineOf(target){
     if(metricsStyleShown()!=='outline' || !target || !target.closest)return null;
     var o=target.closest('.dv-metrics-outline');if(o)return o;
@@ -1737,7 +1739,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
       shown.classList.add('dv-metrics-peek');if(outline._metricsLeader)outline._metricsLeader.classList.add('dv-metrics-peek');}
   }
   function metricsUnpeek(){if(peekTimer)clearTimeout(peekTimer);peekTimer=setTimeout(function(){peekTimer=0;var now=view.getRootNode && view.getRootNode().activeElement;if(!retired)metricsPeek(metricsOutlineOf(now));},200);}
-  function peekOver(ev){if(ev.pointerType==='touch')return;var o=metricsOutlineOf(ev.target);if(o)metricsPeek(o);}
+  function peekOver(ev){if(ev.pointerType==='touch')return;if(hoverHold && ev.clientX===hoverHold.x && ev.clientY===hoverHold.y)return;var o=metricsOutlineOf(ev.target);if(o)metricsPeek(o);}
+  function peekMove(ev){if(ev.pointerType==='touch')return;pointerAt={x:ev.clientX,y:ev.clientY};if(hoverHold && (ev.clientX!==hoverHold.x || ev.clientY!==hoverHold.y))hoverHold=null;}
   function peekOut(ev){if(ev.pointerType==='touch' || !metricsOutlineOf(ev.target))return;if(metricsOutlineOf(ev.relatedTarget)===metricsOutlineOf(ev.target))return;metricsUnpeek();}
   function peekDown(ev){lastPointer=ev.pointerType || 'mouse';if(lastPointer==='touch' && !metricsOutlineOf(ev.target) && !(pop && pop.contains(ev.target)))metricsPeek(null);}
   // Focus shows the card for keyboard and mouse readers; after a touch, focus moves (a closed popover returns it) never open a card over the board.
@@ -1762,9 +1765,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }
   }
   function peekBlur(ev){if(metricsOutlineOf(ev.target) && metricsOutlineOf(ev.relatedTarget)!==metricsOutlineOf(ev.target))metricsUnpeek();}
-  view.addEventListener('pointerover',peekOver);view.addEventListener('pointerout',peekOut);view.addEventListener('pointerdown',peekDown,true);
+  view.addEventListener('pointerover',peekOver);view.addEventListener('pointermove',peekMove);view.addEventListener('pointerout',peekOut);view.addEventListener('pointerdown',peekDown,true);
   view.addEventListener('focusin',peekFocus);view.addEventListener('focusout',peekBlur);view.addEventListener('keydown',peekTab,true);
-  destroyListeners.push(function(){if(peekTimer)clearTimeout(peekTimer);view.removeEventListener('pointerover',peekOver);view.removeEventListener('pointerout',peekOut);view.removeEventListener('pointerdown',peekDown,true);view.removeEventListener('focusin',peekFocus);view.removeEventListener('focusout',peekBlur);view.removeEventListener('keydown',peekTab,true);});
+  destroyListeners.push(function(){if(peekTimer)clearTimeout(peekTimer);view.removeEventListener('pointerover',peekOver);view.removeEventListener('pointermove',peekMove);view.removeEventListener('pointerout',peekOut);view.removeEventListener('pointerdown',peekDown,true);view.removeEventListener('focusin',peekFocus);view.removeEventListener('focusout',peekBlur);view.removeEventListener('keydown',peekTab,true);});
   function carrierClick(ev){
     if(authoring || retired || ev.defaultPrevented || ev.button>0)return;
     var tapped=lastPointer==='touch' && metricsOutlineOf(ev.target);
@@ -2217,7 +2220,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       // #1253: an open popover stays open through the repaint, the post-drop question too (rebuilt in place).
       var openId=active && active.getAttribute('data-live-carrier'),openBinding=active && bindings.find(function(binding){return binding.el.contains(active);}),openMetrics=!!(active && active._liveCarrier && active._liveCarrier.metricsOnly);
       // #1324: an Outline card open on hover, focus or tap, and focus on a link inside it, survive the repaint.
-      var peekCard=view.querySelector('.dv-metrics-card.dv-metrics-peek'),peekOutline=peekCard && peekCard._metricsOutline,peekId=peekOutline && peekOutline.getAttribute('data-metrics-carrier'),peekClosing=!!peekTimer;
+      var peekCard=view.querySelector('.dv-metrics-card.dv-metrics-peek'),peekOutline=peekCard && peekCard._metricsOutline,peekId=peekOutline && peekOutline.getAttribute('data-metrics-carrier'),peekClosing=!!peekTimer,focusedBoard=focused && focused.closest && focused.closest('.board');
       var peekBinding=peekOutline && bindings.find(function(binding){return binding.el.contains(peekOutline);}),peekSignal=focused && peekCard && peekCard.contains(focused) && focused.getAttribute('data-signal');
       if(!focusBinding && peekSignal){focusCarrier=peekId;focusBinding=peekBinding;}
       syncBindings();clearTargets();refreshDependencies();
@@ -2244,11 +2247,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
         var replacement=Array.from(focusBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===focusCarrier && !el.classList.contains('dv-metrics-label-hidden');});
         if(replacement)replacement.focus({preventScroll:true});
         // #1324: the carrier is gone (no button for it now): its board takes focus, never the page.
-        else if(focused && focused.isConnected===false && focusBinding.el.isConnected!==false)focusBoard(focusBinding);
+        else if(focused && focused.isConnected===false && focusBinding.el.isConnected!==false)focusBoard(focusBinding,focusedBoard);
       }
       if(peekNow && !peekLink)metricsPeek(peekNow);
       // A close already due when the repaint came (the pointer or focus had left) still happens.
       if(peekNow && peekClosing)metricsUnpeek();
+      // #1324: exactly the card shown before the repaint stays shown; a resting pointer does not reopen another.
+      hoverHold=metricsStyleShown()==='outline' && pointerAt?{x:pointerAt.x,y:pointerAt.y}:null;
       if(active){
         var target=openBinding && openBinding.el.isConnected && Array.from(openBinding.el.querySelectorAll('.dv-live-target')).find(function(el){return el.getAttribute('data-live-carrier')===openId && !el.classList.contains('dv-metrics-label-hidden') && !!(el._liveCarrier && el._liveCarrier.metricsOnly)===openMetrics;});
         if(target){active=target;refreshPopover();}else close(false);
@@ -2262,9 +2267,11 @@ function createLiveStatus(ctl,page,options,renderOptions){
   }
   /* #1324: focus for a carrier that is gone after a repaint: its diagram's .board, already focusable and named
      (engine.js). Without a board the section takes focus for this moment only. */
-  function focusBoard(binding){
-    var el=binding.el,board=el && el.querySelector && el.querySelector('.board');
-    if(board && typeof board.focus==='function'){board.focus({preventScroll:true});return;}
+  function focusBoard(binding,own){
+    var el=binding.el,root=typeof view.getRootNode==='function'?view.getRootNode():view.ownerDocument;
+    // The board the focused carrier was on, if it is still there; else the section's first board.
+    var board=own && own.isConnected!==false && el.contains(own)?own:el && el.querySelector && el.querySelector('.board');
+    if(board && typeof board.focus==='function'){board.focus({preventScroll:true});if(!root || root.activeElement===board)return;}
     if(!el || typeof el.focus!=='function')return;
     var added=el.getAttribute('tabindex')==null;if(added)el.setAttribute('tabindex','-1');
     if(added)el.addEventListener('blur',function drop(){el.removeEventListener('blur',drop);el.removeAttribute('tabindex');});

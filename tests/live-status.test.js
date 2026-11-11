@@ -3442,6 +3442,28 @@ test('#1324 a carrier gone after an Outline repaint moves focus to its remaining
  assert.ok(!!now && now.classList.contains('board'),'focus moves to the named board, not the page');
  h.ctl.liveStatus.destroy();
 });
+test('#1324 a repaint shows exactly the card that was shown before it: focus on B wins over the pointer resting on A',async()=>{
+ const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{},c:{}},rows:[['a','b','c']],edges:[{from:'a',to:'b',label:'Place',telemetry:TCALL()},{from:'b',to:'c',label:'Ship',telemetry:TCALL()}]}}]}};
+ const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}},'b->c':{signals:{rate:{value:200},errors:{value:0}}}});
+ const A=outlineOf(h,'a->b'),B=outlineOf(h,'b->c');
+ // The pointer rests on A (hover), then keyboard focus moves to B, whose card replaces A's.
+ h.view.dispatchEvent({type:'pointermove',pointerType:'mouse',clientX:40,clientY:40,target:A});
+ h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',clientX:40,clientY:40,target:A});
+ B.focus();
+ assert.ok(B._metricsCard.classList.contains('dv-metrics-peek')===true && A._metricsCard.classList.contains('dv-metrics-peek')===false,'before the repaint B\'s card is the one shown');
+ h.ctl.telemetry.apply({'a->b':{signals:{rate:{value:101},errors:{value:0}}},'b->c':{signals:{rate:{value:202},errors:{value:0}}}});h.flush();await settle();h.flush();
+ // A browser re-fires pointerover on the new element under a pointer that has not moved.
+ const A2=outlineOf(h,'a->b'),B2=outlineOf(h,'b->c');
+ h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',clientX:40,clientY:40,target:A2});
+ assert.ok(h.doc.activeElement===B2,'focus stays on B');
+ assert.ok(B2._metricsCard.classList.contains('dv-metrics-peek')===true,'B\'s card is still the one shown');
+ assert.ok(A2._metricsCard.classList.contains('dv-metrics-peek')===false,'A\'s card is not reopened just because the pointer rests on it');
+ // A real move of the pointer onto A afterwards shows A's card again.
+ h.view.dispatchEvent({type:'pointermove',pointerType:'mouse',clientX:44,clientY:41,target:A2});
+ h.view.dispatchEvent({type:'pointerover',pointerType:'mouse',clientX:44,clientY:41,target:A2});
+ assert.ok(A2._metricsCard.classList.contains('dv-metrics-peek')===true,'after the pointer moves, hover works again');
+ h.ctl.liveStatus.destroy();
+});
 test('#1324 a card closing when the repaint comes still closes after it',async()=>{
  const raw={page:{tracking:{telemetry:{}},sections:[{id:'main',diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',telemetry:TCALL()}]}}]}};
  const h=await outlineBoard(raw,{'a->b':{signals:{rate:{value:100},errors:{value:0}}}});

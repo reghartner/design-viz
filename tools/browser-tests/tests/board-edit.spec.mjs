@@ -17,7 +17,7 @@
 | E7 Discard | two pending changes | Discard → zero publishes, EX-1 NOT ON DIAGRAM again, B has no Jira cue, Save/Discard gone | Discard that hides buttons but keeps the edited board |
 | E8 leave warning | one pending change; then after Save; then after Discard | navigation raises one beforeunload dialog with a pending change and none after Save or Discard | no handler; a handler left armed after Save/Discard |
 | E9 read-only rejection | publish rejects not_writer | Edit, Save and Discard gone; the panel says the board is read-only here | treating not_writer as a retryable error |
-| E10 conflict | publish rejects conflict once; the reload serves another editor's spec (A retitled, its own history entry) | the runtime's reload raises no beforeunload dialog (also E12–E14); after reload: A's new title shows (the winner rendered), EX-1 re-applied (B has it, tag gone), notice "Another editor saved first. 1 of your changes were re-applied; 0 could not be", zero publishes until Save; Save publishes the winner text plus EX-1 on B with both history entries | an automatic second publish; replay onto the editor's stale text; losing the winner's history |
+| E10 conflict | publish rejects conflict once; the reload serves another editor's spec (A retitled, its own history entry) | the runtime's reload raises no beforeunload dialog (also E12–E14); after reload: A's new title shows (the winner rendered), EX-1 re-applied (B has it, tag gone), notice "Another editor saved first. 1 of your changes was re-applied.", zero publishes until Save; Save publishes the winner text plus EX-1 on B with both history entries | an automatic second publish; replay onto the editor's stale text; losing the winner's history |
 | E11 duplicate identities | node id door in sections one and two; two parallel edges door → cloud in section two (the second bent apart: same-endpoint edges otherwise draw on one line); panel on section two's page | drops onto section two's door and the second parallel edge change only sections[1].nodes.door and sections[1].edges[1] | addressing by node id or endpoints alone |
 | E12 conflict replay: sections swapped | editor drops on section "second"'s door; the winner swaps the sections | EX-1 lands on the door of the section whose id is "second" (now index 0), not on index 1 | replay by stored numeric path |
 | E13 conflict replay: ambiguous parallel edge | two identical unlabeled door → cloud edges; the editor drops on the second; the winner deletes the first | the op is dropped and listed ("0 of your changes were re-applied; 1 could not be"), the remaining edge has no EX-1, no Save button | replaying onto the only remaining edge |
@@ -37,7 +37,7 @@ validator and panel rows (H1c, H3c, H7c, H14) in the node tests, B3 in edit-hist
 | E17 local edge Clear | edges[0] (a → b "calls") marked | edge 0's live break visible; popover from its label (aria-label ends "calls") → Clear → the break is gone; saved edges[0] == {from,to,label}; change {edge ["a","b"], label "Alpha service → Beta service", path to edges[0]} | clearing a node; the edge label instead of endpoint titles |
 | E18 post-drop question, keep | B marked; EX-1, AA-1, CAN-1 dropped on B; EX-1 again on B; EX-1 on A | each add on B opens B's popover with `.dv-live-question` "Does <KEY> cover the missing work?", a Clear and a Keep button, B still dv-live-missing, still open after the live map repaints (1 s); Keep, Escape and an outside click each close it with the pending count unchanged; the repeat drop and the drop on unmarked A open no popover; Save 4 → B keeps missingWork and holds EX-1, AA-1, CAN-1; four add changes, no clear | an automatic clear on drop; a question on no-op or unmarked drops; a question closed by the next repaint |
 | E18 post-drop question, clear | edge 0 marked; EX-1 dropped on its label | the question opens on the edge popover; Clear → break gone, "Save 2 changes"; saved edges[0] == {from,to,label,tickets ["EX-1"]}; one history entry with [add EX-1, clear-missing-work] on that edge | a clear that drops the add; two history entries |
-| E19 conflict replay | (a) twoSections with section "second"'s door marked, cleared, the winner swaps sections; (b) B cleared, the winner deletes B; (c) B cleared, the winner already cleared B | (a) notice "1 of your changes were re-applied; 0 could not be", no automatic publish, Save → sections[0] (id second) door == {title}, change path to sections[0]; (b) notice "0 of your changes were re-applied; 1 could not be (carrier moved, removed or ambiguous): Missing work cleared from Beta service", (c) "… Missing work cleared from Beta service could not be re-applied: their version has no Missing work marker on Beta service to clear." (#1290 PR 9: each reason true for its case), no Save | replay by numeric path; counting a clear with nothing to clear as applied |
+| E19 conflict replay | (a) twoSections with section "second"'s door marked, cleared, the winner swaps sections; (b) B cleared, the winner deletes B; (c) B cleared, the winner already cleared B | (a) notice "1 of your changes was re-applied.", no automatic publish, Save → sections[0] (id second) door == {title}, change path to sections[0]; (b) notice "0 of your changes were re-applied; 1 could not be (carrier moved, removed or ambiguous): Missing work cleared from Beta service", (c) "… Missing work cleared from Beta service could not be re-applied: their version has no Missing work marker on Beta service to clear." (#1290 PR 9: each reason true for its case), no Save | replay by numeric path; counting a clear with nothing to clear as applied |
 | E16 clear only, no Undo (Chuck 2026-11-01; test review c1) | same board: unmarked node A and unmarked edge 1 (b → c, which lists CC-1; an edge with no tickets has no popover at all) in Edit mode; after the clear | A's and edge 1's popovers have no button named /missing work/i and no checkbox; after the clear the Live status panel and B's reopened popover have no button named /undo/i | a Set/Mark Missing work control; an Undo control. Absence guards: they pass at the baseline |
 | E17/E18 no Undo on edges (test review c2) | E17 after its clear; E18 edge case after its clear (edge 0 then lists EX-1, so it has a popover) | no button named /undo/i in the Live status panel (both) or in edge 0's reopened popover (E18), which has no Clear button | an Undo control confined to the panel or an edge popover. Absence guards: they pass at the baseline |
 | E20 no Clear outside Edit mode or for read-only viewers | B and edge 0 marked; editor not editing; canEdit false | B's and edge 0's popovers show the Missing work explanation and no Clear or Keep button | a Clear control for every viewer |
@@ -212,7 +212,7 @@ test('E10 a conflict replays the stashed change onto the winning spec without pu
  const winnerText=await serveWinner(board,winner);
  expect(await reloadRecordingDialogs(page),'the conflict reload raises no leave-page warning').toEqual([]);({root,panel}=await showBoard(page));
  await expect(root.locator('g.node[data-dv-node="a"]')).toContainText('Alpha renamed by Bo');
- await expect(panel.locator('.dv-live-edit-notice')).toHaveText(/^Another editor saved first\. 1 of your changes were re-applied; 0 could not be/);
+ await expect(panel.locator('.dv-live-edit-notice')).toHaveText(/^Another editor saved first\. 1 of your changes was re-applied\./);
  await expect(coverageTag(panel,'EX-1')).toHaveCount(0);await expect(cue(root,'b')).toHaveCount(1);
  await page.waitForTimeout(1000);expect(await publishes(page),'no automatic second publish').toEqual([]);
  const text=await save(page,panel,1),saved=JSON.parse(text);
@@ -264,7 +264,7 @@ test('E12 conflict replay finds a swapped section by identity, not position',asy
  const {panel,notice}=await conflictThenReload(page,board,async(root,panel)=>{
   await dragTicket(page,panel,'EX-1',await cardPoint(nodeCard(sectionScope(root,'second'),'door')));
  },winner,{before:2,after:1});
- await expect(notice).toHaveText(/1 of your changes were re-applied; 0 could not be/);
+ await expect(notice).toHaveText(/1 of your changes was re-applied\./);
  const saved=JSON.parse(await save(page,panel,1));
  expect(saved.page.sections[0].id).toBe('second');
  expect(diagramAt(saved,0).nodes.door.tickets).toEqual(['EX-1']);expect(diagramAt(saved,1).nodes.door.tickets).toBeUndefined();
@@ -431,7 +431,7 @@ test('E19 conflict replay re-applies a clear onto a swapped section by identity'
   await clickClear(await openPopover(page,nodeCard(sectionScope(root,'second'),'door')));
   await expect(saveButton(panel)).toHaveText('Save 1 change');
  },winner,{before:2,after:1});
- await expect(notice).toHaveText(/1 of your changes were re-applied; 0 could not be/);
+ await expect(notice).toHaveText(/1 of your changes was re-applied\./);
  const saved=JSON.parse(await save(page,panel,1));
  expect(saved.page.sections[0].id).toBe('second');
  expect(diagramAt(saved,0).nodes.door).toEqual({title:'Door two'});expect(diagramAt(saved,1).nodes.door).toEqual({title:'Door one'});
@@ -449,7 +449,7 @@ test('E19 conflict replay drops and lists a clear whose carrier is gone or whose
   },winner);
   // #1290 PR 9 review c2: each dropped change gives the reason that is true for it.
   await expect(notice,name).toHaveText(name==='deleted'?/0 of your changes were re-applied; 1 could not be \(carrier moved, removed or ambiguous\): Missing work cleared from Beta service/:
-   'Another editor saved first. 0 of your changes were re-applied; Missing work cleared from Beta service could not be re-applied: their version has no Missing work marker on Beta service to clear.');
+   'Another editor saved first. 0 of your changes were re-applied. Missing work cleared from Beta service could not be re-applied: their version has no Missing work marker on Beta service to clear.');
   await expect(saveButton(panel),name).toHaveCount(0);
   await tab.close();
  }

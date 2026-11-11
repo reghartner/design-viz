@@ -288,7 +288,7 @@ test('E14 Links "Edit in Inspect" asks Inspect to open the Trace spans fold for 
   const ui=harness(d);
   assert.equal(typeof ui.h.inspector.revealTraceSpans,'function','the Inspector offers revealTraceSpans');
   ui.select(EDGE);assert.equal(ui.editor().open,false,'closed by default');
-  ui.h.inspector.revealTraceSpans();ui.select(NODE);
+  ui.h.inspector.revealTraceSpans(NODE);ui.select(EDGE);assert.equal(ui.editor().open,false,'another carrier\'s render leaves the request');ui.select(NODE);
   assert.equal(ui.editor().open,true,'open for the carrier Links asked for');
   ui.select(EDGE);assert.equal(ui.editor().open,false,'only once');
 });

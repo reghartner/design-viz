@@ -3095,7 +3095,7 @@ function boardForm(){
     var traceStatus=!traceState.enabled && (traceState.present || traceState.companyIds.length)?'Off':
       traceState.present?(traceCount?traceCount+(traceCount===1?' connection':' connections'):'None'):
       traceCount?'Inherits '+traceCount+(traceCount===1?' company profile':' company profiles'):
-      traceState.companyIds.length?'Not used (no traces)':'Not set';
+      traceState.companyIds.length?(traceState.usesTraces?'None':'Not used (no traces)'):'Not set';
     var traces=section('traces','Traces',count(warnings.traces) || traceStatus,warnings.traces.length>0);
     var environments=section('environments','Environments',count(warnings.environments) || environmentIds.join(', '),warnings.environments.length>0);
     var lookupSet=specObject(telemetry.lookups)?Object.keys(telemetry.lookups).length:0;

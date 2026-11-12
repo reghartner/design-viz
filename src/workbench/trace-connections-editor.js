@@ -11,8 +11,9 @@
 function createFlowTraceConnections(o){
   var d=flowMetricsDom(o),c=o.controls,s=o.state,commit=o.commit,warnings=s.warnings || [];
   var box=d.el('div','trace-connections');
-  // What the board inherits while it sets no map: the resolver's answer (none without traces or with metrics off).
-  var inherited=s.present?[]:Object.keys(s.resolved);
+  /* What the board inherits while it sets no map: every valid company profile on a board that uses traces
+     (also while Allow metrics is off, so turning it back on loses none), none otherwise. */
+  var inherited=s.present || !s.usesTraces?[]:s.companyIds.filter(function(id){return !!s.profiles[id].profile;});
   function edit(fields){return commit(Object.assign({op:'traceConnections'},fields));}
   function named(control,name,title){control.setAttribute('aria-label',name);if(title)control.title=title;return control;}
   var serial=0,prefix=o.idPrefix || 'dv-trace-connections';
@@ -44,7 +45,7 @@ function createFlowTraceConnections(o){
     d.note(box,'tracking.telemetry.traceConnections is not an object, so readers get no trace connections. Fix it in Advanced JSON below.');
   }else if(!s.present){
     d.note(box,!s.companyIds.length?'This build has no company trace profiles. Add an inline profile in Advanced JSON.':
-      !s.enabled?'Allow metrics is off for this page, so readers get no trace connections. Choosing Use still saves the choice.':
+      !s.enabled?'Allow metrics is off for this page, so readers get no trace connections now. Use and Disable still save the choice.':
       inherited.length?'This board inherits every company profile, including ones added later. Choose Use or Disable on a profile to pick them for this board.':
       'This board does not use traces yet (a step trace match, span declarations, or Metrics on a Live status board), so it inherits no company profile. Choose Use to add one now.','trace-connections-mode');
   }else{

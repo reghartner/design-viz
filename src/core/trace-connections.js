@@ -97,7 +97,9 @@ var FlowTraceConnections=(function(){
         // #1239 (Chuck 2026-11-12): a board may add allowed attributes to a company profile; the
         // connection allows the company list plus these (de-duplicated). profile() checks the result.
         if(own(entry,'allowedAttributes')){
-          if(!Array.isArray(entry.allowedAttributes))fail('configuration','Board allowedAttributes must be an array of span attribute names.');
+          if(!Array.isArray(entry.allowedAttributes) || entry.allowedAttributes.length>32)fail('configuration','Board allowedAttributes must be an array of at most 32 span attribute names.');
+          // Checked against the board's own list, so a message names the board's index.
+          entry.allowedAttributes.forEach(function(k,i){if(!attribute(k))fail('configuration','Board allowedAttributes['+i+'] must be a non-empty, non-secret span attribute name.');});
           p.allowedAttributes=(p.allowedAttributes || []).concat(entry.allowedAttributes).filter(function(k,i,all){return all.indexOf(k)===i;});
         }
         p=profile(p);

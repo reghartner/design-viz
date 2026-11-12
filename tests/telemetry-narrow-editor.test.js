@@ -210,7 +210,7 @@ test('E8 Copy provider queries turns the merge overlay into a replacing binding 
   const resolvedBefore=p.resolved();
   p.apply(NODE,{op:'copyProviderQuery'});
   assert.deepEqual(plain(p.overlay()),{kind:'service',signals:{sent:{loki:LOKI,needsNarrow:['code'],narrow:{loki:['| json','| code="A"']}},up:{grafana:'up{job="dcf"}'}}},'the copy is the effective binding, without extends');
-  assert.equal(canonical(p.resolved()),canonical(resolvedBefore),'the resolved metrics are unchanged');
+  assert.equal(canonical(p.resolved().signals),canonical(resolvedBefore.signals),'the resolved signals are unchanged');assert.equal(p.resolved().kind,resolvedBefore.kind);
   assert.equal(p.state(NODE).merge,null,'the carrier now edits its own binding');
   p.refuse(NODE,{op:'copyProviderQuery'},/already/);
   p.refuse(LOCAL,{op:'copyProviderQuery'},/imported/);

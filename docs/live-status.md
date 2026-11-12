@@ -827,6 +827,47 @@ and live early (including ALREADY LIVE). A step takes the live-status rollup of
 its directly selected carriers' Jira states, then the worst telemetry state
 (degraded, silent, unmeasured, unobserved, flowing), joined by the same matrix.
 
+### End-to-end metrics
+
+Page-level `tracking.endToEndMetrics: true` (#1404) makes Proof answer "does the
+whole path work, according to its metrics?" instead of combining metrics with
+Jira. The author (or agent) sets it only after the metrics and their limits are
+in place and agreed: it states that the metrics on this board cover the whole
+path. Only the boolean `true` turns it on; any other value warns and is ignored.
+Without it nothing changes.
+
+With the flag on, Jira state is not an input to Proof. Tickets keep their own
+job: Jira colours, the Tickets table, epic status and step ticket rows are
+unchanged. In Proof:
+
+- A **counted** carrier is a bound carrier with at least one signal that has a
+  `min` or `max` limit. Carriers with metrics but no limit appear in the table
+  as *not counted, no limit* and never enter the ring.
+- Each counted carrier gets one verdict from its limits and traffic:
+
+| Verdict | When |
+| --- | --- |
+| **PROVEN** | traffic observed, an authored `min` is observed and met, and every limit holds |
+| **DEGRADED** | a `max` limit (plain or `maxRatioOf`) is breached while traffic flows |
+| **ERROR** | a signal with `role: "error"` is outside its limit (#1201) |
+| **UNPROVEN** | zero across the window, no traffic, below a `min`, or no observed `min` at all |
+| no verdict | nothing observed yet, or a limit's data is still pending: shown as today's unobserved / evidence incomplete state, never proven |
+
+- The headline reads **End to end proven** only when every counted carrier is
+  proven (none in error). Otherwise it reads **N of M proven** and the summary
+  names the degraded, error, unproven and not-measured carriers. With no counted
+  carrier nothing is claimed.
+- The Proof table drops the Jira and Since Done columns and has no ticket-state
+  wording; there is no live-early bucket, and no Done marker on charts.
+- A step's verdict is the worst of its counted carriers (error, degraded,
+  unproven), no verdict while one is pending, else proven. Step `ticketFilter`
+  narrowing does not apply to Proof.
+- Canvas seals follow the same verdicts: PROVEN check, UNPROVEN slash, DEGRADED
+  and ERROR `!`.
+
+`proofVerdicts(input, {endToEndMetrics: true})` in `src/core/proof.js` is the one
+engine for the panel, the canvas cues and the step caption.
+
 ### Metrics and proof authoring
 
 Agent authors load the live-status board skill's conditional

@@ -113,16 +113,18 @@ test('boundary tiles resize from their outer edges and adjacent tiles each own t
   expect(await stripAt(page,[mid-2,y])).toBe('e|panel:home');expect(await stripAt(page,[mid+2,y])).toBe('w|panel:below');
   // The diagram tile sits on the grid's left and top boundary: its w, n and nw
   // strips take its own outer 4px. Drag them inward by one cell or row.
-  const diagram=page.locator('[data-layout-key="diagram"]');await diagram.scrollIntoViewIfNeeded();
+  // Scroll the canvas back to the top so the tile's top edge is not under the sticky toolbar.
+  const toTop=()=>page.locator('.workmain').evaluate(el=>{el.scrollTop=0;});
+  const diagram=page.locator('[data-layout-key="diagram"]');await toTop();
   const {cell,row}=await grid(diagram);
   const cellsOf=async()=>{const it=items(await src.inputValue()).find(it=>!it.panel && !it.controls);return [it.x,it.y,it.w,it.h];};
   let r=await diagram.boundingBox(),point=[r.x+2,r.y+r.height/2];
   expect(await stripAt(page,point)).toBe('w|diagram');await pointerDrag(page,point,cell,0);
   await expect.poll(cellsOf).toEqual([1,0,15,16]);
-  r=await diagram.boundingBox();point=[r.x+r.width/2,r.y+2];
+  await toTop();r=await diagram.boundingBox();point=[r.x+r.width/2,r.y+2];
   expect(await stripAt(page,point)).toBe('n|diagram');await pointerDrag(page,point,0,row);
   await expect.poll(cellsOf).toEqual([1,1,15,15]);
-  r=await diagram.boundingBox();point=[r.x+2,r.y+2];
+  await toTop();r=await diagram.boundingBox();
   // Off the boundary now, so the nw corner is pressed outside the tile again.
   expect(await stripAt(page,[r.x-2,r.y-2])).toBe('nw|diagram');await pointerDrag(page,[r.x-2,r.y-2],-cell,-row);
   await expect.poll(cellsOf).toEqual([0,0,16,16]);

@@ -1578,7 +1578,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(active._liveCarrier && !active._liveCarrier.metricsOnly){rebuildPopover(active);active.setAttribute('aria-expanded','true');return;}
     var hadProduction=!!pop.querySelector('.dv-live-production');
     if(!paintProduction(active) && hadProduction){close(true);return;}
-    active.setAttribute('aria-expanded','true');
+    // #1165: the Metrics section can change size; keep the popover inside the diagram frame.
+    place(active);active.setAttribute('aria-expanded','true');
   }
   function popoverControlKey(el){var row=el.closest('[data-live-ticket]');return [row?row.getAttribute('data-live-ticket'):'',el.tagName,el.className,el.getAttribute('href') || '',el.getAttribute('aria-label') || ''].join('|');}
   function popoverMarkup(nodes){return nodes.every(function(node){return typeof node.outerHTML==='string';})?nodes.map(function(node){return node.outerHTML;}).join(''):null;}
@@ -1672,10 +1673,33 @@ function createLiveStatus(ctl,page,options,renderOptions){
     found.prs.forEach(function(url){link(box,url,url);});
     return {dismiss:dismiss,asking:asking && marker && marker.clearable?asking:null};
   }
+  // #1165: the visible part of the diagram frame (the trigger's .board cut by every clipping ancestor and the
+  // window), so the popover never covers the Status panel or the step controls. No board: the window.
+  function popoverFrame(trigger){
+    var frame={left:0,top:0,right:window.innerWidth,bottom:window.innerHeight},board=trigger.closest && trigger.closest('.board');
+    function cut(el){var b=el.getBoundingClientRect();frame={left:Math.max(frame.left,b.left),top:Math.max(frame.top,b.top),right:Math.min(frame.right,b.right),bottom:Math.min(frame.bottom,b.bottom)};}
+    for(var el=board;el && el!==document.body && el!==document.documentElement;el=el.parentElement || (el.parentNode && el.parentNode.host) || null){
+      var style=getComputedStyle(el);if(el===board || style.overflowX!=='visible' || style.overflowY!=='visible')cut(el);
+    }
+    return frame.right-frame.left>=80 && frame.bottom-frame.top>=80?frame:{left:0,top:0,right:window.innerWidth,bottom:window.innerHeight};
+  }
+  // Below the trigger when it fits, else above, right or left where it fits, else the side with the most room;
+  // then clamped to the frame. A popover taller or wider than the frame is capped to it and its body scrolls.
   function place(trigger){
-    var rect=trigger.getBoundingClientRect();
-    pop.style.left=Math.max(8,Math.min(window.innerWidth-pop.offsetWidth-8,rect.left))+'px';
-    pop.style.top=Math.max(8,Math.min(window.innerHeight-pop.offsetHeight-8,rect.bottom+6))+'px';
+    var rect=trigger.getBoundingClientRect(),frame=popoverFrame(trigger),gap=6;
+    var m=Math.min(8,(frame.right-frame.left)/20,(frame.bottom-frame.top)/20),inner={left:frame.left+m,top:frame.top+m,right:frame.right-m,bottom:frame.bottom-m};
+    pop.style.maxWidth='';pop.style.maxHeight='';
+    if(pop.offsetWidth>inner.right-inner.left)pop.style.maxWidth=(inner.right-inner.left)+'px';
+    if(pop.offsetHeight>inner.bottom-inner.top)pop.style.maxHeight=(inner.bottom-inner.top)+'px';
+    var w=pop.offsetWidth,h=pop.offsetHeight;
+    var sides=[
+      {room:inner.bottom-rect.bottom-gap,size:h,left:rect.left,top:rect.bottom+gap},
+      {room:rect.top-gap-inner.top,size:h,left:rect.left,top:rect.top-gap-h},
+      {room:inner.right-rect.right-gap,size:w,left:rect.right+gap,top:rect.top},
+      {room:rect.left-gap-inner.left,size:w,left:rect.left-gap-w,top:rect.top}];
+    var side=sides.find(function(s){return s.room>=s.size;}) || sides.reduce(function(best,s){return s.room/s.size>best.room/best.size?s:best;});
+    pop.style.left=Math.max(inner.left,Math.min(inner.right-w,side.left))+'px';
+    pop.style.top=Math.max(inner.top,Math.min(inner.bottom-h,side.top))+'px';
   }
   function reveal(trigger,dismiss,ask){
     active=trigger;asked=ask;trigger.setAttribute('aria-expanded','true');pop.hidden=false;if(pop.showPopover)pop.showPopover();

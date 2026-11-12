@@ -195,7 +195,7 @@ with exactly one operator (#1413):
 | `{"contains": ".prd."}` | contains the text |
 | `{"in": ["GET", "HEAD"]}` | is one of the listed texts |
 
-Operators compare text values only; a number or true/false value never matches them.
+Operators compare text values only, case-sensitively (`{"startsWith": "B."}` does not match `b.x`); a number or true/false value never matches them.
 The operand must be non-empty text (`in`: a non-empty list of text). Any other object,
 such as an unknown operator, two operators or an empty prefix, matches no span (never
 every span), and the validator warns at its path. Example: service A's HTTP client
@@ -304,7 +304,7 @@ profile that has both `allowedAttributes` and `dataset`.
   are rejected: names containing token, secret, password, passwd, credential,
   authorization, cookie, header, bearer, private key, access key or api key, and
   names with an `auth`, `pwd`, `jwt` or `session` part.
-- Values match exactly, with the same rules as built-in attributes. Tempo keeps the
+- Values match exactly, or by an [operator](#attribute-operators), with the same rules as built-in attributes. Tempo keeps the
   span attribute value and its type; Honeycomb values are text.
 - Validation accepts an attribute that any connection for the page lists, also
   while `tracking.telemetry.enabled` is `false`. Without such a profile it rejects
@@ -512,7 +512,7 @@ both. `traceScope` (all fields optional; `{}` inherits from shared carriers too)
   (neutral, not counted); with no root span in the trace the root is not checked.
 - `parentStepId`: keeps spans that descend from that step's spans, and spans whose ancestry is
   not in the trace (named in the row); drops spans whose known ancestry leads elsewhere.
-- `attributes`: exact values every inherited span must have (the allowlist above).
+- `attributes`: values every inherited span must have (the allowlist above), exact or by an [operator](#attribute-operators).
 - `skip`: span names, or `role:<role>`, per carrier id (imported ids such as
   `platform::worker`). A name the carrier does not declare, or a carrier the step does not
   light, warns and is ignored.

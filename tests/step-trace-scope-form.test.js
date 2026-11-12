@@ -191,11 +191,11 @@ test('S5 root, parent, attributes, optional, budget and queue depth: one Undo ea
   ui.control('new scope attribute name').value='not.allowed';ui.control('new scope attribute value').value='x';
   refused(ui,()=>ui.click('Add scope attribute'));
   assert.equal(ui.beside('new scope attribute name'),'Attribute not.allowed is not one this board can match. Use a supported attribute such as db.system, or list it in a trace connection\'s allowedAttributes.');
-  ui.control('new scope attribute name').value='http.response.status_code';ui.control('new scope attribute value').value='200';ui.control('new scope attribute type').value='number';
+  ui.control('new scope attribute name').value='http.response.status_code';ui.control('new scope attribute value').value='200';ui.control('new scope attribute match').value='number';
   oneStep(ui,()=>ui.click('Add scope attribute'));assert.deepEqual(scope().attributes,{'http.response.status_code':200});
-  oneStep(ui,()=>ui.set('scope attribute http.response.status_code type','string'));assert.deepEqual(scope().attributes,{'http.response.status_code':'200'});
-  refused(ui,()=>ui.set('scope attribute http.response.status_code type','boolean'));
-  assert.match(ui.beside('scope attribute http.response.status_code type'),/true or false/);
+  oneStep(ui,()=>ui.set('scope attribute http.response.status_code match','string'));assert.deepEqual(scope().attributes,{'http.response.status_code':'200'});
+  refused(ui,()=>ui.set('scope attribute http.response.status_code match','boolean'));
+  assert.match(ui.beside('scope attribute http.response.status_code match'),/true or false/);
   oneStep(ui,()=>ui.click('Remove scope attribute http.response.status_code'));assert.equal(Object.hasOwn(scope(),'attributes'),false);
   // Optional, Time budget, Max queue depth.
   oneStep(ui,()=>ui.check('Optional',true));assert.equal(scope().optional,true);

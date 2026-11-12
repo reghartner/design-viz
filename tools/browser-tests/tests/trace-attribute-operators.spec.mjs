@@ -24,12 +24,12 @@ test('A1 desktop: a starts-with attribute on an imported connection\'s span is s
   const before=await source.inputValue();
   const name=fold.getByLabel('send new attribute name',{exact:true});await name.click();await page.keyboard.type(A);
   const value=fold.getByLabel('send new attribute value',{exact:true});await value.click();await page.keyboard.type('prd');
-  await fold.getByLabel('send new attribute type',{exact:true}).selectOption('startsWith');
+  await fold.getByLabel('send new attribute match',{exact:true}).selectOption('startsWith');
   await fold.getByRole('button',{name:'Add attribute to send',exact:true}).click();
   const overlay=async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.topologyImports[0].edgeTracking?.['a->b']?.trace;
   await expect.poll(overlay).toEqual({spans:{send:{attributes:{[A]:{startsWith:'prd'}}}}});
   await expect(fold.locator('.trace-span-attributes .fnote').first()).toHaveText(A+' starts with prd');
-  await expect(fold.getByLabel('send attribute '+A+' type',{exact:true})).toHaveValue('startsWith');
+  await expect(fold.getByLabel('send attribute '+A+' match',{exact:true})).toHaveValue('startsWith');
   await page.screenshot({path:info.outputPath('trace-attribute-starts-with.png')});
   const saved=await source.inputValue();
   expect(await page.evaluate(()=>window.spanContext.specs[0])).toEqual(provider);

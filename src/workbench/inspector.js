@@ -1021,7 +1021,7 @@ function traceSpansControls(){
       var TYPES=TRACE_ATTRIBUTE_KINDS;
       Object.keys(attrs).forEach(function(a){
         var line=el('div','rowline','',box),label=el('span','fnote',traceAttributeLabel(a,attrs[a]),line);label.setAttribute('aria-hidden','true');
-        var type=traceAttributeKind(attrs[a]),types=select(TYPES,type,key+' attribute '+a+' type');types.title='How the value matches: exactly (text, number or true/false), or Starts with, Ends with, Contains or Is one of (values separated by commas). Honeycomb table cells are text.';line.appendChild(types);
+        var type=traceAttributeKind(attrs[a]),types=select(TYPES,type,key+' attribute '+a+' match');types.title='How the value matches: exactly (text, number or true/false), or Starts with, Ends with, Contains or Is one of (values separated by commas). Honeycomb table cells are text.';line.appendChild(types);
         listen(types,'change',function(){if(commit({op:'attribute',name:key,key:a,attrName:a,value:traceAttributeText(attrs[a]),type:types.value},{any:types})===false)types.value=type;});
         var x=named(actionButton('\u00d7',function(){return commit({op:'attribute',name:key,key:a,attrName:null},{any:addName});},'rowx'),'Remove attribute '+a+' from '+key,'Remove attribute '+a);line.appendChild(x);
         slot(box,types);
@@ -1031,7 +1031,7 @@ function traceSpansControls(){
       var addValue=named(document.createElement('input'),key+' new attribute value');addValue.type='text';addValue.className='fctl';addValue.placeholder='value';
       [addName,addValue].forEach(function(input,i){var k=draftKey+i;if(TRACE_SPAN_DRAFTS.has(k))input.value=TRACE_SPAN_DRAFTS.get(k);listen(input,'input',function(){TRACE_SPAN_DRAFTS.set(k,input.value);});input._flowviewHasDraft=function(){return input.value!=='';};addLine.appendChild(input);});
       if(state.allowed && state.allowed.length){var listId=prefix+'-span-attrs';if(!guide.querySelector('#'+listId) && !fold.querySelector('#'+listId)){var dl=el('datalist','',null);dl.id=listId;state.allowed.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});}addName.setAttribute('list',listId);}
-      var addType=select(TYPES,'string',key+' new attribute type');addType.title='How the value matches: exactly (text, number or true/false), or Starts with, Ends with, Contains or Is one of (values separated by commas). Honeycomb table cells are text.';addLine.appendChild(addType);
+      var addType=select(TYPES,'string',key+' new attribute match');addType.title='How the value matches: exactly (text, number or true/false), or Starts with, Ends with, Contains or Is one of (values separated by commas). Honeycomb table cells are text.';addLine.appendChild(addType);
       function addAttribute(){if(commit({op:'attribute',name:key,key:null,attrName:addName.value,value:addValue.value,type:addType.value},{any:addName,attribute:addName})!==false){TRACE_SPAN_DRAFTS.delete(draftKey+0);TRACE_SPAN_DRAFTS.delete(draftKey+1);}}
       [addName,addValue].forEach(function(input){listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addAttribute();}});});
       addLine.appendChild(named(actionButton('Add attribute',addAttribute,'rowadd'),'Add attribute to '+key,'Add the attribute typed to the left (Enter also adds it).'));
@@ -1817,7 +1817,7 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
     var attrBox=el('div','trace-scope-attributes');
     Object.keys(attrs).forEach(function(a){
       var line=el('div','rowline','',attrBox),label=el('span','fnote',traceAttributeLabel(a,attrs[a]),line);label.setAttribute('aria-hidden','true');
-      var type=traceAttributeKind(attrs[a]),types=typeSelect(type,'scope attribute '+a+' type');line.appendChild(types);
+      var type=traceAttributeKind(attrs[a]),types=typeSelect(type,'scope attribute '+a+' match');line.appendChild(types);
       listen(types,'change',function(){if(commit({op:'attribute',key:a,attrName:a,value:traceAttributeText(attrs[a]),type:types.value},{any:types})===false)types.value=type;});
       line.appendChild(named(actionButton('×',function(){return commit({op:'attribute',key:a,attrName:null},{any:null});},'rowx'),'Remove scope attribute '+a));
       slot(attrBox,types);
@@ -1825,7 +1825,7 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
     var addLine=el('div','rowline','',attrBox);
     var addName=draft(textInput('new scope attribute name','','A supported trace attribute, such as deployment.environment.name.','attribute'),'attr-name'),addValue=draft(textInput('new scope attribute value','','The value every inherited span must have; the type to the right says how it matches.','value'),'attr-value');
     if(allowed.length){var listId=prefix+'-scope-attrs',dl=el('datalist','',null,attrBox);dl.id=listId;allowed.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});addName.setAttribute('list',listId);}
-    var addType=typeSelect('string','new scope attribute type');
+    var addType=typeSelect('string','new scope attribute match');
     addLine.appendChild(addName);addLine.appendChild(addValue);addLine.appendChild(addType);
     function addAttribute(){var ok=commit({op:'attribute',key:null,attrName:addName.value,value:addValue.value,type:addType.value},{attribute:addName,any:addName});if(ok!==false){TRACE_MATCH_DRAFTS.delete(draftKey('attr-name'));TRACE_MATCH_DRAFTS.delete(draftKey('attr-value'));}return ok;}
     [addName,addValue].forEach(function(i){listen(i,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addAttribute();}});});
@@ -1975,7 +1975,7 @@ function traceMatchEditor(val,ctx,t){
           value=booleanSelect(attrs[key],rowLead+'value');
           listen(value,'change',function(){if(commit({op:'attribute',alternative:i,key:key,name:key,value:value.value,type:type})===false)value.value=String(attrs[key]);});
         }else value=named(textControl(traceAttributeText(attrs[key]),function(v){return commit({op:'attribute',alternative:i,key:key,name:key,value:v==null?'':v,type:type});},{placeholder:type==='in'?'a, b':'value'}),rowLead+'value');
-        var types=typeSelect(type,rowLead+'type');
+        var types=typeSelect(type,rowLead+'match');
         listen(types,'change',function(){
           var text=traceAttributeText(attrs[key]);
           if(types.value==='boolean' && text!=='true' && text!=='false'){formError('Value \''+text+'\' is not true or false; change the value first.');types.value=type;return;}
@@ -1991,7 +1991,7 @@ function traceMatchEditor(val,ctx,t){
       newName.type='text';newName.className='fctl';newName.placeholder='new attribute';if(attributeNames.length)newName.setAttribute('list',attrListId);draft(newName,draftKey+'name');
       var newValue=named(document.createElement('input'),lead+'new attribute value');newValue.type='text';newValue.className='fctl';newValue.placeholder='value';draft(newValue,draftKey+'value');
       var newBool=booleanSelect(true,lead+'new attribute true/false value');
-      var newType=typeSelect(TRACE_MATCH_DRAFTS.get(draftKey+'type') || 'string',lead+'new attribute type');
+      var newType=typeSelect(TRACE_MATCH_DRAFTS.get(draftKey+'type') || 'string',lead+'new attribute match');
       // A true/false value is chosen from a list; the text box shows for text and numbers.
       function showValue(){var bool=newType.value==='boolean';newValue.hidden=bool;newBool.hidden=!bool;}
       listen(newType,'change',function(){TRACE_MATCH_DRAFTS.set(draftKey+'type',newType.value);showValue();});showValue();

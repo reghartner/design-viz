@@ -110,7 +110,11 @@ async function tileDrag(page,handle,dx,dy){
 }
 const homeItem=text=>JSON.parse(text).page.blocks[0].diagram.layouts[0].sectionLayout.default.find(it=>it.panel==='home');
 test('Arrange tile move and resize land on the first try with an Inspector edit pending',async({page,server})=>{
-  await open(page,server);
+  // A 24-column grid: diagram and step controls fill columns 0-15 down to row
+  // 16; the home tile sits at columns 16-23, rows 24-31, with free cells around.
+  const raw=fixture(),layout=raw.page.blocks[0].diagram.layouts[0].sectionLayout;
+  layout.columns=24;layout.default=[{x:0,y:0,w:16,h:12},{panel:'home',x:16,y:24,w:8,h:8},{controls:'steps',attachTo:'diagram',x:0,y:12,w:16,h:4}];
+  await open(page,server,raw);
   await page.getByRole('button',{name:'Hide arrangement controls',exact:true}).click();await expect(page.locator('.section-arrange-fields')).toBeHidden();
   await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
   await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
@@ -120,42 +124,26 @@ test('Arrange tile move and resize land on the first try with an Inspector edit 
   // Inspect floats over the right side of the grid; keep it clear of the tiles.
   const grip=page.locator('#workspace-window-inspect .workspace-window-grip');await grip.focus();
   for(let i=0;i<20;i++)await grip.press('Shift+ArrowLeft');
-  const {cell,row}=await tileGrid(tile);
-  // Arrange saves the 24-column grid first; the home tile then sits right of the
-  // diagram with free rows above it. Moves are read from that saved start.
-  const start=homeItem(await page.locator('#src').inputValue());expect(start.x+start.w).toBe(24);expect(start.y).toBeGreaterThanOrEqual(8);
+  const {cell,row}=await tileGrid(tile),src=page.locator('#src');
   const tileVars=()=>tile.evaluate(el=>['--tile-x','--tile-y','--tile-w','--tile-h'].map(k=>Number(el.style.getPropertyValue(k))));
+  const before=await src.inputValue();expect(homeItem(before)).toMatchObject({x:16,y:24,w:8,h:8});
   await title.fill('Pending before move');
-  // TEMPORARY #1375 diagnostics: event order and handle state around the press.
-  await page.evaluate(()=>{
-    const out=window.__dv1375=[],desc=el=>el?String(el.className && el.className.baseVal!==undefined?el.tagName:el.className || el.tagName).slice(0,50)+(el.isConnected?'':'(detached)'):'null';
-    const src=document.getElementById('src');
-    const state=()=>'active='+desc(document.activeElement)+' arranging='+document.querySelectorAll('.section-arranging').length+' handles='+document.querySelectorAll('.section-tile-move').length+' dragging='+document.querySelectorAll('.layout-dragging').length+' pending='+/Pending/.test(src.value)+' note='+JSON.stringify(document.querySelector('.layout-preview-tools .fnote')?.textContent||'')+' msgs='+JSON.stringify((document.getElementById('msgs')?.textContent||'').slice(0,120));
-    let moves=0;
-    window.addEventListener('pointerdown',ev=>{out.push('down target='+desc(ev.target)+' hit='+desc(document.elementFromPoint(ev.clientX,ev.clientY))+' '+state());setTimeout(()=>out.push('after-down prevented='+ev.defaultPrevented+' hit='+desc(document.elementFromPoint(ev.clientX,ev.clientY))+' '+state()),0);},true);
-    window.addEventListener('pointermove',ev=>{if(moves++<2 && ev.buttons)out.push('move target='+desc(ev.target)+' '+state());},true);
-    for(const t of ['focusout','focusin','change','pointerup','gotpointercapture','lostpointercapture','pointercancel','click'])window.addEventListener(t,ev=>out.push(t+' target='+desc(ev.target)+' '+state()),true);
-  });
-  await tileDrag(page,tile.locator('.section-tile-move'),0,-8*row);
-  await page.waitForTimeout(300);
-  console.log('#1375 tile move events:\n'+(await page.evaluate(()=>window.__dv1375)).join('\n'));
-  await expect(page.locator('#src')).toHaveValue(/Pending before move/);
-  const moved=await page.locator('#src').inputValue();
-  expect(homeItem(moved)).toMatchObject({x:start.x,y:start.y-8,w:start.w,h:start.h});
-  await expect.poll(tileVars).toEqual([start.x+1,start.y-7,start.w,start.h]);
+  await tileDrag(page,tile.locator('.section-tile-move'),-4*cell,-8*row);
+  await expect(src).toHaveValue(/Pending before move/);
+  const moved=await src.inputValue();expect(homeItem(moved)).toMatchObject({x:12,y:16,w:8,h:8});
+  await expect.poll(tileVars).toEqual([13,17,8,8]);
   await expect(title).toBeVisible();await title.fill('Pending before resize');
-  await tileDrag(page,tile.locator('.section-tile-resize'),-2*cell,2*row);
-  await expect(page.locator('#src')).toHaveValue(/Pending before resize/);
-  expect(homeItem(await page.locator('#src').inputValue())).toMatchObject({x:start.x,y:start.y-8,w:start.w-2,h:start.h+2});
-  await expect.poll(tileVars).toEqual([start.x+1,start.y-7,start.w-2,start.h+2]);
-  // Undo: resize, then the second edit, then the move, then the first edit.
-  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(/Pending before resize/);
-  expect(homeItem(await page.locator('#src').inputValue())).toMatchObject({x:start.x,y:start.y-8,w:start.w,h:start.h});
-  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(moved);
-  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(/Pending before move/);
-  expect(homeItem(await page.locator('#src').inputValue())).toMatchObject(start);
-  await page.locator('#undo-builder').click();await expect(page.locator('#src')).not.toHaveValue(/Pending before move/);
-  expect(homeItem(await page.locator('#src').inputValue())).toMatchObject(start);
+  await tileDrag(page,tile.locator('.section-tile-resize'),2*cell,2*row);
+  await expect(src).toHaveValue(/Pending before resize/);
+  expect(homeItem(await src.inputValue())).toMatchObject({x:12,y:16,w:10,h:10});
+  await expect.poll(tileVars).toEqual([13,17,10,10]);
+  // Undo: the resize, then the second edit, then the move, then the first edit.
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(/Pending before resize/);
+  expect(homeItem(await src.inputValue())).toMatchObject({x:12,y:16,w:8,h:8});
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(moved);
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(/Pending before move/);
+  expect(homeItem(await src.inputValue())).toMatchObject({x:16,y:24,w:8,h:8});
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);
 });
 
 test('Standard arrangement drag keeps the scrolled desktop viewport stable',async({page,server},testInfo)=>{

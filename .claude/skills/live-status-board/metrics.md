@@ -168,16 +168,17 @@ metrics name their own scope. Full rules:
 
 ### Narrowing an imported signal
 
-Narrow an inherited signal in its provider's own language under `narrow`, keyed by the
-signal's source, in the import's `extends` overlay; never restate the provider's query:
-- Honeycomb: `"narrow": {"honeycomb": {"filters": [{"column": "event_code", "op": "=", "value": "FULL_CHARGE"}]}}`
-- CloudWatch: `"narrow": {"cloudwatch": {"dimensions": {"NotificationType": "FULL_CHARGE"}}}`
+Narrow an inherited signal in its provider's own language under `narrow`, keyed by
+source, in the import's `extends` overlay; never restate the provider's query:
+- `"honeycomb": {"filters": [{"column": "code", "op": "=", "value": "X"}]}`
+- `"cloudwatch": {"dimensions": {"Type": "X"}}`
+- `"loki": "| code=\"X\""` (one stage per entry), `"grafana": "code=\"X\""` (matchers)
+- `"cloudwatchLogs": "filter code = \"X\""`
 
-Flowview appends it and never translates it. A provider signal with
-`needsNarrow: ["event_code"]` (or `true`) is not shown until a board pins it (`=`/`in`).
-Narrowing only adds up; another language, SQL, Tempo, an OR query or a dimension
-conflict is not shown, with a reason. LogQL, PromQL and Logs Insights cannot be
-narrowed yet ([details](../../../docs/live-status.md#narrowing-inherited-signals)).
+Flowview appends it, never translates it, and anything unsafe (another language, SQL,
+Tempo, an OR query, a conflict) is not shown, with a reason. A provider signal with
+`needsNarrow: ["code"]` (or `true`) stays hidden until a board pins it (`=`/`in`)
+([details](../../../docs/live-status.md#narrowing-inherited-signals)).
 
 ### CloudWatch Logs Insights
 

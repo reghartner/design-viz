@@ -196,6 +196,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     return states[key];
   }
   function setWindowHidden(w,value){
+    if(value && pinned(w))return;
     w.state.hidden=value;
     var floating=w.prose?memory.prose:memory.panels[w.panel.id];if(floating)floating.hidden=value;
     var canvas=memory.canvasPanels && memory.canvasPanels[w.prose?'prose':'panel:'+w.panel.id];if(canvas)canvas.hidden=value;
@@ -350,7 +351,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     moved.push({node:node,anchor:anchor});host.appendChild(node);
   }
   function available(w){if(w===playerWindow)return !!bar || !!player.querySelector('.playback-mode-rail');return !w.authoredHidden && !w.card.classList.contains('panel-step-hidden');}
-  function visible(w){if(workbenchFocus)return false;if(w===playerWindow)return available(w);return available(w) && !w.state.hidden && !memory.focus;}
+  function visible(w){if(workbenchFocus)return false;if(w===playerWindow)return available(w);return available(w) && (!w.state.hidden || pinned(w)) && !memory.focus;}
+  /* #1371 (option A): a Status controls panel stays while no Status panel can be shown (the View or the step hides it,
+     or there is none), so the reader cannot hide every control. Hiding it while Status can be shown moves the controls
+     into the Status panel instead. */
+  function pinned(w){
+    return !!(w.panel && w.panel.type==='status-controls' && available(w) && !windows.some(function(o){return o.panel && o.panel.type==='live-status' && available(o);}));
+  }
   function clamp(n,min,max){return Math.max(min,Math.min(max,n));}
   function bounds(){return {w:stage.clientWidth,h:stage.clientHeight};}
   function fitHeight(){
@@ -589,8 +596,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     }
     var maxWidth=stacked.length?b.w-stackLeft:0;
     windows.forEach(function(w){
-      var can=available(w),shown=visible(w);w.el.hidden=!shown;w.check.disabled=!can;w.check.checked=shown;
-      w.note.textContent=w.authoredHidden?'Hidden in this view':!can?'Hidden at this step':'';
+      var can=available(w),shown=visible(w),pin=pinned(w);w.el.hidden=!shown;w.check.disabled=!can || pin;w.check.checked=shown;if(w.hide)w.hide.hidden=pin;
+      w.note.textContent=w.authoredHidden?'Hidden in this view':!can?'Hidden at this step':pin?'Shows while the View hides Status':'';
       if(!shown)return;
       var previous=w.rect,scaled=scaledRect(w,w.state),r=w.state.stacked?stackRects.get(w):constrain(w,scaled);
       if(canvasWindow(w))r=fittedCanvasRect(w,r);
@@ -752,7 +759,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var resize=button('◢',function(){},el,'explore-window-resize');resize.title='Drag to resize; arrow keys to resize';stage.appendChild(el);
     var choice=document.createElement('label'),check=document.createElement('input'),text=document.createElement('span'),note=document.createElement('small');
     check.type='checkbox';text.textContent=label;choice.appendChild(check);choice.appendChild(text);choice.appendChild(note);choices.appendChild(choice);
-    var w={el:el,body:body,card:card,panel:panel,prose:!!notes,label:label,state:state,grip:grip,resize:resize,check:check,note:note,authoredHidden:!!it.hidden,canvasSizing:sizing};
+    var w={el:el,body:body,card:card,panel:panel,prose:!!notes,label:label,state:state,grip:grip,resize:resize,check:check,note:note,hide:hide,authoredHidden:!!it.hidden,canvasSizing:sizing};
     if(sizing)el.setAttribute('data-explore-canvas-sizing',sizing.mode);
     {
       var row=document.createElement('div');row.className='explore-panel-choice';choice.replaceWith(row);row.appendChild(choice);

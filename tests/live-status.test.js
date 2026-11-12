@@ -5574,3 +5574,41 @@ test('DC11 choosing another role clears a refusal shown beside the Declare butto
  assert.equal(b.m.body.querySelector('.dv-trace-map-note button.dv-trace-declare-instead').getAttribute('aria-describedby'),null);
  b.api.destroy();
 });
+
+/* #1371: the Status controls panel. One controller drives both panels. While the controls panel is shown, the Status panel
+   leaves out the view controls and the connector line (Edit stays); when the controls panel is hidden, inside a hidden
+   container (not in the current View) or gone, they come back to the Status panel. */
+function mountControls(h,host=h.view){
+ const d=h.C.PanelRegistry.get('status-controls');assert.ok(d,'#1371 the Status controls panel is registered');
+ const body=host.appendChild(new Element('div',{class:'pbody'})),result=d.render(body,{id:'controls',type:'status-controls'},{},'pastel',[],0,false);
+ result.mounted();return {body,destroy(){if(body._panelMotionCleanup)body._panelMotionCleanup();body.remove();}};
+}
+test('#1371 Status controls hold the view controls; the Status panel leaves them out, and gets them back when the controls are hidden, not in the View or gone',async()=>{
+ const h=harness(overFixture()),api=overReady(h.ctl.liveStatus);api.apply(overToday());api.setHistory({load:()=>({days:overDays()})});
+ const def=h.C.PanelRegistry.get('status-controls');assert.ok(def,'registered');assert.equal(def.label,'Status controls');assert.equal(def.authoring.picker.name,'Status controls');assert.equal(def.authoring.picker.category,'Delivery');
+ const status=mountStatus(h),controls=mountControls(h),CONTROLS=['.dv-status-modes','.dv-live-time','button.dv-live-over-time','button.dv-live-toggle','.dv-live-connection'];
+ const inStatus=()=>CONTROLS.filter(sel=>status.body.querySelector(sel)),inControls=()=>CONTROLS.filter(sel=>controls.body.querySelector(sel));
+ assert.deepEqual(inControls(),CONTROLS,'the controls panel holds the view controls and the connector line');
+ assert.deepEqual(inStatus(),[],'the Status panel leaves them out');
+ assert.ok(status.body.querySelector('table.dv-live-tickets'),'Status keeps the Tickets');assert.ok(status.body.querySelector('.dv-live-edit-controls'),'and the Edit row');
+ assert.equal(controls.body.querySelector('.dv-live-edit-controls'),null,'Edit is not a view control');assert.equal(controls.body.querySelector('table.dv-live-tickets'),null);
+ // One controller: Over time and the day slider in the controls panel change what the Status panel lists.
+ controls.body.querySelector('button.dv-live-over-time').dispatchEvent({type:'click'});await historySettle();
+ assert.equal(api.snapshot().overTime.active,true);const slider=controls.body.querySelector('input.dv-live-over-time-slider');assert.ok(slider,'the day slider is in the controls');
+ assert.equal(status.body.querySelector('input.dv-live-over-time-slider'),null,'and not repeated in Status');
+ slider.value='1';slider.dispatchEvent({type:'input'});assert.equal(api.snapshot().overTime.index,1);
+ assert.ok(textOf(status.body.querySelector('tr[data-live-ticket="AA-1"]')).includes('blocked'),'the Status panel shows day 1');
+ assert.equal(controls.body.querySelector('.dv-live-over-time-day').textContent,'Oct 21','the controls name the day');
+ controls.body.querySelector('button.dv-live-toggle').dispatchEvent({type:'click'});await historySettle();assert.equal(api.snapshot().overTime.active,false,'Live from the controls');
+ // Hidden (the Panels menu, a step): the controls come back to the Status panel; shown again, they leave.
+ controls.body.hidden=true;api.note('repaint');assert.deepEqual(inStatus(),CONTROLS,'hidden controls panel: Status draws them');
+ controls.body.hidden=false;api.note('repaint again');assert.deepEqual(inStatus(),[],'shown again: Status leaves them out');
+ // Not in the current View: its widget sits in a hidden container.
+ const away=h.view.appendChild(new Element('div'));away.hidden=true;away.appendChild(controls.body);api.note('moved');assert.deepEqual(inStatus(),CONTROLS,'not in the View: Status draws them');
+ h.view.appendChild(controls.body);api.note('back');assert.deepEqual(inStatus(),[]);
+ // Gone: Status draws them at once, without waiting for another change.
+ controls.destroy();assert.deepEqual(inStatus(),CONTROLS,'no controls panel: Status draws them');
+ // A board without the panel is unchanged: the Status panel has every control.
+ const plain=harness(overFixture()),only=mountStatus(plain);assert.deepEqual(CONTROLS.filter(sel=>sel==='.dv-live-connection' || only.body.querySelector(sel)),CONTROLS);
+ plain.ctl.liveStatus.destroy();h.ctl.liveStatus.destroy();
+});

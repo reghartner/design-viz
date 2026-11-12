@@ -23,7 +23,8 @@ function addExplore(d){
  const panels=(d.panels || []).map(p=>p.id),steps=(d.steps || []).length>0,share=Math.max(4,Math.floor(24/Math.max(1,panels.length)));
  const tiles=d.sectionLayout && Array.isArray(d.sectionLayout.default)?d.sectionLayout.default:
   [{x:0,y:0,w:16,h:steps?18:24},...(steps?[{controls:'steps',x:0,y:18,w:16,h:6}]:[]),...panels.map((id,i)=>({panel:id,x:16,y:i*share,w:8,h:share}))];
- const columns=d.sectionLayout && d.sectionLayout.columns;
+ // The default grid is 16 + 8 of 24 columns (#1371: without columns:24 those tiles were invalid and ignored).
+ const columns=d.sectionLayout && Array.isArray(d.sectionLayout.default)?d.sectionLayout.columns:24;
  const layout=extra=>({sectionLayout:{...(columns?{columns}:{}),default:structuredClone(tiles)},...extra});
  d.layouts=[layout({id:'standard',name:'Standard',presentation:'standard'}),layout({id:'explore',name:'Explore',presentation:'explore'})];
  d.defaultLayout='standard';delete d.sectionLayout;return d;
@@ -115,7 +116,7 @@ test('X4 Explore: Metrics cards on the canvas, Proof, and Over time',async({page
  await page.addInitScript(()=>{
   let real=null;const add=raw=>{const spec=JSON.parse(JSON.stringify(raw)),d=spec.page.sections[0].diagram,panels=(d.panels || []).map(p=>p.id),steps=(d.steps || []).length>0;
    const tiles=[{x:0,y:0,w:16,h:steps?18:24},...(steps?[{controls:'steps',x:0,y:18,w:16,h:6}]:[]),...panels.map((id,i)=>({panel:id,x:16,y:i*8,w:8,h:8}))];
-   d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:tiles}},{id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:JSON.parse(JSON.stringify(tiles))}}];d.defaultLayout='standard';return spec;};
+   d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{columns:24,default:tiles}},{id:'explore',name:'Explore',presentation:'explore',sectionLayout:{columns:24,default:JSON.parse(JSON.stringify(tiles))}}];d.defaultLayout='standard';return spec;};
   Object.defineProperty(window,'mount',{configurable:true,get(){return real && ((host,raw,opts)=>real(host,add(raw),opts));},set(fn){real=fn;}});
  });
  const root=await metricsBoard(page,server);await enterExplore(root);const status=statusWindow(root);await expect(status).toBeVisible();

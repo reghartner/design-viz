@@ -955,6 +955,14 @@ width. It appears immediately, with no menu click.
 The generic desktop Workbench picker lists **Delivery → Live status**; insertion
 and Export project preserve the panel. There are no authored state or patch fields.
 
+**Status controls (#1371, opt-in).** Add `{"id":"controls","type":"status-controls","title":"Status controls"}`
+beside the Status panel (Workbench picker: **Delivery → Status controls**) to move the view controls into a panel
+of their own: Jira | Trace, Env, the Metrics overlay with its style and Refresh now, Live | Over time, the day row,
+and the connector lines (refreshed time, Demo, Snapshot). Both panels drive one controller. While the controls
+panel is shown, the Status panel leaves those controls out and keeps Edit, the counts, Tickets, Proof and the Trace
+details. When it is hidden (Panels menu, a step, or a View that hides it) or absent, the controls return to the
+Status panel. For Explore, show the controls and hide the Status panel in that View's tiles (`"hidden": true`).
+
 The Jira and Trace views share one header (#1131). Its top row holds **Jira** | **Trace**,
 an **Env** select when the board names environments, **Edit** (then **Save N changes**,
 **Discard** or **Done**) for anyone who can edit the board, and the **Metrics overlay** switch

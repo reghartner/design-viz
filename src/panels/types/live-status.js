@@ -1,4 +1,6 @@
 /* Authored placement, runtime evidence. No ticket status is folded into the spec. */
+// #1371: the panel mount, shared with the Status controls panel (panels/types/status-controls.js).
+var liveStatusPanelMount=null;
 (function(){
   var LIVE_SAMPLE=[["BE-67", "Build the notification service", "Riley"], ["BE-68", "Accept firmware events over HTTPS", "Riley"], ["FW-45", "Deliver firmware events", "Sam"], ["FW-46", "Integrate hardware interrupts", "Sam"], ["HW-123", "Debounce the doorbell button", "Alex"], ["HW-124", "Stabilize the hardware event signal", "Alex"], ["UX-89", "Show resident notifications", "Morgan"], ["UX-90", "Alert sound setting", "Morgan"]];
   var states=['todo','active','testing','done','blocked','missing'];
@@ -34,11 +36,24 @@
       '<h3>Tickets</h3><div class="dv-live-tickets-scroll"><table class="dv-live-tickets"><thead><tr><th>Key</th><th>Title</th><th>State</th><th>Owner</th><th>Depends on</th><th>PRs</th></tr></thead><tbody>'+
       sample.map(function(row){return '<tr class="dv-live-ticket-row'+(row.key==='UX-90'?' dv-live-ticket-with-tag':'')+'"><td class="dv-live-ticket-key">'+esc(row.key)+'</td><td class="dv-live-ticket-title">'+esc(row.title)+'</td><td>done</td><td class="dv-live-ticket-owner">'+esc(row.owner)+'</td><td class="dv-live-ticket-depends">'+(row.key==='FW-46'?'<span class="dv-live-dep dv-live-dep-done" data-tone="done"><span class="dv-live-dep-icon" data-icon="check"></span><span class="dv-live-dep-key">HW-124</span> <span class="dv-live-state-pill">done</span></span>':'')+'</td><td class="dv-live-ticket-prs">1 merged</td></tr>'+(row.key==='UX-90'?'<tr class="dv-live-coverage-row"><td colspan="6"><div class="dv-live-coverage"><span class="dv-live-coverage-tag">NOT ON DIAGRAM</span></div></td></tr>':'');}).join('')+'</tbody></table></div><h3>Blockers and dependency chains</h3><p>None</p><h3>Activity</h3></div>';
   }
-  function mount(host){
+  /* #1371: `role` 'controls' mounts the Status controls panel: the shared header's view controls (mode, Env, Metrics,
+     Refresh now, Live | Over time and the day row) and the connection lines. The Status panel (role 'status') leaves
+     those out while a Status controls panel of the same controller is shown (controlsElsewhere); Edit stays here. */
+  var controlPanels=[],statusPanels=[];
+  // Shown: in the page, with no hidden ancestor (across shadow roots) and, where layout exists, a box on screen.
+  function panelShown(node){
+    if(!node || node.isConnected===false)return false;
+    for(var at=node;at;at=at.parentNode || at.host || null)if(at.hidden)return false;
+    return typeof node.getClientRects!=='function' || node.getClientRects().length>0;
+  }
+  function repaintStatus(api){statusPanels.forEach(function(p){if(p.api()===api)p.repaint();});}
+  function mount(host,role){
     if(host._panelMotionCleanup)host._panelMotionCleanup();
-    var doc=host.ownerDocument || document,live=true,offChange=null,offDestroy=null,offReady=null,api=null,epoch=0;
+    role=role==='controls'?'controls':'status';
+    var doc=host.ownerDocument || document,live=true,offChange=null,offDestroy=null,offReady=null,api=null,epoch=0,away=false;
     // The shared renderer may have replaced its shell since our previous mount.
-    if(!host._liveChildren || !host.querySelector('.dv-status-modes')){host.replaceChildren();host._liveChildren=Object.create(null);}
+    if(!host._liveChildren || !host.querySelector('.dv-status-header')){host.replaceChildren();host._liveChildren=Object.create(null);}
+    function controlsElsewhere(){return role==='status' && !!api && controlPanels.some(function(p){return p.api()===api && panelShown(p.host);});}
     function el(parent,tag,key,cls,text){
       var children=parent._liveChildren || (parent._liveChildren=Object.create(null)),node=children[key];
       if(node && node.tagName.toLowerCase()!==tag){node.remove();node=null;}
@@ -68,6 +83,7 @@
       var over=value && value.overTime,loading=!!(over && over.loading),controls=host._liveFocusControls || {};
       if(host._liveOverLoading && !loading && over && over.active){var slider=host.querySelector('input.dv-live-over-time-slider');if(slider && activeElement()===controls.overTime)slider.focus({preventScroll:true});}
       host._liveOverLoading=loading;
+      if(role==='controls')return;
       // A panel not in the page yet (a re-render still building) leaves the hand-off to the next paint. Focus moves
       // only while it is still on the pressed control (or another edit control) or nowhere (the body, or a removed
       // element after a re-render); a reader who moved on keeps their place. The edit notice is the last resort,
@@ -380,9 +396,9 @@
     function traceBody(value){
       // #1131: Env and the Metrics overlay switch are in the shared header, not here.
       var trace=value.trace,body=el(host,'div','trace-body','dv-live-panel-body dv-live-trace'),controls=el(body,'div','controls','dv-live-controls');
-      metricsLine(body,value.metrics || {available:false,enabled:false});
-      if(value.actionLabel)button(controls,'action','reader-button',value.actionLabel,'runAction');
-      controls.hidden=!value.actionLabel;
+      if(!away)metricsLine(body,value.metrics || {available:false,enabled:false});
+      if(value.actionLabel && !away)button(controls,'action','reader-button',value.actionLabel,'runAction');
+      controls.hidden=!value.actionLabel || away;
       // Open sections are keyed by the entry key and trace ID. A loaded trace's key carries its load token, so it is 'direct' and a Verify of it keeps them.
       // An example keeps them while its entry key is unchanged; a new selection token expires the selection instead.
       var shownTrace=trace.selected?JSON.stringify([trace.selected.manual?'direct':trace.selected.key,trace.selected.exemplar.traceId]):null;
@@ -676,8 +692,12 @@
     // #1131 (Chuck D1 D6 D8 D12): one header above the Jira and the Trace view. Top row: Jira | Trace, Env, Edit and the
     // Metrics overlay switch. Then Live | Over time, the Over time error and the day row. The Metrics connector line is not
     // here: each view draws it below its own button rows (metricsLine, #1162).
-    function sharedHeader(value){
+    // part: 'all', 'controls' (no Edit row; the Status controls panel) or 'edit' (only the Edit row; the Status panel
+    // while a Status controls panel is shown, #1371).
+    function sharedHeader(value,part){
       var header=el(host,'div','header','dv-status-header'),top=el(header,'div','top','dv-status-top'),trace=!!(value && value.mode==='trace');
+      host._liveFocusControls={};
+      if(part!=='edit'){
       // #1136: a board without ticket or epic references (snapshot().available false) has no Jira view, so no switch.
       var modes=el(top,'div','modes','dv-status-modes dv-status-segmented');modes.setAttribute('role','group');modes.setAttribute('aria-label','Status view');modes.hidden=!!(value && !value.available && trace);
       ['jira','trace'].forEach(function(mode){var count=value && value.trace?new Set(value.trace.entries.flatMap(function(e){return e.candidates.map(function(c){return c.traceId;});})).size:0;var control=button(modes,mode,'reader-button dv-status-mode',mode==='jira'?'Jira':'Trace'+(count?' · '+count:''),'setStatusMode');control._liveArgument=mode;control.setAttribute('aria-pressed',String((value && value.mode || 'jira')===mode));});
@@ -690,6 +710,8 @@
         environmentSelect.value=metrics.environment;
         if(!environmentSelect._liveChange){environmentSelect._liveChange=function(){var owner=host._livePanelApi;if(owner)owner.setMetricsEnvironment(environmentSelect.value);};environmentSelect.addEventListener('change',environmentSelect._liveChange);}
       }
+      }
+      if(part!=='controls'){
       // #828 shared-board Edit mode: Edit for editors, then a prominent Save N changes and Discard. On the top row, in both views, with or without tickets (#1136).
       var edit=value && value.edit || null,pending=edit?edit.pending:0,editing=!!(edit && edit.active),editRow=el(top,'div','edit','dv-live-edit-controls');
       var editControl=button(editRow,'edit','reader-button dv-live-edit','Edit','editStart');editControl.hidden=!(edit && edit.editable && !editing);editControl.disabled=!!(edit && (edit.blocked || edit.saving));
@@ -699,6 +721,8 @@
       var doneControl=button(editRow,'done','reader-button dv-live-edit-done','Done','editDone');doneControl.hidden=!(editing && !pending);
       host._liveFocusControls={edit:editControl,save:saveControl,discard:discardControl,done:doneControl};
       editRow.hidden=editControl.hidden && saveControl.hidden && discardControl.hidden && doneControl.hidden;
+      }
+      if(part==='edit')return;
       // Metrics (#939): an on/off switch, not a third view (D12). Shown only with a telemetry provider or demo, off by default, never persisted.
       var metricsSwitch=el(top,'button','metrics','dv-live-metrics');metricsSwitch.type='button';metricsSwitch.setAttribute('role','switch');metricsSwitch.setAttribute('aria-checked',String(!!metrics.enabled));metricsSwitch.hidden=!metrics.available;metricsSwitch._liveArgument=!metrics.enabled;
       el(el(metricsSwitch,'span','track','dv-live-switch-track'),'i','thumb','dv-live-switch-thumb').parentNode.setAttribute('aria-hidden','true');el(metricsSwitch,'span','label','','Metrics overlay');
@@ -753,9 +777,36 @@
         if(past && !trace && hasData)el(row,'p','note','dv-live-over-time-note','Status as of '+over.label+' · other columns show today').setAttribute('role','status');
       }
     }
+    // The Jira connector line: Demo and Snapshot name themselves here, with the refreshed time (#1371: in the Status
+    // controls panel when one is shown).
+    function connectionLine(parent,value){
+      var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo',snapshot:''}[conn.state];
+      var connection=el(parent,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
+      var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
+      el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[connWho,conn.checkedText].filter(Boolean).join(', '));
+      var gh=conn.github || {state:'none'},ghLabel={connecting:'GitHub connecting',connected:'GitHub connected',error:'GitHub did not answer'}[gh.state];
+      var github=el(connection,'span','github','dv-live-connection-github',ghLabel || '');github.setAttribute('data-state',gh.state);github.setAttribute('data-busy',String(!!gh.busy));github.hidden=!ghLabel;
+      connection.hidden=!(value && value.available) || conn.state==='none';
+      return {el:connection,who:connWho,conn:conn,github:ghLabel};
+    }
+    // #1371: the Status controls panel: the header's view controls, then the connector lines and the provider action.
+    function paintControls(value){
+      epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=activeElement();
+      sharedHeader(value,'controls');
+      var row=el(host,'div','status','dv-live-status dv-status-controls-status'),text=el(row,'div','text','dv-live-status-text');
+      var metrics=value && value.metrics || {available:false,enabled:false},connection=connectionLine(text,value).el,metricsConnection=metricsLine(text,metrics);
+      var actionLabel=(value && value.available || metrics.available) && value && value.actionLabel || '';
+      var action=button(row,'action','reader-button dv-live-action',actionLabel,'runAction');action.hidden=!actionLabel;
+      row.hidden=connection.hidden && metricsConnection.el.hidden && action.hidden;
+      sweep(host);
+      if(focused && host.contains(focused) && activeElement()!==focused && focused.focus)focused.focus({preventScroll:true});
+      settleFocus(value);
+    }
     function paint(value){
-      if(!live)return;epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=activeElement();host._liveFocusControls={};
-      sharedHeader(value);
+      if(!live)return;if(role==='controls'){paintControls(value);return;}
+      epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=activeElement();host._liveFocusControls={};
+      away=controlsElsewhere();
+      sharedHeader(value,away?'edit':'all');
       if(value && value.mode==='trace'){traceBody(value);sweep(host);revealTraceFocus();settleFocus(value);return;}
       stopListCap();
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
@@ -771,17 +822,12 @@
       missingCount.setAttribute('data-live-count','missing-work');missingCount.setAttribute('title','Authored nodes and connections marked as missing work; each occurrence counts.');missingCount.hidden=!hasData || !missingWork.count;
       states.forEach(function(state){var count=el(countRow,'span','count-'+state,'dv-live-count'+(hasData && value && value.enabled && value.counts[state]?' dv-live-'+state:''),state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
       var metrics=value && value.metrics || {available:false,enabled:false},proof=metrics.proof;
-      var conn=value && value.connection || {state:'none'},connLabel={disconnected:'not connected',approval:'needs approval',connecting:'connecting',connected:'connected',error:'error',demo:'demo',snapshot:''}[conn.state];
-      var connection=el(statusLine,'span','connection','dv-live-connection');connection.setAttribute('data-state',conn.state);connection.setAttribute('data-busy',String(!!conn.busy));connection.setAttribute('role','status');
-      var connWho=(conn.source || '')+(connLabel && connLabel!==String(conn.source || '').toLowerCase()?' '+connLabel:'');
-      el(connection,'i','dot','dv-live-connection-dot');el(connection,'span','text','',[connWho,conn.checkedText].filter(Boolean).join(', '));
-      var gh=conn.github || {state:'none'},ghLabel={connecting:'GitHub connecting',connected:'GitHub connected',error:'GitHub did not answer'}[gh.state];
-      var github=el(connection,'span','github','dv-live-connection-github',ghLabel || '');github.setAttribute('data-state',gh.state);github.setAttribute('data-busy',String(!!gh.busy));github.hidden=!ghLabel;
-      connection.hidden=!available || conn.state==='none';
-      var metricsConnection=metricsLine(statusLine,metrics);
+      // #1371: while a Status controls panel is shown, the connector lines are there, not here.
+      var line=away?{el:{hidden:true},who:'',conn:{},github:''}:connectionLine(statusLine,value),connection=line.el,connWho=line.who,conn=line.conn,ghLabel=line.github;
+      var metricsConnection=away?{el:{hidden:true},text:''}:metricsLine(statusLine,metrics);
       var note=el(statusLine,'span','note','dv-live-note',available?value.note.text:'');note.setAttribute('role','status');note.setAttribute('data-kind',value?value.note.kind:'info');note.hidden=!available || !value.note.text;
       var actionLabel=(available || metrics.available) && value && value.actionLabel || '';
-      var action=button(controls,'action','reader-button dv-live-action',actionLabel,'runAction');action.hidden=!actionLabel;
+      var action=button(controls,'action','reader-button dv-live-action',actionLabel,'runAction');action.hidden=!actionLabel || away;
       // #828 Edit mode: its buttons are in the shared header (#1136); its reason and notice are in this status row.
       var edit=available && value.edit || null,editing=!!(edit && edit.active);
       // A fixed slot and size, last in the row so a button appearing to its left cannot move it (#986). "No blockers" only when that is true: blockers off the current path, or with colors off, leave "First blocker" greyed out.
@@ -793,7 +839,7 @@
       var editNotice=el(statusLine,'span','edit-notice','dv-live-edit-notice',edit && edit.notice?edit.notice.text:'');editNotice.setAttribute('role','status');editNotice.setAttribute('data-kind',edit && edit.notice?edit.notice.kind:'info');editNotice.hidden=!editNotice.textContent;
       // #1253: the notice can take focus from script (tabindex -1, not a Tab stop) when an edit control has nothing to hand focus to.
       if(editNotice.textContent)editNotice.setAttribute('tabindex','-1');else editNotice.removeAttribute('tabindex');host._liveFocusControls.notice=editNotice;
-      controls.hidden=!actionLabel && !hasData;statusRow.hidden=(!available || !(hasData || value.note.text)) && !reason.textContent && !editNotice.textContent && metricsConnection.el.hidden || connection.hidden && metricsConnection.el.hidden && note.hidden && reason.hidden && editNotice.hidden;
+      controls.hidden=action.hidden && !hasData;statusRow.hidden=(!available || !(hasData || value.note.text)) && !reason.textContent && !editNotice.textContent && metricsConnection.el.hidden || connection.hidden && metricsConnection.el.hidden && note.hidden && reason.hidden && editNotice.hidden;
       head.hidden=controls.hidden && statusRow.hidden;
       // The tooltip repeats the whole status text.
       var statusText=[connection.hidden?'':[connWho,conn.checkedText].filter(Boolean).concat(ghLabel?[ghLabel]:[]).join(', '),metricsConnection.el.hidden?'':metricsConnection.text,note.textContent,reason.textContent,editNotice.textContent].filter(Boolean).join(' · ');
@@ -900,12 +946,23 @@
       if(focused && host.contains(focused) && activeElement()!==focused && focused.focus)focused.focus({preventScroll:true});
       settleFocus(value);
     }
-    function cleanup(){if(!live)return;live=false;stopFocusWatch();stopListCap();host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();}
+    /* #1371: each Status panel can be repainted when a Status controls panel appears, goes or is shown or hidden (a
+       ResizeObserver on its host sees display changes: the Panels menu, a View or a step hiding it). */
+    var entry={host:host,api:function(){return api;},repaint:function(){if(live && api)paint(api.snapshot());}},seen=null,watch=null,ending=false;
+    (role==='controls'?controlPanels:statusPanels).push(entry);
+    function controlsChanged(){var now=panelShown(host);if(now===seen)return;seen=now;if(api)repaintStatus(api);}
+    if(role==='controls' && typeof ResizeObserver!=='undefined'){watch=new ResizeObserver(controlsChanged);watch.observe(host);}
+    function cleanup(){if(!live)return;live=false;stopFocusWatch();stopListCap();
+      var list=role==='controls'?controlPanels:statusPanels,at=list.indexOf(entry);if(at>=0)list.splice(at,1);if(watch)watch.disconnect();
+      var owner=api;host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();
+      if(role==='controls' && owner && !ending)repaintStatus(owner);}
     host._panelMotionCleanup=cleanup;
-    function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(function(){var value=api.snapshot();value.metrics=Object.assign({},value.metrics,{proof:null,available:false,enabled:false});value.trace=Object.assign({},value.trace,{entries:[],selected:null,available:false,enabled:false});paint(value);cleanup();});}
+    function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(function(){var value=api.snapshot();value.metrics=Object.assign({},value.metrics,{proof:null,available:false,enabled:false});value.trace=Object.assign({},value.trace,{entries:[],selected:null,available:false,enabled:false});paint(value);ending=true;cleanup();});
+      if(role==='controls'){seen=panelShown(host);repaintStatus(api);}}
     var controller=typeof liveStatusControllerFor==='function'?liveStatusControllerFor(host):null;
     if(controller)connect(controller);else {paint(null);if(typeof liveStatusWhenReady==='function')offReady=liveStatusWhenReady(host,connect);}
   }
+  liveStatusPanelMount=mount;
   var LIVE_STYLES=String.raw`
 /* #1131: the header shared by the Jira and Trace views. Segments keep the reader's button look (#863); the selected one is filled. */
 .dv-status-header{display:flex;flex-direction:column;gap:8px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--explore-border)}
@@ -913,7 +970,7 @@
 .dv-live-metrics-connection>span{min-width:0;overflow-wrap:anywhere}
 /* #1162: in the Trace view the Metrics line sits directly under the controls row. */
 .dv-live-trace>.dv-live-metrics-connection{display:flex;margin:6px 0;font:11px/1.5 'IBM Plex Mono',monospace}
-.pt-live-status .dv-live-head .tbtn.dv-live-first[data-reserved]{visibility:hidden;}
+:is(.pt-live-status,.pt-status-controls) .dv-live-head .tbtn.dv-live-first[data-reserved]{visibility:hidden;}
 .dv-status-top{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .dv-status-segmented{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
 .dv-live-environment{display:inline-flex;align-items:center;gap:6px;font:11px/1.5 'IBM Plex Mono',monospace;color:var(--dtext)}
@@ -934,7 +991,7 @@
 @media(prefers-reduced-motion:reduce){.dv-live-switch-track,.dv-live-switch-thumb{transition:none}}
 .dv-status-header>.dv-live-over-time-status{margin:0;font:11px/1.5 'IBM Plex Mono',monospace}
 .dv-status-header>.dv-live-day-row{margin-top:0}
-.pt-live-status .dv-live-metrics-style .tbtn[aria-pressed="true"],.pt-live-status .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],.pt-live-status .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
+:is(.pt-live-status,.pt-status-controls) .dv-live-metrics-style .tbtn[aria-pressed="true"],:is(.pt-live-status,.pt-status-controls) .dv-status-modes .tbtn.dv-status-mode[aria-pressed="true"],:is(.pt-live-status,.pt-status-controls) .dv-live-trace .tbtn.dv-trace-candidate[aria-pressed="true"],:is(.pt-live-status,.pt-status-controls) .dv-live-trace .tbtn.dv-trace-show[aria-pressed="true"]{background:var(--dv-live-active);color:#fff;border-color:var(--dv-live-active)}
 .dv-live-trace{font-size:12px}.dv-live-trace p{margin:6px 0;overflow-wrap:anywhere}.dv-trace-mode-status:empty{display:none}
 .dv-trace-direct{border:1px solid var(--explore-border);border-radius:6px;padding:10px;margin:10px 0}.dv-trace-input-label{display:grid;gap:4px;margin:8px 0}.dv-trace-check-label{display:flex;align-items:center;gap:6px;margin:8px 0}.dv-trace-input{box-sizing:border-box;width:100%;min-width:0;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);border-radius:4px;padding:6px}.dv-trace-arguments{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:10px}.dv-trace-direct-report{padding:8px;border:1px solid var(--explore-border);margin-top:8px}
 .dv-trace-config>summary,.dv-trace-time>summary,.dv-trace-diagnostics>summary{cursor:pointer;overflow-wrap:anywhere}.dv-trace-config-action{margin-left:.4em;color:var(--dfaint)}.dv-trace-request{margin:6px 0}.dv-trace-request>summary{cursor:pointer;overflow-wrap:anywhere;font-weight:600}.dv-trace-log-search{margin:8px 0;padding:8px;border:1px solid var(--explore-border);border-radius:6px;min-width:0}.dv-trace-log-search-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 8px;min-width:0}.dv-trace-log-search-controls>.dv-trace-input-label{flex:1 1 160px;min-width:0;margin:0}.dv-trace-log-label{font-weight:600;overflow-wrap:anywhere}.dv-trace-log-find[aria-busy=true]{cursor:progress}.dv-trace-time{margin:10px 0}.dv-trace-diagnostics{margin:6px 0}.dv-trace-report-compact{border:0;padding:0;margin:6px 0}.dv-trace-direct>.dv-live-controls{margin-top:6px}
@@ -988,10 +1045,10 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-live-note[data-kind="warn"],.dv-live-note[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-over-time-status{color:var(--dv-live-blocked);}
 /* Amber marks "not live": no ticket status uses it. */
-.pt-live-status{--dv-live-past:#f5a524;}
-.pt-live-status .dv-live-time .tbtn.dv-live-toggle[aria-pressed="true"],.pt-live-status .dv-live-time .tbtn.dv-live-toggle[aria-pressed="true"]:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#000;}
-.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls) .tbtn:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;}
-.pt-live-status .dv-live-time .tbtn.dv-live-over-time[aria-pressed="true"],.pt-live-status .dv-live-time .tbtn.dv-live-over-time[aria-pressed="true"]:hover{background:var(--dv-live-past);border-color:var(--dv-live-past);color:#2b1a00;}
+:is(.pt-live-status,.pt-status-controls){--dv-live-past:#f5a524;}
+:is(.pt-live-status,.pt-status-controls) .dv-live-time .tbtn.dv-live-toggle[aria-pressed="true"],:is(.pt-live-status,.pt-status-controls) .dv-live-time .tbtn.dv-live-toggle[aria-pressed="true"]:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#000;}
+:is(.pt-live-status,.pt-status-controls) :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls) .tbtn:focus-visible{outline:2px solid var(--dink,currentColor);outline-offset:3px;}
+:is(.pt-live-status,.pt-status-controls) .dv-live-time .tbtn.dv-live-over-time[aria-pressed="true"],:is(.pt-live-status,.pt-status-controls) .dv-live-time .tbtn.dv-live-over-time[aria-pressed="true"]:hover{background:var(--dv-live-past);border-color:var(--dv-live-past);color:#2b1a00;}
 .dv-live-day-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:10px;font:11px/1.4 'IBM Plex Mono',monospace;color:var(--dtext);font-variant-numeric:tabular-nums;}
 .dv-live-over-time-row{padding:8px 12px;border-left:3px solid var(--dv-live-past);border-radius:4px;background:color-mix(in srgb,var(--dv-live-past) 14%,transparent);}
 .dv-live-step{min-width:34px;text-align:center;}
@@ -1106,14 +1163,14 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-live-none{color:var(--dfaint);}
 .dv-live-suggest{margin:8px 0 0;font:11px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint);}
 /* Save keeps its fill over every theme's tbtn rules, hover included. */
-.pt-live-status .dv-live-edit-controls .tbtn.dv-live-save,.pt-live-status .dv-live-edit-controls .tbtn.dv-live-save:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;font-weight:700;}
-.pt-live-status .dv-live-edit-controls .tbtn.dv-live-save:disabled{opacity:.7;}
+:is(.pt-live-status,.pt-status-controls) .dv-live-edit-controls .tbtn.dv-live-save,:is(.pt-live-status,.pt-status-controls) .dv-live-edit-controls .tbtn.dv-live-save:hover{background:var(--dv-live-active);border-color:var(--dv-live-active);color:#fff;font-weight:700;}
+:is(.pt-live-status,.pt-status-controls) .dv-live-edit-controls .tbtn.dv-live-save:disabled{opacity:.7;}
 /* Fixed slot and size: the width of the longer label, plus the button's padding and border (#986). */
-.pt-live-status .dv-live-head .tbtn.dv-live-first{margin-left:auto;width:calc(13ch + 24px);text-align:center;}
-.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls,.dv-live-day-row) .tbtn:is(:disabled,[aria-disabled="true"]){opacity:.5;cursor:default;}
-.pt-live-status :is(.dv-live-time,.dv-live-edit-controls) .tbtn[aria-disabled="true"]{cursor:progress;}
+:is(.pt-live-status,.pt-status-controls) .dv-live-head .tbtn.dv-live-first{margin-left:auto;width:calc(13ch + 24px);text-align:center;}
+:is(.pt-live-status,.pt-status-controls) :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls,.dv-live-day-row) .tbtn:is(:disabled,[aria-disabled="true"]){opacity:.5;cursor:default;}
+:is(.pt-live-status,.pt-status-controls) :is(.dv-live-time,.dv-live-edit-controls) .tbtn[aria-disabled="true"]{cursor:progress;}
 /* Paper has no controls: print hides these buttons as it hides the reader's other tbtn controls. */
-@media print{.pt-live-status :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls,.dv-live-day-row) .tbtn,.pt-live-status :is(.dv-live-metrics,.dv-live-metrics-refresh,.dv-live-environment){display:none;}}
+@media print{:is(.pt-live-status,.pt-status-controls) :is(.dv-live-head,.dv-live-time,.dv-live-edit-controls,.dv-live-day-row) .tbtn,:is(.pt-live-status,.pt-status-controls) :is(.dv-live-metrics,.dv-live-metrics-refresh,.dv-live-environment){display:none;}}
 .dv-live-edit-reason,.dv-live-edit-notice{flex-basis:100%;font:12px/1.5 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .dv-live-edit-notice[data-kind="warn"],.dv-live-edit-notice[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-draggable{cursor:grab;}
@@ -1124,9 +1181,9 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-live-missing-source{margin:6px 0;}
 .dv-live-tickets .dv-live-state-pill{color:var(--dv-live-color,inherit);white-space:nowrap;}
 
-.pwidget.pt-live-status{display:flex;flex-direction:column}
-.pt-live-status>.ptitle{flex:none}
-.pt-live-status .pbody{flex:1;min-width:0;min-height:0;overflow:auto;color:var(--dtext);font:13px/1.5 'IBM Plex Sans',sans-serif}
+.pwidget:is(.pt-live-status,.pt-status-controls){display:flex;flex-direction:column}
+:is(.pt-live-status,.pt-status-controls)>.ptitle{flex:none}
+:is(.pt-live-status,.pt-status-controls) .pbody{flex:1;min-width:0;min-height:0;overflow:auto;color:var(--dtext);font:13px/1.5 'IBM Plex Sans',sans-serif}
 .dv-live-head{display:flex;flex-direction:column;gap:6px;padding-bottom:10px;border-bottom:1px solid var(--explore-border);font:11px/1.5 'IBM Plex Mono',monospace}
 .dv-live-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
 .dv-live-head>.dv-live-controls{flex-wrap:nowrap;align-items:flex-start;}
@@ -1140,7 +1197,7 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-live-status-text>*{flex:0 1 auto;min-width:0;overflow-wrap:anywhere;}
 .dv-live-connection>span{min-width:0;overflow-wrap:anywhere;}
 .dv-live-controls[hidden],.dv-live-status[hidden]{display:none!important;}
-.pt-live-status [hidden]{display:none!important}
+:is(.pt-live-status,.pt-status-controls) [hidden]{display:none!important}
 .dv-live-panel-body{min-width:0;color:var(--dtext)}
 .dv-live-panel-body h3,.dv-live-offline h3{margin:18px 0 8px;font:600 14px/1.4 'IBM Plex Sans',sans-serif;color:var(--dink)}
 .dv-live-offline-note{margin:0 0 4px;color:var(--dtext);font:12px/1.5 'IBM Plex Sans',sans-serif}
@@ -1150,7 +1207,7 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-live-agent-guide{margin:12px 0 0;font:11px/1.5 'IBM Plex Sans',sans-serif;color:var(--dfaint)}
 .dv-live-ring-done{transition:stroke-dasharray .3s ease}
 @media(prefers-reduced-motion:reduce){.dv-live-ring-done{transition:none;animation:none}}
-@media print{.pt-live-status .pbody,.dv-live-tickets-scroll{overflow:visible;max-height:none}.dv-live-ring-done{transition:none;animation:none}}
+@media print{:is(.pt-live-status,.pt-status-controls) .pbody,.dv-live-tickets-scroll{overflow:visible;max-height:none}.dv-live-ring-done{transition:none;animation:none}}
 `;
   PanelRegistry.define('live-status',{
     label:'Live status',since:'0.2.0',

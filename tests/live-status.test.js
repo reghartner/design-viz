@@ -5222,7 +5222,7 @@ test('#1280 Edit-mode span dragging caps the list; a focused row scrolls inside 
 });
 /* #1280 review c5 (probe C5): the Edit-mode cap's resize and scroll listeners exist only while the cap is on; turning it
    off and destroying the panel remove them, so three boards built and destroyed leave none behind. */
-test('#1280 the Edit-mode cap listeners exist only while the cap is on and are gone after destroy',async()=>{
+test('#1280 #1411 the Edit-mode cap listeners exist only while the cap is on and are gone after destroy',async()=>{
  const counting=()=>({listeners:new Map(),
   addEventListener(type,fn,capture){const key=type+(capture?':capture':'');if(!this.listeners.has(key))this.listeners.set(key,new Set());this.listeners.get(key).add(fn);},
   removeEventListener(type,fn,capture){const key=type+(capture?':capture':'');if(this.listeners.has(key))this.listeners.get(key).delete(fn);},
@@ -5234,8 +5234,9 @@ test('#1280 the Edit-mode cap listeners exist only while the cap is on and are g
   const b=mapBoard({editor}),view=counting();b.h.doc.defaultView=view;views.push(view);
   assert.ok(await b.api.loadDirectTrace(false));b.h.flush();
   assert.ok(b.m.body.querySelector('.dv-trace-waterfall').classList.contains('dv-trace-waterfall-edit'),'the cap is on');
-  assert.deepEqual([...view.listeners.keys()].sort(),['resize','scroll:capture']);assert.equal(view.count(),2,'one resize and one scroll listener while the cap is on');
-  if(i===0){active=false;b.api.setTraceShow(false);b.api.setTraceShow(true);b.h.flush();assert.equal(view.count(),0,'the cap turning off removes them');active=true;}
+  // #1411: the Trace view's page cap (the panel ends at the window's bottom) has its own resize and scroll listener.
+  assert.deepEqual([...view.listeners.keys()].sort(),['resize','scroll:capture']);assert.equal(view.count(),4,'one resize and one scroll listener each for the Edit-mode cap and the page cap');
+  if(i===0){active=false;b.api.setTraceShow(false);b.api.setTraceShow(true);b.h.flush();assert.equal(view.count(),2,'the Edit cap turning off removes its two; the page cap keeps its two while the Trace view shows');active=true;}
   b.api.destroy();assert.equal(view.count(),0,'destroy removes them');
  }
  assert.equal(views.reduce((n,v)=>n+v.count(),0),0,'none left after three boards');

@@ -2669,13 +2669,16 @@ trace** are icons at the right end of the request line, outside its summary, wit
 those accessible names. The request card also holds **Pin as evidence**, **Source
 and limitations** and **All operation mappings**. A header row, "Spans · 55 · click
 a span to focus it on the diagram", sits above the span list. The list has no
-scroll bar of its own: it is as tall as its spans (#1280). In a section layout the
-Live status tile grows with it, so the page scrolls instead. A focused span's detail
+scroll bar of its own: it is as tall as its spans (#1280). The panel stays on the
+page next to the diagram (#1411): in the Trace view the Status panel ends at the
+window's bottom on every surface, and its body (span list, focused-span detail, log
+search results, request details) scrolls inside it. The page does not scroll for
+the trace. A focused span's detail
 (duration, service, operation, the matched step or the step choices, **Clear trace
 focus**) opens directly under its row. A span the reader focuses (a row, a step
-choice, or the log line it was loaded from) is scrolled into view by the least page
-scroll. A focus nobody asked for, such as the failed span focused when a trace loads
-or a focus kept across an Edit-mode change, never scrolls the page.
+choice, or the log line it was loaded from) is scrolled into view by the least
+scroll of the panel body. A focus nobody asked for, such as the failed span focused
+when a trace loads or a focus kept across an Edit-mode change, never scrolls the page.
 
 Each annotated node or uniquely matched edge gets one label from its rows: one row per
 step on the current path whose `traceMatch` names it (#1154). Connection timing (#1196):

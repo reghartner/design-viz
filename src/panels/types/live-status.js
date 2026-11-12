@@ -663,6 +663,32 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
       };
       watch._view=view;view.addEventListener('resize',watch);view.addEventListener('scroll',watch,true);
     }
+    /* #1411 (Chuck 2026-11-12: "stay ON THE PAGE so it's always next to the diagram"): in the Trace view the panel card is
+       capped from its top to the window's bottom and its body scrolls inside it, on every surface (no section layout, a
+       section layout tile that grows to its content, an Explore window, the Workbench preview). The top is measured on each
+       paint and, once per frame, after a resize or any scroll; the listeners exist only while the Trace view is shown. */
+    function measurePageCap(card){
+      if(!card.getBoundingClientRect || !card.style || !card.style.setProperty)return;
+      var view=doc.defaultView || (typeof window!=='undefined'?window:null),top=Math.round(Math.max(pageTop(view),card.getBoundingClientRect().top))+'px';if(card._livePageTop===top)return;
+      card._livePageTop=top;card.style.setProperty('--dv-live-card-top',top);
+    }
+    function pageCap(on){
+      var card=host.parentElement,view=doc.defaultView,watch=host._livePageWatch;
+      if(!on || !card || !card.classList){
+        if(host.classList)host.classList.remove('dv-live-on-page-body');
+        if(card && card.classList && card.classList.contains('dv-live-on-page')){card.classList.remove('dv-live-on-page');card.style.removeProperty('--dv-live-card-top');card._livePageTop=null;}
+        if(watch){host._livePageWatch=null;watch._view.removeEventListener('resize',watch);watch._view.removeEventListener('scroll',watch,true);}
+        return;
+      }
+      card.classList.add('dv-live-on-page');host.classList.add('dv-live-on-page-body');measurePageCap(card);
+      if(watch || !view || !view.addEventListener)return;
+      var frame=view.requestAnimationFrame?function(f){view.requestAnimationFrame(f);}:function(f){view.setTimeout(f,16);},queued=false;
+      watch=host._livePageWatch=function(){
+        if(queued)return;queued=true;
+        frame(function(){queued=false;var c=host.parentElement;if(live && host._livePageWatch===watch && c && c.isConnected)measurePageCap(c);});
+      };
+      watch._view=view;view.addEventListener('resize',watch);view.addEventListener('scroll',watch,true);
+    }
     function stopListCap(){
       var watch=host._traceCapWatch;host._traceCapList=null;if(!watch)return;host._traceCapWatch=null;
       watch._view.removeEventListener('resize',watch);watch._view.removeEventListener('scroll',watch,true);
@@ -834,8 +860,8 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
       epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=activeElement();host._liveFocusControls={};
       away=controlsElsewhere();
       sharedHeader(value,away?'edit':'all');
-      if(value && value.mode==='trace'){traceBody(value);sweep(host);revealTraceFocus();settleFocus(value);return;}
-      stopListCap();
+      if(value && value.mode==='trace'){traceBody(value);sweep(host);pageCap(true);revealTraceFocus();settleFocus(value);return;}
+      stopListCap();pageCap(false);
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
       // #986/#1162: the first row is the counts, then the provider action, then First blocker in a fixed slot at its top right, so
       // neither changing counts nor a button appearing can move it. The counts wrap onto more lines so every one shows in full;
@@ -985,7 +1011,7 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
     function controlsChanged(){var now=panelShown(host);if(now===seen)return;seen=now;if(api)repaintStatus(api);}
     entry.check=controlsChanged;
     if(role==='controls' && typeof ResizeObserver!=='undefined'){watch=new ResizeObserver(controlsChanged);watch.observe(host);}
-    function cleanup(){if(!live)return;live=false;stopFocusWatch();stopListCap();
+    function cleanup(){if(!live)return;live=false;stopFocusWatch();stopListCap();pageCap(false);
       var list=role==='controls'?controlPanels:statusPanels,at=list.indexOf(entry);if(at>=0)list.splice(at,1);if(watch)watch.disconnect();
       var owner=api;host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();
       if(role==='controls' && owner && !ending)repaintStatus(owner,[entry]);}
@@ -1031,6 +1057,10 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}.dv-trace-log-report>.dv-trace-direct-report{margin-top:0}.dv-trace-log-row:has(+.dv-trace-log-report){border-bottom:0}
 .dv-trace-selected{min-width:0}.dv-trace-slot{margin:10px 0;min-width:0}.dv-trace-slot-hint{margin:0;padding:10px;border:1px dashed var(--explore-border);border-radius:6px;color:var(--dfaint);font-size:11px}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
+/* #1411: the Trace view keeps the panel on the page (pageCap): the card ends at the window's bottom and its body scrolls. The
+   card's own min-height (a section layout tile that grows to its content) gives way, so the card can be shorter than its tile. */
+.docview .pwidget.pt-live-status.dv-live-on-page,.docview .section-layout-tile>.pwidget.pt-live-status.dv-live-on-page{display:flex;flex-direction:column;box-sizing:border-box;min-height:0;max-height:max(200px,calc(100vh - var(--dv-live-card-top,0px) - 8px))}
+.docview .pwidget.pt-live-status.dv-live-on-page>.ptitle{flex:none}.docview .pwidget.pt-live-status.dv-live-on-page>.pbody.dv-live-on-page-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior-y:contain}
 .dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall.dv-trace-waterfall-edit{max-height:max(240px,calc(100vh - var(--dv-trace-list-top,200px) - 16px));overflow:auto}.dv-trace-waterfall{margin:0 0 12px;border:1px solid var(--explore-border);border-top:0;border-radius:0 0 6px 6px;padding:0 8px 8px}
 .dv-trace-span{width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;align-items:center;padding:5px 0;font-size:10px}.dv-trace-span[aria-pressed="true"]{background:color-mix(in srgb,var(--dv-live-active) 10%,transparent)}.dv-trace-span:focus-visible{outline:2px solid var(--dv-live-active)}.dv-trace-operation-detail{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;gap:6px;margin-top:12px;padding:8px;border:1px solid var(--explore-border);border-radius:6px}.dv-trace-operation-detail>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}.dv-trace-operation-detail small{grid-column:1/-1}.dv-trace-duration{font:700 13px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}.dv-trace-span .dv-trace-duration{grid-column:2;grid-row:1;white-space:nowrap}.dv-trace-operation-detail .dv-trace-duration{font-size:20px;line-height:1.4}.dv-trace-span-name{grid-column:1;grid-row:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-track{grid-column:1/-1;grid-row:2;height:10px;background:color-mix(in srgb,var(--dink) 7%,transparent)}.dv-trace-bar{display:block;box-sizing:border-box;max-width:100%;height:10px;background:var(--dv-live-active)}.dv-trace-span[data-error="true"] .dv-trace-bar{background:var(--dv-live-blocked)}
 .dv-trace-mappings{display:grid;gap:5px}.dv-trace-mapping{display:grid;grid-template-columns:1fr auto;gap:2px 8px;border-left:3px solid var(--dfaint);padding:5px 8px}.dv-trace-mapping small{grid-column:1/-1;color:var(--dfaint)}.dv-trace-mapping[data-tone="error"]{border-color:var(--dv-live-blocked)}.dv-trace-mapping[data-tone="warning"]{border-color:#d49620}

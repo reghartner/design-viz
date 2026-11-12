@@ -44,6 +44,8 @@ test('grid columns in Inspect have plain visible and accessible labels, also aft
   await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);
 
   // Starting-state fields are named by their plain label, not the spec key.
+  // Undo may leave Inspect without a selection; select the panel again.
+  await inspectPageElement(page,root.locator('.pt-grid .ptitle'));
   const initial=guide.locator('.initialedit');await openInspectorGroup(initial);
   await expect(initial.getByLabel('Cell values',{exact:true})).toHaveCount(1);
   await expect(initial.getByLabel('cells',{exact:true})).toHaveCount(0);

@@ -145,6 +145,8 @@ var FlowTopology = (function(){
         if(!object(entry))return;
         var current=object(target[key])?target[key]:{};
         if(rules.entry)rules.entry(field,current,entry);
+        // rules.patch(field, current, patch) may return the patch to apply; the authored overlay is never changed.
+        if(rules.patch)entry=rules.patch(field,current,entry);
         var merged=patchFields(current,entry);
         if(Object.keys(merged).length)target[key]=merged;else delete target[key];
       });
@@ -161,8 +163,41 @@ var FlowTopology = (function(){
     entry:function(field,current,patch){
       if(field!=='signals' || !TELEMETRY_SOURCES.some(function(source){return patch[source]!=null;}))return;
       TELEMETRY_SOURCES.forEach(function(source){if(!own(patch,source))delete current[source];});
+    },
+    // #1348: narrow appends to the inherited fragments and needsNarrow only adds up; neither can be
+    // removed. A board that narrows an inherited signal no longer gets the provider's query link
+    // (it opens the unnarrowed query) unless it sets its own.
+    patch:function(field,current,patch){
+      if(field!=='signals' || !(own(patch,'narrow') || own(patch,'needsNarrow')))return patch;
+      var out=Object.assign({},patch);
+      if(own(patch,'narrow')){
+        var merged=telemetryNarrowMerge(current.narrow,patch.narrow);
+        if(merged)out.narrow=merged;else delete out.narrow;
+        var adds=telemetryNarrowMerge(null,patch.narrow);
+        if(adds && object(current.links) && own(current.links,'query') && !(object(patch.links) && own(patch.links,'query'))){
+          var links=Object.assign({},current.links,object(patch.links)?patch.links:{});delete links.query;
+          out.links=Object.keys(links).length?links:null;
+        }
+      }
+      if(own(patch,'needsNarrow')){var needs=telemetryNeedsMerge(current.needsNarrow,patch.needsNarrow);if(needs)out.needsNarrow=needs;else delete out.needsNarrow;}
+      return out;
     }};
-  function mergeTelemetry(inherited,overlay){return mergeOverlay(inherited,overlay,TELEMETRY_OVERLAY_RULES);}
+  function mergeTelemetry(inherited,overlay){
+    var out=mergeOverlay(inherited,overlay,TELEMETRY_OVERLAY_RULES);
+    // #1353: the carrier's query link opens the provider's query too; a board that narrows a signal
+    // here no longer gets it, unless it sets its own.
+    var narrows=object(overlay) && object(overlay.signals) && Object.keys(overlay.signals).some(function(name){var p=overlay.signals[name];return object(p) && !!telemetryNarrowMerge(null,p.narrow);});
+    if(narrows && object(out.links) && own(out.links,'query') && !(object(overlay.links) && own(overlay.links,'query'))){
+      delete out.links.query;if(!Object.keys(out.links).length)delete out.links;
+    }
+    return out;
+  }
+  // #1353: what the provider carrier asks every board to narrow by, over all its signals (true wins).
+  function telemetryCarrierNeeds(binding){
+    var needs=object(binding)?telemetryNeedsMerge(null,binding.needsNarrow):null,signals=object(binding) && object(binding.signals)?binding.signals:{};
+    Object.keys(signals).forEach(function(name){if(object(signals[name]))needs=telemetryNeedsMerge(needs,signals[name].needsNarrow);});
+    return needs;
+  }
   // #1290: trace spans always merge. A span names spans one way, so a patch that sets
   // operation removes an inherited operationPrefix and the reverse.
   var TRACE_OVERLAY_RULES={hide:'spans',fields:{spans:'entries'},
@@ -188,11 +223,20 @@ var FlowTopology = (function(){
   var TELEMETRY_ITEM_NAMES={filters:['filter','filters'],calculations:['calculation','calculations'],breakdowns:['breakdown','breakdowns'],logGroups:['log group','log groups'],orders:['order','orders'],havings:['having','havings']};
   function telemetryItem(key,x){
     if(typeof x==='string' || typeof x==='number')return String(x);
-    if(object(x) && key==='filters' && typeof x.column==='string')return x.column+(x.op!=null?' '+x.op:'')+(x.value!==undefined?' '+(Array.isArray(x.value)?x.value.join(', '):String(x.value)):'');
-    if(object(x) && typeof x.op==='string')return x.op+(typeof x.column==='string'?'('+x.column+')':'');
+    if(!object(x))return telemetryCanonical(x);
+    function shown(v){return Array.isArray(v)?'['+v.join(', ')+']':String(v);}
+    function calc(op,column){return op+(typeof column==='string'?'('+column+')':'');}
+    if(key==='filters' && typeof x.column==='string')return x.column+(x.op!=null?' '+x.op:'')+(x.value!==undefined?' '+shown(x.value):'');
+    if(key==='havings' && typeof x.calculate_op==='string')return calc(x.calculate_op,x.column)+(x.op!=null?' '+x.op:'')+(x.value!==undefined?' '+shown(x.value):'');
+    if(key==='orders' && (typeof x.op==='string' || typeof x.column==='string'))return (typeof x.op==='string'?calc(x.op,x.column):x.column)+(typeof x.order==='string'?' '+x.order:'');
+    if(typeof x.op==='string')return calc(x.op,x.column);
     return telemetryCanonical(x);
   }
-  function telemetryList(items){return items.length>1?items.slice(0,-1).join(', ')+' and '+items[items.length-1]:items[0];}
+  // More than three names read "a, b, c and N more".
+  function telemetryList(items){
+    if(items.length>3)return items.slice(0,3).join(', ')+' and '+(items.length-3)+' more';
+    return items.length>1?items.slice(0,-1).join(', ')+' and '+items[items.length-1]:items[0];
+  }
   function telemetryLeftOut(inherited,patch){
     var out={absent:[],changed:[]};
     Object.keys(inherited).forEach(function(key){
@@ -215,6 +259,12 @@ var FlowTopology = (function(){
     Object.keys(patches).forEach(function(name){
       var patch=patches[name],was=have[name];
       if(!object(patch) || !object(was))return;
+      // #1348: no widening. A null for an inherited narrowing, or for needsNarrow, is ignored.
+      var inheritedNarrow=telemetryNarrowMerge(was.narrow,null);
+      if(own(patch,'narrow') && inheritedNarrow && (patch.narrow===null || object(patch.narrow) && Object.keys(inheritedNarrow).some(function(k){return own(patch.narrow,k) && patch.narrow[k]===null;})))
+        note('warning','.signals.'+name+'.narrow','signal '+name+' on '+carrier+': a board cannot remove a narrowing the provider set — ignored');
+      if(own(patch,'needsNarrow') && was.needsNarrow!=null && (patch.needsNarrow===null || patch.needsNarrow===false))
+        note('warning','.signals.'+name+'.needsNarrow','signal '+name+' on '+carrier+': a board cannot drop the provider\'s needsNarrow — ignored');
       var to=TELEMETRY_SOURCES.filter(function(s){return patch[s]!=null;})[0],from=TELEMETRY_SOURCES.filter(function(s){return was[s]!=null;})[0];
       if(!to || !from)return;
       var at='.signals.'+name+'.'+to,who='signal '+name+' on '+carrier+': ',label=TELEMETRY_SOURCE_NAMES[to];
@@ -225,7 +275,7 @@ var FlowTopology = (function(){
       else note('note',at,who+'this '+label+' patch replaces the provider\'s whole query; later provider changes to it no longer reach this board');
     });
   }
-  function applyTracking(value,addition,note,carrier){
+  function applyTracking(value,addition,note,carrier,templates){
     if(!addition)return;
     if(addition.missingWork===true)value.missingWork=true;
     if(addition.existsWhen==='tickets-done')value.existsWhen=addition.existsWhen;
@@ -235,11 +285,29 @@ var FlowTopology = (function(){
     // #1266: an `extends` overlay merges with the inherited binding; any other consumer binding
     // replaces it (the original rule, so existing documents keep their meaning).
     if(own(addition,'telemetry')){
-      if(!telemetryMergeOverlay(addition.telemetry))value.telemetry=clone(addition.telemetry);
+      if(!telemetryMergeOverlay(addition.telemetry)){
+        // A replacing binding keeps what the provider carrier asks boards to narrow by (#1353): it
+        // belongs to the canon carrier, not to the query text, so each signal written here keeps it.
+        var needs=telemetryCarrierNeeds(value.telemetry);
+        value.telemetry=clone(addition.telemetry);
+        // Kept on the binding, so it also reaches signals a consumer template writes when it is expanded.
+        if(needs && object(value.telemetry)){
+          value.telemetry.needsNarrow=telemetryNeedsMerge(value.telemetry.needsNarrow,needs);
+          var written=telemetryExpand(value.telemetry,templates || {},null),names=written && object(written.signals)?Object.keys(written.signals):[];
+          if(note)note('warning','','this binding replaces the provider\'s on '+carrier+', whose signals must be narrowed'+(needs===true?'':' by '+telemetryList(needs))+'; '+(names.length?(names.length>1?'its signals ':'its signal ')+telemetryList(names)+(names.length>1?' keep':' keeps'):'each signal here keeps')+' that requirement');
+        }
+      }
       else{
         if(note)telemetryPatchFindings(value.telemetry,addition.telemetry,carrier,note);
         // Hiding every signal leaves no binding for this consumer: the carrier is quietly unbound.
+        var carrierNeeds=telemetryCarrierNeeds(value.telemetry),inheritedSignals=object(value.telemetry) && object(value.telemetry.signals)?value.telemetry.signals:{};
         var merged=mergeTelemetry(value.telemetry,addition.telemetry);
+        // A signal this overlay adds keeps the carrier's needsNarrow too (#1353): it belongs to the canon carrier.
+        if(carrierNeeds && object(merged.signals) && object(addition.telemetry.signals))Object.keys(addition.telemetry.signals).forEach(function(name){
+          if(own(inheritedSignals,name) || !object(merged.signals[name]))return;
+          merged.signals[name].needsNarrow=telemetryNeedsMerge(merged.signals[name].needsNarrow,carrierNeeds);
+          if(note)note('warning','.signals.'+name,'this signal is added to the provider\'s binding on '+carrier+', whose signals must be narrowed'+(carrierNeeds===true?'':' by '+telemetryList(carrierNeeds))+'; it keeps that requirement');
+        });
         if(object(merged.signals) && Object.keys(merged.signals).length)value.telemetry=merged;else delete value.telemetry;
       }
     }
@@ -455,6 +523,8 @@ var FlowTopology = (function(){
           if(sources.some(function(other){return other.d!==provider;}))fail(where,'cannot merge exports from different provider sections; use separate imports and namespaces');
           var exp=Array.isArray(imp.export)?mergeExports(provider,names):clone(source.exp),nodes=provider.nodes || {};
           var providerTemplates=trackingTelemetry(byId.get(imp.spec).page).templates;
+          // The importing page's own templates, to name the signals a replacing `use` binding writes (#1353).
+          var consumerTemplates=trackingTelemetry(spec.page).templates;
           var providerRecord=typeof sectionRecords==='function'?sectionRecords(byId.get(imp.spec).page).find(function(record){return record.section.diagram===provider;}):null;
           var providerAt=(providerRecord?providerRecord.path:'section')+'.diagram';
           function dropped(kind,id,path){return function(problem){drops.push({kind:kind,id:id,spec:imp.spec,path:path+'.telemetry'+problem.path,message:problem.message});};}
@@ -497,7 +567,7 @@ var FlowTopology = (function(){
               else {if(value.handoff!=null)fail(where,'nodeDetails '+key+' conflicts with its inherited handoff');value.detail=clone(imp.nodeDetails[key]);}
             }
             if(own(imp.nodeCodeRefs || {},key))value.codeRefs=(value.codeRefs || []).concat(clone(imp.nodeCodeRefs[key]));
-            inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));applyTracking(value,(imp.nodeTracking || {})[key],telemetryNoted('nodeTracking',key),'node '+key);
+            inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));applyTracking(value,(imp.nodeTracking || {})[key],telemetryNoted('nodeTracking',key),'node '+key,consumerTemplates);
             inheritTrace(value,(imp.nodeTracking || {})[key],'node',spec,byId.get(imp.spec),traceDropped('nodes',prefix+key,providerAt+'.nodes.'+key),traceNoted('nodeTracking',key),referenceLit.nodes.indexOf(prefix+key)>=0?referenceSpans:null);
             if(imp.presentation)value.presentation=imp.presentation;
             Object.keys((imp.nodeOverrides || {})[key] || {}).forEach(function(field){var override=imp.nodeOverrides[key][field];if(override===null)delete value[field];else value[field]=clone(override);});
@@ -526,7 +596,7 @@ var FlowTopology = (function(){
           exp.edges.forEach(function(key){
             var matches=(provider.edges || []).filter(function(e){return e && edgeKey(e)===key;});
             if(matches.length!==1)fail(where,'missing or ambiguous exported edge '+key);
-            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));applyTracking(edge,(imp.edgeTracking || {})[key],telemetryNoted('edgeTracking',key),'connection '+key);
+            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));applyTracking(edge,(imp.edgeTracking || {})[key],telemetryNoted('edgeTracking',key),'connection '+key,consumerTemplates);
             inheritTrace(edge,(imp.edgeTracking || {})[key],'edge',spec,byId.get(imp.spec),traceDropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'),traceNoted('edgeTracking',key),referenceLit.edges.indexOf(importedEdge(key))>=0?referenceSpans:null);
             if(imp.presentation)edge.presentation=imp.presentation;
             if(!selected.has(edge.from) || !selected.has(edge.to))fail(where,'exported edge '+key+' must include both endpoints in exported nodes');

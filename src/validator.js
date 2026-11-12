@@ -879,14 +879,21 @@ function validate(page){
   trackingDependencyLinks(page,function(index){warnings.push('tracking.jira.dependencyLinks'+(index===null?': must be an array of Jira link descriptions such as "is blocked by" — using the defaults':'['+index+']: use a non-empty link description — entry ignored'));});
   // Telemetry bindings (#937): page config, then every carrier and consumer overlay
   // with the page's templates. Warnings only; invalid entries are ignored.
-  var telemetry=trackingTelemetry(page,function(path,message){warnings.push('tracking.telemetry'+path+': '+message);}),hasTelemetry=false;
+  var telemetry=trackingTelemetry(page,function(path,message){warnings.push('tracking.telemetry'+path+': '+message);}),hasTelemetry=false,narrowWarnings=[];
   sectionRecords(page).forEach(function(record){
     var d=record.section && record.section.diagram,DP=record.path+'.diagram';
     if(!specObject(d))return;
     function bound(carrier,at){
       if(!specObject(carrier) || !Object.prototype.hasOwnProperty.call(carrier,'telemetry'))return;
       hasTelemetry=true;
-      carrierTelemetry(carrier,telemetry.templates,function(path,message){warnings.push(at+'.telemetry'+path+': '+message);});
+      var bindingOut=carrierTelemetry(carrier,telemetry.templates,function(path,message){warnings.push(at+'.telemetry'+path+': '+message);});
+      // #1348: a signal that cannot be narrowed is not shown. Faults in a fragment as written warned
+      // above on any page; the rest (an unmet needsNarrow, an OR query, a dimension conflict) matter
+      // only where signals are shown, on pages with a live-status panel, so a canon page still builds.
+      if(bindingOut)Object.keys(bindingOut.signals).forEach(function(name){
+        var sig=bindingOut.signals[name];
+        if(sig.narrowFailure && !sig.narrowWritten)narrowWarnings.push(at+'.telemetry.signals.'+name+': '+sig.error);
+      });
     }
     if(specObject(d.nodes))Object.keys(d.nodes).forEach(function(id){bound(d.nodes[id],DP+'.nodes.'+id);});
     (Array.isArray(d.edges)?d.edges:[]).forEach(function(e,i){bound(e,DP+'.edges['+i+']');});
@@ -933,6 +940,7 @@ function validate(page){
     (d.panels || []).forEach(function(panel,index){if(panel && panel.type==='live-status')statusPanels.push(record.reference+'.diagram.panels['+index+']');});
   });
   tabPanelRepeatWarnings(page,warnings);
+  if(statusPanels.length)warnings.push.apply(warnings,narrowWarnings);
   if((ticketTracking || hasTickets) && !statusPanels.length)warnings.push('page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup');
   if(!hasTracking && !hasTickets && !hasTelemetry)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));

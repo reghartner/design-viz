@@ -14,6 +14,15 @@
 | X12 | (#1345) A consumer signal patch that names the inherited source with an object query and leaves out part of it warns at the overlay, naming the signal, the carrier and what is left out: absent keys (Honeycomb calculations, breakdowns; CloudWatch dimensions) and each inherited list item the patch leaves out or changes, by name (a filter as column op value, a calculation as OP(column), a log group). Only absent keys get "write all of it"; a changed item asks the author to check it is meant. | provider node, edge and store with Honeycomb, CloudWatch and CloudWatch Logs signals | warnings exactly | silently broken signals |
 | X13 | (#1345) A patch that keeps all of the provider's query (a restatement), a string query, or a source switch is a note, not a warning; a field patch and a local binding give nothing. | same provider | notes exactly; no warnings | notes that fail builds, or findings on plain field patches |
 | X14 | (#1345) Nested and twice-imported carriers: each overlay's findings sit at its own document and import; a middle diagram's finding is its own, not its importer's. | provider → middle → consumer; one provider imported twice | warnings and notes per document | findings at the wrong import or leaking across documents |
+| X15 | (#1347 review c2 wording) Named items read in full: a Honeycomb having as "COUNT > 10", an order with its direction ("COUNT descending"), an in filter with bracketed values ("code in [E1, E2]"); more than three items read "a, b, c and N more". | provider with havings, orders and many filters | warnings exactly | unreadable or endless item lists |
+| X16 | (#1348) An overlay narrow is stored as a list after the inherited fragments; the provider's query stays literal, so a later provider query change still reaches the board and is narrowed. | provider Honeycomb signal; consumer narrow | merged narrow; sent query after a provider edit | rewriting the merged query, which stops provider changes |
+| X17 | (#1348) Nested chains append in order (provider, middle, consumer) and an identical fragment is kept once; needsNarrow unions (a re-exporter can require more, never less); true stays true. | provider → middle → consumer | merged narrow and needsNarrow; sent filters | applying one level only, or twice |
+| X18 | (#1348) The same canon imported twice narrows each import on its own; local carriers narrow too. | consumer importing provider as fc and et, plus a local signal | sent filters per carrier | one narrowing for every import |
+| X19 | (#1348) A source switch keeps the inherited narrowing, so a fragment in the old language fails closed with a reason. | provider Honeycomb signal narrowed by the middle; consumer switches to Grafana | signal error | a stale fragment applied to another language |
+| X20 | (#1348) No widening: a null narrow, a null for an inherited source, or a null/false needsNarrow is ignored and warns at the overlay. | consumer patches | merged binding unchanged; warnings exactly | a board removing the provider's narrowing |
+| X21 | (#1348, D10) A board that narrows an inherited signal no longer gets the provider's query link (it opens the unnarrowed query) unless it sets its own; other links stay. | provider signal with links.query | merged links | a link to the unnarrowed query |
+| X22 | (#1353 review c1 minors 1 and 3, c2 MAJOR) A replacing binding (no extends) keeps the provider carrier's needsNarrow on every signal it writes, also those a consumer use template writes (all-template, or template plus literal signals), so a restated query fails closed unless it narrows; it warns at the overlay naming those signals. Narrowing an inherited signal also drops the provider's carrier-level query link unless the board sets its own. | provider needsNarrow; replacing consumer bindings | sent signal; warnings; merged links | reading the unnarrowed number by restating the provider query |
+| X23 | (#1353, needsNarrow belongs to the canon carrier) A new signal an extends overlay adds to a carrier whose provider signals have needsNarrow inherits the same union: it fails closed unless it narrows, and the overlay warns; an inherited signal's own requirement is unchanged. | provider needsNarrow; overlay adding a signal | sent signals; warnings | reading the unnarrowed number through an added signal |
 | X6 | Validator: a merge overlay produces no telemetry warnings; a malformed `hide` warns at its overlay path. Compatibility declares `flow.telemetry-merge` only for merge overlays. | consumer docs | warnings; features | warnings on valid merges; silent malformed filters; older runtimes treating merges as replaces |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
@@ -250,4 +259,157 @@ test('#1345 X14 nested and twice-imported carriers: findings stay with their own
   assert.deepEqual(findings(both,{version:1,id:'consumer',specs:[provider,both]}),{
     warnings:['sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.signals.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query and leaves out calculations, so the signal no longer reads what the provider defined; to replace the query, write all of it'],
     notes:['sections[0].diagram.topologyImports[1].nodeTracking.api.telemetry.signals.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query; later provider changes to it no longer reach this board']});
+});
+
+test('#1345 X15 named items read in full; long lists are capped',()=>{
+  const q={dataset:'orders',calculations:[{op:'COUNT'},{op:'P99',column:'duration_ms'}],
+    filters:[{column:'code',op:'in',value:['E1','E2']},{column:'region',op:'in',value:['eu','us']},{column:'a',op:'=',value:'1'},{column:'b',op:'=',value:'2'},{column:'c',op:'exists'}],
+    havings:[{calculate_op:'COUNT',op:'>',value:10},{calculate_op:'P99',column:'duration_ms',op:'<',value:500}],orders:[{op:'COUNT',order:'descending'},{column:'region'}]};
+  const provider=spec('provider',{nodes:{api:{title:'API',telemetry:{kind:'service',signals:{received:{honeycomb:q}}}}},rows:[['api']],topologyExports:{core:{nodes:['api'],edges:[]}}});
+  const run=patch=>{const consumer=consumerOf([{spec:'provider',export:'core',as:'shared',nodeTracking:{api:{telemetry:{extends:true,signals:{received:{honeycomb:patch}}}}}}]);return findings(consumer,{version:1,id:'consumer',specs:[provider,consumer]}).warnings;};
+  const at='sections[0].diagram.topologyImports[0].nodeTracking.api.telemetry.signals.received.honeycomb: signal received on node api: this Honeycomb patch replaces the provider\'s whole query and ';
+  const end=', so the signal no longer reads what the provider defined; check that this is meant';
+  assert.deepEqual(run({...q,havings:[],orders:[q.orders[1]],filters:q.filters.slice(2)}),
+    [at+'leaves out or changes the inherited filters code in [E1, E2] and region in [eu, us], the inherited havings COUNT > 10 and P99(duration_ms) < 500 and the inherited order COUNT descending'+end]);
+  assert.deepEqual(run({...q,filters:[{column:'x',op:'=',value:'y'}]}),
+    [at+'leaves out or changes the inherited filters code in [E1, E2], region in [eu, us], a = 1 and 2 more'+end],'more than three items are capped');
+  assert.deepEqual(run({...q,orders:[{op:'COUNT',order:'ascending'},q.orders[1]]}),[at+'leaves out or changes the inherited order COUNT descending'+end]);
+});
+
+/* #1348 narrowing across imports. */
+const NARROW_HC=()=>({calculations:[{op:'COUNT'}],filters:[{column:'service.name',op:'=',value:'dcf'}]});
+const flt=(column,value)=>({column,op:'=',value});
+function narrowProvider(signal={honeycomb:NARROW_HC(),unit:'events',needsNarrow:['event_code']}){
+  return spec('provider',{nodes:{dcf:{title:'DCF',telemetry:{kind:'service',signals:{received:signal}}}},rows:[['dcf']],topologyExports:{core:{nodes:['dcf'],edges:[]}}});
+}
+const sent=(doc,context,id)=>{const d=diagramOf(C.FlowTopology.resolveSource(doc,context));return plain(C.carrierTelemetry(d.nodes[id],{}).signals.received);};
+const narrowWith=(...filters)=>({extends:true,signals:{received:{narrow:{honeycomb:{filters}}}}});
+
+test('#1348 X16 an overlay narrowing is appended to the literal provider query; provider changes still flow',()=>{
+  let provider=narrowProvider();
+  const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:narrowWith(flt('event_code','FULL_CHARGE'))}}}]);
+  const merged=plain(diagramOf(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]})).nodes['fc::dcf'].telemetry.signals.received);
+  assert.deepEqual(merged,{honeycomb:NARROW_HC(),unit:'events',needsNarrow:['event_code'],narrow:{honeycomb:[{filters:[flt('event_code','FULL_CHARGE')]}]}},'the provider query stays literal; the fragment is a list');
+  let s=sent(consumer,{version:1,id:'consumer',specs:[provider,consumer]},'fc::dcf');
+  assert.deepEqual(s.query.filters,[flt('service.name','dcf'),flt('event_code','FULL_CHARGE')]);assert.equal(s.error,undefined);
+  provider=narrowProvider({honeycomb:{...NARROW_HC(),filters:[flt('service.name','dcf-v2')]},unit:'events',needsNarrow:['event_code']});
+  s=sent(consumer,{version:1,id:'consumer',specs:[provider,consumer]},'fc::dcf');
+  assert.deepEqual(s.query.filters,[flt('service.name','dcf-v2'),flt('event_code','FULL_CHARGE')],'a later provider change reaches the board, narrowed');
+  const bare=consumerOf([{spec:'provider',export:'core',as:'fc'}]);
+  assert.equal(sent(bare,{version:1,id:'consumer',specs:[provider,bare]},'fc::dcf').error,'The provider asks each board to narrow this signal by event_code, and nothing narrows it here, so it is not shown.');
+});
+
+test('#1348 X17 nested chains append in order; needsNarrow only adds up',()=>{
+  const provider=narrowProvider();
+  const middle=spec('middle',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'inner',nodeTracking:{dcf:{telemetry:{extends:true,signals:{received:{narrow:{honeycomb:{filters:[flt('device_type','cam')]}},needsNarrow:['region']}}}}}}],
+    topologyExports:{nested:{nodes:['inner::dcf'],edges:[]}}});
+  const consumer=consumerOf([{spec:'middle',export:'nested',as:'outer',nodeTracking:{'inner::dcf':{telemetry:{extends:true,signals:{received:{narrow:{honeycomb:[{filters:[flt('device_type','cam')]},{filters:[flt('event_code','FULL_CHARGE'),flt('region','eu')]}]},needsNarrow:['event_code']}}}}}}]);
+  const context={version:1,id:'consumer',specs:[provider,middle,consumer]};
+  const merged=plain(diagramOf(C.FlowTopology.resolveSource(consumer,context)).nodes['outer::inner::dcf'].telemetry.signals.received);
+  assert.deepEqual(merged.needsNarrow,['event_code','region']);
+  assert.deepEqual(merged.narrow.honeycomb,[{filters:[flt('device_type','cam')]},{filters:[flt('event_code','FULL_CHARGE'),flt('region','eu')]}],'the middle fragment first, the identical one once, then the consumer\'s');
+  assert.deepEqual(sent(consumer,context,'outer::inner::dcf').query.filters,[flt('service.name','dcf'),flt('device_type','cam'),flt('event_code','FULL_CHARGE'),flt('region','eu')]);
+  const middleOnly=sent(middle,{version:1,id:'middle',specs:[provider,middle]},'inner::dcf');
+  assert.equal(middleOnly.error,'The provider asks each board to narrow this signal by event_code and region, and nothing narrows it here, so it is not shown.','the middle diagram is itself not narrowed enough');
+  assert.equal(plain(C.FlowTopology.mergeTelemetry({signals:{x:{grafana:'q',needsNarrow:true}}},{extends:true,signals:{x:{needsNarrow:['a']}}})).signals.x.needsNarrow,true,'true stays true');
+});
+
+test('#1348 X18 the same canon imported twice narrows each import on its own; a local carrier narrows too',()=>{
+  const provider=narrowProvider();
+  const consumer=consumerOf([
+    {spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:narrowWith(flt('event_code','FULL_CHARGE'))}}},
+    {spec:'provider',export:'core',as:'et',position:{x:40,y:400},nodeTracking:{dcf:{telemetry:narrowWith(flt('event_code','EARLY_TERMINATION'))}}}],
+    {nodes:{local:{title:'Local',telemetry:{kind:'service',signals:{received:{honeycomb:NARROW_HC(),narrow:{honeycomb:{filters:[flt('event_code','LOCAL')]}}}}}}}});
+  const context={version:1,id:'consumer',specs:[provider,consumer]};
+  assert.deepEqual(sent(consumer,context,'fc::dcf').query.filters.at(-1),flt('event_code','FULL_CHARGE'));
+  assert.deepEqual(sent(consumer,context,'et::dcf').query.filters.at(-1),flt('event_code','EARLY_TERMINATION'));
+  assert.deepEqual(sent(consumer,context,'local').query.filters.at(-1),flt('event_code','LOCAL'));
+});
+
+test('#1348 X19 a source switch keeps the inherited narrowing, which then fails closed',()=>{
+  const provider=narrowProvider({honeycomb:NARROW_HC(),narrow:{honeycomb:{filters:[flt('event_code','X')]}}});
+  const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{extends:true,signals:{received:{grafana:'sum(rate(received_total[5m]))'}}}}}}]);
+  const s=sent(consumer,{version:1,id:'consumer',specs:[provider,consumer]},'fc::dcf');
+  assert.equal(s.source,'grafana');
+  assert.equal(s.error,'This signal reads from Prometheus, so a Honeycomb narrowing cannot apply; it is not shown.');
+});
+
+test('#1348 X20 a board cannot remove a narrowing or needsNarrow; the attempt warns and is ignored',()=>{
+  const provider=narrowProvider({honeycomb:NARROW_HC(),narrow:{honeycomb:{filters:[flt('device_type','cam')]}},needsNarrow:['event_code']});
+  const run=patch=>{const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{extends:true,signals:{received:patch}}}}}]);const context={version:1,id:'consumer',specs:[provider,consumer]};
+    return {merged:plain(diagramOf(C.FlowTopology.resolveSource(consumer,context)).nodes['fc::dcf'].telemetry.signals.received),warnings:findings(consumer,context).warnings.filter(w=>/cannot (remove|drop)/.test(w))};};
+  const at='sections[0].diagram.topologyImports[0].nodeTracking.dcf.telemetry.signals.received';
+  for(const patch of [{narrow:null},{narrow:{honeycomb:null}}]){
+    const r=run(patch);
+    assert.deepEqual(r.merged.narrow,{honeycomb:[{filters:[flt('device_type','cam')]}]},'kept');
+    assert.deepEqual(r.warnings,[at+'.narrow: signal received on node dcf: a board cannot remove a narrowing the provider set — ignored']);
+  }
+  for(const patch of [{needsNarrow:null},{needsNarrow:false}]){
+    const r=run(patch);
+    assert.deepEqual(r.merged.needsNarrow,['event_code']);
+    assert.ok(r.warnings.includes(at+'.needsNarrow: signal received on node dcf: a board cannot drop the provider\'s needsNarrow — ignored'),r.warnings.join('\n'));
+  }
+});
+
+test('#1348 X21 narrowing an inherited signal hides the provider\'s query link unless the board sets its own',()=>{
+  const provider=narrowProvider({honeycomb:NARROW_HC(),links:{query:'https://ui.honeycomb.io/q/1'}});
+  const merged=patch=>{const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{extends:true,signals:{received:patch}}}}}]);
+    return plain(diagramOf(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]})).nodes['fc::dcf'].telemetry.signals.received);};
+  assert.equal(Object.hasOwn(merged({narrow:{honeycomb:{filters:[flt('event_code','X')]}}}),'links'),false,'the unnarrowed query link is gone');
+  assert.deepEqual(merged({narrow:{honeycomb:{filters:[flt('event_code','X')]}},links:{query:'https://ui.honeycomb.io/q/2'}}).links,{query:'https://ui.honeycomb.io/q/2'},'the board\'s own link stays');
+  assert.deepEqual(merged({unit:'n'}).links,{query:'https://ui.honeycomb.io/q/1'},'a patch that does not narrow keeps it');
+});
+
+test('#1353 X22 a replacing binding keeps the provider\'s needsNarrow; narrowing drops the carrier query link',()=>{
+  const provider=narrowProvider();
+  const replace=telemetry=>{const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry}}}]);return {consumer,context:{version:1,id:'consumer',specs:[provider,consumer]}};};
+  let r=replace({kind:'service',signals:{count:{honeycomb:NARROW_HC()}}});
+  const s=plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(r.consumer,r.context)).nodes['fc::dcf'],{}).signals.count);
+  assert.equal(s.error,'The provider asks each board to narrow this signal by event_code, and nothing narrows it here, so it is not shown.','the restated query is not shown');
+  assert.deepEqual(findings(r.consumer,r.context).warnings.filter(w=>/replaces/.test(w)),['sections[0].diagram.topologyImports[0].nodeTracking.dcf.telemetry: this binding replaces the provider\'s on node dcf, whose signals must be narrowed by event_code; its signal count keeps that requirement']);
+  r=replace({kind:'service',signals:{count:{honeycomb:NARROW_HC(),narrow:{honeycomb:{filters:[flt('event_code','FULL_CHARGE')]}}}}});
+  assert.equal(plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(r.consumer,r.context)).nodes['fc::dcf'],{}).signals.count).error,undefined,'a replacement that narrows is shown');
+  const linked=spec('provider',{nodes:{dcf:{title:'DCF',telemetry:{kind:'service',links:{query:'https://ui.honeycomb.io/q/carrier',dashboard:'https://grafana.test/d'},signals:{received:{honeycomb:NARROW_HC()}}}}},rows:[['dcf']],topologyExports:{core:{nodes:['dcf'],edges:[]}}});
+  const merged=overlay=>{const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:overlay}}}]);return plain(diagramOf(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[linked,consumer]})).nodes['fc::dcf'].telemetry.links);};
+  assert.deepEqual(merged(narrowWith(flt('event_code','X'))),{dashboard:'https://grafana.test/d'},'the carrier query link goes; the dashboard stays');
+  assert.deepEqual(merged({...narrowWith(flt('event_code','X')),links:{query:'https://ui.honeycomb.io/q/board'}}),{query:'https://ui.honeycomb.io/q/board',dashboard:'https://grafana.test/d'},'the board\'s own stays');
+  assert.deepEqual(merged({extends:true,signals:{received:{unit:'n'}}}),{query:'https://ui.honeycomb.io/q/carrier',dashboard:'https://grafana.test/d'},'no narrowing, no change');
+});
+
+test('#1353 X23 a signal an extends overlay adds keeps the carrier\'s needsNarrow',()=>{
+  const provider=narrowProvider();
+  const run=signals=>{const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{extends:true,signals}}}}]);const context={version:1,id:'consumer',specs:[provider,consumer]};
+    return {sent:plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(consumer,context)).nodes['fc::dcf'],{}).signals),warnings:findings(consumer,context).warnings.filter(w=>/keeps that requirement/.test(w))};};
+  let r=run({count:{honeycomb:NARROW_HC()}});
+  assert.equal(r.sent.count.error,'The provider asks each board to narrow this signal by event_code, and nothing narrows it here, so it is not shown.','the added signal restating the query is not shown');
+  assert.deepEqual(r.warnings,['sections[0].diagram.topologyImports[0].nodeTracking.dcf.telemetry.signals.count: this signal is added to the provider\'s binding on node dcf, whose signals must be narrowed by event_code; it keeps that requirement']);
+  r=run({count:{honeycomb:NARROW_HC(),narrow:{honeycomb:{filters:[flt('event_code','FULL_CHARGE')]}}},received:{narrow:{honeycomb:{filters:[flt('event_code','FULL_CHARGE')]}}}});
+  assert.equal(r.sent.count.error,undefined,'an added signal that narrows is shown');
+  assert.equal(r.sent.received.error,undefined,'the inherited signal narrowed here is shown');
+  assert.equal(r.warnings.length,1,'only the added signal is named');
+  const free=spec('provider',{nodes:{dcf:{title:'DCF',telemetry:{kind:'service',signals:{received:{honeycomb:NARROW_HC()}}}}},rows:[['dcf']],topologyExports:{core:{nodes:['dcf'],edges:[]}}});
+  const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{extends:true,signals:{count:{honeycomb:NARROW_HC()}}}}}}]);
+  assert.equal(plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[free,consumer]})).nodes['fc::dcf'],{}).signals.count).error,undefined,'a carrier without needsNarrow adds signals freely');
+});
+
+test('#1353 X22 a replacing use-template binding keeps the provider\'s needsNarrow on every signal it writes',()=>{
+  const provider=narrowProvider();
+  const run=(telemetry)=>{
+    const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry}}}]);
+    consumer.page.tracking={telemetry:{templates:{t:{kind:'service',params:['svc'],signals:{count:{honeycomb:{calculations:[{op:'COUNT'}],filters:[flt('service.name','${svc}')]}}}}}}};
+    const context={version:1,id:'consumer',specs:[provider,consumer]},page=C.FlowTopology.resolveSource(consumer,context);
+    return {sent:plain(C.carrierTelemetry(diagramOf(page).nodes['fc::dcf'],C.trackingTelemetry(page.page).templates).signals),warnings:findings(consumer,context).warnings.filter(w=>/replaces the provider/.test(w))};
+  };
+  const unmet='The provider asks each board to narrow this signal by event_code, and nothing narrows it here, so it is not shown.';
+  const at='sections[0].diagram.topologyImports[0].nodeTracking.dcf.telemetry: this binding replaces the provider\'s on node dcf, whose signals must be narrowed by event_code; ';
+  let r=run({use:'t',svc:'dcf'});
+  assert.equal(r.sent.count.error,unmet,'the template\'s signal is not shown');
+  assert.deepEqual(r.warnings,[at+'its signal count keeps that requirement']);
+  r=run({use:'t',svc:'dcf',signals:{extra:{honeycomb:NARROW_HC()}}});
+  assert.equal(r.sent.count.error,unmet,'template plus literal: the template\'s signal is not shown');
+  assert.equal(r.sent.extra.error,unmet,'nor the literal one');
+  assert.deepEqual(r.warnings,[at+'its signals count and extra keep that requirement']);
+  r=run({use:'t',svc:'dcf',signals:{count:{honeycomb:{calculations:[{op:'COUNT'}],filters:[flt('service.name','dcf')]},narrow:{honeycomb:{filters:[flt('event_code','FULL_CHARGE')]}}}}});
+  assert.equal(r.sent.count.error,undefined,'a signal the board narrows is shown');
+  assert.deepEqual(r.sent.count.query.filters,[flt('service.name','dcf'),flt('event_code','FULL_CHARGE')]);
 });

@@ -3246,6 +3246,67 @@ aliases allow letters, digits and `_`, starting with a letter. `env`, `account`,
 `constructor`, `prototype` and `__proto__` are reserved. Arrays, numeric IDs,
 unknown company fields and malformed entries fail the build with their field path.
 
+### Narrowing inherited signals
+
+A board that imports a canon diagram can narrow a metric signal it inherits without
+restating the provider's query (#1344, #1348). It writes the narrowing in the
+provider's own query language under the signal's `narrow`, keyed by the signal's source,
+in the import's `nodeTracking` or `edgeTracking` `extends` overlay (a local signal may
+carry `narrow` too). Flowview appends it to the query when the query is built and never
+translates, escapes or reorders it:
+
+| Source | `narrow` value | Applied as |
+|---|---|---|
+| `honeycomb` | `{"filters": [{"column": "event_code", "op": "=", "value": "FULL_CHARGE"}]}` (one fragment or a list) | filters appended after the provider's; `calculations`, `havings`, `orders` and `breakdowns` stay |
+| `cloudwatch` | `{"dimensions": {"NotificationType": "FULL_CHARGE"}}` | dimensions added to the query's (CloudWatch matches the whole dimension set, so the metric must be published with that dimension) |
+
+```json
+"nodeTracking": {"dcf": {"telemetry": {"extends": true, "signals": {
+  "received": {"narrow": {"honeycomb": {"filters": [{"column": "event_code", "op": "=", "value": "FULL_CHARGE"}]}}}}}}}
+```
+
+A Honeycomb filter is `{column, op, value}` with `op` one of `=`, `!=`, `>`, `>=`, `<`,
+`<=`, `starts-with`, `does-not-start-with`, `ends-with`, `does-not-end-with`,
+`contains`, `does-not-contain`, `exists`, `does-not-exist` (no value), `in` and
+`not-in` (a list of values). Fragments may use `${name}` variables; they are filled in
+before the narrowing is applied.
+
+- **Merge.** Fragments accumulate in order: the provider's, then each importing level's
+  (an identical fragment once). The provider's query stays literal, so its later
+  changes still reach the board, narrowed. Nested imports and the same canon imported
+  twice narrow each level and each import on its own.
+- **No widening.** A board cannot remove a narrowing or a `needsNarrow` the provider set;
+  `null` for either is ignored with a warning at the overlay.
+- **`needsNarrow`** on a provider signal (`["event_code"]`, or `true`) says every board
+  must narrow it. It is met when a fragment pins each field to chosen values: a
+  Honeycomb filter with `=` or `in` and a value, or a CloudWatch dimension. A filter that
+  only tests the field (`exists`, `!=`, `not-in`, `does-not-exist`, `contains` …) still
+  counts every value, so it does not count. `true` needs one pinning filter. Lists join
+  across levels, so a re-exporter can require more, never less. A replacing binding
+  (no `extends`) keeps the provider carrier's requirement on every signal it writes, so
+  a restated query is not shown unless it narrows too, also a signal a `use` template
+  writes (the requirement is kept on the binding); the validator warns at the overlay,
+  naming those signals. A signal an `extends` overlay adds to such a carrier keeps the same
+  requirement, with the same warning: `needsNarrow` belongs to the canon carrier.
+- **Fail closed.** The signal is not queried and reads unobserved, with the reason in
+  Proof ("Not shown: …") and the Metrics note, when: `needsNarrow` is unmet; a fragment is in another source's
+  language (also after a source switch); a fragment is malformed; the Honeycomb query
+  combines its filters with `OR`; a CloudWatch dimension is set to two values; the
+  source is Grafana SQL or Tempo (write a `${name}` placeholder in the provider's query
+  instead); or the source is LogQL, PromQL or Logs Insights, which cannot be narrowed
+  yet.
+- **Validator.** A fragment fault as written warns where it is written, on any page. An
+  unmet `needsNarrow`, an `OR` query or a dimension conflict warns only on a page with a
+  live-status panel, so a canon page that asks boards to narrow still builds.
+- **Display.** Proof names the applied fragments ("Narrowed: event_code = FULL_CHARGE").
+  No link opens an unnarrowed query: a board that narrows an inherited signal does not
+  get the provider's signal-level or carrier-level `links.query` unless it sets its
+  own; a narrowed signal's card never falls back to the carrier's query link; and a
+  signal that is not shown loses its query links. The text view prints "Not shown:
+  <reason>" in place of that signal's query. A carrier's `links.dashboard` stays: it
+  opens the provider's own dashboard, which is not narrowed.
+- Pages need `flow.telemetry-narrow`.
+
 ### Named environment variables and counting scope
 
 Put shared string defaults in `tracking.telemetry.variables`, with per-profile

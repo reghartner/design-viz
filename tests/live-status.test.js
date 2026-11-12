@@ -3215,6 +3215,20 @@ test('#1158 the log form renders "Only lines with a trace ID" checked, and unche
  h.flush();assert.equal(m.body.querySelector('.dv-trace-log-traced').checked,false,'the repaint keeps it unchecked');
  api.destroy();
 });
+test('#1415 a search with requireTraceId false renders "Only lines with a trace ID" unchecked; the box follows the shown search',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);},calls=[];
+ const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'},device:{label:'Device ID',query:'{app="cams"} | deviceId="$value"',requireTraceId:false}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async args=>{calls.push(plain(args));return {data:[{timestamp:'1700000000000000000',line:'B reported: low battery',labels:{}}]};}}}}),api=h.ctl.liveStatus;
+ api.setStatusMode('trace');await settle();const m=mountStatus(h),box=()=>m.body.querySelector('.dv-trace-logs .dv-trace-log-traced');
+ assert.equal(box().checked,true,'the first search keeps the default');
+ const pick=m.body.querySelectorAll('.dv-trace-logs select').find(el=>el.getAttribute('aria-label')==='Log search');pick.value='device';pick.dispatchEvent({type:'change'});await settle();h.flush();
+ assert.equal(box().checked,false,'the device search starts unchecked');
+ api.setLogLookupField({field:'value',value:'cam-1',lookup:'device'});await api.findLogLines('device');h.flush();
+ assert.deepEqual(calls.map(c=>c.logql),['{app="cams"} | deviceId="cam-1"'],'no trace ID filter');
+ assert.deepEqual(m.body.querySelectorAll('.dv-trace-log-row .dv-trace-log-missing').map(n=>n.textContent),['This log line has no trace_id'],'the line without a trace ID is listed');
+ assert.deepEqual(m.body.querySelectorAll('.dv-trace-log-value').map(n=>n.textContent),['B reported: low battery']);
+ api.destroy();
+});
 /* #1142: in Over time, Load trace and Verify call the transport and search the selected day. */
 test('#1142 Over time Load trace and Verify call the transport with the selected day window',async()=>{
  const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8'),ID='8413cd87a9f15b6bfe8e1acf5b3346d0',calls=[];
@@ -4439,7 +4453,8 @@ test('#1173 #1233 #1349 one Log search dropdown shows only the selected search; 
  assert.equal(find('camera').getAttribute('aria-label'),'Find log lines for Camera model');assert.equal(find('camera').textContent,'Find log lines');
  const value=box('camera').querySelector('input');assert.equal(value.getAttribute('aria-label'),'Camera model');assert.ok(value.getAttribute('list'),'suggested values stay a pick list');
  value.value='arch';value.dispatchEvent({type:'input'});value.dispatchEvent({type:'keydown',key:'Enter',preventDefault(){}});await run();
- assert.deepEqual(first(),['{app="cams"} | cameraModel="arch"'],'Enter in the value field runs its Find, once');assert.deepEqual(rows('camera'),['arch']);
+ assert.deepEqual(first(),['{app="cams"} | cameraModel="arch"'],'Enter in the value field runs its Find, once');assert.deepEqual(rows('camera'),['{app="cams"} | cameraModel="arch" line'],'#1415: the row shows the log line');
+ assert.equal(box('camera').querySelector('.dv-trace-log-value').title,'{app="cams"} | cameraModel="arch" line\nCamera model: arch','#1415: the tooltip names the typed value');
  await choose('errors');assert.deepEqual(shown(),['errors'],'the other search replaces it');assert.equal(box('errors').querySelector('input'),null,'no $value slot: no text box');
  assert.equal(box('errors').querySelector('.dv-trace-log-name'),null,'the dropdown names it');assert.equal(find('errors').getAttribute('aria-label'),'Find log lines for Recent errors');assert.equal(calls.length,1,'switching makes no call');
  // While it runs, the pressed Find keeps focus (aria-disabled, not disabled), names what it does, and ignores a repeat press.
@@ -4450,17 +4465,17 @@ test('#1173 #1233 #1349 one Log search dropdown shows only the selected search; 
  assert.equal(find('errors'),running);assert.deepEqual([running.disabled,running.getAttribute('aria-disabled'),running.textContent,running.getAttribute('aria-label')],[false,null,'Find log lines','Find log lines for Recent errors'],'done: back to Find');
  assert.deepEqual(first(),['{app="cams"} | cameraModel="arch"','{app="cams"} |= "error"'],'the selected search runs its own query');assert.deepEqual(rows('errors'),['{app="cams"} |= "error" line']);
  // Back to the first search: its value and its own results return, with no call.
- await choose('camera');assert.equal(box('camera').querySelector('input').value,'arch','its value is kept');assert.deepEqual(rows('camera'),['arch'],'its own last results are kept');
+ await choose('camera');assert.equal(box('camera').querySelector('input').value,'arch','its value is kept');assert.deepEqual(rows('camera'),['{app="cams"} | cameraModel="arch" line'],'its own last results are kept');
  assert.equal(logs().result.lookup,'camera');assert.equal(logs().form.values.camera,'arch');await choose('errors');assert.deepEqual(rows('errors'),['{app="cams"} |= "error" line'],'and so are the other search\'s');assert.equal(calls.length,2);
  // Switching away while a Find runs drops that Find; the search it ran for has no results.
  await choose('camera');hold={};hold.promise=new Promise(resolve=>{hold.release=resolve;});find('camera').dispatchEvent({type:'click'});await run();assert.equal(logs().busy,true);
  await choose('errors');assert.equal(logs().busy,false,'the running Find is dropped');assert.deepEqual(rows('errors'),['{app="cams"} |= "error" line']);
  release=hold.release;hold=null;release();await run();await choose('camera');assert.equal(logs().result,null,'the dropped Find left nothing');assert.equal(box('camera').querySelector('.dv-trace-log-results'),null);
- // A value edit clears only that search's results; the shared checkbox clears every search's.
- box('camera').querySelector('input').dispatchEvent({type:'keydown',key:'Enter',preventDefault(){}});await run();assert.deepEqual(rows('camera'),['arch']);
+ // A value edit clears only that search's results; #1415: the checkbox clears the shown search's.
+ box('camera').querySelector('input').dispatchEvent({type:'keydown',key:'Enter',preventDefault(){}});await run();assert.deepEqual(rows('camera'),['{app="cams"} | cameraModel="arch" line']);
  const field=box('camera').querySelector('input');field.value='arc';field.dispatchEvent({type:'input'});await run();assert.equal(box('camera').querySelector('.dv-trace-log-results'),null,'its own edit clears its results');
  await choose('errors');assert.deepEqual(rows('errors'),['{app="cams"} |= "error" line'],'the other search keeps its results');
- const traced=m.body.querySelector('input.dv-trace-log-traced');traced.checked=false;traced.dispatchEvent({type:'change'});await run();assert.equal(box('errors').querySelector('.dv-trace-log-results'),null,'the checkbox clears every search');
+ const traced=m.body.querySelector('input.dv-trace-log-traced');traced.checked=false;traced.dispatchEvent({type:'change'});await run();assert.equal(box('errors').querySelector('.dv-trace-log-results'),null,'the checkbox clears the shown search\'s results');
  // Type a LogQL query: only the LogQL box and its Find.
  await choose(typedId);assert.deepEqual(shown(),[typedId]);const typed=box(typedId);assert.equal(typed.querySelector('input'),null);
  const area=typed.querySelector('textarea');assert.equal(area.getAttribute('aria-label'),'LogQL log query');area.value='{app="cams"}';area.dispatchEvent({type:'input'});

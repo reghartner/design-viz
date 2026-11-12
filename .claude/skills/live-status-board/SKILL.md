@@ -51,7 +51,7 @@ metadata on the line `Handling camera stats message`, next to `trace_id` and
 ```
 
 The reader picks or types a value; one `query_loki_logs` call over the Load trace
-lookback lists up to 10 newest lines (time, value, trace ID), and **Load** loads
+lookback lists up to 10 newest lines (time, line, trace ID), and **Load** loads
 that trace and focuses the line's span. Readers can also type a LogQL log query.
 Use only a query and field names verified on a real line; set `fields: {traceId,
 spanId}` when the IDs are not `trace_id` / `span_id`. Suggested `values` need a

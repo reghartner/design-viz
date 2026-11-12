@@ -14,11 +14,14 @@
 | N6 | Validator: a fragment fault as written warns at its path on any page; an unmet needsNarrow, an OR query or a dimension conflict warns only on a page with a live-status panel, so a canon page that requires narrowing still builds. Field patches in an overlay get fragment checks too. |
 | N7 | Compatibility: a signal or overlay with narrow or needsNarrow declares flow.telemetry-narrow. |
 | N8 | Viewer: a carrier whose signal is not shown reads "Not shown: <reason>" instead of "Evidence is missing or incomplete." in Proof and the metrics popup; a narrowed signal lists its fragments in the Proof predicate ("Narrowed: …"). |
+| N9 | (review c1 minor 2) needsNarrow counts only a filter that pins values: Honeycomb = or in with a value, a CloudWatch dimension with a value. exists, !=, not-in, does-not-exist (and an empty =) do not; true needs one pinning filter too. The reason names the field. |
+| N10 | (minor 1) No link opens an unnarrowed query: a signal that fails closed loses its own and the carrier's query link; a narrowed signal's card never falls back to the carrier's query link. |
+| N11 | (minor 6) The text view prints "Not shown: <reason>" for a fail-closed signal instead of its provider query; a narrowed signal prints the narrowed query. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const loader=require('../tools/source-loader.cjs');
 const C={URL,TextEncoder};vm.createContext(C);
-vm.runInContext(loader.composeSources(['canon.js','validator.js','compatibility.js']),C);
+vm.runInContext(loader.composeSources(['canon.js','validator.js','compatibility.js','core/text-view.js']),C);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const HC=()=>({calculations:[{op:'COUNT'}],filters:[{column:'service.name',op:'=',value:'dcf'}],breakdowns:['status'],havings:[{calculate_op:'COUNT',op:'>',value:0}],orders:[{op:'COUNT',order:'descending'}]});
 const CW=()=>({namespace:'AWS/SNS',metric:'NumberOfMessagesPublished',region:'us-east-1',accountId:'123456789012',dimensions:{TopicName:'notify'},statistic:'Sum'});
@@ -125,4 +128,43 @@ test('N8 viewer: "Not shown: <reason>" and the narrowed fragments',()=>{
   assert.equal(plainRow.explanation,'Evidence is missing or incomplete.','a signal that is merely not measured yet reads as before');
   const narrowed=proofRow({kind:'service',signals:{received:{honeycomb:HC(),narrow:{honeycomb:{filters:[{column:'event_code',op:'=',value:'FULL_CHARGE'}]}}}}});
   assert.match(narrowed.predicate,/ · Narrowed: event_code = FULL_CHARGE$/);
+});
+
+test('N9 needsNarrow counts only filters that pin values; the reason names the field',()=>{
+  const needs=['tenant'],only=(f)=>narrow('honeycomb',HC(),{honeycomb:{filters:[f]}},needs);
+  const weak='The provider asks each board to narrow this signal by tenant; a filter on tenant counts only with = or in and a value, so it is not shown.';
+  for(const f of [{column:'tenant',op:'exists'},{column:'tenant',op:'!=',value:'a'},{column:'tenant',op:'not-in',value:['a']},{column:'tenant',op:'does-not-exist'},{column:'tenant',op:'=',value:''},{column:'tenant',op:'contains',value:'a'}])
+    assert.deepEqual(only(f),{kind:'unmet',error:weak},f.op+' does not pin tenant');
+  assert.equal(only({column:'tenant',op:'=',value:'acme'}).error,undefined);
+  assert.equal(only({column:'tenant',op:'in',value:['acme','beta']}).error,undefined);
+  assert.equal(narrow('honeycomb',HC(),{honeycomb:{filters:[{column:'tenant',op:'exists'},{column:'region',op:'=',value:'eu'}]}},['tenant','region']).error,weak,'region pinned, tenant only tested');
+  assert.equal(narrow('honeycomb',HC(),{honeycomb:{filters:[{column:'x',op:'exists'}]}},true).error,'The provider asks each board to narrow this signal; a filter counts only with = or in and a value, so it is not shown.','true needs one pinning filter');
+  assert.equal(narrow('honeycomb',HC(),{honeycomb:{filters:[{column:'x',op:'=',value:0}]}},true).error,undefined,'a number pins');
+  assert.equal(narrow('cloudwatch',CW(),{cloudwatch:{dimensions:{Tenant:'acme'}}},['Tenant']).error,undefined,'a CloudWatch dimension pins');
+});
+
+test('N10 no query link opens an unnarrowed query',()=>{
+  const links={query:'https://ui.honeycomb.io/q/provider'};
+  const failed=plain(C.carrierTelemetry({telemetry:{kind:'service',links,signals:{received:{honeycomb:HC(),needsNarrow:['event_code'],links:{query:'https://ui.honeycomb.io/q/signal'}}}}},{}));
+  assert.equal(failed.signals.received.links,undefined,'a fail-closed signal loses its own query link');
+  assert.equal(failed.links.query,undefined,'and the carrier\'s');
+  const kept=plain(C.carrierTelemetry({telemetry:{kind:'service',links:{...links,dashboard:'https://grafana.test/d'},signals:{received:{honeycomb:HC()}}}},{}));
+  assert.deepEqual(kept.links,{query:'https://ui.honeycomb.io/q/provider',dashboard:'https://grafana.test/d'},'an unnarrowed carrier keeps its links');
+  const V={URL,AbortController,document:{hidden:false,addEventListener(){},removeEventListener(){}},setTimeout,clearTimeout};
+  vm.runInNewContext(loader.entrypoint('native').source,V);
+  const binding=narrowed=>({links,signals:{received:{source:'honeycomb',query:HC(),...(narrowed?{narrow:['event_code = X']}:{})}}});
+  assert.equal(V.telemetryMetricUrl(binding(true),null,'received'),null,'a narrowed signal never falls back to the carrier query link');
+  assert.equal(V.telemetryMetricUrl(binding(false),null,'received'),'https://ui.honeycomb.io/q/provider','an unnarrowed single signal still does');
+});
+
+test('N11 the text view says why a signal is not shown, and prints a narrowed query as sent',()=>{
+  const page=C.normalize({page:{title:'t',sections:[{id:'main',diagram:{nodes:{
+    a:{title:'A',telemetry:{kind:'service',signals:{received:{honeycomb:HC(),needsNarrow:['event_code']}}}},
+    b:{title:'B',telemetry:{kind:'service',signals:{received:{honeycomb:HC(),narrow:{honeycomb:{filters:[{column:'event_code',op:'=',value:'FULL'}]}}}}}}},rows:[['a','b']]}}]}});
+  const flat=C.textViewFlat(C.textViewModel(page)).split('\n');
+  assert.ok(flat.includes('node a metric.received.query Not shown: The provider asks each board to narrow this signal by event_code, and nothing narrows it here, so it is not shown.'),flat.filter(l=>/metric/.test(l)).join('\n'));
+  assert.ok(!flat.some(l=>/^node a metric\.received\.query\./.test(l)),'the provider query is not printed for it');
+  assert.ok(flat.includes('node b metric.received.query.filters[1].column event_code'),flat.filter(l=>/node b metric/.test(l)).join('\n'));
+  const elements=String(C.textViewElements(C.textViewModel(page)));
+  assert.match(elements,/Not shown: The provider asks each board to narrow this signal by event_code/,'the elements view says so too');
 });

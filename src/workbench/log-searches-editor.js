@@ -4,7 +4,7 @@
    commands/telemetry.js telemetryEditLookups, one accepted edit per Undo step. Validator warnings
    sit next to the field they name; the rest are listed at the end. Uncommitted New log search text
    lives in o.drafts (inspector-owned, cleared when the selection changes). Nothing here runs a query. */
-var LOG_SEARCH_WARNING_FIELD=/^tracking\.telemetry\.lookups\.([A-Za-z][A-Za-z0-9_-]*)\.(label|query|datasource|values|fields)(?:\[\d+\])?(?:\.(traceId|spanId))?: /;
+var LOG_SEARCH_WARNING_FIELD=/^tracking\.telemetry\.lookups\.([A-Za-z][A-Za-z0-9_-]*)\.(label|query|datasource|values|fields|requireTraceId)(?:\[\d+\])?(?:\.(traceId|spanId))?: /;
 // Validator warnings for log searches → {byId: {id: {field: [text]}}, general: [text]}.
 function logSearchWarnings(list,ids){
   var out={byId:Object.create(null),general:[]};
@@ -59,6 +59,11 @@ function createFlowLogSearches(o){
     field('Loki datasource UID',c.text(entry.datasource,function(v){return edit('datasource',v);},{placeholder:'From Metrics → Grafana Loki UID'}),'datasource');
     field('trace ID field',c.text(fields.traceId,function(v){return edit('traceId',v);},{placeholder:'trace_id'}),'traceId');
     field('span ID field',c.text(fields.spanId,function(v){return edit('spanId',v);},{placeholder:'span_id'}),'spanId');
+    // #1415: requireTraceId; checked (the default, #1158) writes no key.
+    var traceLabel=id+' Only lines with a trace ID starts checked',traced=c.checkbox(entry.requireTraceId!==false,function(v){return edit('requireTraceId',v);}),tracedInput=traced.querySelector('input');
+    d.row(fold,traceLabel,traced);tracedInput.setAttribute('aria-label',traceLabel);
+    tracedInput.title='On (default): this search starts with "Only lines with a trace ID" checked in the Trace view. Off: it starts unchecked and lists every matching line (requireTraceId: false). Readers can still change it.';
+    warn(fold,tracedInput,w.requireTraceId);
     var actions=d.el('div','log-search-actions');fold.appendChild(actions);
     function move(offset){var ok=commit({op:'moveLookup',name:id,offset:offset});if(ok)focusAfter({id:id,move:offset});return ok;}
     var up=c.action('Move log search '+id+' up',function(){return move(-1);}),down=c.action('Move log search '+id+' down',function(){return move(1);});

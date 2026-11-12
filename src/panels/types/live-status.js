@@ -261,7 +261,7 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
         if(running){go.setAttribute('aria-busy','true');go.setAttribute('aria-disabled','true');}else{go.removeAttribute('aria-busy');go.removeAttribute('aria-disabled');}
         return go;
       }
-      // #1158: checked by default; Find then lists only lines with a trace ID. It applies to every box.
+      // #1158: checked by default; Find then lists only lines with a trace ID. #1415: it shows the shown search's own state.
       var traced=control(section,'traced','Only lines with a trace ID','checkbox');if(traced.checked!==logs.form.traced)traced.checked=logs.form.traced;
       // #1141: in Over time Find searches the selected day; name it.
       if(logs.search)el(section,'p','window','dv-trace-logs-window',logs.search);
@@ -307,7 +307,7 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
           // #1252: local time like the trace card it loads; the UTC time is in the title.
           var stamp=el(item,'time','time','dv-trace-log-time',row.time?liveStatusReadableTime(row.time,true):'time unavailable');
           if(row.time){stamp.setAttribute('datetime',row.time);stamp.setAttribute('title',row.time.replace('T',' ').replace(/(?:\.\d+)?Z$/,' UTC'));}else{stamp.removeAttribute('datetime');stamp.removeAttribute('title');}
-          el(item,'span','value','dv-trace-log-value',row.value).title=row.line;
+          el(item,'span','value','dv-trace-log-value',row.line).title=row.title;
           if(!row.traceId){el(item,'span','missing','dv-trace-log-missing',row.missing);return;}
           el(item,'code','trace','dv-trace-log-id',row.traceId);
           var load=el(item,'button','load','reader-button dv-trace-log-load tbtn','Load');load.type='button';load.setAttribute('aria-label','Load trace '+row.traceId);load._logIndex=i;load.disabled=!direct.available || direct.busy;

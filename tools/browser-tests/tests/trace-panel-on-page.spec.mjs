@@ -30,6 +30,8 @@ function spec(surface){
   edges:[{from:'web',to:'checkout',label:'PlaceOrder'},{from:'checkout',to:'payment',label:'Charge'}],
   steps:[{id:'accept',text:'Accept checkout',nodes:['web'],traceMatch:{serviceName:'frontend',operation:'/cart/checkout',nodeId:'web'}},{id:'place',text:'Place the order',edge:'web->checkout',traceMatch:{serviceName:'checkout',operation:'msdemo.CheckoutService/PlaceOrder'}},{id:'cache',text:'Read the cart cache',nodes:['payment'],traceMatch:{serviceName:'redis',operation:'HGET',nodeId:'payment'}}],
   view:'step',autoplay:false,panels:[{id:'status',type:'live-status',title:'Status'}]};
+ // follower: a Status controls panel follows the Status card in the same panel column (no section layout).
+ if(surface==='follower')d.panels.push({id:'controls',type:'status-controls',title:'Status controls'});
  if(surface==='tile' || surface==='workbench')d.sectionLayout={columns:24,default:structuredClone(TILES)};
  if(surface==='explore'){
   d.layouts=['standard','explore'].map(id=>({id,name:id[0].toUpperCase()+id.slice(1),presentation:id,sectionLayout:{columns:24,default:structuredClone(TILES)}}));d.defaultLayout='standard';
@@ -51,7 +53,7 @@ async function enterExplore(scope){
  await expect(scope.locator('.explore-stage').first()).toBeVisible();
 }
 // Opens the surface and loads the 60-span trace in its Status panel; returns the panel card locator.
-async function open(page,server,surface){
+async function open(page,server,surface,before=null){
  await host(page);
  if(surface==='workbench'){
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec(surface),null,2));await prepareEditorSurface(page);
@@ -61,6 +63,7 @@ async function open(page,server,surface){
   await page.goto(server.origin+'/'+name+'.html');
  }
  const view=page.locator('#docview');await expect(view.locator('.dv-live-trace').first()).toBeVisible();
+ if(before)await before(page);
  if(surface==='explore'){await enterExplore(view);await expect(view.locator('[data-explore-panel="status"] .dv-live-trace')).toBeVisible();}
  const panel=(surface==='explore'?view.locator('[data-explore-panel="status"] .pwidget.pt-live-status'):view.locator('.pwidget.pt-live-status')).filter({visible:true}).first();
  await panel.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await panel.getByRole('button',{name:'Load trace',exact:true}).click();
@@ -101,3 +104,29 @@ for(const surface of ['plain','tile','explore','workbench']){
   expect(after.bodyTop,'what scrolled is the panel body'+where).toBeGreaterThan(100);
  });
 }
+
+// Review c2: a card after the Status card in the same column (the Status controls panel) is never covered: the Status card is
+// sticky only as the last card of its column, so the next panel scrolls into view with the page and takes a click.
+test('#1411 follower: a panel after the Status card in its column can be scrolled into view and clicked while the Trace view is open',async({page,server})=>{
+ const panel=await open(page,server,'follower'),controls=page.locator('#docview .pwidget.pt-status-controls');
+ await expect(controls).toHaveCount(1);
+ expect(await panel.evaluate(card=>getComputedStyle(card).position),'the Status card is not sticky with a card after it').not.toBe('sticky');
+ const g=await geometry(panel);expect(g.panel.bottom,'the Status panel still ends inside the window').toBeLessThanOrEqual(g.innerHeight);
+ const title=controls.locator('.ptitle');await title.scrollIntoViewIfNeeded();
+ const hit=await title.evaluate(el=>{const b=el.getBoundingClientRect(),at=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return {inside:b.top>=0 && b.bottom<=innerHeight,own:!!at && el.closest('.pwidget').contains(at),at:at && (at.className || at.tagName)};});
+ expect(hit,'the Status controls title is on screen and nothing covers it').toEqual({inside:true,own:true,at:hit.at});
+ await title.click();
+});
+// Review c2: the cap follows a page scroll. Content above the section puts the card low on the page, so its cap is short; a
+// real wheel over that content scrolls the page, the card's top rises and the re-measured cap grows, still ending on screen.
+test('#1411 plain: after a page scroll the re-measured cap grows and the panel still ends inside the window',async({page,server})=>{
+ const panel=await open(page,server,'plain',async page=>page.evaluate(()=>{const spacer=document.createElement('div');spacer.className='trace-on-page-spacer';spacer.style.height='420px';document.querySelector('#docview .doc-sec').before(spacer);window.scrollTo(0,0);}));
+ const settle=async()=>{await expect.poll(async()=>{const a=JSON.stringify((await geometry(panel)).panel);await frames(page);return a===JSON.stringify((await geometry(panel)).panel);},{message:'the panel box has settled'}).toBe(true);return geometry(panel);};
+ const first=await settle(),h0=first.panel.bottom-first.panel.top;
+ expect(first.pageY,'the page starts at the top').toBe(0);expect(first.panel.bottom,'the low card ends inside the window').toBeLessThanOrEqual(first.innerHeight);
+ const spacer=await page.locator('.trace-on-page-spacer').boundingBox();await page.mouse.move(spacer.x+spacer.width/2,Math.max(spacer.y+40,first.panel.top-200));await page.mouse.wheel(0,300);
+ await expect.poll(()=>page.evaluate(()=>Math.round(scrollY)),{message:'the wheel over the content above scrolls the page'}).toBeGreaterThan(200);
+ const after=await settle(),h1=after.panel.bottom-after.panel.top;
+ expect(h1,'the cap grew with the room the page scroll made ('+h0+' then '+h1+')').toBeGreaterThan(h0+150);
+ expect(after.panel.bottom,'the panel still ends inside the window').toBeLessThanOrEqual(after.innerHeight);
+});

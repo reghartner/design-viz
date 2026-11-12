@@ -5,7 +5,7 @@ function telemetryStepModel(diagram,index,pathId,page,snapshot,jiraMap,jiraOn){
   var direct=liveStatusStepCarriers(diagram,step,true),templates=telemetryTemplates()(page),narrowed=trackingStepProofTickets(diagram,step,page);
   // A step ticketFilter (#1103) narrows the Jira half of this step's verdict too.
   var carriers=direct.map(function(c){var b=carrierTelemetry(c.value,templates);return {id:c.id,tickets:jiraOn?(narrowed?narrowed[c.id]:trackingRefs(c.value).tickets):[],kind:b && b.kind,signals:b?b.signals:{},proof:b?b.proof:{}};});
-  var proof=proofVerdicts({carriers:carriers,jiraMap:jiraMap,telemetryMap:snapshot.map,steps:[{id:'current',carriers:carriers.map(function(c){return c.id;})}]});
+  var proof=proofVerdicts({carriers:carriers,jiraMap:jiraMap,telemetryMap:snapshot.map,steps:[{id:'current',carriers:carriers.map(function(c){return c.id;})}]},snapshot.verdicts && snapshot.verdicts.endToEnd?{endToEndMetrics:true}:undefined);
   var measured=carriers.some(function(c){return telemetryMetricNames(c).some(function(n){return telemetryReading(snapshot.map[c.id],n).value!==null;});});
   // Primary is the first directly selected carrier in the existing carrier walk
   // (edges, then explicit nodes), not whichever happens to return a trace.

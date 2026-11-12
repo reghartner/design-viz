@@ -80,7 +80,7 @@ function statusBoardHasBindings(raw){
 }
 /* #1254 items 8 and 9: one page Jira or GitHub edit. edit(jira, page, tracking) changes clones.
    Only `tracking.jira`, `tracking.github` and (#1237) `tracking.dependencies` and `tracking.staleDays`
-   are written, pretty-printed, so the rest of the block keeps its authored text. An emptied jira block is dropped; an emptied tracking block is dropped
+   and (#1404) `tracking.endToEndMetrics` are written, pretty-printed, so the rest of the block keeps its authored text. An emptied jira block is dropped; an emptied tracking block is dropped
    unless the page has a Live status panel, where `tracking: {}` marks the status board. */
 function planPageTracking(text,raw,edit){
   var doc=builderDocumentPage(raw);if(!doc)return {error:'Add document settings first.'};
@@ -93,7 +93,7 @@ function planPageTracking(text,raw,edit){
   if(Object.keys(jira).length)tracking.jira=jira;
   else if(hadJira && JSON.stringify(jira)!==jiraBefore)delete tracking.jira;
   var pairs=[];
-  ['jira','github','dependencies','staleDays'].forEach(function(key){
+  ['jira','github','dependencies','staleDays','endToEndMetrics'].forEach(function(key){
     if(JSON.stringify(before[key])===JSON.stringify(tracking[key]))return;
     pairs.push([key,tracking[key]===undefined?null:JSON.stringify(tracking[key],null,2)]);
   });
@@ -105,7 +105,7 @@ function planPageTracking(text,raw,edit){
 }
 /* Validator warnings for the page tracking block, split by Status board section. */
 var STATUS_BOARD_WARNING_SECTIONS=[['environments',/^tracking\.telemetry\.environments?[.:[]/],['lookups',/^tracking\.telemetry\.lookups[.:[]/],
-  ['traces',/^tracking\.telemetry\.traceConnections[.:[]/],['metrics',/^tracking\.telemetry[.:[]/],['jira',/^tracking\.[A-Za-z]/],['board',/^tracking:/]];
+  ['traces',/^tracking\.telemetry\.traceConnections[.:[]/],['metrics',/^tracking\.(telemetry[.:[]|endToEndMetrics:)/],['jira',/^tracking\.[A-Za-z]/],['board',/^tracking:/]];
 function statusBoardWarnings(raw,validateSource){
   var out={board:[],jira:[],metrics:[],traces:[],environments:[],lookups:[]},warnings;
   try{warnings=builderValidateSource(raw,validateSource).warnings || [];}catch(ex){warnings=[];}

@@ -51,6 +51,11 @@ side/offset. The preview makes no connector calls, adds no Undo entry, and is
 not exported. It survives same-document edits and resets for a new project or
 import. The Services & evidence chapter explains both controls.
 
+**Status board settings → Metrics → End-to-end metrics applied** writes
+`tracking.endToEndMetrics: true` (one Undo step; unchecking removes it). Check it
+once the board's metrics and limits cover the whole path: Proof then rolls up from
+metrics only ([End-to-end metrics](live-status.md#end-to-end-metrics)).
+
 The workspace chapter explains top inspector actions, collapsed muted section
 headers, same-selection expansion retention, and group-scoped Apply controls.
 

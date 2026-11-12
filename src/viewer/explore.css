@@ -181,6 +181,7 @@ body.dv-tour-button .explore-tour-button:focus-visible{outline:2px solid var(--a
  .explore-stage,.explore-canvas,.docview .explore-board,.explore-window,.explore-player{position:static;height:auto;width:auto;overflow:visible;max-height:none;}
  .explore-window{break-inside:avoid;margin-top:12px;}
  .explore-window-body,body .docview .explore-player>.termbar{width:100%;height:auto;transform:none;}
+ .explore-stage>.explore-window>.explore-window-body{width:100%;margin:0;}
  .docview .explore-board .boardcanvas{padding:0;min-height:0;width:auto;}
  .docview .explore-board .boardcanvas>svg{width:100%;}
 }

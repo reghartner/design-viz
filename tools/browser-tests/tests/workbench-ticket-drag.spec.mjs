@@ -3,7 +3,7 @@
    targets, and the Workbench writes the ticket key as one Undo step.
 | row | rule | fixture | assertion | broken implementation it rejects |
 |---|---|---|---|---|
-| D1 | Demo live status on: a real pointer drag of the HW-123 row onto node chime adds HW-123 to chime (the row's own node keeps it); while held over chime the card shows the drop highlight; one Undo restores the source. | the doorbell example board | dv-edit-over on chime while held; nodes.chime.tickets; source after Undo | no drag in the Workbench; a move instead of an add; two Undo steps |
+| D1 | Demo live status on: a real pointer drag of the HW-123 row onto node notify adds HW-123 to notify (the row's own node keeps it); while held over notify the card shows the drop highlight; one Undo restores the source. | the doorbell example board | both drag points on screen; dv-edit-over on notify while held; nodes.notify.tickets; source after Undo | no drag in the Workbench; a move instead of an add; two Undo steps |
 | D2 | A loaded snapshot whose epic lists DOOR-7 (not on the diagram): dragging DOOR-7 onto connection ingest → notify adds it there; the saved source opened in the viewer paints that connection from DOOR-7's state. | the same board; snapshot with DOOR-7 blocked | edges[3].tickets; viewer path.edge[data-dv-edge="3"] dv-live-blocked | a drop written nowhere, or to the wrong carrier |
 | D3 | Neither demo nor snapshot showing: the Tickets rows are not draggable. | the same board | no draggable rows | a drag offered with nothing to drag from |
 Desktop only. */
@@ -35,12 +35,15 @@ test('D1 desktop Demo live status: drag a Tickets row onto a node; one Undo remo
   await page.getByRole('checkbox',{name:'Demo live status',exact:true}).check();
   const row=ticketRow(panel,'HW-123');await expect(row).toHaveAttribute('draggable','true');
   await expect(panel.locator('.dv-live-tickets-hint')).toContainText('Drag a row onto a node or connection');
-  await onScreen(row);const target=await cardPoint(nodeCard(view,'chime'));
+  // CI #1402: the held point must be on screen with the row (as dragTicket requires); notify sits beside the panel.
+  await onScreen(row);const target=await cardPoint(nodeCard(view,'notify'));
+  const from=await row.locator('.dv-live-ticket-title').boundingBox(),viewport=page.viewportSize();
+  for(const p of [{x:from.x+from.width/2,y:from.y+from.height/2},target])expect(p.y>0 && p.y<viewport.height && p.x>0 && p.x<viewport.width,'drag point on screen '+JSON.stringify(p)).toBe(true);
   const release=await holdTicketOver(page,panel,'HW-123',target);
-  await expect(view.locator('g.node[data-dv-node="chime"]')).toHaveClass(/dv-edit-over/);
+  await expect(view.locator('g.node[data-dv-node="notify"]')).toHaveClass(/dv-edit-over/);
   await page.screenshot({path:info.outputPath('workbench-ticket-drag-held.png')});
   await release();
-  await expect.poll(async()=>(await source(src)).nodes.chime.tickets).toEqual(['HW-124','HW-123']);
+  await expect.poll(async()=>(await source(src)).nodes.notify.tickets).toEqual(['BE-68','HW-123']);
   expect((await source(src)).nodes.button.tickets,'an add, not a move').toEqual(['HW-123']);
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);
 });

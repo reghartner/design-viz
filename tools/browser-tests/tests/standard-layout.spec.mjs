@@ -109,6 +109,7 @@ async function tileDrag(page,handle,dx,dy){
 const homeItem=text=>JSON.parse(text).page.blocks[0].diagram.layouts[0].sectionLayout.default.find(it=>it.panel==='home');
 test('Arrange tile move and resize land on the first try with an Inspector edit pending',async({page,server})=>{
   const source=await open(page,server);
+  await page.getByRole('button',{name:'Hide arrangement controls',exact:true}).click();await expect(page.locator('.section-arrange-fields')).toBeHidden();
   await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
   await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
   const outline=page.locator('#workspace-window-outline .workspace-window-close');if(await outline.isVisible())await outline.click();

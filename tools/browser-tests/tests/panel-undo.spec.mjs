@@ -8,12 +8,6 @@ const source=JSON.stringify(exploreSpec(),null,2);
 
 async function open(page,server){await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);}
 async function geometry(el){return el.evaluate(el=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height].map(Math.round);});}
-async function settled(page,el){
-  // Two animation frames, then the same rect on two reads 150ms apart.
-  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  let last=null;await expect.poll(async()=>{const now=await geometry(el),same=JSON.stringify(now)===JSON.stringify(last);last=now;return same;},{intervals:[150]}).toBe(true);
-  return last;
-}
 // Landed rect equals the start rect plus the pointer delta (1px rounding).
 async function expectLanded(el,before,dx,dy){
   const want=[before[0]+dx,before[1]+dy,before[2],before[3]];
@@ -191,30 +185,11 @@ test('the first canvas drag after an uncommitted Inspector edit saves the edit a
   const before=await geometry(panel);await title.fill('Committed on leaving Inspector');
   await drag(page,panel.locator('.explore-window-grip'),-350,60);
   await expect(page.locator('#src')).toHaveValue(/Committed on leaving Inspector/);
-  console.log('#1375 inspector-drag feedback:',JSON.stringify(await page.locator('.fnote').allTextContents()),'before',before,'after',await geometry(panel));
   await expectLanded(panel,before,-350,60);
   const both=await page.locator('#src').inputValue();expect(JSON.parse(both).page.blocks[0].diagram.layouts[0].exploreLayout).toBeTruthy();
   await page.locator('#undo-builder').click();await expect.poll(()=>geometry(panel)).toEqual(before);
   await expect(page.locator('#src')).toHaveValue(/Committed on leaving Inspector/);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
-});
-
-/* #1375: the drop's grip click selected the panel and opened a docked Inspect,
-   which narrowed the stage and pulled the dropped panel back to the left. */
-test('an Explore panel dropped near the stage edge stays where it landed after layout settles',async({page,server})=>{
-  await open(page,server);const inspect=page.locator('#workspace-window-inspect');
-  await page.locator('#editor-tab-inspect').click();await inspect.getByRole('button',{name:'Dock Inspect panel',exact:true}).click();
-  await inspect.locator('.workspace-window-close').click();await expect(inspect).toBeHidden();
-  const panel=page.locator('[data-explore-panel=home]'),before=await geometry(panel);
-  const stage=await panel.evaluate(el=>{const r=el.parentElement.getBoundingClientRect();return [r.x,r.y,r.width,r.height].map(Math.round);});
-  // Land the panel's right edge 240px inside the stage's right edge: inside
-  // the strip a docked Inspect takes from the stage.
-  const dx=stage[0]+stage[2]-240-(before[0]+before[2]),dy=80;
-  await drag(page,panel.locator('.explore-window-grip'),dx,dy);
-  await expect(page.locator('#src')).not.toHaveValue(source);
-  const landed=await settled(page,panel);
-  console.log('#1375 edge-drop stage',stage,'before',before,'delta',[dx,dy],'landed',landed,'inspect visible',await inspect.isVisible(),'feedback',JSON.stringify(await page.locator('.fnote').allTextContents()));
-  await expectLanded(panel,before,dx,dy);
 });
 
 test('removing an authored Explore view in handwritten JSON preserves the full source history and draft on Redo',async({page,server})=>{

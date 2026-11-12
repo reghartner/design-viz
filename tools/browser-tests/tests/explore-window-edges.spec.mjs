@@ -63,13 +63,18 @@ test('an Explore panel window and the step controls resize from every corner and
   await expect.poll(async()=>near(await box(fresh.locator('[data-explore-panel=home]')),final)).toBe(true);await fresh.close();
 });
 
-test('the right resize strip of a floating Explore window leaves the body scrollbar usable',async({page,server})=>{
+test('resize strips of a floating Explore window leave the body scrollbar, the grip and Hide usable',async({page,server})=>{
   await page.setViewportSize({width:1600,height:1000});
   await page.goto(server.origin+'/workbench.html');await paste(page,floatingSpec());await closeTools(page);
   const panel=page.locator('[data-explore-panel=home]'),body=panel.locator('.explore-window-body');
   // Make the body scroll: shrink the window from its bottom-right button.
   await panel.locator('.explore-window-resize').focus();for(let i=0;i<10;i++)await page.keyboard.press('Shift+ArrowUp');
   await closeTools(page);
+  // Corner squares leave every pixel of the grip and Hide reachable.
+  for(const control of ['.explore-window-grip','.explore-window-hide'])expect(await panel.locator(control).evaluate(el=>{
+    const r=el.getBoundingClientRect(),points=[[r.left+1,r.top+1],[r.right-1,r.top+1],[r.left+1,r.bottom-1],[r.right-1,r.bottom-1]];
+    return points.every(([x,y])=>{const hit=document.elementFromPoint(x,y);return hit===el || el.contains(hit);});
+  }),control).toBe(true);
   const strip=await box(panel.locator('.explore-window-edge[data-edge="e"]')),bodyBox=await box(body);
   expect(strip[0]).toBeGreaterThanOrEqual(bodyBox[0]+bodyBox[2]-1);
   const bar=await body.evaluate(el=>({width:el.offsetWidth-el.clientWidth,overflow:el.scrollHeight-el.clientHeight}));

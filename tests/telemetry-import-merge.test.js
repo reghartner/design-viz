@@ -22,6 +22,7 @@
 | X20 | (#1348) No widening: a null narrow, a null for an inherited source, or a null/false needsNarrow is ignored and warns at the overlay. | consumer patches | merged binding unchanged; warnings exactly | a board removing the provider's narrowing |
 | X21 | (#1348, D10) A board that narrows an inherited signal no longer gets the provider's query link (it opens the unnarrowed query) unless it sets its own; other links stay. | provider signal with links.query | merged links | a link to the unnarrowed query |
 | X22 | (#1353 review c1 minors 1 and 3) A replacing binding (no extends) keeps the provider carrier's needsNarrow on every signal it writes, so a restated query fails closed unless it narrows; it warns at the overlay. Narrowing an inherited signal also drops the provider's carrier-level query link unless the board sets its own. | provider needsNarrow; replacing consumer bindings | sent signal; warnings; merged links | reading the unnarrowed number by restating the provider query |
+| X23 | (#1353, needsNarrow belongs to the canon carrier) A new signal an extends overlay adds to a carrier whose provider signals have needsNarrow inherits the same union: it fails closed unless it narrows, and the overlay warns; an inherited signal's own requirement is unchanged. | provider needsNarrow; overlay adding a signal | sent signals; warnings | reading the unnarrowed number through an added signal |
 | X6 | Validator: a merge overlay produces no telemetry warnings; a malformed `hide` warns at its overlay path. Compatibility declares `flow.telemetry-merge` only for merge overlays. | consumer docs | warnings; features | warnings on valid merges; silent malformed filters; older runtimes treating merges as replaces |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
@@ -373,4 +374,20 @@ test('#1353 X22 a replacing binding keeps the provider\'s needsNarrow; narrowing
   assert.deepEqual(merged(narrowWith(flt('event_code','X'))),{dashboard:'https://grafana.test/d'},'the carrier query link goes; the dashboard stays');
   assert.deepEqual(merged({...narrowWith(flt('event_code','X')),links:{query:'https://ui.honeycomb.io/q/board'}}),{query:'https://ui.honeycomb.io/q/board',dashboard:'https://grafana.test/d'},'the board\'s own stays');
   assert.deepEqual(merged({extends:true,signals:{received:{unit:'n'}}}),{query:'https://ui.honeycomb.io/q/carrier',dashboard:'https://grafana.test/d'},'no narrowing, no change');
+});
+
+test('#1353 X23 a signal an extends overlay adds keeps the carrier\'s needsNarrow',()=>{
+  const provider=narrowProvider();
+  const run=signals=>{const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{extends:true,signals}}}}]);const context={version:1,id:'consumer',specs:[provider,consumer]};
+    return {sent:plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(consumer,context)).nodes['fc::dcf'],{}).signals),warnings:findings(consumer,context).warnings.filter(w=>/keeps that requirement/.test(w))};};
+  let r=run({count:{honeycomb:NARROW_HC()}});
+  assert.equal(r.sent.count.error,'The provider asks each board to narrow this signal by event_code, and nothing narrows it here, so it is not shown.','the added signal restating the query is not shown');
+  assert.deepEqual(r.warnings,['sections[0].diagram.topologyImports[0].nodeTracking.dcf.telemetry.signals.count: this signal is added to the provider\'s binding on node dcf, whose signals must be narrowed by event_code; it keeps that requirement']);
+  r=run({count:{honeycomb:NARROW_HC(),narrow:{honeycomb:{filters:[flt('event_code','FULL_CHARGE')]}}},received:{narrow:{honeycomb:{filters:[flt('event_code','FULL_CHARGE')]}}}});
+  assert.equal(r.sent.count.error,undefined,'an added signal that narrows is shown');
+  assert.equal(r.sent.received.error,undefined,'the inherited signal narrowed here is shown');
+  assert.equal(r.warnings.length,1,'only the added signal is named');
+  const free=spec('provider',{nodes:{dcf:{title:'DCF',telemetry:{kind:'service',signals:{received:{honeycomb:NARROW_HC()}}}}},rows:[['dcf']],topologyExports:{core:{nodes:['dcf'],edges:[]}}});
+  const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{extends:true,signals:{count:{honeycomb:NARROW_HC()}}}}}}]);
+  assert.equal(plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[free,consumer]})).nodes['fc::dcf'],{}).signals.count).error,undefined,'a carrier without needsNarrow adds signals freely');
 });

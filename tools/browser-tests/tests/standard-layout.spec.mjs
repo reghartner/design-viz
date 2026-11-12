@@ -112,7 +112,7 @@ test('Arrange tile move and resize land on the first try with an Inspector edit 
   await page.getByRole('button',{name:'Hide arrangement controls',exact:true}).click();await expect(page.locator('.section-arrange-fields')).toBeHidden();
   await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
   await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
-  const outline=page.locator('#workspace-window-outline .workspace-window-close');if(await outline.isVisible())await outline.click();
+  const outline=page.locator('#workspace-window-outline .workspace-window-close');if(await outline.isVisible())await outline.press('Enter');
   const title=page.locator('#guide').getByLabel('Name',{exact:true}),tile=page.locator('[data-layout-key="panel:home"]');
   await expect(title).toHaveValue('Doorbell');
   const {cell,row}=await tileGrid(tile);

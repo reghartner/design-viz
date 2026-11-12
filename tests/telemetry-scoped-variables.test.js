@@ -18,8 +18,10 @@
 | V10 | (minor 2) A value in a SQL LIKE or ILIKE pattern string may hold no % or _. |
 | V11 | (minor 3) label_replace string arguments and LogQL regexp and pattern strings take the regex rule. |
 | V12 | (minor 4) TraceQL strings are "…" and `…` only: a ' does not open a string, so a placeholder after it takes the bare-token rule. |
-| V13 | (#1359 review c2 minor 1) SQL the scan cannot read safely fails closed, naming the form: a backslash before a quote, a MySQL # comment, a nested block comment, dollar quoting; standard doubled quotes still read. |
+| V13 | (#1359 review c2 minor 1, VARTEST-1359) SQL the scan cannot read in step (a backslash before a quote, a # , a nested or unclosed block comment, dollar quoting) takes only a plain token (letters, digits, . @ -, no --) wherever the placeholder sits; anything else is refused, naming the form; standard doubled quotes still read. |
 | V14 | (minor 2) A string anywhere in a SQL LIKE, ILIKE or SIMILAR TO operand (joined by || or inside CONCAT) takes the LIKE rule; a string after ~, ~*, !~, !~*, REGEXP or RLIKE takes the regex rule. |
+| V15 | (#1359 review c3) A % is refused at every SQL string placement (not only in a detected LIKE operand), so an operand the scan misreads cannot take one; _ stays refused in detected patterns only. Postgres ~~, ~~*, !~~ and !~~* are pattern operators. |
+| V16 | (VARTEST-1359) SQL bare refuses --; LogQL label_replace string arguments take the regex rule (a matcher inside the selector braces does not, in PromQL or LogQL); LogQL |> and !> pattern line filters refuse < and >; line_format and label_format templates refuse { and }; SQL SIMILAR TO refuses its pattern characters; a bare value inside a PromQL or LogQL [range] may not hold :; a Logs Insights parse glob refuses *. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const loader=require('../tools/source-loader.cjs');
@@ -180,7 +182,7 @@ test('V10 a SQL LIKE or ILIKE pattern string takes no % or _',()=>{
     assert.equal(scopedRun(q,{code:'FULL'}).error,undefined,op);
     assert.equal(scopedRun(q,{code:"x' OR '1'='1"}).error,unsafe('code','it would end the string it is filled into'));
   }
-  assert.equal(scopedRun({sql:"SELECT count(*) FROM events WHERE code = '${code}'"},{code:'a%'}).error,undefined,'= takes % literally');
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM events WHERE code = '${code}'"},{code:'a_b'}).error,undefined,'= takes _ literally');
 });
 
 test('V11 label_replace arguments and LogQL regexp and pattern strings take the regex rule',()=>{
@@ -204,12 +206,16 @@ test('V13 SQL the scan cannot read safely fails closed, naming the form',()=>{
   const form=f=>unsafe('code','this SQL query uses '+f+', which Flowview cannot read safely');
   const cases=[
     ["SELECT count(*) FROM t WHERE path = 'C:\\' AND code = ${code}",'a backslash before a quote'],
-    ["SELECT count(*) FROM t # it's\nWHERE code = ${code}",'a # comment'],
+    ["SELECT count(*) FROM t # it's\nWHERE code = ${code}",'a # (MySQL comment, or a Postgres #> / # operator)'],
     ["SELECT count(*) FROM t /* a /* b */ it's */ WHERE code = ${code}",'a nested block comment'],
     ["SELECT count(*) FROM t WHERE note = $$it's$$ AND code = ${code}",'dollar quoting'],
     ["SELECT count(*) FROM t WHERE note = $tag$it's$tag$ AND code = '${code}'",'dollar quoting'],
     ["SELECT count(*) FROM t /* unclosed WHERE code = ${code}",'an unclosed block comment']];
-  for(const [q,f] of cases)for(const v of ['1 OR 1=1','FULL'])assert.equal(scopedRun({sql:q},{code:v}).error,form(f),q+' / '+v);
+  // VARTEST-1359: such SQL takes only a plain token, wherever the placeholder sits.
+  for(const [q,f] of cases){
+    for(const v of ['1 OR 1=1','1--','a"b',"a'b",'a_b','a%'])assert.equal(scopedRun({sql:q},{code:v}).error,form(f),q+' / '+v);
+    assert.equal(scopedRun({sql:q},{code:'FULL-1'}).error,undefined,q+' takes a plain token');
+  }
   const doubled={sql:"SELECT count(*) FROM t WHERE name = 'it''s' AND code = '${code}'"};
   assert.equal(scopedRun(doubled,{code:'FULL'}).query,"SELECT count(*) FROM t WHERE name = 'it''s' AND code = 'FULL'",'standard doubled quotes still read');
   assert.equal(scopedRun(doubled,{code:"x' OR '1'='1"}).error,unsafe('code','it would end the string it is filled into'));
@@ -227,6 +233,48 @@ test('V14 SQL LIKE operands and regex operators',()=>{
     for(const v of ['.*','A|B'])assert.equal(scopedRun(q,{code:v}).error,regex,op+' '+v);
     assert.equal(scopedRun(q,{code:'FULL'}).error,undefined,op);
   }
-  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE code = '${code}' AND name LIKE 'x%'"},{code:'a%'}).error,undefined,'a string before the LIKE is not its operand');
-  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE name LIKE 'x%' AND code = '${code}'"},{code:'a%'}).error,undefined,'nor one after AND');
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE code = '${code}' AND name LIKE 'x%'"},{code:'a_b'}).error,undefined,'a string before the LIKE is not its operand');
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE name LIKE 'x%' AND code = '${code}'"},{code:'a_b'}).error,undefined,'nor one after AND');
+});
+
+test('V15 a % is refused in every SQL string; Postgres ~~ operators are patterns',()=>{
+  const pct=unsafe('code','it is filled into a SQL string and holds %, which a LIKE pattern reads as a wildcard');
+  for(const q of ["SELECT count(*) FROM t WHERE code = '${code}'","SELECT count(*) FROM t WHERE code LIKE /* and */ '${code}'","SELECT count(*) FROM t WHERE code LIKE CONCAT(t.order, '${code}')",
+    "SELECT count(*) FROM t WHERE code LIKE '%' || CAST(n AS text) || '${code}'","SELECT count(*) FROM t WHERE code LIKE CONCAT(\"a and b\", '${code}')"])
+    assert.equal(scopedRun({sql:q},{code:'a%'}).error,pct,q);
+  const like=unsafe('code','it is filled into a LIKE pattern and holds % or _');
+  for(const op of ['~~','~~*','!~~','!~~*']){
+    const q={sql:"SELECT count(*) FROM t WHERE code "+op+" '${code}'"};
+    assert.equal(scopedRun(q,{code:'a_b'}).error,like,op);
+    assert.equal(scopedRun(q,{code:'A.B'}).error,undefined,op+' is a pattern, not a regex');
+  }
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE code = '${code}'"},{code:'full_charge'}).error,undefined,'_ outside a pattern is fine');
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE code LIKE '${code}'"},{code:'full_charge'}).error,like,'_ in a pattern is refused: compare with = instead');
+});
+
+test('V16 VARTEST-1359 boundaries: comment openers, label_replace, pattern filters, templates, SIMILAR TO, ranges, parse globs',()=>{
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM events WHERE code = ${code} AND tenant = 'acme'"},{code:'1--'}).error,unsafe('code','outside a string it may not hold --, which starts a SQL comment'));
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM events WHERE code = ${code} AND tenant = 'acme'"},{code:'-1'}).error,undefined,'a negative number is fine');
+  const regex=unsafe('code','it is filled into a regex and holds regex characters');
+  assert.equal(scopedRun({loki:'label_replace(sum by (src) (count_over_time({app="dcf"}[5m])), "dst", "$1", "src", "${code}")'},{code:'.*'}).error,regex,'LogQL label_replace');
+  assert.equal(scopedRun({loki:'label_replace(count_over_time({app="dcf", code="${code}"}[5m]), "dst", "$1", "src", "(.*)")'},{code:'svc.name'}).error,undefined,'a LogQL matcher inside the selector is literal');
+  assert.equal(scopedRun({grafana:'label_replace(up{job="dcf", code="${code}"}, "dst", "$1", "src", "(.*)")'},{code:'svc.name'}).error,undefined,'a PromQL matcher inside label_replace\'s selector is literal');
+  for(const op of ['|>','!>']){
+    const q={loki:'sum(count_over_time({app="dcf"} '+op+' "${code}" [5m]))'};
+    assert.equal(scopedRun(q,{code:'<_>'}).error,unsafe('code','it is filled into a pattern line filter and holds < or >'),op);
+    assert.equal(scopedRun(q,{code:'full_charge'}).error,undefined,op+': _ alone is literal');
+  }
+  for(const q of ['sum(count_over_time({app="dcf"} | line_format "code=${code} {{.msg}}" [5m]))','sum(count_over_time({app="dcf"} | label_format dst="${code} {{.src}}" [5m]))'])
+    assert.equal(scopedRun({loki:q},{code:'{{.secret}}'}).error,unsafe('code','it is filled into a line_format or label_format template and holds { or }'),q);
+  const similar={sql:"SELECT count(*) FROM events WHERE code SIMILAR TO '${code}'"};
+  for(const v of ['a|b','a+','(a)','[ab]','a*'])assert.equal(scopedRun(similar,{code:v}).error,unsafe('code','it is filled into a SIMILAR TO pattern and holds pattern characters'),v);
+  assert.equal(scopedRun(similar,{code:'svc.name'}).error,undefined,'. is literal in SIMILAR TO');
+  for(const q of [{grafana:'sum(rate(x_total{job="dcf"}[${code}]))'},{loki:'sum(count_over_time({app="dcf"}[${code}]))'}]){
+    assert.equal(scopedRun(q,{code:'5m:1m'}).error,unsafe('code','inside a range it may not hold :, which turns the range into a subquery'));
+    assert.equal(scopedRun(q,{code:'5m'}).error,undefined);
+  }
+  const glob={cloudwatchLogs:{logGroups:['g'],query:'parse @message "code=${code} took *ms" as t | stats count() as n',region:'us-east-1',valueField:'n'}};
+  assert.equal(scopedRun(glob,{code:'a*'}).error,unsafe('code','it is filled into a parse pattern and holds *'));
+  assert.equal(scopedRun(glob,{code:'FULL'}).error,undefined);
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM events WHERE code LIKE N'${code}'"},{code:'a_b'}).error,unsafe('code','it is filled into a LIKE pattern and holds % or _'),'an N-prefixed string is a string');
 });

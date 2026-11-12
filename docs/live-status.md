@@ -3381,8 +3381,12 @@ literal, never expanded, and the same in every environment.
   travel with an import.
 - **Never escaping or widening.** A scoped value is filled into the provider's query only
   where it cannot change its meaning: inside a string it holds no quote of that kind, no
-  `\` and no control character; inside a regex (`=~`, `!~`, `|~`, a Logs `/regex/`) no
-  regex character; outside a string only letters, digits and `. _ : - @`. Otherwise the
+  `\` and no control character; inside a regex (`=~`, `!~`, `|~`, a Logs `/regex/`, a
+  `label_replace` argument, a LogQL `regexp` or `pattern` string) no regex character; in a
+  SQL `LIKE`/`ILIKE` pattern no `%` or `_`; outside a string only letters, digits and
+  `. _ : - @`. The scan skips the provider's comments (SQL `--` and block comments; `#`
+  in PromQL, LogQL and Logs Insights), and a placeholder inside one is refused. TraceQL
+  strings are `"…"` and `` `…` `` only. Otherwise the
   signal is not shown: "Variable ${code} from this import or carrier cannot be filled in
   safely here (…)". A narrowing fragment that uses a scoped value is checked again after
   it is filled in. Board-wide and profile variables keep their meaning.

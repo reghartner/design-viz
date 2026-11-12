@@ -297,17 +297,28 @@ function telemetryScopedVariables(value,warn,at){
 /* #1357: why a scoped value cannot be filled into a provider's text query safely, or null. Inside
    a string it may not end that string (its quote, a \ or a control character); in a regex it may
    hold no regex character, so it cannot widen the match; outside a string it is a plain token. */
-var TELEMETRY_SCOPED_QUOTES={loki:'"`',grafana:'"\'`',tempo:'"\'`',sql:'\'"`',cloudwatchLogs:'"\'`'};
+// String quotes per language. TraceQL strings are "…" and `…` only (Tempo's lexer); a ' is not one.
+var TELEMETRY_SCOPED_QUOTES={loki:'"`',grafana:'"\'`',tempo:'"`',sql:'\'"`',cloudwatchLogs:'"\'`'};
+/* Where a placeholder sits in a provider query (#1359 review): a forward scan that skips strings
+   (with their escapes) and comments (SQL -- and block comments; # in PromQL, LogQL and Logs
+   Insights), and keeps the function call each ( opens. A placeholder in a comment, or in a string
+   the scan cannot place, gets no permissive rule. */
 function telemetryScopedPlacement(source,text,index){
-  var quotes=TELEMETRY_SCOPED_QUOTES[source] || '"\'`',quote=null,opened=-1;
+  var quotes=TELEMETRY_SCOPED_QUOTES[source] || '"\'`',quote=null,opened=-1,calls=[],openedIn=null;
   for(var i=0;i<index;i++){
     var c=text[i];
-    if(quote){if(quote!=='`' && c==='\\'){i++;continue;}if(c===quote)quote=null;continue;}
-    if(quotes.indexOf(c)>=0 || source==='cloudwatchLogs' && c==='/' && typeof telemetryLogsRegexOpens==='function' && telemetryLogsRegexOpens(text.slice(0,i))){quote=c;opened=i;}
+    if(quote){if(quote!=='`' && quote!=='/' && c==='\\'){i++;continue;}if(quote==='/' && c==='\\'){i++;continue;}if(c===quote)quote=null;continue;}
+    var comment=source==='sql'?(text.slice(i,i+2)==='--'?'\n':text.slice(i,i+2)==='/*'?'*/':null):(source==='grafana' || source==='loki' || source==='cloudwatchLogs') && c==='#'?'\n':null;
+    if(comment){var end=text.indexOf(comment,i+(comment==='*/'?2:1));if(end<0 || end>=index)return {comment:true};i=end+comment.length-1;continue;}
+    if(c==='('){var callee=/([A-Za-z_][A-Za-z0-9_]*)\s*$/.exec(text.slice(0,i));calls.push(callee?callee[1].toLowerCase():'');continue;}
+    if(c===')'){calls.pop();continue;}
+    if(quotes.indexOf(c)>=0 || source==='cloudwatchLogs' && c==='/' && typeof telemetryLogsRegexOpens==='function' && telemetryLogsRegexOpens(text.slice(0,i))){quote=c;opened=i;openedIn=calls[calls.length-1] || '';}
   }
   if(!quote)return {string:false};
   var before=text.slice(0,opened).replace(/\s+$/,'');
-  return {string:true,quote:quote,regex:quote==='/' || source!=='cloudwatchLogs' && source!=='sql' && /(?:=~|!~|\|~)$/.test(before)};
+  var regex=quote==='/' || source!=='cloudwatchLogs' && source!=='sql' && /(?:=~|!~|\|~)$/.test(before) ||
+    source==='grafana' && openedIn==='label_replace' || source==='loki' && /\|\s*(?:regexp|pattern)$/.test(before);
+  return {string:true,quote:quote,regex:regex,pattern:source==='sql' && /\b(?:i?like|similar\s+to)$/i.test(before)};
 }
 function telemetryScopedValueProblem(source,query,scoped){
   var texts=[];
@@ -321,7 +332,9 @@ function telemetryScopedValueProblem(source,query,scoped){
     while((hit=re.exec(texts[t]))){
       var name=hit[1];if(!telemetryOwn(scoped,name))continue;
       var value=String(scoped[name]),at=telemetryScopedPlacement(source,texts[t],hit.index),why=null;
-      if(at.string && at.regex && /[.*+?()\[\]{}|^$\\\/]/.test(value))why='it is filled into a regex and holds regex characters';
+      if(at.comment)why='it sits in a comment of the provider\'s query';
+      else if(at.string && at.regex && /[.*+?()\[\]{}|^$\\\/]/.test(value))why='it is filled into a regex and holds regex characters';
+      else if(at.string && at.pattern && /[%_]/.test(value))why='it is filled into a LIKE pattern and holds % or _';
       else if(at.string && (value.indexOf(at.quote)>=0 || value.indexOf('\\')>=0 || /[\x00-\x1f\x7f]/.test(value)))why='it would end the string it is filled into';
       else if(!at.string && !/^[A-Za-z0-9_.:@-]+$/.test(value))why='outside a string it may hold only letters, digits and . _ : - @';
       if(why)return 'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';

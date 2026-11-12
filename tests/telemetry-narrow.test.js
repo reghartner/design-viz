@@ -20,8 +20,8 @@
 | N13 | (#1354) LogQL fragment safety: one line filter (with or chains), label filter expression or parser per entry; anything else fails closed: a second "|", [ ] { }, #, a newline, unbalanced quotes or parentheses, a refused stage (line_format, label_format, unwrap, drop, keep, decolorize, distinct); a variable value that breaks the stage says so. |
 | N14 | (#1354) PromQL placement (keywords are case-insensitive, #1356 c1 minor 3): the matcher text goes into every vector selector, inside its braces or as braces after a bare metric name; by/without/on/ignoring/group_left/group_right lists are skipped; ranges with $__rate_interval stay; a $var outside strings and ranges, an unknown token, or no selector fails closed. |
 | N15 | (#1354) PromQL fragment safety: matcher text only (label op "value" joined by commas); a }, or, unless, a trailing comma, an unquoted value or a newline fails closed. |
-| N16 | (#1354) Logs Insights placement: "| filter …" before the first stats, or at the end; breakdown and trend queries are narrowed too, and a failure there sets only their own error; a limit or dedup before the insertion point fails closed. A provider parse /regex/ is opaque, a / elsewhere is a division, and provider text is never rewritten (#1356 review c1 MAJOR 2). |
-| N17 | (#1354) Logs Insights fragment safety: one filter command; a "|", "#", a newline, unbalanced quotes or a non-filter command fails closed; /regex/ is masked only after a standalone like, not like or =~ (#1356 review c1 MAJOR 1: x.like / … is a division). |
+| N16 | (#1354) Logs Insights placement: "| filter …" before the first stats, or at the end; breakdown and trend queries are narrowed too, and a failure there sets only their own error; only fields, filter, filterIndex, parse, sort, unmask, unnest and SOURCE may come before the insertion point; any other command fails closed, named (#1356 review c2). A provider's parse <field> /regex/ at command start, and like, not like or =~ after an operand, are opaque; any other / is a division; provider text is never rewritten (#1356 review c1 MAJOR 2, c2). |
+| N17 | (#1354) Logs Insights fragment safety: one filter command; a "|", "#", a newline, unbalanced quotes or a non-filter command fails closed; a board's fragment may hold no / outside a quoted string (no regex literal, no division; #1356 review c1 MAJOR 1 and c2 MAJOR). |
 | N18 | (#1354) needsNarrow pins with text: a PromQL or LogQL label "=" with a value; a Logs Insights top-level and chain of field = value or field in [...] (no parentheses or functions); a fragment with or (or not) pins nothing; true is met by a LogQL |= line filter whose every alternative is non-empty. |
 | N19 | (#1353 review c1 minor 5) A narrowed Honeycomb trace search (query_spec) is not shown, with a narrowing reason. |
 | N11 | (minor 6) The text view prints "Not shown: <reason>" for a fail-closed signal instead of its provider query; a narrowed signal prints the narrowed query. |
@@ -268,7 +268,7 @@ test('N16 Logs Insights: "| filter …" before the first stats, or at the end; b
   ok('fields @message | filter level="error" | stats count() as n','filter code = "E1"','fields @message | filter level="error" | filter code = "E1" | stats count() as n');
   ok('filter a = 1 | stats count() as n | stats sum(n) as m','filter code = "E1"','filter a = 1 | filter code = "E1" | stats count() as n | stats sum(n) as m');
   ok('fields @timestamp, @message','filter code = "E1"','fields @timestamp, @message | filter code = "E1"');
-  ok('fields @message | stats count() as n',['filter a = 1','filter b like /x|y/'],'fields @message | filter a = 1 | filter b like /x|y/ | stats count() as n');
+  ok('fields @message | stats count() as n',['filter a = 1','filter b like "x|y"'],'fields @message | filter a = 1 | filter b like "x|y" | stats count() as n');
   const r=logs('filter a = 1 | stats count() as n','filter code = "E1"',{breakdown:{query:'filter a = 1 | stats count() as n by clientId | sort n desc | limit 20',labelField:'clientId',valueField:'n',limit:20},trend:{query:'filter a = 1 | stats count() as n by bin(1h)',timeField:'bin(1h)',valueField:'n'}});
   assert.equal(r.query.breakdown.query,'filter a = 1 | filter code = "E1" | stats count() as n by clientId | sort n desc | limit 20','a limit after stats is fine');
   assert.equal(r.query.trend.query,'filter a = 1 | filter code = "E1" | stats count() as n by bin(1h)');
@@ -278,17 +278,27 @@ test('N16 Logs Insights: "| filter …" before the first stats, or at the end; b
   ok('parse /(?<a>[^#]+)/ | stats count() as n','filter tenant = "A"','parse /(?<a>[^#]+)/ | filter tenant = "A" | stats count() as n');
   ok('fields a|filter b = 1|stats sum(bytes)/1024 as kb','filter tenant = "A"','fields a|filter b = 1|filter tenant = "A" | stats sum(bytes)/1024 as kb');
   ok('fields  bytes / 1024 as kb ','filter tenant = "A"','fields  bytes / 1024 as kb | filter tenant = "A"');
-  assert.deepEqual(logs('fields a | limit 10 | stats count() as n','filter code = "E1"'),{kind:'placement',error:'This Logs Insights query has limit or dedup before its stats, so a filter cannot be added safely; it is not shown.'});
+  assert.deepEqual(logs('fields a | limit 10 | stats count() as n','filter code = "E1"'),{kind:'placement',error:'This Logs Insights query has a limit command before its stats, so a filter cannot be added safely; it is not shown.'});
+  // #1356 review c2: before the insertion point only known commands are accepted; any other fails closed, named.
+  for(const [q,word] of [['fields a | head 10 | stats count() as n','head'],['pattern @message | stats count() as n','pattern'],['fields a | diff | stats count() as n','diff'],['dedup a | stats count() as n','dedup'],['fields a | display a','display']])
+    assert.deepEqual(logs(q,'filter code = "E1"'),{kind:'placement',error:'This Logs Insights query has a '+word+' command before its stats, so a filter cannot be added safely; it is not shown.'},q);
+  ok('SOURCE logGroups(namePrefix: ["/aws"]) | fields a | filterIndex region = "x" | unmask @message | unnest x into y | sort @timestamp desc | stats count() as n','filter code = "E1"','SOURCE logGroups(namePrefix: ["/aws"]) | fields a | filterIndex region = "x" | unmask @message | unnest x into y | sort @timestamp desc | filter code = "E1" | stats count() as n');
+  // The provider's regex: parse <field> /…/ only at command start; like and =~ only after an operand.
+  ok('fields a|parse @message /a|b/|stats count() as n','filter code = "E1"','fields a|parse @message /a|b/|filter code = "E1" | stats count() as n');
+  ok('filter m like /a|stats x/ | stats count() as n','filter code = "E1"','filter m like /a|stats x/ | filter code = "E1" | stats count() as n');
+  ok('filter m not like /x|y/ and k =~ /p|q/ | stats count() as n','filter code = "E1"','filter m not like /x|y/ and k =~ /p|q/ | filter code = "E1" | stats count() as n');
+  ok('filter parse / 2 > 1 | stats count() as n','filter code = "E1"','filter parse / 2 > 1 | filter code = "E1" | stats count() as n');
+  ok('filter like / 2 > 1 | stats count() as n','filter code = "E1"','filter like / 2 > 1 | filter code = "E1" | stats count() as n');
   const side=logs('stats count() as n','filter code = "E1"',{breakdown:{query:'dedup clientId | stats count() as n by clientId',labelField:'clientId',valueField:'n',limit:20}});
   assert.equal(side.error,undefined,'the total is still narrowed and shown');
-  assert.equal(side.breakdownError,'This Logs Insights query has limit or dedup before its stats, so a filter cannot be added safely; it is not shown.');
+  assert.equal(side.breakdownError,'This Logs Insights query has a dedup command before its stats, so a filter cannot be added safely; it is not shown.');
   const s=plain(C.carrierTelemetry({telemetry:{kind:'service',signals:{fail:{cloudwatchLogs:{logGroups:['g'],query:'stats count() as n',region:'us-east-1',valueField:'n',breakdown:{query:'dedup c | stats count() as n by c',labelField:'c',valueField:'n',limit:20}},narrow:{cloudwatchLogs:'filter code = "E1"'}}}}},{}).signals.fail);
   assert.equal(s.error,undefined);assert.equal(s.query.query,'filter code = "E1" | stats count() as n');
-  assert.match(s.breakdownError,/limit or dedup before its stats/,'only the details query fails');
+  assert.match(s.breakdownError,/has a dedup command before its stats/,'only the details query fails');
 });
 
 test('N17 Logs Insights: one filter command; every escape attempt fails closed',()=>{
-  for(const frag of ['filter a = "x"','FILTER a in ["x","y"]','filter @message like /a|b#c/','filter a = \'x\' and b != 2'])assert.equal(logs('stats count() as n',frag).error,undefined,frag);
+  for(const frag of ['filter a = "x"','FILTER a in ["x","y"]','filter @message like "a|b#c"','filter a = \'x\' and b != 2'])assert.equal(logs('stats count() as n',frag).error,undefined,frag);
   const bad=(frag,why)=>assert.deepEqual(logs('stats count() as n',frag),{kind:'shape',written:true,error:'A Logs Insights narrowing of this signal is not valid ('+why+'), so it is not shown.'},JSON.stringify(frag));
   bad('filter a = "x" | stats count() as n','one filter command: this one has a "|"');
   bad('filter a = "x" # c','"#" would comment out the rest of the query');
@@ -296,10 +306,12 @@ test('N17 Logs Insights: one filter command; every escape attempt fails closed',
   bad('filter a = "x','its quotes are unbalanced');
   bad('fields a','a Logs Insights narrowing is one filter command');
   // #1356 review c1 MAJOR 1: a regex opens only after a standalone like, not like or =~; x.like / … is a division.
-  bad('filter x.like / 1 or 1 = 1 | stats count(*) as n # / and tenant = "A"','"#" would comment out the rest of the query');
-  bad('filter x.like / 2 | stats sum(bytes) as n | filter n / 1 > 0','one filter command: this one has a "|"');
-  assert.match(narrow('cloudwatchLogs',{logGroups:['g'],query:'stats count() as n',region:'us-east-1'},{cloudwatchLogs:'filter tenant = "A" and x.like / 1 or 1 / 1 = 1'},['tenant']).error || '',/narrow this signal by tenant/,'an or outside any regex pins nothing');
-  for(const frag of ['filter @message not like /a|b/','filter (@message like /a|b/)','filter x =~ /a|b/'])assert.equal(logs('stats count() as n',frag).error,undefined,frag);
+  bad('filter x.like / 1 or 1 = 1 | stats count(*) as n # / and tenant = "A"','a Logs Insights narrowing may not contain / (use like \"text\" or a quoted string)');
+  bad('filter x.like / 2 | stats sum(bytes) as n | filter n / 1 > 0','a Logs Insights narrowing may not contain / (use like \"text\" or a quoted string)');
+  // #1356 review c2 MAJOR: a board's fragment holds no / at all: no regex literal, no division.
+  for(const frag of ['filter parse / 1 or 1 = 1 | stats count(*) as n # / and tenant = "A"','filter like / 1 or 1 = 1 | stats count(*) as n # / and tenant = "A"','filter tenant = "A" and parse / 1 or 1 / 1 = 1','filter tenant = "A" and like / 1','filter @message like /a|b/','filter x =~ /a/','filter bytes / 2 > 1','filter m not like /x/'])bad(frag,'a Logs Insights narrowing may not contain / (use like \"text\" or a quoted string)');
+  assert.match(narrow('cloudwatchLogs',{logGroups:['g'],query:'stats count() as n',region:'us-east-1'},{cloudwatchLogs:'filter tenant = "A" and x.like / 1 or 1 / 1 = 1'},['tenant']).error || '',/may not contain \//,'refused outright, so it never counts as narrowing by tenant');
+  for(const frag of ['filter @message like "a/b"','filter @message not like "x"','filter path = "/a/b"'])assert.equal(logs('stats count() as n',frag).error,undefined,'a / inside a string is fine: '+frag);
   bad('stats count()','a Logs Insights narrowing is one filter command');
 });
 
@@ -313,7 +325,7 @@ test('N18 needsNarrow pins with text fragments',()=>{
   assert.ok(!met('loki','{a="b"}','!= "FULL"',true));
   const q={logGroups:['g'],query:'stats count() as n',region:'us-east-1'};
   assert.ok(met('cloudwatchLogs',q,'filter code = "E1"',['code']));assert.ok(met('cloudwatchLogs',q,'filter code in ["a","b"]',['code']));
-  for(const f of ['filter code = "E1" or x = 1','filter not code = "E1"','filter code != "E1"','filter code like /E/'])assert.ok(!met('cloudwatchLogs',q,f,['code']),f);
+  for(const f of ['filter code = "E1" or x = 1','filter not code = "E1"','filter code != "E1"','filter code like "E"'])assert.ok(!met('cloudwatchLogs',q,f,['code']),f);
   // #1356 review c1 minors 1 and 2.
   assert.ok(!met('loki','{a="b"}','|= "x" or ""',true),'an empty alternative matches every line');
   assert.ok(met('loki','{a="b"}','|= "x" or "y"',true));

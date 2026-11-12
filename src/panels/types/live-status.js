@@ -643,15 +643,16 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
     function revealLoadedTrace(){
       var target=traceRevealTarget();if(target && target.getClientRects && target.getClientRects().length)revealInView(target,false);
     }
-    /* #1411 (Chuck 2026-11-12: "stay ON THE PAGE so it's always next to the diagram"): in the Trace view the panel body
-       scrolls inside the card and the card never reaches past what the reader can see.
+    /* #1411 (Chuck 2026-11-12: "stay ON THE PAGE"): in the Trace view the panel body scrolls inside the card, and the card's
+       height is capped to the visible page.
        - In a fixed-size Explore window the card fills the window body (dv-live-fill, CSS only).
        - Elsewhere (no section layout, a tile that grows to its content, an automatic Explore window, the Workbench
-         previews) the card is capped at the bottom of its bounding scroller: the window,
-         or the nearest scrolling ancestor that overflows (the Workbench page preview), kept once chosen so the cap does not
-         flip between the two. Lengths are divided by the card's scale (a scaled Explore window).
-       As the last card of its column it is also sticky below the reader's bar (a card after it would slide under it).
-       The cap is measured on each paint and, once per frame, after a resize or any scroll while the Trace view is shown. */
+         previews) the card's max-height runs from its top to the bottom of its bounding scroller: the window, or the
+         nearest scrolling ancestor that overflows (the Workbench page preview), kept once chosen so the cap does not flip
+         between the two. Lengths are divided by the card's scale (a scaled Explore window). The card is pinned (sticky)
+         below the reader's bar only when it is the last card in its column; a card after it would slide under it.
+       The cap is re-measured on each paint and, once per frame, after a resize or any scroll while the Trace view is shown.
+       A hidden card or a hidden bounding scroller keeps the last cap. */
     function boundingScroller(card,view){
       if(card._liveBound && !(card._liveBound.contains && card._liveBound.contains(card)))card._liveBound=null;
       for(var at=card.parentElement || (card.parentNode && card.parentNode.host) || null;at && at!==doc.body && at!==doc.documentElement;at=at.parentElement || (at.parentNode && at.parentNode.host) || null){
@@ -667,6 +668,8 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
       if(!view || !view.getComputedStyle || !card.getBoundingClientRect || !card.style || !card.style.setProperty)return;
       var win=card.closest && card.closest('.explore-window'),fill=!!(win && !win.classList.contains('explore-window-automatic'));
       card.classList.toggle('dv-live-fill',fill);card.classList.toggle('dv-live-on-page',!fill);if(fill)return;
+      // A hidden card (the Status panel hidden at a step) has no box: keep the last cap until it shows again.
+      if(card.getClientRects && !card.getClientRects().length)return;
       // Sticky only as the last card of its column: a card after it (a log panel, Status controls) would slide under it.
       var follows=false;for(var next=card.nextElementSibling;next;next=next.nextElementSibling)if(next.classList && next.classList.contains('pwidget') && next.getClientRects && next.getClientRects().length){follows=true;break;}
       card.classList.toggle('dv-live-sticky',!follows);

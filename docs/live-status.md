@@ -2669,13 +2669,15 @@ trace** are icons at the right end of the request line, outside its summary, wit
 those accessible names. The request card also holds **Pin as evidence**, **Source
 and limitations** and **All operation mappings**. A header row, "Spans · 55 · click
 a span to focus it on the diagram", sits above the span list. The list has no
-scroll bar of its own: it is as tall as its spans (#1280). The panel stays on the
-page next to the diagram (#1411): on screen, the Trace view's Status panel sticks
-below the reader's bar and ends at the bottom of the window (or of the scrolling
-Workbench preview that holds it), at least 160 px tall; in a fixed-size Explore
-window it fills the window. Its body (span list, focused-span detail, log search
-results, request details) is the one scroller, in Edit mode too, and the page does
-not scroll for the trace. Printing shows the whole list. A focused span's detail
+scroll bar of its own: it is as tall as its spans (#1280). In the Trace view the
+Status panel's height is capped to the visible page (#1411): on screen, it ends at
+the bottom of the window (or of the scrolling Workbench preview that holds it), at
+least 160 px tall, and the cap is measured again on a scroll or a resize. In a
+fixed-size Explore window the panel fills the window. The panel is pinned (sticky)
+below the reader's bar only when it is the last card in its column. Its body (span
+list, focused-span detail, log search results, request details) is the one
+scroller, in Edit mode too, and the page does not scroll for the trace. Printing
+shows the whole list. A focused span's detail
 (duration, service, operation, the matched step or the step choices, **Clear trace
 focus**) opens directly under its row. A span the reader focuses (a row, a step
 choice, or the log line it was loaded from) is scrolled into view by the least

@@ -117,8 +117,19 @@ test('Arrange tile move and resize land on the first try with an Inspector edit 
   await expect(title).toHaveValue('Doorbell');
   const {cell,row}=await tileGrid(tile);
   await title.fill('Pending before move');
+  // TEMPORARY #1375 diagnostics: event order and handle state around the press.
+  await page.evaluate(()=>{
+    const out=window.__dv1375=[],desc=el=>el?String(el.className && el.className.baseVal!==undefined?el.tagName:el.className || el.tagName).slice(0,60)+(el.isConnected?'':'(detached)'):'null';
+    const state=()=>'active='+desc(document.activeElement)+' arranging='+document.querySelectorAll('.section-arranging').length+' handles='+document.querySelectorAll('.section-tile-move').length+' dragging='+document.querySelectorAll('.layout-dragging').length+' note='+JSON.stringify(document.querySelector('.layout-preview-tools .fnote')?.textContent||'')+' popovers='+Array.from(document.querySelectorAll(':popover-open')).map(desc).join('|');
+    let moves=0;
+    window.addEventListener('pointerdown',ev=>{out.push('down target='+desc(ev.target)+' hit='+desc(document.elementFromPoint(ev.clientX,ev.clientY))+' at '+ev.clientX+','+ev.clientY+' '+state());setTimeout(()=>out.push('after-down target='+desc(ev.target)+' hit='+desc(document.elementFromPoint(ev.clientX,ev.clientY))+' '+state()),0);},true);
+    window.addEventListener('pointermove',ev=>{if(moves++<2 && ev.buttons)out.push('move target='+desc(ev.target)+' '+state());},true);
+    for(const t of ['focusout','focusin','pointerup','gotpointercapture','lostpointercapture','pointercancel','click'])window.addEventListener(t,ev=>out.push(t+' target='+desc(ev.target)+' '+state()),true);
+    document.getElementById('src').addEventListener('input',()=>out.push('src input'));
+  });
   await tileDrag(page,tile.locator('.section-tile-move'),4*cell,-8*row);
   console.log('#1375 tile move feedback:',JSON.stringify(await page.locator('.fnote').allTextContents()));
+  console.log('#1375 tile move events:\n'+(await page.evaluate(()=>window.__dv1375)).join('\n'));
   await expect(page.locator('#src')).toHaveValue(/Pending before move/);
   expect(homeItem(await page.locator('#src').inputValue())).toMatchObject({x:12,y:16,w:4,h:8});
   await expect.poll(()=>tile.evaluate(el=>['--tile-x','--tile-y','--tile-w','--tile-h'].map(k=>Number(el.style.getPropertyValue(k))))).toEqual([13,17,4,8]);

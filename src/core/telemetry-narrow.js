@@ -19,16 +19,24 @@ function telemetryNarrowCanonical(v){
   return JSON.stringify(v===undefined?null:v);
 }
 /* #1354 text fragments. Strings are masked first: each character inside quotes becomes "x", so
-   structure (pipes, braces, comments) is read only outside strings. regex masks a Logs Insights
-   /regex/ only where Logs Insights reads one: after a standalone like or not like, after =~, or
-   after parse and its field. Any other / is a division (x.like / 1 is one, #1356 review). null
-   when a string never closes. */
-var TELEMETRY_LOGS_REGEX_BEFORE=/(?:(?:^|[\s(])(?:not\s+)?like|=~|(?:^|[\s(|])parse(?:\s+[@A-Za-z_][\w.@]*)?)\s*$/i;
+   structure (pipes, braces, comments) is read only outside strings. regex (provider Logs Insights
+   query text only, never a board's fragment, which may hold no / at all) also masks a /regex/
+   where Logs Insights reads one: after parse <field> at the start of a command, and after like,
+   not like or =~ that follow an operand. Any other / is a division (#1356 review). null when a
+   string never closes. */
+var TELEMETRY_LOGS_NOT_OPERANDS=['filter','and','or','not','parse','like','in','by','as','fields','stats','sort'];
+function telemetryLogsRegexOpens(before){
+  if(/(?:^|\|)\s*parse(?:\s+(?:[@A-Za-z_][\w.@]*|`[^`]*`))?\s*$/i.test(before))return true;
+  var hit=/(\S+)\s+not\s+like\s*$/i.exec(before) || /(\S+)\s+like\s*$/i.exec(before) || /(\S+?)\s*!?=~\s*$/.exec(before);
+  if(!hit)return false;
+  var operand=hit[1];
+  return /[A-Za-z0-9_@.`"')\]]$/.test(operand) && TELEMETRY_LOGS_NOT_OPERANDS.indexOf(operand.toLowerCase())<0;
+}
 function telemetryNarrowMask(text,quotes,regex){
   var out='',i=0,n=text.length;
   while(i<n){
     var c=text[i];
-    if(quotes.indexOf(c)>=0 || regex && c==='/' && TELEMETRY_LOGS_REGEX_BEFORE.test(text.slice(0,i))){
+    if(quotes.indexOf(c)>=0 || regex && c==='/' && telemetryLogsRegexOpens(text.slice(0,i))){
       var j=i+1;out+=c;
       while(j<n && text[j]!==c){if(c!=='`' && text[j]==='\\'){out+=j+1<n?'xx':'x';j+=2;continue;}out+='x';j++;}
       if(j>=n)return null;
@@ -93,8 +101,10 @@ function telemetryLogsFragmentProblem(fragment){
   var command='a Logs Insights narrowing is one filter command';
   if(typeof fragment!=='string' || !fragment.trim())return command;
   if(/[\r\n]/.test(fragment))return 'a narrowing is one line';
-  var t=fragment.trim(),m=telemetryNarrowMask(t,'"\'`',true);
+  // A board's fragment is masked for strings only: any / left is refused (#1356 review c2).
+  var t=fragment.trim(),m=telemetryNarrowMask(t,'"\'`');
   if(m===null)return 'its quotes are unbalanced';
+  if(m.indexOf('/')>=0)return 'a Logs Insights narrowing may not contain / (use like "text" or a quoted string)';
   if(m.indexOf('#')>=0)return '"#" would comment out the rest of the query';
   if(m.indexOf('|')>=0)return 'one filter command: this one has a "|"';
   if(!/^filter\s+\S/i.test(m))return command;
@@ -179,6 +189,7 @@ function telemetryPromPlace(query,text){
   });
   return {query:out};
 }
+var TELEMETRY_LOGS_BEFORE_FILTER=['fields','filter','filterindex','parse','sort','unmask','unnest','source'];
 function telemetryLogsPlace(query,commands){
   var m=typeof query==='string'?telemetryNarrowMask(query,'"\'`',true):null;
   if(m===null)return {kind:'placement',error:'This Logs Insights query has an unclosed string or regex, so a filter cannot be added safely; it is not shown.'};
@@ -189,7 +200,9 @@ function telemetryLogsPlace(query,commands){
   var parts=starts.map(function(from,k){var to=k+1<starts.length?starts[k+1]-1:m.length;return {from:from,masked:m.slice(from,to).trim()};});
   var at=parts.findIndex(function(p){return /^stats\b/i.test(p.masked);});
   var before=at<0?parts:parts.slice(0,at);
-  if(before.some(function(p){return /^(?:limit|dedup)\b/i.test(p.masked);}))return {kind:'placement',error:'This Logs Insights query has limit or dedup before its stats, so a filter cannot be added safely; it is not shown.'};
+  // Only commands known to keep every row's fields may come before the filter (#1356 review c2).
+  var unknown=before.filter(function(p){var w=(/^[A-Za-z]+/.exec(p.masked) || [''])[0].toLowerCase();return TELEMETRY_LOGS_BEFORE_FILTER.indexOf(w)<0;})[0];
+  if(unknown){var word=(/^[A-Za-z]+/.exec(unknown.masked) || [''])[0];return {kind:'placement',error:'This Logs Insights query has '+(word?'a '+word+' command':'an empty command')+' before its stats, so a filter cannot be added safely; it is not shown.'};}
   var added=commands.map(function(c){return c.trim();}).join(' | ');
   if(at<0)return {query:query.replace(/\s+$/,'')+' | '+added};
   var from=parts[at].from;while(from<query.length && /\s/.test(query[from]))from++;
@@ -199,7 +212,7 @@ function telemetryLogsPlace(query,commands){
 // filter, which meets needsNarrow: true only. A fragment with or (or not) pins nothing.
 function telemetryNarrowTextFields(source,fragment,pinned,named){
   if(typeof fragment!=='string')return;
-  var m=telemetryNarrowMask(fragment.trim(),source==='grafana'?'"\'`':source==='loki'?'"`':'"\'`',source==='cloudwatchLogs');
+  var m=telemetryNarrowMask(fragment.trim(),source==='loki'?'"`':'"\'`');
   if(m===null)return;
   // A |= line filter meets needsNarrow: true only when every alternative is non-empty ("" matches every line).
   if(source==='loki' && /^\|=/.test(m)){if(/^\|=\s*(?:"x+"|`x+`)(?:\s+or\s+(?:"x+"|`x+`))*\s*$/.test(m))pinned.push('|=');return;}

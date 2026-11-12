@@ -3290,10 +3290,17 @@ fails closed:
   `decolorize`, `distinct`, which change what is counted.
 - PromQL: `label op "value"` joined by commas, with `=`, `!=`, `=~` or `!~`; anything
   else (a `}`, `or`, `unless`, a trailing comma, an unquoted value) is refused.
-- Logs Insights: one `filter` command; a `|`, `#` or newline is refused. A `/regex/` is
-  read only after a standalone `like`, `not like` or `=~` (or a provider's `parse` and
-  its field); any other `/` is a division, so `x.like / 1` hides nothing. The provider's
-  query text is kept as written: the filter is spliced in at one point.
+- Logs Insights: one `filter` command; a `|`, `#` or newline is refused, and so is any
+  `/` outside a quoted string: no regex literal and no division ("a Logs Insights
+  narrowing may not contain / (use like "text" or a quoted string)"). `like "text"`
+  works, but pins nothing.
+- In the provider's Logs Insights query, a `/regex/` is read only after `parse` and its
+  field at the start of a command, or after `like`, `not like` or `=~` that follow an
+  operand; any other `/` is a division. The provider's text is kept as written: the
+  filter is spliced in at one point. Before that point only `fields`, `filter`,
+  `filterIndex`, `parse`, `sort`, `unmask`, `unnest` and `SOURCE` may appear; any
+  other command (`limit`, `dedup`, `pattern`, `diff` …) is not shown, named in the
+  reason.
 
 - **Merge.** Fragments accumulate in order: the provider's, then each importing level's
   (an identical fragment once). The provider's query stays literal, so its later
@@ -3329,7 +3336,8 @@ fails closed:
   cannot be placed: no stream or vector selector, unbalanced strings or brackets, a `#`
   comment, a token Flowview does not recognise, a PromQL `$var` outside a string or
   range, a LogQL line filter after an inherited `line_format`, a LogQL label filter after
-  an inherited `drop`, `keep` or `label_format`, or a Logs Insights `limit` or `dedup`
+  an inherited `drop`, `keep` or `label_format`, or a Logs Insights command other than
+  `fields`, `filter`, `filterIndex`, `parse`, `sort`, `unmask`, `unnest` or `SOURCE`
   before the insertion point. PromQL keywords (`BY`, `OR`, `Inf` …) are read in any
   case.
 - **Validator.** A fragment fault as written warns where it is written, on any page. An

@@ -100,7 +100,7 @@ test('workbench story time, step time, battery constants and extra drain edit th
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();await page.locator('#editor-tab-inspect').click();
   const patch=guide.locator('.patchedit').filter({has:page.locator(':scope > summary').filter({hasText:/^bat ·/})});
   if(await patch.getAttribute('open')===null)await patch.locator(':scope > summary').click();
-  const extra=patch.getByLabel('drain',{exact:true});
+  const extra=patch.getByLabel('Extra drain %',{exact:true});
   await expect(extra).toHaveAttribute('placeholder','Extra % used at this step');
   await extra.fill('1.5');await extra.press('Tab');
   await expect(root.locator('.pt-battery .btval')).toHaveText('43%');

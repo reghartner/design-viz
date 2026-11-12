@@ -220,7 +220,7 @@
         video:{label:'Video state',group:'Video'},scenePlayback:{label:'Scene playback',group:'Video'},videoReason:{label:'Video reason',group:'Video'},audio:{label:'Operator audio',group:'Video'},spotlight:{label:'Spotlight',group:'Video'},siren:{label:'Alarm siren',group:'Video'},
         status:{label:'Monitoring status',group:'Monitoring'},operator:{label:'Operator',group:'Monitoring'},incident:{label:'Incident',group:'Monitoring'},assessment:{label:'Assessment',group:'Monitoring'},detail:{label:'Summary',group:'Monitoring'},note:{label:'Internal note',group:'Monitoring'}
       },
-      setupFields:[['site','text'],['scene','scene'],['videoLabel','text'],['sensors','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'zone'}],max:12}],['initial','json']],
+      setupFields:[['site','text'],['scene','scene'],['videoLabel','text'],['sensors','rows',{cols:[{k:'id',label:'Sensor ID',req:true},{k:'label',label:'Name'},{k:'kind',label:'Sensor type',kind:'enum',options:kinds},{k:'zone',label:'Zone'}],max:12}],['initial','json']],
       patchFields:[['video','enum',videoStates],['scene','enum',SCENE_NAMES],['scenePlayback','enum',['waiting','playing']],['videoReason','text'],['audio','objf',FlowAudio.fields],['spotlight','enum',SCREEN_SPOTLIGHTS],['siren','enum',SCREEN_SIRENS],['status','enum',statuses],['operator','text'],['incident','text'],['assessment','enum',assessments],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('security').authoring.patchFields.concat(items(panel).map(function (sensor) {

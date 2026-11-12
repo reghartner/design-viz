@@ -125,6 +125,6 @@ function createPanelLogComposer(context,options){
   if(current!==undefined && (!Array.isArray(current) || current.some(function(item){return typeof item!=='string' && !panelObject(item);})))return null;
   var rows=(current || []).map(function(item,index){return {tag:item && item.tag,text:typeof item==='string'?item:item.text,_sourceIndex:index};});
   var tags=Object.keys(options.panel.tags || {});
-  return context.controls.rows('Events',rows,{cols:[{k:'tag',kind:'enum',options:tags},{k:'text',req:true}]},
+  return context.controls.rows('Events',rows,{cols:[{k:'tag',label:'Tag',kind:'enum',options:tags},{k:'text',label:'Entry text',req:true}]},
     {raw:false,commitValue:options.commit,collect:function(items){return panelLogEditorCollect(items,current);}});
 }

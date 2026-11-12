@@ -130,7 +130,7 @@ test('cost editor changes starting volume and rates with exact Undo/Redo',async(
   const root=page.locator('#docview'),guide=page.locator('#guide'),source=page.locator('#src');
   await inspectPageElement(page,root.locator('.pt-cost .ptitle'));
   const initial=guide.locator('.initialedit');await openInspectorGroup(initial);
-  const messages=initial.getByLabel('messages',{exact:true});
+  const messages=initial.getByLabel('Workload volume',{exact:true});
   await messages.fill('10000000');await messages.press('Tab');
   await expect(root.locator('.cost-total')).toHaveText(['USD 32.00','USD 26.00']);
   const changed=await source.inputValue();expect(changed).not.toBe(original);

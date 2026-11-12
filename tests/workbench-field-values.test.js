@@ -30,14 +30,14 @@ test('patchSummaryLine compacts arrays and objects and prints scalar values bare
 
 test('patchSummaryLine uses the edit form labels and names temporary changes by field (#997)', () => {
   B.PanelRegistry.define('summary-fixture',{authoring:{
-    patchFields:[['mode','enum',['live','recorded']],['banner','text'],['scenePlayback','text']],
+    patchFields:[['mode','enum',['live','recorded']],['banner','text'],['reason','text']],
     transientFields:['mode','banner'],
     fieldMeta:{mode:{label:'Screen mode'},banner:{label:'Banner text',step:{label:'Banner at this step'}}}}});
   const decl={type:'summary-fixture'};
   assert.strictEqual(B.patchSummaryLine({mode: 'live', enterOnce: {banner: 'Alarm'}}, decl),
     'Screen mode → live · Banner at this step (this step only) → Alarm');
-  assert.strictEqual(B.patchSummaryLine({enterOnce: {mode: 'recorded', banner: 'x'}, scenePlayback: 'loop'}, decl),
-    'Scene playback → loop · Screen mode (this step only) → recorded · +1 more');
+  assert.strictEqual(B.patchSummaryLine({enterOnce: {mode: 'recorded', banner: 'x'}, reason: 'loop'}, decl),
+    'Reason → loop · Screen mode (this step only) → recorded · +1 more');
   // The Inspect edit form may label a field through its panel editor; the summary follows it.
   assert.strictEqual(B.patchSummaryLine({mode: 'live'}, decl, key => key === 'mode' ? 'What the screen shows' : null),
     'What the screen shows → live');

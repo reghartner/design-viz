@@ -528,6 +528,9 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 .effective-panel>summary,.effective-json>summary{cursor:pointer;overflow-wrap:anywhere;}
 .effective-heading{display:flex;gap:6px;flex-wrap:wrap;align-items:baseline;}
 .effective-origin{font-size:10px;color:var(--sub);}
+.effective-label{font-weight:600;}
+.effective-heading>code,.effective-key{font-size:10px;color:var(--sub);}
+.effective-key{margin-left:4px;}
 .effective-origin[data-origin="transient"]{color:var(--accent);font-weight:600;}
 .effective-field{margin:9px 0;padding:7px;border:1px solid var(--line);border-radius:5px;}
 .effective-field pre{font:11px/1.45 'IBM Plex Mono',monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:150px;overflow:auto;margin:6px 0;}
@@ -739,6 +742,10 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .rowline.rowcard .fctl{flex:none; width:100%; box-sizing:border-box;}
 .rowcell{display:flex; flex-direction:column; gap:2px; min-width:0;}
 .rowk{font:600 9px 'IBM Plex Mono',monospace; color:var(--sub);}
+/* Narrow item rows caption every input too; captions sit above, actions align with the inputs. */
+.rowline:has(>.rowcell-compact){align-items:end;}
+.rowline>.rowcell-compact{flex:1 1 0; min-width:0;}
+.rowline>.rowcell-compact .fctl{flex:none; width:100%; box-sizing:border-box;}
 .rowcardacts{grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end;}
 /* Icon pickers in item cards take two tracks, so the name has room beside the
    preview and Choose. :where keeps this at zero specificity: a panel that sizes

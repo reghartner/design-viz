@@ -85,15 +85,38 @@ function panelFieldAssignment(field,raw,mode){
   return {value:text};
 }
 
-function patchSummaryLine(patchObj){
-  var keys = Object.keys(patchObj || {}).slice(0, 2);
-  if (!keys.length) return 'empty patch';
-  return keys.map(function(key){
-    var value = patchObj[key];
+/* Plain label of one step field, as the Inspect edit form shows it. */
+function panelFieldLabel(decl,key,mode){
+  var fields=decl && panelPatchFields(decl) || [],field=null;
+  for(var i=0;i<fields.length;i++)if(fields[i] && fields[i][0]===key){field=fields[i];break;}
+  return panelFieldPresentation(decl,field || [key],mode || 'step').label;
+}
+
+/* Collapsed summary of one step's panel change: the first two assignments by
+   their form labels. labelFor(key) may supply the label a panel editor shows. */
+function patchSummaryLine(patchObj, decl, labelFor){
+  var entries = [];
+  function label(key){
+    var custom = labelFor && labelFor(key);
+    return custom || panelFieldLabel(decl, key, 'step');
+  }
+  function add(source, once){
+    Object.keys(source || {}).forEach(function(key){
+      if (!once && key === 'enterOnce' && panelObject(source[key])) return;
+      entries.push({label: label(key) + (once ? ' (this step only)' : ''), value: source[key]});
+    });
+  }
+  add(patchObj, false);
+  if (patchObj && panelObject(patchObj.enterOnce)) add(patchObj.enterOnce, true);
+  if (!entries.length) return 'empty patch';
+  var shown = entries.slice(0, 2).map(function(entry){
+    var value = entry.value;
     var compact = Array.isArray(value) ? '[' + value.length + ' items]' :
       value !== null && typeof value === 'object' ? '{…}' : String(value);
-    return key + ' → ' + compact;
-  }).join(' · ');
+    return entry.label + ' → ' + compact;
+  });
+  if (entries.length > 2) shown.push('+' + (entries.length - 2) + ' more');
+  return shown.join(' · ');
 }
 
 function panelPatchFields(decl){

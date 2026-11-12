@@ -267,7 +267,7 @@ PanelRegistry.define('funnel', {
     },
     setupFields: [
       ['unit', 'text'],
-      ['stages', 'rows', { max: FUNNEL_MAX_STAGES, cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'tone', kind: 'enum', options: FUNNEL_DOCUMENTED_TONES }] }],
+      ['stages', 'rows', { max: FUNNEL_MAX_STAGES, cols: [{ k: 'id', label: 'Stage ID', req: true }, { k: 'label', label: 'Name' }, { k: 'tone', label: 'Tone', kind: 'enum', options: FUNNEL_DOCUMENTED_TONES }] }],
       ['initial', 'json'],
     ],
     patchFields: [['counts', 'json', { nullable: true }], ['active', 'text'], ['note', 'text']],

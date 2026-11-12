@@ -973,12 +973,12 @@ PanelRegistry.extend('timeline', {
     },
     setupFields: [
       ['span', 'clock'],
-      ['cadence', 'objf', { cols: [{ k: 'every', kind: 'clock', req: true }, { k: 'label' }] }],
+      ['cadence', 'objf', { cols: [{ k: 'every', label: 'Every', kind: 'clock', req: true }, { k: 'label', label: 'Name' }] }],
       [
         'lanes',
         'rows',
         {
-          cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'every', kind: 'clock', req: true }],
+          cols: [{ k: 'id', label: 'Lane ID', req: true }, { k: 'label', label: 'Name' }, { k: 'every', label: 'Every', kind: 'clock', req: true }],
           max: 4,
         },
       ],
@@ -987,10 +987,10 @@ PanelRegistry.extend('timeline', {
         'rows',
         {
           cols: [
-            { k: 'at', kind: 'clock', req: true },
-            { k: 'label' },
-            { k: 'kind', kind: 'enum', options: ['ok', 'alert', 'info'] },
-            { k: 'lane' },
+            { k: 'at', label: 'Time', kind: 'clock', req: true },
+            { k: 'label', label: 'Event label' },
+            { k: 'kind', label: 'Kind', kind: 'enum', options: ['ok', 'alert', 'info'] },
+            { k: 'lane', label: 'Lane' },
           ],
         },
       ],

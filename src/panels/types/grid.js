@@ -322,8 +322,8 @@ PanelRegistry.define('grid', {
       initial: { cells: { 'groupA.period1': 1.4, 'groupA.period2': -0.6, 'groupB.period1': 0.1, 'groupB.period2': 0.2 } },
     },
     setupFields: [
-      ['rows', 'rows', { max: GRID_MAX_AXIS, cols: [{ k: 'id', req: true }, { k: 'label' }] }],
-      ['cols', 'rows', { max: GRID_MAX_AXIS, cols: [{ k: 'id', req: true }, { k: 'label' }] }],
+      ['rows', 'rows', { max: GRID_MAX_AXIS, cols: [{ k: 'id', label: 'Row ID', req: true }, { k: 'label', label: 'Row name' }] }],
+      ['cols', 'rows', { max: GRID_MAX_AXIS, cols: [{ k: 'id', label: 'Column ID', req: true }, { k: 'label', label: 'Column name' }] }],
       ['scale', 'json'], ['decimals', 'num', { min: 0, max: 4 }], ['unit', 'text'], ['initial', 'json'],
     ],
     patchFields: [['cells', 'json', { nullable: true }], ['marks', 'json', { nullable: true }], ['highlight', 'json', { nullable: true }], ['note', 'text']],

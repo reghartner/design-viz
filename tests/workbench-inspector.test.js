@@ -52,7 +52,7 @@ test('palette-created simple panels expose typed starting state with sparse exac
   const h=e.mount(spec);h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
   assert.ok(h.guide.querySelector('[data-panel-state="initial"]'));
   assert.equal(aria(h.guide,'Value assignment').value,'set');
-  const value=aria(h.guide,'value');assert.equal(value.value,'12');
+  const value=aria(h.guide,'Value');assert.equal(value.value,'12');
   const before=h.text;value.value='42';value.fire('change');h.flush();
   assert.deepEqual(JSON.parse(h.text).panels[0].initial,{value:42,futureReading:{unit:'future'}});
   const changed=h.text;h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(h.text,changed);
@@ -68,17 +68,17 @@ test('step controls distinguish inherited and set values while retaining importe
   ]},h=e.mount(spec);
   h.session.target={kind:'step',section:0,index:1};h.inspector.render();
   assert.equal(aria(h.guide,'Current state assignment').value,'omit');
-  assert.equal(aria(h.guide,'state').disabled,false,'an omitted field can be assigned directly');
+  assert.equal(aria(h.guide,'Current state').disabled,false,'an omitted field can be assigned directly');
   assert.match(h.guide.querySelector('.panel-state-note').textContent,/Inherited "ON" · Inherited from step 1/);
   const mode=aria(h.guide,'Current state assignment');mode.value='set';mode.fire('change');
-  const field=aria(h.guide,'state');assert.equal(field.disabled,false);field.value='OFF';field.fire('change');h.flush();
+  const field=aria(h.guide,'Current state');assert.equal(field.disabled,false);field.value='OFF';field.fire('change');h.flush();
   assert.deepEqual(JSON.parse(h.text).steps[1].panels.status,{futureSecond:7,state:'OFF'});
   h.session.target={kind:'step',section:0,index:0};h.inspector.render();
-  assert.equal(aria(h.guide,'state').value,'ON');
+  assert.equal(aria(h.guide,'Current state').value,'ON');
   assert.match(h.guide.querySelector('.panel-state-note').textContent,/Effective "ON" · Set at this step/);
   h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
-  assert.equal(aria(h.guide,'state').value,'FUTURE');
-  assert.match(aria(h.guide,'state').options.at(-1).textContent,/unknown/);
+  assert.equal(aria(h.guide,'Current state').value,'FUTURE');
+  assert.match(aria(h.guide,'Current state').options.at(-1).textContent,/unknown/);
 });
 
 test('effective field context follows the active path at a shared target step',()=>{
@@ -98,8 +98,8 @@ test('dynamic object fields preserve empty text, unknown siblings, and explicit 
   const h=e.mount(spec);h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
   assert.equal(aria(h.guide,'Uplink assignment').value,'set');
   assert.equal(aria(h.guide,'Note assignment').value,'set');
-  assert.equal(aria(h.guide,'note').value,'');
-  assert.equal(aria(h.guide,'state').value,'future');
+  assert.equal(aria(h.guide,'Note').value,'');
+  assert.equal(aria(h.guide,'State').value,'future');
   const noteMode=aria(h.guide,'Note assignment');noteMode.value='omit';noteMode.fire('change');h.flush();
   assert.deepEqual(JSON.parse(h.text).panels[0].initial,{up:{state:'future',futureNested:9},futureTop:true});
 
@@ -120,7 +120,7 @@ test('dynamic step icon inheritance and report-time actions preserve sparse sibl
   }}}]};
   const h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();
 
-  const icon=aria(h.guide,'icon');icon.value='';icon.fire('change');h.flush();
+  const icon=aria(h.guide,'Icon');icon.value='';icon.fire('change');h.flush();
   assert.deepEqual(JSON.parse(h.text).steps[0].panels.app,{
     model:{value:'Doorbell',futureNested:4},battery:{reportedAt:null,futureNested:5},futureTop:6
   });
@@ -452,12 +452,12 @@ test('temporary value controls reject stale carry/once ownership without writing
     const audio={microphone:'capturing'},patch=once?{enterOnce:{audio}}:{audio};
     const spec={nodes:{},rows:[],panels:[{id:'p',type}],steps:[{panels:{p:patch}}]};
     const e=environment(),h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();
-    const input=h.guide.querySelector('[aria-label="microphone"]');assert.ok(input);
+    const input=h.guide.querySelector('[aria-label="Microphone"]');assert.ok(input);
     spec.steps[0].panels.p=once?{audio}:{enterOnce:{audio}};const changed=JSON.stringify(spec,null,2);h.writeSource(changed);
     input.value='listening';input.fire('change');
     assert.equal(h.text,changed);assert.equal(h.session.canUndo(),false);
     assert.match(h.guide.querySelector('.ierr').textContent,/duration changed in JSON/);
-    h.inspector.render();const fresh=h.guide.querySelector('[aria-label="microphone"]');fresh.value='listening';fresh.fire('change');
+    h.inspector.render();const fresh=h.guide.querySelector('[aria-label="Microphone"]');fresh.value='listening';fresh.fire('change');
     const result=JSON.parse(h.text).steps[0].panels.p;
     assert.equal((once?result.audio:result.enterOnce.audio).microphone,'listening');
     assert.equal(once?result.enterOnce:result.audio,undefined);
@@ -468,7 +468,7 @@ test('temporary value controls reject stale carry/once ownership without writing
 test('temporary field edits use current sibling fields while ownership is unchanged',()=>{
   const spec={nodes:{},rows:[],panels:[{id:'p',type:'screen'}],steps:[{panels:{p:{enterOnce:{audio:{microphone:'capturing'}}}}}]};
   const e=environment(),h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();
-  const input=h.guide.querySelector('[aria-label="microphone"]');
+  const input=h.guide.querySelector('[aria-label="Microphone"]');
   spec.steps[0].panels.p.enterOnce.audio.future={keep:true};spec.steps[0].panels.p.audio={output:'chime'};
   const changed=JSON.stringify(spec,null,2);h.writeSource(changed);input.value='listening';input.fire('change');
   assert.deepEqual(JSON.parse(h.text).steps[0].panels.p,{audio:{output:'chime'},enterOnce:{audio:{microphone:'listening',future:{keep:true}}}});
@@ -550,7 +550,7 @@ test('log composer edits events at one step without rewriting accumulated earlie
   const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'log',type:'log',tags:{NET:'#112233'},initial:{log:['boot']}}],steps:[{panels:{log:{log:[{tag:'NET',text:'connected',future:7}]}}},{panels:{log:{log:[{tag:'NET',text:'sent'}]}}}]};
   const h=e.mount(spec);h.session.target={kind:'step',section:0,index:1};h.inspector.render();const before=h.text;
   const events=h.guide.querySelector('.patchedit').querySelector('.rowline');
-  const text=aria(events,'text');text.value='acknowledged';text.fire('change');h.flush();
+  const text=aria(events,'Entry text');text.value='acknowledged';text.fire('change');h.flush();
   const changed=JSON.parse(h.text);assert.deepEqual(changed.panels,spec.panels);assert.deepEqual(changed.steps[0],spec.steps[0]);assert.deepEqual(changed.steps[1].panels.log.log,[{tag:'NET',text:'acknowledged'}]);
   h.session.undo();assert.equal(h.text,before);
 });

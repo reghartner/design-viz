@@ -330,7 +330,7 @@ PanelRegistry.extend('replicas', {
     },
     setupFields: [
       ['unit', 'text'],
-      ['replicas', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }], max: 8 }],
+      ['replicas', 'rows', { cols: [{ k: 'id', label: 'Replica ID', req: true }, { k: 'label', label: 'Name' }], max: 8 }],
       ['initial', 'json'],
     ],
     patchFields: [

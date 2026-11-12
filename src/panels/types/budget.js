@@ -178,11 +178,11 @@ PanelRegistry.extend('budget', {
         'rows',
         {
           cols: [
-            { k: 'id', req: true },
-            { k: 'label' },
-            { k: 'unit' },
-            { k: 'max', kind: 'num', req: true },
-            { k: 'warn', kind: 'num' },
+            { k: 'id', label: 'Metric ID', req: true },
+            { k: 'label', label: 'Name' },
+            { k: 'unit', label: 'Unit' },
+            { k: 'max', label: 'Limit', kind: 'num', req: true },
+            { k: 'warn', label: 'Warning at', kind: 'num' },
           ],
           max: 6,
         },

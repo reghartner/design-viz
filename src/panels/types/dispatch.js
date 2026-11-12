@@ -181,7 +181,7 @@
         status:{label:'Dispatch status',group:'Incident'},priority:{label:'Priority',group:'Incident'},timeOfDay:{label:'Time of day',group:'Incident'},
         incident:{label:'Incident',group:'Details'},location:{label:'Location',group:'Details'},dispatcher:{label:'Dispatcher',group:'Details'},detail:{label:'Summary',group:'Details'},note:{label:'Internal note',group:'Details'}
       },
-      setupFields:[['agency','text'],['responders','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'callsign'}],max:8}],['initial','json']],
+      setupFields:[['agency','text'],['responders','rows',{cols:[{k:'id',label:'Responder ID',req:true},{k:'label',label:'Name'},{k:'kind',label:'Service',kind:'enum',options:kinds},{k:'callsign',label:'Call sign'}],max:8}],['initial','json']],
       patchFields:[['status','enum',statuses],['priority','enum',priorities],['timeOfDay','enum',times],['incident','text'],['location','text'],['dispatcher','text'],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('dispatch').authoring.patchFields.concat(items(panel).map(function (unit) {

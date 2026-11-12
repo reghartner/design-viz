@@ -327,7 +327,7 @@ PanelRegistry.extend('xray', {
       ],
     },
     setupFields: [
-      ['layers', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'holder' }] }],
+      ['layers', 'rows', { cols: [{ k: 'id', label: 'Layer ID', req: true }, { k: 'label', label: 'Name' }, { k: 'holder', label: 'Key holder' }] }],
       ['initial', 'json'],
     ],
     patchFields: [

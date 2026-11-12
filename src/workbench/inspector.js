@@ -2053,10 +2053,17 @@ function effectiveStateControl(target){
           if (ev.target!==box || !guide.contains(box)) return;
           if (box.open) OPEN_EFFECTIVE_PANELS.add(p.id); else OPEN_EFFECTIVE_PANELS.delete(p.id);
         });
-        var label=document.createElement('summary'); label.textContent=p.id+' · '+p.type+' · '+p.fields.length+' fields'; box.appendChild(label);
+        var decl=(Array.isArray(d.panels)?d.panels:[]).find(function(item){return item && item.id===p.id;}) || {id:p.id,type:p.type};
+        var editor=panelEditor(p.type);
+        var label=document.createElement('summary');
+        label.appendChild(document.createTextNode((typeof decl.title==='string' && decl.title.trim()?decl.title.trim():p.id)+' · '+p.fields.length+(p.fields.length===1?' field ':' fields ')));
+        var panelKey=document.createElement('code'); panelKey.className='effective-key'; panelKey.textContent=p.id+' · '+p.type; label.appendChild(panelKey);
+        box.appendChild(label);
         p.fields.forEach(function(field){
           var row=document.createElement('div'); row.className='effective-field'; row.setAttribute('data-effective-field',field.key);
           var heading=document.createElement('div'); heading.className='effective-heading';
+          var custom=editor.patchLabel && editor.patchLabel(field.key);
+          var plain=document.createElement('span'); plain.className='effective-label'; plain.textContent=custom && custom!==field.key?custom:panelFieldLabel(decl,field.key,'step'); heading.appendChild(plain);
           var name=document.createElement('code'); name.textContent=field.key; heading.appendChild(name);
           var origin=document.createElement('span'); origin.className='effective-origin'; origin.setAttribute('data-origin',field.origin.kind); origin.textContent=field.origin.label; heading.appendChild(origin); row.appendChild(heading);
           var value=document.createElement('pre'); value.textContent=JSON.stringify(field.value,null,2); row.appendChild(value);
@@ -2099,7 +2106,10 @@ function panelPatchControl(pid, patch, decl, target, options){
       else OPEN_PATCH_EDITORS.delete(pid);
     });
     var summary = document.createElement('summary');
-    summary.textContent = initial ? 'Starting state' : pid + ' · ' + patchSummaryLine(patch);
+    summary.textContent = initial ? 'Starting state' : pid + ' · ' + patchSummaryLine(patch, decl, function(key){
+      var custom=editor.patchLabel && editor.patchLabel(key);
+      return custom && custom!==key?custom:null;
+    });
     det.appendChild(summary);
     var body = document.createElement('div');
     body.className = 'rowsedit';
@@ -2188,7 +2198,7 @@ function panelPatchControl(pid, patch, decl, target, options){
         input = colInput({k: f[0], kind: f[1]}, value);
         if (f[1] === 'num') input.className += ' fnum';
       }
-      input.setAttribute('aria-label', f[0]);
+      input.setAttribute('aria-label', meta ? stateLabel(f[0],meta) : f[0]);
       if (editor.patchField) editor.patchField(f,input,options);
       if(input.tagName==='SELECT' && input.options.length && input.options[0].value==='')input.options[0].textContent='Choose value…';
       return input;
@@ -2454,6 +2464,9 @@ function jsonFieldControl(key, value, kind, after){
     return det;
   }
 
+/* Columns name themselves in plain words; the spec key is only a fallback. */
+function rowColumnLabel(col){return col.label || builderFieldLabel(col.k);}
+
 function colInput(col, value){
     var input;
     var options = col.kind === 'icon' ? ICON_SET : (col.options || []);
@@ -2461,7 +2474,7 @@ function colInput(col, value){
       input = document.createElement('select');
       input.className = 'fctl';
       var none = document.createElement('option');
-      none.value = ''; none.textContent = col.unsetLabel || '(' + (col.label || col.k) + ')';
+      none.value = ''; none.textContent = col.unsetLabel || '(' + rowColumnLabel(col) + ')';
       input.appendChild(none);
       options.forEach(function(o){
         var op = document.createElement('option');
@@ -2480,10 +2493,10 @@ function colInput(col, value){
     } else {
       input = document.createElement('input');
       input.type = 'text'; input.className = 'fctl';
-      input.placeholder = (col.label || col.k) + (col.req ? ' *' : '') + (col.kind === 'clock' ? ' (5m, 2h…)' : '');
+      input.placeholder = rowColumnLabel(col) + (col.req ? ' *' : '') + (col.kind === 'clock' ? ' (5m, 2h…)' : '');
       input.value = value == null ? '' : String(value);
     }
-    input.setAttribute('aria-label',col.label || col.k);
+    input.setAttribute('aria-label',rowColumnLabel(col));
     return input;
   }
 
@@ -2553,16 +2566,16 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true,l
         var input = colInput(col, base ? base[col.k] : null);
         wireCommit(input, commitRows);
         ref.inputs[col.k] = input;
-        if (wide){
-          var cell = document.createElement('label');
-          cell.className = 'rowcell';
-          var cap = document.createElement('span');
-          cap.className = 'rowk';
-          cap.textContent = (col.label || col.k) + (col.req ? ' *' : '');
-          cell.appendChild(cap);
-          if (!options.cell || !options.cell({column:col,input:input,cell:cell,ref:ref,base:base})) cell.appendChild(col.kind==='icon'?iconPickerControl(input):input);
-          line.appendChild(cell);
-        } else line.appendChild(col.kind==='icon'?iconPickerControl(input):input);
+        /* Every input keeps a visible caption: a placeholder alone disappears
+           once a value is typed. */
+        var cell = document.createElement('label');
+        cell.className = wide ? 'rowcell' : 'rowcell rowcell-compact';
+        var cap = document.createElement('span');
+        cap.className = 'rowk';
+        cap.textContent = rowColumnLabel(col) + (col.req ? ' *' : '');
+        cell.appendChild(cap);
+        if (!wide || !options.cell || !options.cell({column:col,input:input,cell:cell,ref:ref,base:base})) cell.appendChild(col.kind==='icon'?iconPickerControl(input):input);
+        line.appendChild(cell);
       });
 
       var acts = line;
@@ -2654,7 +2667,7 @@ function objFieldsControl(key, cur, shape){
     var wrap = document.createElement('div');
     wrap.className = 'rowsedit';
     var line = document.createElement('div');
-    line.className = 'rowline' + ((shape.cols || []).some(function(col){return col.label;}) ? ' obj-fields' : '');
+    line.className = 'rowline obj-fields';
     var base = (cur && typeof cur === 'object' && !Array.isArray(cur)) ? cur : {};
     var inputs = {};
     function commitObj(){
@@ -2672,10 +2685,8 @@ function objFieldsControl(key, cur, shape){
       if (col.kind === 'num') input.inputMode = 'decimal';
       wireCommit(input, commitObj);
       inputs[col.k] = input;
-      if (col.label){
-        var field=document.createElement('label'); field.className='obj-field'; field.textContent=col.label;
-        field.appendChild(input); line.appendChild(field);
-      } else line.appendChild(input);
+      var field=document.createElement('label'); field.className='obj-field'; field.textContent=rowColumnLabel(col);
+      field.appendChild(input); line.appendChild(field);
     });
     wrap.appendChild(line);
     if (shape.hint){

@@ -120,7 +120,7 @@ test('V5 fragments, SQL placeholders and structured sources',()=>{
   assert.equal(run('x" | drop code').error,not(allowed));
   // #1359: a fragment is read like the query: bare, a space is refused and a comparison takes a number.
   assert.equal(run('a b','| code=${code}').error,not(allowed));
-  assert.equal(run('FULL','| code = ${code}').error,not('it is compared with a field, where only a number or a duration may be filled in'));
+  assert.equal(run('FULL','| code = ${code}').error,not('outside a string only a number or a duration may be filled in here'));
   assert.equal(run('500','| code = ${code}').query,'sum(count_over_time({app="dcf"} | code = 500 [5m]))');
   const sql=provider({sql:"SELECT count(*) FROM events WHERE code = '${code}'"});
   let c=consumer([{spec:'provider',export:'core',as:'fc',variables:{code:'FULL'}}]);
@@ -173,7 +173,7 @@ const unsafe=(name,why)=>'Variable ${'+name+'} from this import or carrier canno
 const ALLOWED='a telemetry variable may hold only letters, digits and _ . @ : - (and spaces inside a string)';
 const REGEX='it is filled into a regex and holds regex characters';
 const PATTERN='in a SQL query that uses patterns or regexes, a variable may not hold _ or .';
-const CMP='it is compared with a field, where only a number or a duration may be filled in';
+const NUMERIC='outside a string only a number or a duration may be filled in here';
 const unreadable=f=>'this SQL query uses '+f+', which Flowview cannot read safely';
 
 test('V9 comments: an apostrophe in a comment never opens a string; a placeholder in a comment fails closed',()=>{
@@ -292,7 +292,7 @@ test('V16 VARTEST-1359 boundaries: comment openers, label_replace, pattern filte
   assert.equal(scopedRun({sql:"SELECT count(*) FROM events WHERE code LIKE N'${code}'"},{code:'a_b'}).error,unsafe('code',PATTERN),'an N-prefixed string in a LIKE query');
 });
 
-test('V17 a bare comparison operand is a number or a duration, never a field name',()=>{
+test('V17 a bare comparison operand is a number or a duration, never a field name (a bare value is numeric by default)',()=>{
   const cases=[
     [{sql:"SELECT count(*) FROM events WHERE status = ${code}"},['status','OR','NULL','TRUE','a'],['200','1.5e3','0.25']],
     [{sql:"SELECT count(*) FROM events WHERE ${code} = status"},['status'],['1']],
@@ -306,12 +306,12 @@ test('V17 a bare comparison operand is a number or a duration, never a field nam
     [{loki:'sum(count_over_time({app="dcf"} | json | status >= ${code} [5m]))'},['status'],['500']],
     [{grafana:'sum(rate(x_total{job="dcf"}[5m])) > ${code}'},['x_total'],['100']]];
   for(const [signal,bad,good] of cases){
-    for(const v of bad)assert.equal(scopedRun(signal,{code:v}).error,unsafe('code',CMP),JSON.stringify(signal)+' / '+v);
+    for(const v of bad)assert.equal(scopedRun(signal,{code:v}).error,unsafe('code',NUMERIC),JSON.stringify(signal)+' / '+v);
     for(const v of good)assert.equal(scopedRun(signal,{code:v}).error,undefined,JSON.stringify(signal)+' / '+v);
   }
   for(const [q,v] of [['{ status = ${code} }','error'],['{ status != ${code} }','ok'],['{ kind = ${code} }','server'],['{ span:kind = ${code} }','consumer']])
     assert.equal(scopedRun({tempo:q},{code:v}).error,undefined,'TraceQL '+q+' takes '+v);
-  assert.equal(scopedRun({tempo:'{ status = ${code} }'},{code:'span.name'}).error,unsafe('code',CMP));
+  assert.equal(scopedRun({tempo:'{ status = ${code} }'},{code:'span.name'}).error,unsafe('code',NUMERIC));
   assert.equal(scopedRun({sql:"SELECT count(*) FROM ${code} WHERE a = 1"},{code:'events'}).error,undefined,'a table name takes a plain token');
   assert.equal(scopedRun({grafana:'topk(${code}, sum by (job) (rate(x_total[5m])))'},{code:'5'}).error,undefined);
 });
@@ -347,4 +347,41 @@ test('V18 VARTEST-1359 round 2: a - only between allowed characters, more unread
   // A regex position in every language refuses .
   for(const signal of [{loki:'sum(count_over_time({app="dcf"} |~ "${code}" [5m]))'},{grafana:'up{job=~"${code}"}'},{tempo:'{ span.code !~ "${code}" }'}])
     assert.equal(scopedRun(signal,{code:'a.b'}).error,unsafe('code',REGEX),JSON.stringify(signal));
+});
+
+test('V19 a bare value is a number or a duration except in a named list of token positions',()=>{
+  const bare=[
+    ['sql',"SELECT count(*) FROM t WHERE status IN (lower(${code}))"],['sql',"SELECT count(*) FROM t WHERE code LIKE ${code}"],
+    ['sql',"SELECT count(*) FROM t WHERE code ~ ${code}"],['sql',"SELECT count(*) FROM t WHERE code REGEXP ${code}"],
+    ['sql',"SELECT count(*) FROM t WHERE status = CASE WHEN x = 1 THEN ${code} ELSE 0 END"],['sql',"SELECT count(*) FROM t WHERE ${code}"],
+    ['sql',"SELECT count(*) FROM t WHERE x = 1 AND ${code}"],['sql',"SELECT count(*) FROM t GROUP BY ${code}"],
+    ['sql',"SELECT code FROM t LIMIT ${code}"],['sql',"SELECT code FROM t LIMIT 5 OFFSET ${code}"],['sql',"SELECT count(*) FROM t WHERE flag IS ${code}"],
+    ['grafana','sum(x_total) > on() ${code}'],['grafana','sum(x_total) * ${code}'],['grafana','${code}{job="dcf"}'],
+    ['cloudwatchLogs',{logGroups:['g'],query:'filter isPresent(${code}) | stats count() as n',region:'us-east-1',valueField:'n'}],
+    ['cloudwatchLogs',{logGroups:['g'],query:'filter status in [${code}] | stats count() as n',region:'us-east-1',valueField:'n'}],
+    ['grafana','sum(x_total) > bool ${code}'],
+    ['tempo','{ span.x = ${code} && span.y = 1 }']];
+  for(const [src,q] of bare){
+    for(const v of ['status','total','OR'])assert.equal(scopedRun({[src]:q},{code:v}).error,unsafe('code',NUMERIC),src+' '+JSON.stringify(q)+' / '+v);
+    assert.equal(scopedRun({[src]:q},{code:'5'}).error,undefined,src+' '+JSON.stringify(q)+' takes a number');
+  }
+  for(const v of ['NULL','true','False'])assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE flag IS ${code}"},{code:v}).error,undefined,'IS takes '+v);
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE flag IS NOT ${code}"},{code:'NULL'}).error,undefined,'IS NOT takes NULL');
+  const tokens=[
+    ['grafana','sum by (${code}) (rate(x_total[5m]))'],['grafana','sum without (job, ${code}) (rate(x_total[5m]))'],
+    ['grafana','x_total / on(${code}) group_left(job) y_total'],['grafana','x_total / ignoring(${code}) y_total'],['grafana','x_total / on(job) group_left(${code}) y_total'],
+    ['loki','sum by (${code}) (count_over_time({app="dcf"}[5m]))'],
+    ['sql',"SELECT count(*) FROM ${code} WHERE a = 1"],['sql',"SELECT count(*) FROM t JOIN ${code} ON t.id = u.id"]];
+  for(const [src,q] of tokens)assert.equal(scopedRun({[src]:q},{code:'service_name'}).error,undefined,src+' '+q+' takes a token');
+  for(const [q,v] of [['{ status = ${code} }','status'],['{ kind = ${code} }','kind'],['{ status = ${code} }','span.status'],['{ status = ${code} && kind = server }','server'],['{ kind = ${code} }','error']])
+    assert.equal(scopedRun({tempo:q},{code:v}).error,unsafe('code',NUMERIC),'TraceQL '+q+' refuses '+v);
+  for(const q of ["SELECT count(*) FROM events WHERE code IS NOT DISTINCT FROM ${code}","SELECT count(*) FROM t WHERE y = EXTRACT(year FROM ${code})","SELECT count(*) FROM t WHERE x = ')' AND y = substring(a FROM ${code})"])
+    assert.equal(scopedRun({sql:q},{code:'code'}).error,unsafe('code',NUMERIC),q+': not a table name');
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE id IN (SELECT id FROM ${code})"},{code:'other'}).error,undefined,'a subquery FROM takes a table name');
+  // A slot keyword inside a string or a comment never makes a slot.
+  for(const [src,q] of [['grafana','sum(x_total) > # by (\n${code})'],['grafana','label_replace(x_total, "a", "by (", "b", "c") > ${code}'],
+    ['sql',"SELECT count(*) FROM t WHERE note = 'from' AND x = /* JOIN */ ${code}"],['sql',"SELECT count(*) FROM t WHERE x = -- from\n${code}"],['sql',"SELECT count(*) FROM t WHERE x = 'SELECT a FROM' || ${code}"]])
+    assert.equal(scopedRun({[src]:q},{code:'total'}).error,unsafe('code',NUMERIC),src+' '+JSON.stringify(q));
+  for(const q of ["SELECT count(*) FROM t WHERE PATINDEX('%' + '${code}' + '%', code) > 0","SELECT count(*) FROM t WHERE patindex('${code}', code) > 0"])
+    assert.equal(scopedRun({sql:q},{code:'a_b'}).error,unsafe('code',PATTERN),q);
 });

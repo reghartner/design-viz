@@ -2772,7 +2772,8 @@ function panelSetupRows(val){
         }
         rows={push:function(row){advancedFold.appendChild(row);}};
       }else{
-        var groupName=key==='initial'?(lastGroup || advancedFold?'Starting state':''):meta.group;
+        /* Starting state is named once: its own disclosure summary, or a heading above a raw JSON row. */
+        var groupName=key==='initial'?(!panelAuthoring(val.type).initialFields && (lastGroup || advancedFold)?'Starting state':''):meta.group;
         if(groupName && groupName!==lastGroup){var heading=document.createElement('h4');heading.className='panel-state-group panel-setup-group';heading.textContent=groupName;rows.push(heading);}
         lastGroup=groupName || lastGroup;
       }

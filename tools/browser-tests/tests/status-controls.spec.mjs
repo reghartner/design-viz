@@ -7,6 +7,7 @@
 | C2 Explore | an Explore View showing the controls and hiding the Status panel | the controls work with Status hidden; showing Status from the Panels menu adds no controls to it; hiding the controls panel brings them back into Status | controls that can all be hidden; duplicates |
 | C3 no panel | the same board without the controls panel | the Status panel has every control, as before | a change to existing boards |
 | C5 Explore, Status hidden by the View (option A) | the C2 Views | the Status controls window has no Hide button; its Panels menu checkbox is checked, disabled and notes "Shows while the View hides Status"; in the View that shows Status the checkbox is enabled again | a reader hiding every control while the ticket list cannot be shown |
+| C6 Standard, a step hides the controls panel (review c1) | the board's second step sets panelVisibility controls:false | at that step the controls panel is step-hidden and Live, Over time and the Metrics switch show in the Status panel and work; back on the first step they leave Status again | a step-hidden controls panel that still counts as shown |
 | C4 Workbench | the doorbell example pasted, Add → Panel… → Status controls | the spec gains the panel and the preview shows it holding the controls, with none in the Status panel | a type the picker cannot add |
 */
 import {readFile} from 'node:fs/promises';
@@ -17,16 +18,17 @@ import {setup} from '../helpers/telemetry-proof.mjs';
 
 // Wrap the native mount: add the Status controls panel and, with `views`, a Standard and an Explore View whose Explore
 // tiles hide the Status panel (per-View visibility).
-async function withControls(page,{panel=true,views=false}={}){
- await page.addInitScript(({panel,views})=>{
+async function withControls(page,{panel=true,views=false,hideAt=null}={}){
+ await page.addInitScript(({panel,views,hideAt})=>{
   let real=null;const add=raw=>{const spec=JSON.parse(JSON.stringify(raw)),d=spec.page.sections[0].diagram;
    if(panel)d.panels.push({id:'controls',type:'status-controls',title:'Status controls'});
+   if(hideAt)d.steps.find(st=>st.id===hideAt).panelVisibility={controls:false};
    if(views){const tiles=hide=>[{x:0,y:0,w:16,h:18},{controls:'steps',x:0,y:18,w:16,h:6},{panel:'controls',x:16,y:0,w:8,h:6},{panel:'status',x:16,y:6,w:8,h:18,...(hide?{hidden:true}:{})}];
     d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{columns:24,default:tiles(false)}},{id:'explore',name:'Explore',presentation:'explore',sectionLayout:{columns:24,default:tiles(true)}},{id:'both',name:'Explore all',presentation:'explore',sectionLayout:{columns:24,default:tiles(false)}}];d.defaultLayout='standard';}
    return spec;};
   // mountCues' first mount checks the plain Status panel; setup's own mount (after it sets window.calls) gets the panel.
   Object.defineProperty(window,'mount',{configurable:true,get(){return real && ((host,raw,opts)=>real(host,window.calls?add(raw):raw,opts));},set(fn){real=fn;}});
- },{panel,views});
+ },{panel,views,hideAt});
 }
 const statusPanel=root=>root.locator('.pwidget.pt-live-status'),controlsPanel=root=>root.locator('.pwidget.pt-status-controls');
 const metrics=scope=>scope.getByRole('switch',{name:'Metrics overlay',exact:true});
@@ -90,6 +92,18 @@ test('C5 Explore: while the View hides Status, the Status controls cannot be hid
  await view('Explore all').click();await expect(root.locator('[data-explore-panel="status"]')).toBeVisible();
  await expect(controls.getByRole('button',{name:'Hide Status controls',exact:true})).toBeVisible();
  await root.locator('.explore-panel-menu summary').first().click();await expect(row.getByRole('checkbox')).toBeEnabled();await expect(row).not.toContainText('Shows while the View hides Status');
+});
+
+test('C6 Standard: a step that hides the Status controls panel brings the controls into the Status panel',async({page,server},info)=>{
+ await withControls(page,{hideAt:'retry'});const root=await setup(page,server),status=statusPanel(root),controls=controlsPanel(root);
+ const chip=index=>root.locator('.schip[data-step-source="'+index+'"]').first();
+ await chip(0).click();await expect(controls).not.toHaveClass(/panel-step-hidden/);await expect(button(controls,'Live')).toBeVisible();expect(await visibleControls(status)).toBe(0);
+ await chip(1).click();await expect(controls,'the step hides the controls panel').toHaveClass(/panel-step-hidden/);
+ await expect(button(status,'Live'),'the controls are in the Status panel').toBeVisible();await expect(button(status,'Over time')).toBeVisible();await expect(metrics(status)).toBeVisible();
+ await metrics(status).click();await expect(card(root,'ingest->app')).toContainText('100 req/h');
+ await info.attach('c6-step-hidden-controls-in-status',{body:await page.screenshot(),contentType:'image/png'});
+ await chip(0).click();await expect(controls).not.toHaveClass(/panel-step-hidden/);await expect.poll(()=>visibleControls(status),{message:'back on step one they leave Status'}).toBe(0);
+ await expect(metrics(controls)).toHaveAttribute('aria-checked','true');
 });
 
 test('C3 a board without the Status controls panel keeps every control in the Status panel',async({page,server})=>{

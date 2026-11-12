@@ -171,7 +171,61 @@ var FlowTopology = (function(){
       if(patch.operationPrefix!=null)delete current.operation;
     }};
   function mergeTrace(inherited,overlay){return mergeOverlay(inherited,overlay,TRACE_OVERLAY_RULES);}
-  function applyTracking(value,addition){
+  /* #1345: a consumer signal patch that names a source replaces the inherited source whole.
+     Same source, an object query: anything of the provider's query the patch leaves out is a
+     warning (keys, list items such as Honeycomb filters, CloudWatch dimensions); a patch that
+     keeps all of it, a string query, or a source switch is a note, since later provider changes
+     to that query no longer reach this board. note(type, at, message), at relative to the
+     overlay's telemetry. */
+  var TELEMETRY_SOURCE_NAMES={grafana:'Grafana',loki:'Loki',tempo:'Tempo',sql:'SQL',honeycomb:'Honeycomb',cloudwatch:'CloudWatch',cloudwatchLogs:'CloudWatch Logs'};
+  function telemetryCanonical(v){
+    if(Array.isArray(v))return '['+v.map(telemetryCanonical).join(',')+']';
+    if(object(v))return '{'+Object.keys(v).sort().map(function(k){return JSON.stringify(k)+':'+telemetryCanonical(v[k]);}).join(',')+'}';
+    return JSON.stringify(v===undefined?null:v);
+  }
+  // What the provider's query held that the patch does not: whole keys (absent), and list items or
+  // dimensions the patch does not keep as they were (missing, or kept with another value).
+  var TELEMETRY_ITEM_NAMES={filters:['filter','filters'],calculations:['calculation','calculations'],breakdowns:['breakdown','breakdowns'],logGroups:['log group','log groups'],orders:['order','orders'],havings:['having','havings']};
+  function telemetryItem(key,x){
+    if(typeof x==='string' || typeof x==='number')return String(x);
+    if(object(x) && key==='filters' && typeof x.column==='string')return x.column+(x.op!=null?' '+x.op:'')+(x.value!==undefined?' '+(Array.isArray(x.value)?x.value.join(', '):String(x.value)):'');
+    if(object(x) && typeof x.op==='string')return x.op+(typeof x.column==='string'?'('+x.column+')':'');
+    return telemetryCanonical(x);
+  }
+  function telemetryList(items){return items.length>1?items.slice(0,-1).join(', ')+' and '+items[items.length-1]:items[0];}
+  function telemetryLeftOut(inherited,patch){
+    var out={absent:[],changed:[]};
+    Object.keys(inherited).forEach(function(key){
+      var was=inherited[key];
+      if(was==null)return;
+      if(!own(patch,key) || patch[key]==null){out.absent.push(key);return;}
+      var is=patch[key];
+      if(Array.isArray(was) && Array.isArray(is)){
+        var missing=was.filter(function(x){return !is.some(function(y){return telemetryCanonical(y)===telemetryCanonical(x);});});
+        if(missing.length){var names=TELEMETRY_ITEM_NAMES[key] || [key,key];out.changed.push('the inherited '+names[missing.length>1?1:0]+' '+telemetryList(missing.map(function(x){return telemetryItem(key,x);})));}
+      }else if(key==='dimensions' && object(was) && object(is)){
+        var gone=Object.keys(was).filter(function(k){return !own(is,k);});
+        if(gone.length)out.absent.push((gone.length>1?'dimensions ':'dimension ')+telemetryList(gone));
+      }
+    });
+    return out;
+  }
+  function telemetryPatchFindings(inherited,overlay,carrier,note){
+    var have=object(inherited) && object(inherited.signals)?inherited.signals:{},patches=object(overlay) && object(overlay.signals)?overlay.signals:{};
+    Object.keys(patches).forEach(function(name){
+      var patch=patches[name],was=have[name];
+      if(!object(patch) || !object(was))return;
+      var to=TELEMETRY_SOURCES.filter(function(s){return patch[s]!=null;})[0],from=TELEMETRY_SOURCES.filter(function(s){return was[s]!=null;})[0];
+      if(!to || !from)return;
+      var at='.signals.'+name+'.'+to,who='signal '+name+' on '+carrier+': ',label=TELEMETRY_SOURCE_NAMES[to];
+      if(to!==from){note('note',at,who+'this switches its source from '+TELEMETRY_SOURCE_NAMES[from]+' to '+label+'; later provider changes to its query no longer reach this board');return;}
+      var left=object(was[from]) && object(patch[to])?telemetryLeftOut(was[from],patch[to]):{absent:[],changed:[]};
+      var parts=(left.absent.length?['leaves out '+telemetryList(left.absent)]:[]).concat(left.changed.length?['leaves out or changes '+telemetryList(left.changed)]:[]);
+      if(parts.length)note('warning',at,who+'this '+label+' patch replaces the provider\'s whole query and '+parts.join(', and ')+', so the signal no longer reads what the provider defined; '+(left.absent.length?'to replace the query, write all of it':'check that this is meant'));
+      else note('note',at,who+'this '+label+' patch replaces the provider\'s whole query; later provider changes to it no longer reach this board');
+    });
+  }
+  function applyTracking(value,addition,note,carrier){
     if(!addition)return;
     if(addition.missingWork===true)value.missingWork=true;
     if(addition.existsWhen==='tickets-done')value.existsWhen=addition.existsWhen;
@@ -183,6 +237,7 @@ var FlowTopology = (function(){
     if(own(addition,'telemetry')){
       if(!telemetryMergeOverlay(addition.telemetry))value.telemetry=clone(addition.telemetry);
       else{
+        if(note)telemetryPatchFindings(value.telemetry,addition.telemetry,carrier,note);
         // Hiding every signal leaves no binding for this consumer: the carrier is quietly unbound.
         var merged=mergeTelemetry(value.telemetry,addition.telemetry);
         if(object(merged.signals) && Object.keys(merged.signals).length)value.telemetry=merged;else delete value.telemetry;
@@ -263,6 +318,13 @@ var FlowTopology = (function(){
   // the same name can never reinterpret it; the carrier stays unbound. Why it
   // was dropped is kept per resolved diagram for the validator, never serialized.
   var telemetryDrops=new WeakMap();
+  // #1345: a consumer signal patch's findings, per resolved diagram (warnings and notes at the overlay).
+  var telemetryNotes=new WeakMap();
+  function telemetryFindings(d,DP){
+    var out={warnings:[],notes:[]};
+    (telemetryNotes.get(d) || []).forEach(function(f){out[f.type==='warning'?'warnings':'notes'].push(DP+'.'+f.at+': '+f.message);});
+    return out;
+  }
   function inheritTelemetry(value,templates,overlay,record){
     if(!object(value) || !object(value.telemetry) || !own(value.telemetry,'use'))return;
     var problems=[],expanded=telemetryExpand(value.telemetry,templates,function(path,message){problems.push({path:path,message:message});});
@@ -375,7 +437,7 @@ var FlowTopology = (function(){
       states.set(id,'visiting');
       var spec=byId.get(id);
       sections(spec).forEach(function(sec,si){
-        var d=sec.diagram,at=id+' section '+(sec.id || si),imports=d.topologyImports || [],provenance=[],defaultPlacements=Object.create(null),drops=[],spanDrops=[];
+        var d=sec.diagram,at=id+' section '+(sec.id || si),imports=d.topologyImports || [],provenance=[],defaultPlacements=Object.create(null),drops=[],spanDrops=[],metricNotes=[];
         var referenceSpans=FlowCanon.referenceSpans(d),referenceLit=referenceSpans?FlowCanon.referenceLit(d):{nodes:[],edges:[]};
         imports.forEach(function(imp,importIndex){
           var where=at+' import '+imp.as+' ('+imp.spec+' export '+imp.export+')',prefix=imp.as+'::';
@@ -397,6 +459,7 @@ var FlowTopology = (function(){
           var providerAt=(providerRecord?providerRecord.path:'section')+'.diagram';
           function dropped(kind,id,path){return function(problem){drops.push({kind:kind,id:id,spec:imp.spec,path:path+'.telemetry'+problem.path,message:problem.message});};}
           function traceDropped(kind,id,path){return function(key,message){spanDrops.push({type:'drop',kind:kind,id:id,key:key,spec:imp.spec,path:path+'.trace'+(key==null?'':'.spans.'+key),message:message});};}
+          function telemetryNoted(field,key){return function(type,sub,message){metricNotes.push({type:type,at:'topologyImports['+importIndex+'].'+field+'.'+key+'.telemetry'+sub,message:message});};}
           function traceNoted(field,key){return function(type,sub,message){spanDrops.push({type:type,at:'topologyImports['+importIndex+'].'+field+'.'+key+'.trace'+sub,message:message});};}
           function importedEdge(key){var parts=key.split('->');return prefix+parts[0]+'->'+prefix+parts[1];}
           ['nodes','edges'].forEach(function(key){
@@ -434,7 +497,7 @@ var FlowTopology = (function(){
               else {if(value.handoff!=null)fail(where,'nodeDetails '+key+' conflicts with its inherited handoff');value.detail=clone(imp.nodeDetails[key]);}
             }
             if(own(imp.nodeCodeRefs || {},key))value.codeRefs=(value.codeRefs || []).concat(clone(imp.nodeCodeRefs[key]));
-            inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));applyTracking(value,(imp.nodeTracking || {})[key]);
+            inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));applyTracking(value,(imp.nodeTracking || {})[key],telemetryNoted('nodeTracking',key),'node '+key);
             inheritTrace(value,(imp.nodeTracking || {})[key],'node',spec,byId.get(imp.spec),traceDropped('nodes',prefix+key,providerAt+'.nodes.'+key),traceNoted('nodeTracking',key),referenceLit.nodes.indexOf(prefix+key)>=0?referenceSpans:null);
             if(imp.presentation)value.presentation=imp.presentation;
             Object.keys((imp.nodeOverrides || {})[key] || {}).forEach(function(field){var override=imp.nodeOverrides[key][field];if(override===null)delete value[field];else value[field]=clone(override);});
@@ -463,7 +526,7 @@ var FlowTopology = (function(){
           exp.edges.forEach(function(key){
             var matches=(provider.edges || []).filter(function(e){return e && edgeKey(e)===key;});
             if(matches.length!==1)fail(where,'missing or ambiguous exported edge '+key);
-            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));applyTracking(edge,(imp.edgeTracking || {})[key]);
+            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));applyTracking(edge,(imp.edgeTracking || {})[key],telemetryNoted('edgeTracking',key),'connection '+key);
             inheritTrace(edge,(imp.edgeTracking || {})[key],'edge',spec,byId.get(imp.spec),traceDropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'),traceNoted('edgeTracking',key),referenceLit.edges.indexOf(importedEdge(key))>=0?referenceSpans:null);
             if(imp.presentation)edge.presentation=imp.presentation;
             if(!selected.has(edge.from) || !selected.has(edge.to))fail(where,'exported edge '+key+' must include both endpoints in exported nodes');
@@ -524,6 +587,7 @@ var FlowTopology = (function(){
         if(provenance.length)d.topologyProvenance={version:1,imports:provenance};
         if(drops.length)telemetryDrops.set(d,drops);
         if(spanDrops.length)traceDrops.set(d,spanDrops);
+        if(metricNotes.length)telemetryNotes.set(d,metricNotes);
         if(provenance.length || d.topologyProvenance)checkReferences(d,at);
       });
       // Validate exports even when nobody imports them, so broken declarations
@@ -666,7 +730,7 @@ var FlowTopology = (function(){
   }
   return {validateDeclarations:function(specs){materializeSources(specs,true);},validateTracking:validateTracking,mergeOverlay:mergeOverlay,mergeTelemetry:mergeTelemetry,
     telemetryDrops:function(d){return (telemetryDrops.get(d) || []).map(function(drop){return clone(drop);});},mergeTrace:mergeTrace,
-    traceFindings:traceFindings,mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
+    traceFindings:traceFindings,telemetryFindings:telemetryFindings,mergeExports:mergeExports,validateNodeOverride:validateNodeOverride,validateEdgeOverride:validateEdgeOverride,materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
 })();
 FlowCanon.materializeTopology=FlowTopology.materialize;
 FlowCanon.topologyDependencies=FlowTopology.dependencies;

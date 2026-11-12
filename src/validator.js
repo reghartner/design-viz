@@ -898,6 +898,8 @@ function validate(page){
       warnings.push(at+'.telemetry: provider "'+drop.spec+'" '+drop.path+': '+drop.message);
     });
     // #1290: provider spans dropped for this board warn at the carrier; overlay findings sit at the overlay.
+    // #1345: a consumer signal patch that leaves out part of the provider's query warns; a full restatement or a source switch is a note.
+    if(typeof FlowTopology!=='undefined' && FlowTopology.telemetryFindings){var metricFindings=FlowTopology.telemetryFindings(d,DP);warnings.push.apply(warnings,metricFindings.warnings);notes.push.apply(notes,metricFindings.notes);}
     if(typeof FlowTopology!=='undefined' && FlowTopology.traceFindings){var spanFindings=FlowTopology.traceFindings(d,DP);errors.push.apply(errors,spanFindings.errors);warnings.push.apply(warnings,spanFindings.warnings);}
     traceScopeWarnings(d,DP,warnings);
     referenceTraceDeclarationWarnings(d,DP,warnings);
@@ -915,7 +917,11 @@ function validate(page){
     });
   });
   editHistoryEntries(page,function(message){warnings.push(message);});
+  // #1345 (Chuck 2026-11-11): telemetry never asks for a live-status panel; tickets and ticket
+  // tracking do. A tracking block that holds only telemetry settings (a canon page's datasources)
+  // does not count; it still counts toward "the panel will be empty".
   var statusPanels=[],hasTracking=Object.prototype.hasOwnProperty.call(page,'tracking'),hasTickets=false;
+  var ticketTracking=hasTracking && !(specObject(page.tracking) && Object.keys(page.tracking).length && Object.keys(page.tracking).every(function(k){return k==='telemetry';}));
   sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};
     Object.keys(d.nodes || {}).map(function(id){return d.nodes[id];}).concat(d.edges || []).forEach(function(carrier){if(trackingRefs(carrier).tickets.length)hasTickets=true;});
     (Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp){
@@ -927,7 +933,7 @@ function validate(page){
     (d.panels || []).forEach(function(panel,index){if(panel && panel.type==='live-status')statusPanels.push(record.reference+'.diagram.panels['+index+']');});
   });
   tabPanelRepeatWarnings(page,warnings);
-  if((hasTracking || hasTickets || hasTelemetry) && !statusPanels.length)warnings.push('page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup');
+  if((ticketTracking || hasTickets) && !statusPanels.length)warnings.push('page.tracking: no live-status panel declared — add {"type": "live-status"} to a section\'s panels so viewers see the rollup');
   if(!hasTracking && !hasTickets && !hasTelemetry)statusPanels.forEach(function(path){warnings.push(path+': this page has no ticket references — the panel will be empty');});
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));

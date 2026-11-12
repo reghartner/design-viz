@@ -783,15 +783,15 @@ class InjectTests(unittest.TestCase):
         self.assertEqual(servers(profile), [{"server": profile["server"], "tools": ["get_trace"]}])
         listed = {**profile, "allowedAttributes": ["event.type"], "dataset": "events"}
         self.assertEqual(servers(listed), [{"server": profile["server"], "tools": ["get_trace", "run_query"]}])
-        # #1205: without a dataset Load makes no run_query, so none is declared.
-        self.assertEqual(servers({**profile, "allowedAttributes": ["event.type"]}), [{"server": profile["server"], "tools": ["get_trace"]}])
-        # The guide line about the extra call appears only with allowedAttributes and
-        # dataset; otherwise the guide is byte-identical to a profile without them.
-        line = "Honeycomb allowedAttributes with `dataset`: each Load/Verify also calls run_query once; keep it declared."
+        # #1414: without a dataset Load still makes one run_query (environment-wide), so it is declared.
+        self.assertEqual(servers({**profile, "allowedAttributes": ["event.type"]}), [{"server": profile["server"], "tools": ["get_trace", "run_query"]}])
+        # The guide line about the extra call appears only with allowedAttributes;
+        # a dataset alone leaves the guide byte-identical to a profile without either.
+        line = "Honeycomb allowedAttributes: each Load/Verify also calls run_query once (environment-wide without `dataset`); keep it declared."
         plain = guide_for(profile)
         self.assertNotIn(line, plain)
-        self.assertEqual(guide_for({**profile, "allowedAttributes": ["event.type"]}), plain)
         self.assertEqual(guide_for({**profile, "dataset": "events"}), plain)
+        self.assertIn(line, guide_for({**profile, "allowedAttributes": ["event.type"]}))
         self.assertIn(line, guide_for(listed))
 
     def test_company_trace_profile_declares_its_connector_only_on_boards_that_use_traces(self):

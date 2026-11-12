@@ -934,6 +934,16 @@ function logSearchesControls(warnings){
       return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }
+/* #1239: Status board settings → Traces (tracking.telemetry.traceConnections). */
+function companyTraceProfiles(){return typeof TELEMETRY_COMPANY_TRACE_CONNECTIONS!=='undefined' && specObject(TELEMETRY_COMPANY_TRACE_CONNECTIONS)?TELEMETRY_COMPANY_TRACE_CONNECTIONS:{};}
+function traceConnectionsControls(warnings){
+    var snapshot=parseEditor();if(snapshot.error)return null;
+    var company=companyTraceProfiles(),state=telemetryTraceConnectionState(snapshot.raw,company),doc=builderDocumentPage(snapshot.raw);state.warnings=warnings || [];
+    var t=doc && specObject(doc.page.tracking) && specObject(doc.page.tracking.telemetry)?doc.page.tracking.telemetry:{};
+    return createFlowTraceConnections({document:document,state:state,company:company,authored:t.traceConnections,controls:metricsControlKit(),listen:listen,drafts:METRICS_DRAFTS,idPrefix:prefix+'-trace-connections',commit:function(edit){
+      return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
+    }});
+  }
 function metricsSettingsControls(environments,warnings){
     var snapshot=parseEditor();if(snapshot.error)return null;
     var state=telemetryPageState(snapshot.raw);if(warnings)state.warnings=warnings;
@@ -3076,7 +3086,11 @@ function boardForm(){
     var hasTelemetry=Object.prototype.hasOwnProperty.call(tracking,'telemetry');
     var jira=section('jira','Jira',count(warnings.jira) || jiraStatus.join(' · ') || 'Not set',warnings.jira.length>0);
     var metrics=section('metrics','Metrics',count(warnings.metrics) || (!hasTelemetry?(statusBoardHasBindings(raw)?'No page settings':'Not set'):telemetry.enabled===false?'Off':''),hasTelemetry || warnings.metrics.length>0);
-    var traces=section('traces','Traces',count(warnings.traces) || 'No settings yet',warnings.traces.length>0);
+    // #1239: the header names how many connections readers can choose, or that the board inherits them.
+    var traceState=telemetryTraceConnectionState(raw,companyTraceProfiles()),traceCount=Object.keys(traceState.resolved).length;
+    var traceStatus=traceState.present?(traceCount?traceCount+(traceCount===1?' connection':' connections'):'None'):
+      traceState.companyIds.length?'Inherits '+traceState.companyIds.length+(traceState.companyIds.length===1?' company profile':' company profiles'):'Not set';
+    var traces=section('traces','Traces',count(warnings.traces) || traceStatus,warnings.traces.length>0);
     var environments=section('environments','Environments',count(warnings.environments) || environmentIds.join(', '),warnings.environments.length>0);
     var lookupSet=specObject(telemetry.lookups)?Object.keys(telemetry.lookups).length:0;
     var lookups=section('lookups','Log searches',count(warnings.lookups) || (!Object.prototype.hasOwnProperty.call(telemetry,'lookups')?'Not set':lookupSet?lookupSet+(lookupSet===1?' search':' searches'):'Typed query only'),warnings.lookups.length>0);
@@ -3085,8 +3099,7 @@ function boardForm(){
     warningList(jira,warnings.jira,'Jira warnings');
     var metricsForm=metricsSettingsControls(environments,warnings.metrics);if(metricsForm)metrics.appendChild(metricsForm);
     warningList(environments,warnings.environments,'Environments warnings');
-    note(traces,'No settings yet. Trace connections choose which company trace profiles this board uses; for now, edit tracking.telemetry.traceConnections in JSON.'+
-      (Object.prototype.hasOwnProperty.call(telemetry,'traceConnections')?' This board sets it.':''));
+    var tracesForm=traceConnectionsControls(warnings.traces);if(tracesForm)traces.appendChild(tracesForm);
     warningList(traces,warnings.traces,'Traces warnings');
     var lookupsForm=logSearchesControls(warnings.lookups);if(lookupsForm)lookups.appendChild(lookupsForm);
     return rows;

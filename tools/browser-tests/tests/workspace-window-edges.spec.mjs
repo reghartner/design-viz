@@ -71,10 +71,11 @@ test('docked Inspect resizes from its left edge by pointer and keyboard; the can
 });
 
 test('resize strips leave the pane scrollbar, the grip and the close button usable',async({page,server})=>{
-  await open(page,server);await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();
-  const win=page.locator('#workspace-window-inspect'),pane=win.locator('.editor-pane');
+  await open(page,server);await page.locator('#editor-tab-json').click();
+  const win=page.locator('#workspace-window-json'),pane=win.locator('.editor-pane');
+  // At its minimum height the JSON window scrolls its source.
   await win.locator('.workspace-window-resize').focus();for(let i=0;i<12;i++)await page.keyboard.press('Shift+ArrowUp');
-  // The right strip sits beside the pane, so it covers none of its scrollbar.
+  // The right strip sits beside the pane, so it covers none of its scrollbars.
   const strip=await box(win.locator('.workspace-window-edge[data-edge="e"]')),paneBox=await box(pane);
   expect(strip[0]).toBeGreaterThanOrEqual(paneBox[0]+paneBox[2]);
   // Corner squares leave the grip and the close button reachable up to their
@@ -87,12 +88,19 @@ test('resize strips leave the pane scrollbar, the grip and the close button usab
     });
     expect(missed,control).toEqual([]);
   }
-  // With a classic scrollbar, dragging its thumb scrolls the pane and never resizes the window.
-  const bar=await pane.evaluate(el=>({width:el.offsetWidth-el.clientWidth,overflow:el.scrollHeight-el.clientHeight}));
-  expect(bar.overflow).toBeGreaterThan(40);
-  if(bar.width>0){
-    const before=await box(win),x=paneBox[0]+paneBox[2]-bar.width/2,y=paneBox[1]+bar.width+6;
+  // The largest scrolling element in the window really overflows; with a
+  // classic scrollbar, dragging its thumb scrolls it and never resizes the window.
+  const scroller=await win.evaluate(root=>{
+    const found=[...root.querySelectorAll('*')].filter(el=>/(auto|scroll)/.test(getComputedStyle(el).overflowY) && el.scrollHeight-el.clientHeight>40 && el.clientHeight>40)
+      .sort((a,b)=>b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight)[0];
+    if(!found)return null;found.setAttribute('data-test-scroller','');const r=found.getBoundingClientRect();
+    return {box:[r.x,r.y,r.width,r.height],bar:found.offsetWidth-found.clientWidth-(parseFloat(getComputedStyle(found).borderLeftWidth)+parseFloat(getComputedStyle(found).borderRightWidth))};
+  });
+  expect(scroller,'a scrolling element in the JSON window').not.toBeNull();
+  expect(strip[0]).toBeGreaterThanOrEqual(Math.round(scroller.box[0]+scroller.box[2])-1);
+  if(scroller.bar>0){
+    const before=await box(win),right=scroller.box[0]+scroller.box[2],x=right-scroller.bar/2-1,y=scroller.box[1]+scroller.bar+6;
     await pointerDrag(page,[x,y],0,40);
-    expect(await pane.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);expect(await box(win)).toEqual(before);
+    expect(await win.locator('[data-test-scroller]').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);expect(await box(win)).toEqual(before);
   }
 });

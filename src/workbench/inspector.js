@@ -1040,7 +1040,7 @@ function traceSpansControls(){
         var x=named(actionButton('\u00d7',function(){return commit({op:'attribute',name:key,key:a,attrName:null},{any:addName});},'rowx'),'Remove attribute '+a+' from '+key,'Remove attribute '+a);line.appendChild(x);
         slot(box,types);
       });
-      var addLine=el('div','rowline','',box),draftKey='attr:'+key+':';
+      var addLine=el('div','rowline trace-attr-add','',box),draftKey='attr:'+key+':';
       var addName=named(document.createElement('input'),key+' new attribute name','A supported span attribute, such as db.system.');addName.type='text';addName.className='fctl';addName.placeholder='attribute';
       var addValue=named(document.createElement('input'),key+' new attribute value');addValue.type='text';addValue.className='fctl';addValue.placeholder='value';
       [addName,addValue].forEach(function(input,i){var k=draftKey+i;if(TRACE_SPAN_DRAFTS.has(k))input.value=TRACE_SPAN_DRAFTS.get(k);listen(input,'input',function(){TRACE_SPAN_DRAFTS.set(k,input.value);});input._flowviewHasDraft=function(){return input.value!=='';};addLine.appendChild(input);});
@@ -1836,7 +1836,7 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
       line.appendChild(named(actionButton('×',function(){return commit({op:'attribute',key:a,attrName:null},{any:null});},'rowx'),'Remove scope attribute '+a));
       slot(attrBox,types);
     });
-    var addLine=el('div','rowline','',attrBox);
+    var addLine=el('div','rowline trace-attr-add','',attrBox);
     var addName=draft(textInput('new scope attribute name','','A supported trace attribute, such as deployment.environment.name.','attribute'),'attr-name'),addValue=draft(textInput('new scope attribute value','','The value every inherited span must have; the type to the right says how it matches.','value'),'attr-value');
     if(allowed.length){var listId=prefix+'-scope-attrs',dl=el('datalist','',null,attrBox);dl.id=listId;allowed.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});addName.setAttribute('list',listId);}
     var addType=typeSelect('string','new scope attribute match');
@@ -1999,7 +1999,7 @@ function traceMatchEditor(val,ctx,t){
         named(remove,'Remove '+lead.toLowerCase()+'attribute '+key,'Remove attribute '+key);
         line.appendChild(name);line.appendChild(value);line.appendChild(types);line.appendChild(remove);attrBox.appendChild(line);
       });
-      var addLine=document.createElement('div');addLine.className='rowline trace-match-attr-add';
+      var addLine=document.createElement('div');addLine.className='rowline trace-match-attr-add trace-attr-add';
       var draftKey='attr:'+i+':';
       var newName=named(document.createElement('input'),lead+'new attribute name','A supported span attribute, such as deployment.environment.name.');
       newName.type='text';newName.className='fctl';newName.placeholder='new attribute';if(attributeNames.length)newName.setAttribute('list',attrListId);draft(newName,draftKey+'name');

@@ -22,12 +22,14 @@ test('A1 desktop: a starts-with attribute on an imported connection\'s span is s
   const fold=page.locator('#guide details.trace-spans-editor');await expect(fold).toHaveCount(1);
   if(!await fold.evaluate(el=>el.open))await fold.locator(':scope > summary').click();
   const before=await source.inputValue();
-  /* Local run 142af956 found a second Inspect rebuild after selecting the imported connection that cleared typed
-     New attribute text; a same-carrier rebuild now keeps it (node test E12). Type once, after the field is ready. */
+  /* Runs 142af956 and 85a672c4 lost the typed name: the New attribute row was one squeezed row, and the name field
+     was about 25px wide, mostly its datalist button, so the click did not leave a place to type. The row is now
+     two rows of two (#1413), and the name field must be wide enough to type in. Type once, after it is ready. */
   const name=fold.getByLabel('send new attribute name',{exact:true}),value=fold.getByLabel('send new attribute value',{exact:true});
   await expect(name).toBeEnabled();await expect(value).toBeEnabled();
-  await name.click();await page.keyboard.type(A);
-  await value.click();await page.keyboard.type('prd');
+  for(const field of [name,value])expect((await field.boundingBox()).width,'the New attribute fields are wide enough to type in').toBeGreaterThan(100);
+  await name.click();await page.keyboard.type(A);await expect(name).toHaveValue(A);
+  await value.click();await page.keyboard.type('prd');await expect(value).toHaveValue('prd');
   await fold.getByLabel('send new attribute match',{exact:true}).selectOption('startsWith');
   await expect(name).toHaveValue(A);
   await fold.getByRole('button',{name:'Add attribute to send',exact:true}).click();

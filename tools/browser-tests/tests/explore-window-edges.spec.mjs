@@ -16,9 +16,12 @@ const CURSORS={n:'ns-resize',s:'ns-resize',e:'ew-resize',w:'ew-resize',ne:'nesw-
 const SIDES=['nw','n','ne','e','se','s','sw','w'];
 async function box(locator){return locator.evaluate(el=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height].map(Math.round);});}
 function near(got,want,tolerance=1){return got.every((v,i)=>Math.abs(v-want[i])<=tolerance);}
-// Edges are pressed 3px inside; corners 6px inside, clear of the 12px rounded corner clip.
-function pointFor(r,edge){
-  const inset=edge.length===2?6:3;
+// Strips inside a window (step controls, canvas windows) are pressed 3px in, and
+// corners 6px in, clear of the 12px rounded corner. A floating window's strips
+// sit outside its border and are pressed 3px outside (inset -3); its
+// bottom-right is the resize button inside the window.
+function pointFor(r,edge,outside=false){
+  const inset=outside && edge!=='se'?-3:edge.length===2?6:3;
   return [edge.includes('w')?r[0]+inset:edge.includes('e')?r[0]+r[2]-inset:r[0]+r[2]/2,edge.includes('n')?r[1]+inset:edge.includes('s')?r[1]+r[3]-inset:r[1]+r[3]/2];
 }
 function outward(edge){return [edge.includes('w')?-40:edge.includes('e')?40:0,edge.includes('n')?-30:edge.includes('s')?30:0];}
@@ -40,11 +43,11 @@ test('an Explore panel window and the step controls resize from every corner and
   let previous=null;
   for(const edge of SIDES){
     const start=await box(panel),[dx,dy]=outward(edge),before=await page.locator('#src').inputValue();
-    await pointerDrag(page,pointFor(start,edge),dx,dy);
+    await pointerDrag(page,pointFor(start,edge,true),dx,dy);
     const want=landed(start,edge,dx,dy),got=await box(panel);
     expect(near(got,want),`${edge}: expected ${want}, got ${got}`).toBe(true);
     expect(await page.locator('#src').inputValue(),`${edge} saves the layout`).not.toBe(before);
-    expect(await cursorAt(page,pointFor(got,edge)),edge).toBe(CURSORS[edge]);
+    expect(await cursorAt(page,pointFor(got,edge,true)),edge).toBe(CURSORS[edge]);
     await closeTools(page);previous=[start,got];
   }
   // Each drag is one Undo step.

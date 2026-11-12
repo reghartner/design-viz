@@ -969,6 +969,7 @@ function validate(page){
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
   if (typeof FlowCanon !== 'undefined' && FlowCanon.traceWarnings) warnings = warnings.concat(FlowCanon.traceWarnings(page));
+  if (typeof FlowCanon !== 'undefined' && FlowCanon.traceNotes) notes.push.apply(notes, FlowCanon.traceNotes(page));
   validateDocumentLinks(page.documentLinks,page.canon && page.canon.id,'page.documentLinks',errors);
   validateDocumentDescription(page.description,'page.description',errors);
   validateDocumentTags(page.tags,'page.tags',errors);

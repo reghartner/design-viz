@@ -286,10 +286,11 @@ test('13. #1414 environment-wide answer fills the allowed attribute on spans of 
 });
 test('14. #1414 with a dataset nothing changes; a run_query schema without environment_wide_query leaves a datasetless profile\'s attributes missing, with a reason',async()=>{
   const C=context();
-  // A profile literal cannot switch the query to environment-wide behind a dataset.
-  const narrowed=profile();narrowed.literals={...narrowed.literals,environment_wide_query:true};
-  const n=await load(C,page(narrowed));
+  const n=await load(C,page(profile()));
   assert.equal(n.calls[1].args.dataset_slug,'events');assert.equal('environment_wide_query' in n.calls[1].args,false);
+  // A passed-through argument cannot switch the query to environment-wide behind a dataset.
+  const q=C.telemetryTraceAttributeQuery(RUN_QUERY,{traceId:ID,environment:'production',dataset:'events',from:'-2h',args:{environment_wide_query:true}},['device.model']);
+  assert.equal(q.input.dataset_slug,'events');assert.equal('environment_wide_query' in q.input,false);
   const old=clone(RUN_QUERY);delete old.inputSchema.properties.environment_wide_query;
   const wide=profile();delete wide.dataset;
   const {e,report,calls}=await load(C,page(wide),undefined,false,old);

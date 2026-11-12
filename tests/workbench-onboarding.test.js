@@ -62,3 +62,14 @@ test('landing selects the first non-detail diagram using canonical section recor
     assert.deepEqual(activated,selected.tabBlock?{tab:1,focus:false,activate:false}:null);
   }
 });
+
+test('the agent chapter mentions live status boards in one short sentence, with or without Jira (#868)',()=>{
+  const steps=plain(harness().workbenchPracticeLessons('agent').steps);
+  assert.equal(steps.length,11,'the mention is a sentence, not a new step');
+  const mentions=steps.filter(step=>/live status board/i.test(step.copy.body));
+  assert.deepEqual(mentions.map(step=>step.id),['refine']);
+  const sentence=mentions[0].copy.body.split(/(?<=\.)\s+/).find(text=>/live status board/i.test(text));
+  assert.ok(sentence.length<=160,'keep tour copy short: '+sentence);
+  assert.match(sentence,/metrics/i,'a status board works without Jira');
+  assert.match(sentence,/Jira/);
+});

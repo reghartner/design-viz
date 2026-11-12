@@ -782,7 +782,103 @@ function telemetryEditMerge(inherited,overlay,edit,options){
   // Nothing left that differs from the inherited binding (kind included): nothing to keep.
   return {value:Object.keys(o).length>1?o:null};
 }
+/* #1393: one scoped variable row (add, rename, value, remove) on a carrier's own variables or its
+   import's. Names follow the board's rules; a value must pass the scoped-value allowlist, and an added
+   or changed value that would keep one of this carrier's signals from being sent is refused with the
+   viewer's reason. The write itself is the existing whole-object 'variables' / 'importVariables' edit. */
+function telemetryVariableRowValue(current,edit){
+  var vars=telemetryObject(current)?telemetryClone(current):{},name=edit.name,action=edit.action;
+  function nameProblem(n){
+    if(typeof n!=='string' || !telemetryParamPattern.test(n))return 'Variable names start with a letter and use letters, digits and _.';
+    return TELEMETRY_RESERVED_VARIABLES.indexOf(n)>=0?'"'+n+'" is reserved; choose another name.':'';
+  }
+  function valueProblem(v){
+    if(!telemetryText(v))return 'A variable value is non-empty text; use Remove to delete the variable.';
+    return TELEMETRY_SCOPED_SPACED.test(v.trim())?'':TELEMETRY_SCOPED_ALLOWED.charAt(0).toUpperCase()+TELEMETRY_SCOPED_ALLOWED.slice(1)+'.';
+  }
+  var problem;
+  if(action==='add'){
+    if(!name)return {error:'Type a variable name.'};
+    if((problem=nameProblem(name)))return {error:problem};
+    if(telemetryOwn(vars,name))return {error:'Variable "'+name+'" already exists; edit its value instead.'};
+    if((problem=valueProblem(edit.value)))return {error:problem};
+    vars[name]=edit.value.trim();
+  }else{
+    if(typeof name!=='string' || !telemetryOwn(vars,name))return {error:'Variable "'+name+'" not found. Select the element again.'};
+    if(action==='remove')delete vars[name];
+    else if(action==='rename'){
+      if(edit.to==null)return {error:'A variable needs a name; use Remove to delete it.'};
+      if(edit.to===name)return {value:vars};
+      if((problem=nameProblem(edit.to)))return {error:problem};
+      if(telemetryOwn(vars,edit.to))return {error:'Variable "'+edit.to+'" already exists.'};
+      vars=telemetryRenameKey(vars,name,edit.to);
+    }else if(action==='value'){if((problem=valueProblem(edit.value)))return {error:problem};vars[name]=edit.value.trim();}
+    else return {error:'Unknown variable edit.'};
+  }
+  return {value:vars};
+}
+/* review c1: why filling `name` = `value` would keep a signal from being sent, or null. Only that name is
+   checked (telemetryScopedValueProblem with a one-name map), so another unset variable never blames it.
+   Carrier scope: the selected carrier. Import scope (as): every node and connection of that import,
+   except one whose own variables set the name (they win). The message names the carrier and signal. */
+function telemetryVariableBlocked(raw,target,context,as,name,value){
+  /* Import scope (review c2): the resolver copies the import's variables into every carrier it owns, so
+     shadowing is read from a copy resolved without them: what is left is the provider's binding and the
+     board's overlay, the variables that win over the import's. */
+  var source=raw;
+  if(as!=null){
+    source=telemetryClone(raw);var paths=specSectionPaths(source)[target.section],d0=paths && specValueAt(source,paths.diagram);
+    (telemetryObject(d0) && Array.isArray(d0.topologyImports)?d0.topologyImports:[]).forEach(function(imp){if(telemetryObject(imp) && imp.as===as)delete imp.variables;});
+  }
+  var resolved;try{resolved=typeof FlowTopology!=='undefined'?FlowTopology.resolveSource(source,context):source;}catch(ex){return null;}
+  var rec=specSectionPaths(resolved)[target.section],d=rec && specValueAt(resolved,rec.diagram);if(!telemetryObject(d))return null;
+  var templates=telemetryPageTemplates(resolved),carriers=[],prefix=as==null?null:as+'::';
+  if(prefix==null){
+    if(target.kind==='node' && telemetryObject(d.nodes) && telemetryObject(d.nodes[target.id]))carriers.push({label:'node '+target.id,value:d.nodes[target.id]});
+    else if(target.kind==='edge' && Array.isArray(d.edges) && telemetryObject(d.edges[target.index])){var e=d.edges[target.index];carriers.push({label:'connection '+e.from+' → '+e.to,value:e});}
+  }else{
+    Object.keys(telemetryObject(d.nodes)?d.nodes:{}).forEach(function(id){if(id.indexOf(prefix)===0)carriers.push({label:'node '+id,value:d.nodes[id]});});
+    (Array.isArray(d.edges)?d.edges:[]).forEach(function(e){if(telemetryObject(e) && String(e.from).indexOf(prefix)===0 && String(e.to).indexOf(prefix)===0)carriers.push({label:'connection '+e.from+' → '+e.to,value:e});});
+  }
+  var scoped={},found=null;scoped[name]=value;
+  carriers.some(function(carrier){
+    var binding=telemetryObject(carrier.value.telemetry)?carrier.value.telemetry:null;if(!binding)return false;
+    if(prefix!=null && telemetryObject(binding.variables) && telemetryOwn(binding.variables,name))return false;
+    var effective=telemetryEffectiveBinding(binding,templates) || binding,signals=telemetryObject(effective.signals)?effective.signals:{};
+    return Object.keys(signals).some(function(signal){
+      var entry=signals[signal],source=telemetrySignalSource(entry);if(!source)return false;
+      var fragments=telemetryObject(entry.narrow)?telemetryNarrowList(entry.narrow[source]):[];
+      var why=telemetryScopedValueProblem(source,entry[source],scoped,fragments);
+      if(why)found='On '+carrier.label+', signal '+signal+' would not be sent: '+why;
+      return !!found;
+    });
+  });
+  return found;
+}
 function planCarrierTelemetry(text,raw,target,edit,context){
+  if(edit && edit.op==='variableRow'){
+    var before;try{before=telemetryCarrierState(raw,target,context);}catch(ex){return {error:ex.message};}
+    if(before.error)return before;
+    var importScope=edit.scope==='import';
+    if(importScope && !before.importVariables)return {error:'Variables for an import are set on its imported nodes and connections.'};
+    var current=importScope?before.importVariables.value:before.variables && before.variables.own;
+    if(current!=null && !telemetryObject(current))return {error:'These variables are not an object; repair them in JSON first.'};
+    var next=telemetryVariableRowValue(current,edit);if(next.error)return next;
+    // review c1/c2: an added, changed or renamed value is checked for its (new) name, in every carrier it reaches.
+    if(edit.action==='add' || edit.action==='value' || edit.action==='rename' && edit.to!==edit.name){
+      var checked=edit.action==='rename'?edit.to:edit.name;
+      var block=telemetryVariableBlocked(raw,target,context,importScope?before.importVariables.as:null,checked,next.value[checked]);
+      if(block)return {error:block};
+    }
+    var whole=Object.keys(next.value).length?JSON.stringify(next.value):null;
+    var plan=planCarrierTelemetry(text,raw,target,{op:importScope?'importVariables':'variables',value:whole},context);
+    if(plan.error || plan.text===text || (edit.action!=='rename' && edit.action!=='remove'))return plan;
+    // A rename or removal that leaves this carrier's signal without a value it used is refused (review c1 MINOR 2).
+    var old=edit.name,after;try{after=telemetryCarrierState(JSON.parse(plan.text),target,context);}catch(ex){after=null;}
+    var was=before.sent || {},now=after && after.sent || {},lost=null;
+    Object.keys(now).some(function(signal){var e=now[signal].error || '';if(e.indexOf('${'+old+'}')>=0 && (!was[signal] || (was[signal].error || '').indexOf('${'+old+'}')<0))lost='Signal '+signal+' uses ${'+old+'}; '+(edit.action==='rename'?'renaming':'removing')+' it would leave the signal without a value. Change the query first, or keep the name.';return !!lost;});
+    return lost?{error:lost}:plan;
+  }
   var t=telemetryCarrierTarget(text,raw,target,context);if(t.error)return t;
   var inherited=telemetryInheritedBinding(text,raw,target,t,context);
   // #1363: an import's scoped variables (topologyImports[i].variables) apply to all its carriers.
@@ -1004,7 +1100,11 @@ function telemetryCarrierState(raw,target,context){
   }
   var ownVars=merge?(merge.overlay && merge.overlay.variables):binding && binding.variables;
   var importVariables=null;
-  if(t.owner){var imps=Array.isArray(t.got.d.topologyImports)?t.got.d.topologyImports:[],imp=imps.find(function(i){return i && i.as===t.owner.as;});if(imp)importVariables={as:t.owner.as,value:telemetryObject(imp.variables)?telemetryClone(imp.variables):{}};}
+  if(t.owner){var imps=Array.isArray(t.got.d.topologyImports)?t.got.d.topologyImports:[],imp=imps.find(function(i){return i && i.as===t.owner.as;});
+    // review c1: a value that is not an object is kept as written (the rows say so), and the validator's
+    // warnings for the import's variables come with it, under the path 'variables'.
+    if(imp){var importWarnings=[];if(telemetryOwn(imp,'variables'))telemetryScopedVariables(imp.variables,function(path,message){importWarnings.push(path+': '+message);},'variables');
+      importVariables={as:t.owner.as,value:telemetryOwn(imp,'variables')?telemetryClone(imp.variables):{},warnings:importWarnings};}}
   return {narrow:narrow,sent:sent,variables:{own:telemetryObject(ownVars)?telemetryClone(ownVars):{},inherited:merge && inherited && telemetryObject(inherited.variables)?telemetryClone(inherited.variables):{}},importVariables:importVariables,
     id:t.id,imported:!!t.owner,provider:t.owner?t.owner.spec+' / '+t.owner.export:null,edge:target.kind==='edge',binding:binding,inherited:inherited,merge:merge,mergeEffects:mergeEffects,templates:templates,
     mode:template!=null?'template':'raw',template:template,

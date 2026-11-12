@@ -45,7 +45,8 @@ function createFlowTraceConnections(o){
     d.note(box,'tracking.telemetry.traceConnections is not an object, so readers get no trace connections. Fix it in Advanced JSON below.');
   }else if(!s.present){
     d.note(box,!s.companyIds.length?'This build has no company trace profiles. Add an inline profile in Advanced JSON.':
-      !s.enabled?'Allow metrics is off for this page, so readers get no trace connections now. Use and Disable still save the choice.':
+      // Disable is offered only for a profile the board inherits (a board that uses traces).
+      !s.enabled?'Allow metrics is off for this page, so readers get no trace connections now. '+(inherited.length?'Use and Disable still save the choice.':'Use still saves the choice.'):
       inherited.length?'This board inherits every company profile, including ones added later. Choose Use or Disable on a profile to pick them for this board.':
       'This board does not use traces yet (a step trace match, span declarations, or Metrics on a Live status board), so it inherits no company profile. Choose Use to add one now.','trace-connections-mode');
   }else{

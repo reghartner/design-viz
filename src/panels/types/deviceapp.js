@@ -788,6 +788,14 @@ PanelRegistry.extend('deviceapp', {
       return panel;
     },
     initialFields: true,
+    fieldMeta: {
+      appName: { setup: { group: 'App' } },
+      device: { setup: { group: 'App' } },
+      subtitle: { setup: { group: 'App' } },
+      showSources: { setup: { group: 'Data sources' } },
+      sources: { setup: { group: 'Data sources' } },
+      fields: { setup: { group: 'Cards' } },
+    },
     setupFields: [
       ['appName', 'text'],
       ['device', 'text'],

@@ -31,6 +31,9 @@ var PANEL_PATCH_FIELDS = panelAuthoringMap('patchFields');
    authoring.fieldMeta.<key> and tuple[3] accept:
      label / help / group / advanced / hidden / assignment
      setup / initial / step — context-specific overrides of those properties
+     ignoredWhen(panel) — returns the reason the renderer ignores this setup
+                          field for the given panel, or nothing; Inspect then
+                          shows the field disabled with that reason
      unsetLabel — copy for an omitted assignment
      nullLabel — opt in to an explicit JSON null assignment
    Context metadata is merged last. */
@@ -47,6 +50,7 @@ function panelFieldPresentation(decl,field,mode){
     ['label','help','group','unsetLabel','nullLabel'].forEach(function(name){if(Object.prototype.hasOwnProperty.call(meta,name))out[name]=meta[name];});
     ['advanced','hidden'].forEach(function(name){if(Object.prototype.hasOwnProperty.call(meta,name))out[name]=meta[name]===true;});
     if(Object.prototype.hasOwnProperty.call(meta,'assignment'))out.assignment=meta.assignment!==false;
+    if(typeof meta.ignoredWhen==='function')out.ignoredWhen=meta.ignoredWhen;
   }
   merge(registered);merge(tuple);merge(registered && registered[mode]);merge(tuple && tuple[mode]);
   if(!out.unsetLabel)out.unsetLabel=mode==='initial'?'Use panel default':mode==='step'?'Inherit previous':'Leave unset';

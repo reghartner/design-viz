@@ -1003,7 +1003,8 @@ PanelRegistry.extend('timeline', {
     ],
     fieldMeta: {
       span: { label: 'Timeline span', help: 'A duration such as 6h or 90m.', group: 'Timeline' },
-      cadence: { label: 'Shared cadence', help: 'Used when no per-lane cadences are declared.', group: 'Timeline' },
+      cadence: { label: 'Shared cadence', help: 'Used when no per-lane cadences are declared.', group: 'Timeline',
+        setup: { ignoredWhen: function (panel) { return Array.isArray(panel.lanes) && panel.lanes.length ? 'Lanes set their own cadence. Remove the lanes to use the shared cadence.' : ''; } } },
       lanes: { label: 'Cadence lanes', help: 'Optional independent periodic tracks; declaring lanes replaces the shared cadence.', group: 'Timeline' },
       events: { label: 'Events', setup: { label: 'Reference events', help: 'Markers that are always present on the timeline.' },
         initial: { label: 'Starting events', help: 'Events already present before the first step.' },

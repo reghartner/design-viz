@@ -2739,17 +2739,38 @@ function panelSetupRows(val){
     var entries=fields.map(function(f,index){return {field:f,index:index,meta:panelFieldPresentation(val,f,'setup')};})
       .filter(function(entry){return !entry.meta.hidden;})
       .sort(function(a,b){return Number(a.meta.advanced)-Number(b.meta.advanced) || a.index-b.index;});
-    var rows=[],lastGroup=null;
+    var out=[],lastGroup=null,advancedFold=null;
     function annotated(row,meta){
-      if(!meta.help)return row;
+      var reason=typeof meta.ignoredWhen==='function'?meta.ignoredWhen(val):null;
+      if(reason){
+        /* The renderer ignores this field in the current setup: show it read-only with the reason. */
+        Array.prototype.forEach.call(row.querySelectorAll('input,select,textarea,button'),function(control){control.disabled=true;});
+        row.classList.add('panel-setup-ignored');
+      }
+      if(!meta.help && !reason)return row;
       var wrap=document.createElement('div');wrap.className='panel-setup-field';wrap.appendChild(row);
-      var note=document.createElement('p');note.className='fnote panel-setup-note';note.textContent=meta.help;wrap.appendChild(note);return wrap;
+      [reason,meta.help].forEach(function(text){
+        if(!text)return;
+        var note=document.createElement('p');note.className='fnote panel-setup-note';note.textContent=text;wrap.appendChild(note);
+      });
+      return wrap;
     }
     entries.forEach(function(entry){
       var f=entry.field,meta=entry.meta,key = f[0], kind = f[1], cur = val[key], editor=panelEditor(val.type),row;
-      var groupName=meta.advanced?'Advanced settings':meta.group;
-      if(groupName && groupName!==lastGroup){var heading=document.createElement('h4');heading.className='panel-state-group panel-setup-group';heading.textContent=groupName;rows.push(heading);}
-      lastGroup=groupName || lastGroup;
+      /* Rarely used fields share one collapsed Advanced section, like the node form's. */
+      var rows=out;
+      if(meta.advanced){
+        if(!advancedFold){
+          advancedFold=document.createElement('details');advancedFold.className='panel-setup-advanced';
+          var foldSummary=document.createElement('summary');foldSummary.textContent='Advanced';advancedFold.appendChild(foldSummary);
+          out.push(advancedFold);
+        }
+        rows={push:function(row){advancedFold.appendChild(row);}};
+      }else{
+        var groupName=meta.group || (key==='initial' && lastGroup && !panelAuthoring(val.type).initialFields?'Starting state':'');
+        if(groupName && groupName!==lastGroup){var heading=document.createElement('h4');heading.className='panel-state-group panel-setup-group';heading.textContent=groupName;rows.push(heading);}
+        lastGroup=groupName || lastGroup;
+      }
       if(key==='initial' && panelAuthoring(val.type).initialFields){rows.push(panelPatchControl(val.id,val.initial===undefined?{}:val.initial,val,Object.assign({},session.target),{initial:true}));return;}
       var custom=editor.setupField && editor.setupField(f,val);
       if(custom){rows.push(annotated(custom,meta));return;}
@@ -2787,7 +2808,7 @@ function panelSetupRows(val){
       if(!row)row=frow(meta.label, jsonFieldControl(key, cur, kind));
       rows.push(annotated(row,meta));
     });
-    return rows;
+    return out;
   }
 
 function panelForm(val, ctx){

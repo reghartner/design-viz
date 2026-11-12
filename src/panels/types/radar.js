@@ -617,6 +617,16 @@ body.sk-editorial .rdsubject{stroke:#EFE8DC;}`,
 PanelRegistry.extend('radar', {
   authoring: {
     template: { title: 'Radar' },
+    fieldMeta: {
+      sensor: { setup: { group: 'Sensor' } },
+      facing: { setup: { group: 'Sensor' } },
+      spread: { setup: { group: 'Sensor' } },
+      range: { setup: { group: 'Sensor' } },
+      threshold: { setup: { group: 'Alert' } },
+      rings: { setup: { advanced: true } },
+      scale: { setup: { advanced: true } },
+      zones: { setup: { advanced: true } },
+    },
     setupFields: [
       ['sensor', 'json'],
       ['facing', 'num'],

@@ -9,7 +9,7 @@ function workspacePrefs(raw){
     var saved=value.windows[name];if(!saved || typeof saved!=='object')return;
     var rect={open:saved.open===true};
     if(saved.docked===true)rect.docked=true;
-    ['x','y','w','h'].forEach(function(key){if(Number.isFinite(saved[key]))rect[key]=saved[key];});
+    ['x','y','w','h','dockW'].forEach(function(key){if(Number.isFinite(saved[key]))rect[key]=saved[key];});
     prefs.windows[name]=rect;
   });
   return prefs;
@@ -22,6 +22,19 @@ function workspacePanelRect(rect,width,height,chromeTop,chromeBottom,chromeLeft)
   var h=Math.max(minH,Math.min(availableH,Number.isFinite(rect.h)?rect.h:640));
   return {x:Math.max(left,Math.min(width-w-12,Number.isFinite(rect.x)?rect.x:84)),
     y:Math.max(top,Math.min(height-h-bottom,Number.isFinite(rect.y)?rect.y:84)),w:w,h:h};
+}
+
+/* #1376: every edge and corner of a floating tool window resizes it. Only the
+   dragged sides move; the opposite sides stay put. Limits are the usable
+   workspace and the 300x240 minimum of workspacePanelRect. */
+var WORKSPACE_EDGE_CURSORS={n:'ns-resize',s:'ns-resize',e:'ew-resize',w:'ew-resize',ne:'nesw-resize',sw:'nesw-resize',nw:'nwse-resize',se:'nwse-resize'};
+function workspaceEdgeRect(r,edge,dx,dy,limits){
+  var x1=r.x,y1=r.y,x2=r.x+r.w,y2=r.y+r.h;
+  if(edge.indexOf('w')>=0)x1=Math.max(limits.left,Math.min(x2-limits.minW,x1+dx));
+  if(edge.indexOf('e')>=0)x2=Math.min(limits.right,Math.max(x1+limits.minW,x2+dx));
+  if(edge.indexOf('n')>=0)y1=Math.max(limits.top,Math.min(y2-limits.minH,y1+dy));
+  if(edge.indexOf('s')>=0)y2=Math.min(limits.bottom,Math.max(y1+limits.minH,y2+dy));
+  return {x:x1,y:y1,w:x2-x1,h:y2-y1};
 }
 
 /* A reader preview is a second renderer, not an authoring canvas with its
@@ -142,7 +155,14 @@ function initWorkbenchWorkspace(){
   }
   function defaults(name){var b=bounds();return {x:name==='agent'?b.left:innerWidth-392,y:b.top,w:name==='json'?500:380,h:Math.min(700,innerHeight-b.top-b.bottom),open:false};}
   function docked(){return names.find(function(name){return prefs.windows[name] && prefs.windows[name].docked && prefs.windows[name].open && !hidden && !(windows[name] && windows[name].classList.contains('workspace-focus-tucked'));});}
-  function dockWidth(){var b=bounds(),name=docked();return name?Math.min(Math.max(300,prefs.windows[name].w),Math.max(300,(innerWidth-b.left)*.45)):0;}
+  // A docked tool keeps its own width (dockW); Float restores the floating size.
+  function dockMax(){return Math.max(300,(innerWidth-bounds().left)*.45);}
+  function dockWidth(){var name=docked(),saved=name && prefs.windows[name];return name?Math.min(Math.max(300,Number.isFinite(saved.dockW)?saved.dockW:saved.w),dockMax()):0;}
+  function setDockWidth(name,width){prefs.windows[name].dockW=Math.round(Math.max(300,Math.min(dockMax(),width)));paintAll();}
+  function edgeLimits(name){
+    var b=bounds(),reserve=docked() && docked()!==name?dockWidth()+12:0,width=innerWidth-reserve,availableH=Math.max(1,innerHeight-b.top-b.bottom);
+    return {left:b.left,top:b.top,right:width-12,bottom:innerHeight-b.bottom,minW:Math.min(300,Math.max(1,width-b.left-12)),minH:Math.min(240,availableH)};
+  }
   function boundRect(value,name){
     var b=bounds(),reserve=docked() && docked()!==name?dockWidth()+12:0;
     return workspacePanelRect(value,innerWidth-reserve,innerHeight,b.top,b.bottom,b.left);
@@ -202,6 +222,18 @@ function initWorkbenchWorkspace(){
     win.dataset.docked=String(isDocked);
     var toggle=win.querySelector('.workspace-window-dock');toggle.textContent=isDocked?'Float':'Dock';toggle.setAttribute('aria-label',(isDocked?'Float ':'Dock ')+labels[name]+' panel');
     win.querySelector('.workspace-window-grip').disabled=isDocked;win.querySelector('.workspace-window-resize').hidden=isDocked;
+    // Docked, only the free left edge resizes; it is then a keyboard splitter.
+    win.querySelectorAll('.workspace-window-edge').forEach(function(edge){
+      var side=edge.getAttribute('data-edge'),splitter=isDocked && side==='w';edge.hidden=isDocked && !splitter;
+      if(splitter){
+        edge.tabIndex=0;edge.setAttribute('role','separator');edge.setAttribute('aria-orientation','vertical');edge.removeAttribute('aria-hidden');
+        edge.setAttribute('aria-label','Resize docked '+labels[name]+' panel width');edge.title='Drag to resize the docked panel · Left/Right arrow keys resize · Shift resizes farther';
+        edge.setAttribute('aria-valuemin','300');edge.setAttribute('aria-valuemax',String(Math.round(dockMax())));edge.setAttribute('aria-valuenow',String(Math.round(r.w)));
+      }else{
+        edge.removeAttribute('tabindex');['role','aria-orientation','aria-label','aria-valuemin','aria-valuemax','aria-valuenow'].forEach(function(a){edge.removeAttribute(a);});
+        edge.setAttribute('aria-hidden','true');edge.title='Drag to resize';
+      }
+    });
     win.style.left=r.x+'px';win.style.top=r.y+'px';win.style.width=r.w+'px';win.style.height=r.h+'px';
     win.hidden=!open || hidden;panes[name].hidden=!open;
     // #1318: a class instead of :has(#workspace-window-agent:not([hidden])) on <body>.
@@ -250,23 +282,31 @@ function initWorkbenchWorkspace(){
     if(cancel){prefs.windows[g.name]=g.before;if(g.placement)placements[g.name]=g.placement;else delete placements[g.name];}
     document.body.classList.remove('workspace-dragging');document.body.style.cursor='';
     if(g.handle.hasPointerCapture(g.id))g.handle.releasePointerCapture(g.id);
-    paint(g.name);if(!cancel)persist();
+    if(g.docked)paintAll();else paint(g.name);if(!cancel)persist();
   }
-  function begin(ev,name,kind,handle){
-    if(ev.button!==0 || !ev.isPrimary || gesture || docked()===name)return;
+  function begin(ev,name,kind,handle,edge){
+    var isDocked=docked()===name;
+    if(ev.button!==0 || !ev.isPrimary || gesture || isDocked && edge!=='w')return;
     retireDock();ev.preventDefault();front(name);handle.focus({preventScroll:true});
-    gesture={id:ev.pointerId,name:name,kind:kind,handle:handle,x:ev.clientX,y:ev.clientY,rect:rect(name),before:Object.assign({},prefs.windows[name]),placement:placements[name]};
-    handle.setPointerCapture(ev.pointerId);document.body.classList.add('workspace-dragging');document.body.style.cursor=kind==='move'?'grabbing':'nwse-resize';
+    gesture={id:ev.pointerId,name:name,kind:kind,edge:edge,docked:isDocked,handle:handle,x:ev.clientX,y:ev.clientY,rect:rect(name),before:Object.assign({},prefs.windows[name]),placement:placements[name]};
+    handle.setPointerCapture(ev.pointerId);document.body.classList.add('workspace-dragging');document.body.style.cursor=kind==='move'?'grabbing':WORKSPACE_EDGE_CURSORS[edge || 'se'];
   }
   function move(ev){
     if(!gesture || ev.pointerId!==gesture.id)return;
     var g=gesture,r=Object.assign({},g.rect),dx=ev.clientX-g.x,dy=ev.clientY-g.y;
-    if(g.kind==='move'){r.x+=dx;r.y+=dy;}else{r.w+=dx;r.h+=dy;}
+    if(g.docked){setDockWidth(g.name,g.rect.w-dx);return;}
+    if(g.kind==='edge')r=workspaceEdgeRect(r,g.edge,dx,dy,edgeLimits(g.name));
+    else if(g.kind==='move'){r.x+=dx;r.y+=dy;}else{r.w+=dx;r.h+=dy;}
     delete placements[g.name];Object.assign(prefs.windows[g.name],boundRect(r,g.name));paint(g.name);
   }
   function keyMove(ev,name,kind){
     if(ev.altKey || ev.ctrlKey || ev.metaKey || !/^Arrow(Left|Right|Up|Down)$/.test(ev.key))return;
-    if(docked()===name)return;
+    if(docked()===name){
+      // The docked splitter: Left widens the panel, Right narrows it.
+      if(kind!=='edge' || !/Left|Right/.test(ev.key))return;
+      retireDock();ev.preventDefault();ev.stopPropagation();setDockWidth(name,dockWidth()+(ev.key==='ArrowLeft'?1:-1)*(ev.shiftKey?50:10));persist();return;
+    }
+    if(kind==='edge')return;
     retireDock();ev.preventDefault();ev.stopPropagation();var r=rect(name),amount=ev.shiftKey?50:10;
     var axis=/Left|Right/.test(ev.key)?(kind==='move'?'x':'w'):(kind==='move'?'y':'h');
     r[axis]+=/Left|Up/.test(ev.key)?-amount:amount;
@@ -279,7 +319,7 @@ function initWorkbenchWorkspace(){
     var grip=document.createElement('button');grip.type='button';grip.className='workspace-window-grip';grip.textContent=labels[name];
     grip.setAttribute('aria-label','Move '+labels[name]+' panel');grip.title='Drag to move · arrow keys move · Shift moves farther';
     var hide=document.createElement('button');hide.type='button';hide.className='workspace-window-close';hide.textContent='×';hide.setAttribute('aria-label','Close '+labels[name]+' panel');
-    var resize=document.createElement('button');resize.type='button';resize.className='workspace-window-resize';resize.textContent='◢';resize.setAttribute('aria-label','Resize '+labels[name]+' panel');resize.title='Drag to resize · arrow keys resize';
+    var resize=document.createElement('button');resize.type='button';resize.className='workspace-window-resize';resize.setAttribute('data-edge','se');resize.textContent='◢';resize.setAttribute('aria-label','Resize '+labels[name]+' panel');resize.title='Drag to resize · arrow keys resize';
     var dock=document.createElement('button');dock.type='button';dock.className='workspace-window-dock';dock.title='Reserve canvas space on the right, or restore floating placement';
     dock.addEventListener('click',function(){
       retireDock();finish(true);var revision=dockRevision,anchor=document.querySelector('#docview .dv-sel'),board=anchor && anchor.closest('.explore-board'),before=board && anchor.getBoundingClientRect();
@@ -297,6 +337,15 @@ function initWorkbenchWorkspace(){
       });});
     });
     head.append(grip,dock,hide);pane.before(win);win.append(head,pane,resize);pane.removeAttribute('role');
+    // Pointer handles for the other edges and corners. The bottom-right button
+    // keeps the keyboard resize; docked, the left edge becomes a splitter.
+    ['n','e','s','w','nw','ne','sw'].forEach(function(side){
+      var edge=document.createElement('div');edge.className='workspace-window-edge';edge.setAttribute('data-edge',side);edge.setAttribute('aria-hidden','true');edge.title='Drag to resize';win.appendChild(edge);
+      edge.addEventListener('pointerdown',function(ev){begin(ev,name,'edge',edge,side);});edge.addEventListener('pointermove',move);
+      edge.addEventListener('pointerup',function(ev){if(gesture && ev.pointerId===gesture.id)finish(false);});
+      edge.addEventListener('pointercancel',function(){finish(true);});edge.addEventListener('lostpointercapture',function(){finish(true);});
+      edge.addEventListener('keydown',function(ev){keyMove(ev,name,'edge');});
+    });
     windows[name]=win;prefs.windows[name]=Object.assign(defaults(name),prefs.windows[name]);
     tab.setAttribute('role','button');tab.removeAttribute('aria-selected');tab.setAttribute('aria-controls',win.id);
     tab.addEventListener('click',function(){showTool(name);});

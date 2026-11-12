@@ -203,8 +203,8 @@ Finish **ADD TO STEP** before using the quick connection shortcut.
 
 The left rail opens independent **Agent**, **Inspect**, **Steps**, **Find objects**,
 **JSON**, and **File** windows. Multiple windows can stay open. Drag a header to
-move it, drag its corner to resize, or use arrow keys on those handles (Shift
-moves farther). Close a window with × and reopen it from the rail. Existing
+move it, drag any edge or corner to resize it (the opposite side stays put), or
+use arrow keys on the header and the bottom-right corner (Shift moves farther). Close a window with × and reopen it from the rail. Existing
 forms, drafts, selection and disclosure state remain intact.
 
 **Contents** navigates tabs, sections, and saved Views. **Find objects** (⌘/Ctrl K)
@@ -247,6 +247,9 @@ working on the canvas or panel handles. Text fields keep their native text undo.
 
 **Dock** in each tool's title bar reserves canvas space on the right. One tool
 can be docked at a time; docking another restores the previous tool to floating.
+Drag a docked tool's left edge to change its width, or focus that edge and use
+Left/Right arrows (Shift resizes farther); the canvas narrows or widens to match
+and the docked width returns on reload.
 **Float** restores its floating size and position. Closing or hiding docked tools
 returns their space to the canvas. **Focus diagram** also releases a dock when
 it hides that tool; **Return to page** restores the dock and its reserved space.

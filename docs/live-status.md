@@ -3382,27 +3382,37 @@ literal, never expanded, and the same in every environment.
 - **Never escaping or widening.** A scoped value is filled into the provider's query only
   where it cannot change its meaning. Otherwise the signal is not shown: "Variable
   ${code} from this import or carrier cannot be filled in safely here (…)".
-  - Inside a string: no quote of that kind, no `\` and no control character.
-  - Inside a regex (`=~`, `!~`, `|~`, a Logs `/regex/`, a `label_replace` string argument
-    in PromQL or LogQL other than a matcher in its selector, a LogQL `regexp` or `pattern`
-    string, SQL `~`, `~*`, `!~`, `!~*`, `REGEXP`, `RLIKE`): no regex character.
-  - In a SQL `LIKE`, `ILIKE`, `SIMILAR TO`, `~~`, `~~*`, `!~~` or `!~~*` operand (a string
-    anywhere in it, joined by `||` or inside `CONCAT`, `N'…'` included): no `%` or `_`. A
-    `_` matches any one character, so a value such as `full_charge` must be compared with
-    `=` instead. `SIMILAR TO` also refuses `| * + ? { } ( ) [ ]`. A `%` is refused in every
-    SQL string.
-  - In a LogQL `|>` or `!>` pattern line filter: no `<` or `>`. In a `line_format` or
-    `label_format` template: no `{` or `}`. In a Logs Insights `parse` glob: no `*`.
-  - Outside a string: only letters, digits and `. _ : - @`; in SQL no `--`; inside a
-    PromQL or LogQL `[range]` no `:` (it would make a subquery).
-  - The scan skips the provider's comments (SQL `--` and block comments; `#` in PromQL,
-    LogQL and Logs Insights). A placeholder inside one is refused, and so is a placeholder
-    that also appears in a comment. TraceQL strings are `"…"` and `` `…` `` only.
-  - A SQL query the scan cannot read in step (a backslash before a quote, a `#` (a MySQL
-    comment or a Postgres `#>` / `#` operator), a nested or unclosed block comment, dollar
-    quoting) takes only a plain token there: letters, digits and `. @ -`, no `--`.
-  - A narrowing fragment that uses a scoped value is checked again after it is filled in.
-    Board-wide and profile variables keep their meaning.
+  - **One allowlist, everywhere.** A value may hold only letters, digits and `_ . @ :`,
+    with `-` only between two of those (never first or last, never `--`). A space is
+    allowed only inside a string of a query the scan can read. So no value holds a quote,
+    `\`, a bracket, a brace, `<`, `>`, `%`, `*`, `|`, `#`, `/` or `$`, and none can end a
+    string, a template or a comment in any of the five languages.
+  - **Regexes.** Inside a regex (`=~`, `!~`, `|~`, a Logs `/regex/`, a `label_replace`
+    string argument in PromQL or LogQL other than a matcher in its selector, a LogQL
+    `regexp` or `pattern` string) a value may not hold `.`.
+  - **SQL patterns.** If a SQL query uses `LIKE`, `ILIKE`, `SIMILAR`, `~`, `REGEXP`,
+    `RLIKE`, a `regexp_…` function or `substring … from` anywhere, no value in it may hold
+    `_` or `.`, wherever it sits. A value such as `full_charge` needs a query compared
+    with `=` only.
+  - **Comparisons.** A bare value that is (part of) a comparison operand takes only a
+    number or a duration (`200`, `0.25`, `1.5e3`, `5m`, `1h30m`, `250ms`): next to `=`,
+    `<>`, `!=`, `<`, `>`, `<=`, `>=`, `==`, `=~` or `!~` with only an arithmetic expression
+    between (`0 + ${n}`, `lower(${n})`, `-${n}`), inside `IN ( … )`, or in
+    `BETWEEN … AND …`. A field name there would compare a field with a field. TraceQL
+    `status` and `kind` comparisons also take `error`, `ok`, `unset`, `server`, `client`,
+    `producer`, `consumer`, `internal` and `unspecified`.
+  - **Ranges.** Inside a PromQL or LogQL `[range]` a value may not hold `:` (it would make
+    a subquery).
+  - **Comments.** The scan skips the provider's comments (SQL `--` and block comments;
+    `#` in PromQL, LogQL and Logs Insights). A placeholder inside one is refused. TraceQL
+    strings are `"…"` and `` `…` `` only.
+  - **SQL the scan cannot read.** A SQL query with any of these refuses every scoped
+    value, naming the form: a string that never closes, a `[bracket]` identifier,
+    `q'…'` quoting, triple quotes, a `--` not followed by a space or line end, a `#`,
+    `$$` or `$tag$` quoting, a nested or unclosed block comment, a backslash before a
+    quote, `UESCAPE`.
+  - A narrowing fragment that uses a scoped value takes the same rules and is checked
+    again after it is filled in. Board-wide and profile variables keep their meaning.
 - **SQL and Tempo.** A provider that wants boards to choose a value writes a `${name}`
   placeholder in its query (in a string for SQL: `WHERE code = '${code}'`); the import
   sets it. This is the route for sources that cannot be narrowed.

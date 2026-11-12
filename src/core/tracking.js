@@ -294,102 +294,112 @@ function telemetryScopedVariables(value,warn,at){
   });
   return out;
 }
-/* #1357: why a scoped value cannot be filled into a provider's text query safely, or null. Inside
-   a string it may not end that string (its quote, a \ or a control character); in a regex it may
-   hold no regex character, so it cannot widen the match; outside a string it is a plain token. */
+/* #1357 / #1359: a scoped value is filled into a provider's text query only when it cannot change
+   the query's meaning. One character allowlist covers every language and position (no quote, \,
+   brace, bracket, angle bracket, %, *, |, #, / or $ can be filled in, so no value can end a string,
+   template or comment in any dialect), plus a few coarse gates: SQL the scan cannot read, a SQL
+   query that uses patterns or regexes, a regex position, a [range], a bare comparison operand. */
 // String quotes per language. TraceQL strings are "…" and `…` only (Tempo's lexer); a ' is not one.
 var TELEMETRY_SCOPED_QUOTES={loki:'"`',grafana:'"\'`',tempo:'"`',sql:'\'"`',cloudwatchLogs:'"\'`'};
-/* Where a placeholder sits in a provider query (#1359 review): a forward scan that skips strings
-   (with their escapes) and comments (SQL -- and block comments; # in PromQL, LogQL and Logs
-   Insights), and keeps the function call each ( opens. A placeholder in a comment, or in a string
-   the scan cannot place, gets no permissive rule. */
-/* #1359 review c2: SQL dialect forms the scan cannot read in step fail closed, named. */
+var TELEMETRY_SCOPED_TOKEN='[A-Za-z0-9_.@:]+(?:-[A-Za-z0-9_.@:]+)*';
+var TELEMETRY_SCOPED_BARE=new RegExp('^'+TELEMETRY_SCOPED_TOKEN+'$'),TELEMETRY_SCOPED_SPACED=new RegExp('^'+TELEMETRY_SCOPED_TOKEN+'(?: +'+TELEMETRY_SCOPED_TOKEN+')*$');
+var TELEMETRY_SCOPED_ALLOWED='a telemetry variable may hold only letters, digits and _ . @ : - (and spaces inside a string)';
+var TELEMETRY_SCOPED_COMPARED='it is compared with a field, where only a number or a duration may be filled in';
+var TELEMETRY_SCOPED_SQL_PATTERN='in a SQL query that uses patterns or regexes, a variable may not hold _ or .';
+var TELEMETRY_TRACE_ENUMS=['error','ok','unset','server','client','producer','consumer','internal','unspecified'];
+/* SQL readability gate (VARTEST-1359): dialect forms the scan cannot follow in step. Any of them
+   makes every scoped value in the query refused, naming the form. */
 function telemetrySqlUnreadable(text){
   if(/\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.test(text))return 'dollar quoting';
   if(/\\['"]/.test(text))return 'a backslash before a quote';
+  if(/\buescape\b/i.test(text))return 'UESCAPE';
+  if(text.indexOf("'''")>=0 || text.indexOf('"""')>=0)return 'triple quotes';
   var quote=null;
   for(var i=0;i<text.length;i++){
     var c=text[i];
     if(quote){if(c===quote)quote=null;continue;}
     if(c==="'" || c==='"' || c==='`'){quote=c;continue;}
+    if((c==='q' || c==='Q') && text[i+1]==="'" && !/[A-Za-z0-9_$]/.test(text[i-1] || ''))return "q'…' quoting";
     if(c==='#')return 'a # (MySQL comment, or a Postgres #> / # operator)';
-    if(text.slice(i,i+2)==='--'){var nl=text.indexOf('\n',i);if(nl<0)break;i=nl;continue;}
+    if(c==='[')return 'a [bracket] identifier';
+    if(text.slice(i,i+2)==='--'){if(!/^--(?:[ \t]|\r?\n|$)/.test(text.slice(i)))return 'a -- with no space after it';var nl=text.indexOf('\n',i);if(nl<0)break;i=nl;continue;}
     if(text.slice(i,i+2)==='/*'){var close=text.indexOf('*/',i+2);if(close<0)return 'an unclosed block comment';if(text.slice(i+2,close).indexOf('/*')>=0)return 'a nested block comment';i=close+1;}
   }
+  if(quote)return 'an unclosed string';
   return null;
 }
-// Words that end a SQL LIKE or regex operand: a string after one of them is not that operand's.
-var TELEMETRY_SQL_CLAUSE=/\b(?:and|or|not|where|select|from|on|then|when|else|group|order|having|limit|union|join|as|in|is|between)\b|[=<>;]/i;
-function telemetrySqlOperand(before,keyword){
-  var hit=null,re=new RegExp(keyword,'gi'),m;while((m=re.exec(before)))hit=m;
-  if(!hit)return false;
-  var between=before.slice(hit.index+hit[0].length).replace(/'(?:[^']|'')*'/g,"''");
-  return !TELEMETRY_SQL_CLAUSE.test(between.replace(/\bconcat\b/gi,''));
+// Patterns and regexes anywhere in a SQL query: a scoped value there may not hold _ or . (VARTEST-1359).
+var TELEMETRY_SQL_PATTERNS=/\b(?:i?like|similar|regexp|rlike)\b|\bregexp_\w+|~|\bsubstring\b[\s\S]*\bfrom\b/i;
+/* Is a bare placeholder part of a comparison operand (#1359 review c4, VARTEST-1359)? It is when
+   only an arithmetic expression (names, numbers, + - * / %, calls, parentheses) stands between it
+   and = <> != < > <= >= == =~ !~ (PromQL: also a comparison's bool), when it is in IN ( … ) or
+   IN [ … ], or in BETWEEN … AND …. There a field name would compare a field with a field. */
+var TELEMETRY_SCOPED_EXPR_STOP=/\b(?:and|or|where|from|select|when|then|else|end|case|on|join|having|group|order|limit|union|filter|stats|fields|sort|by|without|ignoring|offset)\b/i;
+function telemetryScopedComparison(source,text,index,end){
+  var before=text.slice(0,index).replace(/\s+$/,''),after=text.slice(end).replace(/^\s+/,'');
+  var lead=/(?:<>|!=|<=|>=|==|=~|!~|=|<|>)(?:\s*bool)?([\w\s.@()+\-*\/%,]*)$/i.exec(before),trail=/^([\w\s.@()+\-*\/%,]*?)(?:<>|!=|<=|>=|==|=~|!~|=(?![>=])|<(?!-)|>)/.exec(after);
+  var op=lead && !TELEMETRY_SCOPED_EXPR_STOP.test(lead[1]) || trail && !TELEMETRY_SCOPED_EXPR_STOP.test(trail[1]);
+  var list=(source==='sql' || source==='cloudwatchLogs') && (/\bin\s*\([^()]*$/i.test(before) || /\bin\s*\[[^\[\]]*$/i.test(before));
+  var between=source==='sql' && (/\bbetween$/i.test(before) || /\bbetween\s+\S+\s+and$/i.test(before));
+  if(!(op || list || between))return null;
+  return {enums:source==='tempo' && /(?:^|[\s{(.:])(?:status|kind)\s*!?=$/.test(before)};
 }
-function telemetryScopedPlacement(source,text,index){
-  // SQL the scan cannot follow in step: only a plain token may be filled in, wherever it sits (VARTEST-1359).
-  if(source==='sql'){var unreadable=telemetrySqlUnreadable(text);if(unreadable)return {string:false,unreadable:unreadable};}
+/* Where a placeholder sits: a forward scan that skips strings (with their escapes) and comments
+   (SQL -- and block comments; # in PromQL, LogQL and Logs Insights) and keeps the call each (
+   opens, the selector braces and the [range] brackets it is in. */
+function telemetryScopedPlacement(source,text,index,end){
+  if(source==='sql'){var unreadable=telemetrySqlUnreadable(text);if(unreadable)return {unreadable:unreadable};}
   var quotes=TELEMETRY_SCOPED_QUOTES[source] || '"\'`',quote=null,opened=-1,calls=[],openedIn=null,braces=0,openedInBraces=false,brackets=0;
   for(var i=0;i<index;i++){
     var c=text[i];
     if(quote){if(source!=='sql' && quote!=='`' && c==='\\'){i++;continue;}if(c===quote)quote=null;continue;}
     var comment=source==='sql'?(text.slice(i,i+2)==='--'?'\n':text.slice(i,i+2)==='/*'?'*/':null):(source==='grafana' || source==='loki' || source==='cloudwatchLogs') && c==='#'?'\n':null;
-    if(comment){var end=text.indexOf(comment,i+(comment==='*/'?2:1));if(end<0 || end>=index)return {comment:true};i=end+comment.length-1;continue;}
+    if(comment){var stop=text.indexOf(comment,i+(comment==='*/'?2:1));if(stop<0 || stop>=index)return {comment:true};i=stop+comment.length-1;continue;}
     if(c==='('){var callee=/([A-Za-z_][A-Za-z0-9_]*)\s*$/.exec(text.slice(0,i));calls.push(callee?callee[1].toLowerCase():'');continue;}
     if(c===')'){calls.pop();continue;}
     if(c==='{'){braces++;continue;}if(c==='}'){braces=Math.max(0,braces-1);continue;}
     if(c==='['){brackets++;continue;}if(c===']'){brackets=Math.max(0,brackets-1);continue;}
     if(quotes.indexOf(c)>=0 || source==='cloudwatchLogs' && c==='/' && typeof telemetryLogsRegexOpens==='function' && telemetryLogsRegexOpens(text.slice(0,i))){quote=c;opened=i;openedIn=calls[calls.length-1] || '';openedInBraces=braces>0;}
   }
-  // A bare value inside a PromQL or LogQL [range] is a duration.
-  if(!quote)return {string:false,range:(source==='grafana' || source==='loki') && brackets>0};
+  if(!quote){
+    var range=(source==='grafana' || source==='loki') && brackets>0;
+    return {string:false,range:range,compare:range?null:telemetryScopedComparison(source,text,index,end)};
+  }
+  // A string that never closes after the placeholder is not one the scan can read.
+  var k=end;
+  for(;k<text.length;k++){var d=text[k];if(source!=='sql' && quote!=='`' && d==='\\'){k++;continue;}if(d===quote)break;}
+  if(k>=text.length)return {unreadable:'an unclosed string'};
   var before=text.slice(0,opened).replace(/\s+$/,'');
-  var out={string:true,quote:quote,regex:false,pattern:false};
-  if(source==='sql'){
-    // A string anywhere in a LIKE / ILIKE / SIMILAR TO / ~~ operand is a pattern (|| and CONCAT join it);
-    // SIMILAR TO also reads regex-like characters; after ~, ~*, !~, !~*, REGEXP or RLIKE it is a regex.
-    out.pattern=telemetrySqlOperand(before,'(?:\\b(?:i?like|similar\\s+to)\\b|!?~~\\*?)');
-    out.similar=telemetrySqlOperand(before,'\\bsimilar\\s+to\\b');
-    out.regex=telemetrySqlOperand(before,'(?:(?<!~)!?~(?!~)\\*?|\\bregexp\\b|\\brlike\\b)');
-    return out;
-  }
-  // label_replace's string arguments are regexes, except a matcher inside its selector braces.
-  out.regex=quote==='/' || source!=='cloudwatchLogs' && /(?:=~|!~|\|~)$/.test(before) ||
-    (source==='grafana' || source==='loki') && openedIn==='label_replace' && !openedInBraces || source==='loki' && /\|\s*(?:regexp|pattern)$/.test(before);
-  if(source==='loki'){
-    out.linePattern=/(?:\|>|!>)$/.test(before);
-    out.template=/\|\s*line_format$/.test(before) || /\|\s*label_format\b[^|]*=$/.test(before);
-  }
-  if(source==='cloudwatchLogs')out.glob=quote!=='/' && /(?:^|\|)\s*parse\s+(?:[@A-Za-z_][\w.@]*|`[^`]*`)$/i.test(before);
-  return out;
+  // Regex positions: =~ !~ |~, a Logs /regex/, label_replace string arguments (not a matcher in its
+  // selector), a LogQL regexp or pattern stage.
+  var regex=source!=='sql' && (quote==='/' || source!=='cloudwatchLogs' && /(?:=~|!~|\|~)$/.test(before) ||
+    (source==='grafana' || source==='loki') && openedIn==='label_replace' && !openedInBraces || source==='loki' && /\|\s*(?:regexp|pattern)$/.test(before));
+  return {string:true,regex:regex};
 }
-function telemetryScopedValueProblem(source,query,scoped){
+// A numeric literal (signed, decimal, exponent) or a duration (5m, 1h30m, 250ms).
+function telemetryScopedNumber(value){return /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(value) || /^(?:\d+(?:\.\d+)?(?:ns|us|µs|ms|s|m|h|d|w|y))+$/.test(value);}
+function telemetryScopedValueProblem(source,query,scoped,fragments){
   var texts=[];
   if(typeof query==='string')texts.push(query);
   else if(source==='cloudwatchLogs' && telemetryObject(query)){
     if(typeof query.query==='string')texts.push(query.query);
     ['breakdown','trend'].forEach(function(k){if(telemetryObject(query[k]) && typeof query[k].query==='string')texts.push(query[k].query);});
   }
+  // Text narrowing fragments that use a scoped value take the same rules, read as text of the same language.
+  (fragments || []).forEach(function(f){if(typeof f==='string')texts.push(f);});
   for(var t=0;t<texts.length;t++){
     var re=/\$\{([A-Za-z][A-Za-z0-9_]*)\}/g,hit;
     while((hit=re.exec(texts[t]))){
       var name=hit[1];if(!telemetryOwn(scoped,name))continue;
-      var value=String(scoped[name]),at=telemetryScopedPlacement(source,texts[t],hit.index),why=null;
+      var value=String(scoped[name]),why=null;
+      var at=telemetryScopedPlacement(source,texts[t],hit.index,hit.index+hit[0].length);
       if(at.comment)why='it sits in a comment of the provider\'s query';
-      else if(at.unreadable){if(!/^[A-Za-z0-9.@-]+$/.test(value) || value.indexOf('--')>=0)why='this SQL query uses '+at.unreadable+', which Flowview cannot read safely';}
-
-      else if(at.string && at.regex && /[.*+?()\[\]{}|^$\\\/]/.test(value))why='it is filled into a regex and holds regex characters';
-      else if(at.string && at.pattern && /[%_]/.test(value))why='it is filled into a LIKE pattern and holds % or _';
-      else if(at.string && at.similar && /[|*+?{}()\[\]]/.test(value))why='it is filled into a SIMILAR TO pattern and holds pattern characters';
-      else if(at.string && at.linePattern && /[<>]/.test(value))why='it is filled into a pattern line filter and holds < or >';
-      else if(at.string && at.template && /[{}]/.test(value))why='it is filled into a line_format or label_format template and holds { or }';
-      else if(at.string && at.glob && value.indexOf('*')>=0)why='it is filled into a parse pattern and holds *';
-      // #1359 review c3: an operand the scan misreads may still be a LIKE pattern, so % is refused in every SQL string.
-      else if(at.string && source==='sql' && value.indexOf('%')>=0)why='it is filled into a SQL string and holds %, which a LIKE pattern reads as a wildcard';
-      else if(at.string && (value.indexOf(at.quote)>=0 || value.indexOf('\\')>=0 || /[\x00-\x1f\x7f]/.test(value)))why='it would end the string it is filled into';
-      else if(!at.string && !/^[A-Za-z0-9_.:@-]+$/.test(value))why='outside a string it may hold only letters, digits and . _ : - @';
-      else if(!at.string && source==='sql' && value.indexOf('--')>=0)why='outside a string it may not hold --, which starts a SQL comment';
+      else if(at.unreadable)why=(source==='sql' && at.unreadable!=='an unclosed string'?'this SQL query uses ':'this query has ')+at.unreadable+', which Flowview cannot read safely';
+      else if(!(at.string?TELEMETRY_SCOPED_SPACED:TELEMETRY_SCOPED_BARE).test(value))why=TELEMETRY_SCOPED_ALLOWED;
+      else if(at.string && at.regex && value.indexOf('.')>=0)why='it is filled into a regex and holds regex characters';
+      else if(source==='sql' && TELEMETRY_SQL_PATTERNS.test(texts[t]) && /[_.]/.test(value))why=TELEMETRY_SCOPED_SQL_PATTERN;
       else if(!at.string && at.range && value.indexOf(':')>=0)why='inside a range it may not hold :, which turns the range into a subquery';
+      else if(!at.string && at.compare && !telemetryScopedNumber(value) && !(at.compare.enums && TELEMETRY_TRACE_ENUMS.indexOf(value)>=0))why=TELEMETRY_SCOPED_COMPARED;
       if(why)return 'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';
     }
   }
@@ -682,7 +692,8 @@ function carrierTelemetry(obj,templates,invalid,environment){
         if(telemetryObject(authored)){
           var sourceKey=TELEMETRY_SOURCES.filter(function(k){return telemetryOwn(authored,k);})[0];
           var checked=sourceKey==='cloudwatchLogs'?Object.assign({},authored.cloudwatchLogs,hasBreakdown?{breakdown:breakdown}:{},hasTrend?{trend:trend}:{}):sourceKey?authored[sourceKey]:null;
-          var unsafe=sourceKey?telemetryScopedValueProblem(sourceKey,checked,scoped):null;
+          var narrowFragments=sourceKey && telemetryObject(authored.narrow)?telemetryNarrowList(authored.narrow[sourceKey]):[];
+          var unsafe=sourceKey?telemetryScopedValueProblem(sourceKey,checked,scoped,narrowFragments):null;
           if(unsafe)errors[name]=unsafe;
         }
         expanded[key][name]=telemetrySubstitute(expanded[key][name],values,function(missing){

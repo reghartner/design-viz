@@ -224,6 +224,10 @@ test('#1415 A: rows of a $value search show each log line (after the query\'s li
  await typed.api.find('errors');assert.deepEqual(clone(typed.api.snapshot().result.rows).map(r=>[r.line,r.title]),[['error: timeout','error: timeout']]);
  typed.api.set('logql','{env="$env"}');await typed.api.find(typed.C.TELEMETRY_LOG_TYPED);
  assert.deepEqual(clone(typed.api.snapshot().result.rows).map(r=>[r.line,r.title]),[['error: timeout','error: timeout']]);
+ // An empty line, or one of only control characters, says so instead of an empty row.
+ const empty=setup({p:board({device:{label:'Device ID',query:FORMATTED}}),data:[entry({line:''}),entry({line:'\u0000\t\u001f'})]});await settle();
+ empty.api.set('value','cam-1');await empty.api.find();
+ assert.deepEqual(clone(empty.api.snapshot().result.rows).map(r=>[r.line,r.title]),[['(empty line)','(empty line)\nDevice ID: cam-1'],['(empty line)','(empty line)\nDevice ID: cam-1']]);
 });
 
 test('#1415 B: requireTraceId false starts "Only lines with a trace ID" unchecked for that search; Find omits the filter and lists lines without a trace ID',async()=>{

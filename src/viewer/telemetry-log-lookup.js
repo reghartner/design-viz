@@ -183,7 +183,8 @@ function createTelemetryLogLookup(page,transport,hooks){
       if(dead || mine!==serial || signal.aborted)return null;
       var parsed=telemetryLogLines(payload,fields);if(request.traced)parsed.rows=parsed.rows.filter(function(row){return !!row.traceId;});
       // #1415: a row shows its line (after the query's own line_format); a $value search names its value in the tooltip.
-      parsed.rows.forEach(function(row){row.title=slot?row.line+'\n'+lookup.label+': '+value:row.line;});
+      // An empty line (or one of only control characters) says so instead of leaving the row blank.
+      parsed.rows.forEach(function(row){if(!row.line)row.line='(empty line)';row.title=slot?row.line+'\n'+lookup.label+': '+value:row.line;});
       busy=false;abort=null;result.rows=parsed.rows;
       var where=searched?'on '+(searched.short || searched.key):range.lookback?'in the last '+range.lookback:'in the selected range';
       if(!parsed.rows.length)result.note=parsed.metric?'That is a metric query; type a log query that returns lines.':request.traced?'No log lines with a trace ID '+where+'. Clear "Only lines with a trace ID" to see every line.':'No matching log lines '+where+'.';

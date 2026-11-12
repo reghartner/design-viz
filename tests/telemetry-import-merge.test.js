@@ -21,7 +21,7 @@
 | X19 | (#1348) A source switch keeps the inherited narrowing, so a fragment in the old language fails closed with a reason. | provider Honeycomb signal narrowed by the middle; consumer switches to Grafana | signal error | a stale fragment applied to another language |
 | X20 | (#1348) No widening: a null narrow, a null for an inherited source, or a null/false needsNarrow is ignored and warns at the overlay. | consumer patches | merged binding unchanged; warnings exactly | a board removing the provider's narrowing |
 | X21 | (#1348, D10) A board that narrows an inherited signal no longer gets the provider's query link (it opens the unnarrowed query) unless it sets its own; other links stay. | provider signal with links.query | merged links | a link to the unnarrowed query |
-| X22 | (#1353 review c1 minors 1 and 3) A replacing binding (no extends) keeps the provider carrier's needsNarrow on every signal it writes, so a restated query fails closed unless it narrows; it warns at the overlay. Narrowing an inherited signal also drops the provider's carrier-level query link unless the board sets its own. | provider needsNarrow; replacing consumer bindings | sent signal; warnings; merged links | reading the unnarrowed number by restating the provider query |
+| X22 | (#1353 review c1 minors 1 and 3, c2 MAJOR) A replacing binding (no extends) keeps the provider carrier's needsNarrow on every signal it writes, also those a consumer use template writes (all-template, or template plus literal signals), so a restated query fails closed unless it narrows; it warns at the overlay naming those signals. Narrowing an inherited signal also drops the provider's carrier-level query link unless the board sets its own. | provider needsNarrow; replacing consumer bindings | sent signal; warnings; merged links | reading the unnarrowed number by restating the provider query |
 | X23 | (#1353, needsNarrow belongs to the canon carrier) A new signal an extends overlay adds to a carrier whose provider signals have needsNarrow inherits the same union: it fails closed unless it narrows, and the overlay warns; an inherited signal's own requirement is unchanged. | provider needsNarrow; overlay adding a signal | sent signals; warnings | reading the unnarrowed number through an added signal |
 | X6 | Validator: a merge overlay produces no telemetry warnings; a malformed `hide` warns at its overlay path. Compatibility declares `flow.telemetry-merge` only for merge overlays. | consumer docs | warnings; features | warnings on valid merges; silent malformed filters; older runtimes treating merges as replaces |
 */
@@ -366,7 +366,7 @@ test('#1353 X22 a replacing binding keeps the provider\'s needsNarrow; narrowing
   let r=replace({kind:'service',signals:{count:{honeycomb:NARROW_HC()}}});
   const s=plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(r.consumer,r.context)).nodes['fc::dcf'],{}).signals.count);
   assert.equal(s.error,'The provider asks each board to narrow this signal by event_code, and nothing narrows it here, so it is not shown.','the restated query is not shown');
-  assert.deepEqual(findings(r.consumer,r.context).warnings.filter(w=>/replaces/.test(w)),['sections[0].diagram.topologyImports[0].nodeTracking.dcf.telemetry: this binding replaces the provider\'s on node dcf, whose signals must be narrowed by event_code; each signal here keeps that requirement']);
+  assert.deepEqual(findings(r.consumer,r.context).warnings.filter(w=>/replaces/.test(w)),['sections[0].diagram.topologyImports[0].nodeTracking.dcf.telemetry: this binding replaces the provider\'s on node dcf, whose signals must be narrowed by event_code; its signal count keeps that requirement']);
   r=replace({kind:'service',signals:{count:{honeycomb:NARROW_HC(),narrow:{honeycomb:{filters:[flt('event_code','FULL_CHARGE')]}}}}});
   assert.equal(plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(r.consumer,r.context)).nodes['fc::dcf'],{}).signals.count).error,undefined,'a replacement that narrows is shown');
   const linked=spec('provider',{nodes:{dcf:{title:'DCF',telemetry:{kind:'service',links:{query:'https://ui.honeycomb.io/q/carrier',dashboard:'https://grafana.test/d'},signals:{received:{honeycomb:NARROW_HC()}}}}},rows:[['dcf']],topologyExports:{core:{nodes:['dcf'],edges:[]}}});
@@ -390,4 +390,26 @@ test('#1353 X23 a signal an extends overlay adds keeps the carrier\'s needsNarro
   const free=spec('provider',{nodes:{dcf:{title:'DCF',telemetry:{kind:'service',signals:{received:{honeycomb:NARROW_HC()}}}}},rows:[['dcf']],topologyExports:{core:{nodes:['dcf'],edges:[]}}});
   const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{extends:true,signals:{count:{honeycomb:NARROW_HC()}}}}}}]);
   assert.equal(plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[free,consumer]})).nodes['fc::dcf'],{}).signals.count).error,undefined,'a carrier without needsNarrow adds signals freely');
+});
+
+test('#1353 X22 a replacing use-template binding keeps the provider\'s needsNarrow on every signal it writes',()=>{
+  const provider=narrowProvider();
+  const run=(telemetry)=>{
+    const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry}}}]);
+    consumer.page.tracking={telemetry:{templates:{t:{kind:'service',params:['svc'],signals:{count:{honeycomb:{calculations:[{op:'COUNT'}],filters:[flt('service.name','${svc}')]}}}}}}};
+    const context={version:1,id:'consumer',specs:[provider,consumer]},page=C.FlowTopology.resolveSource(consumer,context);
+    return {sent:plain(C.carrierTelemetry(diagramOf(page).nodes['fc::dcf'],C.trackingTelemetry(page.page).templates).signals),warnings:findings(consumer,context).warnings.filter(w=>/replaces the provider/.test(w))};
+  };
+  const unmet='The provider asks each board to narrow this signal by event_code, and nothing narrows it here, so it is not shown.';
+  const at='sections[0].diagram.topologyImports[0].nodeTracking.dcf.telemetry: this binding replaces the provider\'s on node dcf, whose signals must be narrowed by event_code; ';
+  let r=run({use:'t',svc:'dcf'});
+  assert.equal(r.sent.count.error,unmet,'the template\'s signal is not shown');
+  assert.deepEqual(r.warnings,[at+'its signal count keeps that requirement']);
+  r=run({use:'t',svc:'dcf',signals:{extra:{honeycomb:NARROW_HC()}}});
+  assert.equal(r.sent.count.error,unmet,'template plus literal: the template\'s signal is not shown');
+  assert.equal(r.sent.extra.error,unmet,'nor the literal one');
+  assert.deepEqual(r.warnings,[at+'its signals count and extra keep that requirement']);
+  r=run({use:'t',svc:'dcf',signals:{count:{honeycomb:{calculations:[{op:'COUNT'}],filters:[flt('service.name','dcf')]},narrow:{honeycomb:{filters:[flt('event_code','FULL_CHARGE')]}}}}});
+  assert.equal(r.sent.count.error,undefined,'a signal the board narrows is shown');
+  assert.deepEqual(r.sent.count.query.filters,[flt('service.name','dcf'),flt('event_code','FULL_CHARGE')]);
 });

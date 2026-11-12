@@ -79,12 +79,13 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
 [data-explore-width-locked]>.explore-window-edge:is([data-edge="n"],[data-edge="s"]){display:none;}
 /* Floating windows: strips straddle the border, 4px out and 4px in. Stacked
    windows are 8px apart, so neighbouring strips meet without overlapping. The
-   window stops clipping; the body clips its own rounded corners and keeps a
-   4px right gutter so the e strip clears its scrollbar. The header pads 8px on
-   the right so Hide clears the corner square. Step controls keep their strips
-   inside; their content already pads 10px. */
+   window stops clipping. The body sits above the strips, so their inner half
+   never takes a click or scrollbar press from it; it keeps 4px gutters left and
+   right where the w and e strips' inner halves stay usable, and clips its own
+   rounded corners. The header pads 8px on the right so Hide clears the corner
+   square. Step controls keep their strips inside; their content pads 10px. */
 .explore-stage>.explore-window{overflow:visible;}
-.explore-stage>.explore-window>.explore-window-body{width:calc((100% - 4px) / var(--explore-overlay-scale,1));border-radius:0 0 calc(11px / var(--explore-overlay-scale,1)) calc(11px / var(--explore-overlay-scale,1));}
+.explore-stage>.explore-window>.explore-window-body{position:relative;z-index:3;margin-left:4px;width:calc((100% - 8px) / var(--explore-overlay-scale,1));border-radius:0 0 calc(11px / var(--explore-overlay-scale,1)) calc(11px / var(--explore-overlay-scale,1));}
 .explore-stage>.explore-window>.explore-window-resize{border-bottom-right-radius:11px;}
 .explore-stage>.explore-window>.explore-window-header{padding-right:8px;}
 .explore-stage>.explore-window>.explore-window-edge[data-edge="n"]{top:-4px;}
@@ -97,7 +98,9 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
 .explore-stage>.explore-window>.explore-window-edge[data-edge="se"]{bottom:-4px;right:-4px;}
 /* Canvas windows and canvas step controls live in graph units; their strips
    divide by the zoom so they stay 8px (corners 14px) on screen, straddling
-   the border. */
+   the border. A canvas window's body sits above its strips (only their outer
+   half takes presses); its top strips straddle the top of the selected
+   header, which sits above the window. */
 .explore-canvas-objects>:is(.explore-window,.explore-player){--edge:calc(8px / var(--explore-graph-scale,1));--corner:calc(14px / var(--explore-graph-scale,1));--out:calc(-4px / var(--explore-graph-scale,1));}
 .explore-canvas-objects>*>.explore-window-edge[data-edge="n"]{top:var(--out);left:var(--corner);right:var(--corner);height:var(--edge);}
 .explore-canvas-objects>*>.explore-window-edge[data-edge="s"]{bottom:var(--out);left:var(--corner);height:var(--edge);}
@@ -108,6 +111,15 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
 .explore-canvas-objects>*>.explore-window-edge[data-edge="ne"]{top:var(--out);right:var(--out);}
 .explore-canvas-objects>*>.explore-window-edge[data-edge="sw"]{bottom:var(--out);left:var(--out);}
 .explore-canvas-objects>*>.explore-window-edge[data-edge="se"]{bottom:var(--out);right:var(--out);}
+.explore-canvas-objects>.explore-window>.explore-window-body{z-index:3;}
+.explore-canvas-objects>.explore-window>.explore-window-edge:is([data-edge="n"],[data-edge="nw"],[data-edge="ne"]){top:calc(var(--out) - 32px);z-index:4;}
+/* Canvas step controls stop clipping so their strips reach outside the border
+   (their tracks scroll inside the termbar). The player grip (top 10-44px, 18px
+   wide) stays clear: the w strip starts below it and the nw corner ends above it. */
+.explore-canvas-objects>.explore-player{overflow:visible;}
+.explore-canvas-objects>.explore-player>.explore-window-edge[data-edge="w"]{top:48px;}
+.explore-canvas-objects>.explore-player>.explore-window-edge[data-edge="nw"]{height:calc(10px - var(--out));}
+.explore-stage>.explore-player>.explore-window-edge[data-edge="nw"]{height:10px;}
 .explore-window-edge:hover,.viewport-gesturing .explore-window-edge:active{background:color-mix(in srgb,var(--acc) 35%,transparent);}
 .explore-window :focus-visible,.explore-panel-menu summary:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
 .explore-player{position:absolute;z-index:20;left:var(--float-x);top:var(--float-y);width:var(--float-w);height:var(--float-h);box-sizing:border-box;overflow:hidden;overscroll-behavior:contain;border:1px solid var(--explore-border);border-radius:12px;box-shadow:0 6px 22px #14244224;background:var(--explore-bg);}

@@ -114,7 +114,9 @@ test('canvas windows show edge handles only while selected; width-locked windows
   for(const edge of SIDES.filter(e=>e!=='se'))expect(await shown(notes,edge),`selected ${edge}`).toBe(true);
   // An ordinary canvas window: the north-west corner moves only the top and left sides.
   const before=await page.locator('#src').inputValue(),old=savedCanvas(before,'prose'),start=await box(notes),scale=start[2]/old.w;
-  await pointerDrag(page,pointFor(start,'nw',true),-40,-30);
+  // A selected canvas window's header sits above it; the top strips straddle the header's top.
+  const header=await box(notes.locator('.explore-window-header'));
+  await pointerDrag(page,[start[0]-2,header[1]-2],-40,-30);
   const moved=await page.locator('#src').inputValue(),now=savedCanvas(moved,'prose');
   expect(near([now.x,now.y,now.w,now.h],[old.x-40/scale,old.y-30/scale,old.w+40/scale,old.h+30/scale]),`notes: ${JSON.stringify(old)} -> ${JSON.stringify(now)} at scale ${scale}`).toBe(true);
   expect(near([now.x+now.w,now.y+now.h],[old.x+old.w,old.y+old.h])).toBe(true);
@@ -140,7 +142,7 @@ test('stacked windows 8px apart: a press in the gap drags the nearer border only
   const upper=page.locator('[data-explore-panel=home]'),lower=page.locator('[data-explore-panel=below]');
   await expect(upper).toHaveClass(/explore-stacked/);await expect(lower).toHaveClass(/explore-stacked/);
   const [[top,a],[bottom,b]]=[[upper,await box(upper)],[lower,await box(lower)]].sort((p,q)=>p[1][1]-q[1][1]);
-  const edgeAt=point=>page.evaluate(([x,y])=>{const hit=document.elementFromPoint(x,y),owner=hit && hit.closest('[data-explore-panel]');return (hit && hit.getAttribute('data-edge'))+'|'+(owner && owner.getAttribute('data-explore-panel'));},point);
+  const edgeAt=point=>page.evaluate(([x,y])=>{const hit=document.elementFromPoint(x,y),owner=hit && hit.closest('[data-explore-panel]');return (hit && hit.getAttribute('data-edge'))+'|'+(owner && owner.getAttribute('data-explore-panel'))+(hit && !hit.getAttribute('data-edge')?' hit '+String(hit.className || hit.tagName):'');},point);
   const gap=b[1]-(a[1]+a[3]);expect(gap).toBeGreaterThanOrEqual(7);expect(gap).toBeLessThanOrEqual(9);
   // 2px below the upper window: its bottom edge, not the lower window's top.
   const point=[a[0]+a[2]/2,a[1]+a[3]+2];
@@ -150,5 +152,6 @@ test('stacked windows 8px apart: a press in the gap drags the nearer border only
   await expect(bottom).toHaveClass(/explore-stacked/);
   // 2px above the lower window's top border: the lower window's top edge.
   await page.locator('#undo-builder').click();await expect.poll(async()=>near(await box(top),a)).toBe(true);
+  await expect(top).toHaveClass(/explore-stacked/);await expect.poll(async()=>near(await box(bottom),b)).toBe(true);
   const c=await box(bottom);expect(await edgeAt([c[0]+c[2]/2,c[1]-2])).toBe('n|'+await bottom.getAttribute('data-explore-panel'));
 });

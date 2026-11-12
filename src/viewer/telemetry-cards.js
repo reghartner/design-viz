@@ -16,7 +16,8 @@ function telemetryCardValue(binding,sample,name,pending,window){
 function telemetryMetricUrl(binding,sample,name){
   var signal=binding.signals[name],entry=sample && sample.signals && sample.signals[name];
   return telemetryQueryUrl(signal && signal.links && signal.links.query) || telemetryQueryUrl(entry && entry.links && entry.links.query) ||
-    (Object.keys(binding.signals).length===1?(telemetryQueryUrl(binding.links && binding.links.query) || telemetryQueryUrl(sample && sample.links && sample.links.query)):null);
+    // #1353: a narrowed (or not shown) signal never falls back to the carrier's link, which opens the unnarrowed query.
+    (Object.keys(binding.signals).length===1 && !(signal && (signal.narrow || signal.narrowFailure))?(telemetryQueryUrl(binding.links && binding.links.query) || telemetryQueryUrl(sample && sample.links && sample.links.query)):null);
 }
 function telemetryMetricRows(binding,sample,pending,window){
   return telemetryMetricNames(binding).map(function(name){var signal=binding.signals[name];return {name:name,label:signal.label || name,text:telemetryCardValue(binding,sample,name,pending,window),url:telemetryMetricUrl(binding,sample,name),scope:telemetryTileScope(signal)};});

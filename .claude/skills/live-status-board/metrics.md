@@ -160,7 +160,8 @@ successful empty results into zero. Malformed/error results never become zero.
 
 Shared string defaults go in `tracking.telemetry.variables`, per-profile overrides in
 `environments.<id>.variables`. Any signal string may use `${name}` (`env` and `account`
-are reserved); an unset one blocks that signal with a reason. A signal may author
+are reserved); an unset one blocks that signal with a reason. Never interpolate user
+secrets; profiles and queries are shipped in the artifact. A signal may author
 `scope`; without it, CloudWatch `RuleName`, `QueueName` and account-wide AuthError
 metrics name their own scope. Full rules:
 [details](../../../docs/live-status.md#named-environment-variables-and-counting-scope).
@@ -173,7 +174,7 @@ signal's source, in the import's `extends` overlay; never restate the provider's
 - CloudWatch: `"narrow": {"cloudwatch": {"dimensions": {"NotificationType": "FULL_CHARGE"}}}`
 
 Flowview appends it and never translates it. A provider signal with
-`needsNarrow: ["event_code"]` (or `true`) is not shown until a board narrows it.
+`needsNarrow: ["event_code"]` (or `true`) is not shown until a board pins it (`=`/`in`).
 Narrowing only adds up; another language, SQL, Tempo, an OR query or a dimension
 conflict is not shown, with a reason. LogQL, PromQL and Logs Insights cannot be
 narrowed yet ([details](../../../docs/live-status.md#narrowing-inherited-signals)).

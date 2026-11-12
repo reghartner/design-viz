@@ -49,12 +49,23 @@ function telemetryNarrowFragmentProblem(source,fragment){
   }
   return null;
 }
-// The fields a fragment names, for needsNarrow: Honeycomb filter columns, CloudWatch dimension names.
-function telemetryNarrowFields(source,fragments){
+// The fields a fragment pins to chosen values, for needsNarrow: a Honeycomb filter with = or in and
+// a value, a CloudWatch dimension. A filter that only tests a field (exists, !=, not-in, contains …)
+// still counts every value, so it does not narrow (#1353 review). `named` lists every field a
+// fragment mentions, to say why a filter on it did not count.
+function telemetryNarrowFields(source,fragments,named){
   var out=[];
+  function pins(v){return typeof v==='number' || typeof v==='boolean' || typeof v==='string' && v.trim().length>0;}
   fragments.forEach(function(fragment){
-    if(source==='honeycomb' && telemetryNarrowObject(fragment) && Array.isArray(fragment.filters))fragment.filters.forEach(function(f){if(telemetryNarrowObject(f) && typeof f.column==='string')out.push(f.column);});
-    if(source==='cloudwatch' && telemetryNarrowObject(fragment) && telemetryNarrowObject(fragment.dimensions))out=out.concat(Object.keys(fragment.dimensions));
+    if(source==='honeycomb' && telemetryNarrowObject(fragment) && Array.isArray(fragment.filters))fragment.filters.forEach(function(f){
+      if(!telemetryNarrowObject(f) || typeof f.column!=='string')return;
+      if(named)named.push(f.column);
+      if(f.op==='=' && pins(f.value) || f.op==='in' && Array.isArray(f.value) && f.value.some(pins))out.push(f.column);
+    });
+    if(source==='cloudwatch' && telemetryNarrowObject(fragment) && telemetryNarrowObject(fragment.dimensions))Object.keys(fragment.dimensions).forEach(function(k){
+      if(named)named.push(k);
+      if(pins(fragment.dimensions[k]))out.push(k);
+    });
   });
   return out;
 }
@@ -99,8 +110,14 @@ function telemetryNarrowQuery(source,query,narrow,needs){
     if(problem)return {kind:'shape',written:true,error:'A '+label+' narrowing of this signal is not valid ('+problem.message+'), so it is not shown.'};
   }
   if(needed){
-    var named=telemetryNarrowFields(source,fragments),missing=needs===true?(fragments.length?[]:['*']):needs.filter(function(f){return named.indexOf(f)<0;});
-    if(missing.length)return {kind:'unmet',error:'The provider asks each board to narrow this signal'+(needs===true?'':' by '+telemetryNarrowJoin(missing))+', and nothing narrows it here, so it is not shown.'};
+    var mentioned=[],pinned=telemetryNarrowFields(source,fragments,mentioned);
+    var missing=needs===true?(pinned.length?[]:['*']):needs.filter(function(f){return pinned.indexOf(f)<0;});
+    if(missing.length){
+      // A filter on a required field that does not pin it is named, so the board sees why it did not count.
+      var tested=needs===true?mentioned.length>0:missing.some(function(f){return mentioned.indexOf(f)>=0;});
+      if(tested)return {kind:'unmet',error:'The provider asks each board to narrow this signal'+(needs===true?'; a filter':' by '+telemetryNarrowJoin(missing)+'; a filter on '+telemetryNarrowJoin(missing))+' counts only with '+(source==='cloudwatch'?'a dimension value':'= or in and a value')+', so it is not shown.'};
+      return {kind:'unmet',error:'The provider asks each board to narrow this signal'+(needs===true?'':' by '+telemetryNarrowJoin(missing))+', and nothing narrows it here, so it is not shown.'};
+    }
   }
   if(!fragments.length)return {query:query,fragments:[]};
   var out=JSON.parse(JSON.stringify(query)),shown=[];

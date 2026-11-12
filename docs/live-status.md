@@ -3278,9 +3278,14 @@ before the narrowing is applied.
 - **No widening.** A board cannot remove a narrowing or a `needsNarrow` the provider set;
   `null` for either is ignored with a warning at the overlay.
 - **`needsNarrow`** on a provider signal (`["event_code"]`, or `true`) says every board
-  must narrow it. It is met when a fragment names each field (a Honeycomb filter
-  `column`, a CloudWatch dimension name); `true` is met by any fragment. Lists join
-  across levels, so a re-exporter can require more, never less.
+  must narrow it. It is met when a fragment pins each field to chosen values: a
+  Honeycomb filter with `=` or `in` and a value, or a CloudWatch dimension. A filter that
+  only tests the field (`exists`, `!=`, `not-in`, `does-not-exist`, `contains` …) still
+  counts every value, so it does not count. `true` needs one pinning filter. Lists join
+  across levels, so a re-exporter can require more, never less. A replacing binding
+  (no `extends`) keeps the provider carrier's requirement on every signal it writes, so
+  a restated query is not shown unless it narrows too; the validator warns at the
+  overlay.
 - **Fail closed.** The signal is not queried and reads unobserved, with the reason in
   Proof ("Not shown: …") and the Metrics note, when: `needsNarrow` is unmet; a fragment is in another source's
   language (also after a source switch); a fragment is malformed; the Honeycomb query
@@ -3292,8 +3297,11 @@ before the narrowing is applied.
   unmet `needsNarrow`, an `OR` query or a dimension conflict warns only on a page with a
   live-status panel, so a canon page that asks boards to narrow still builds.
 - **Display.** Proof names the applied fragments ("Narrowed: event_code = FULL_CHARGE").
-  A board that narrows an inherited signal does not get the provider's signal-level
-  `links.query` (it opens the unnarrowed query) unless it sets its own.
+  No link opens an unnarrowed query: a board that narrows an inherited signal does not
+  get the provider's signal-level or carrier-level `links.query` unless it sets its
+  own; a narrowed signal's card never falls back to the carrier's query link; and a
+  signal that is not shown loses its query links. The text view prints "Not shown:
+  <reason>" in place of that signal's query.
 - Pages need `flow.telemetry-narrow`.
 
 ### Named environment variables and counting scope

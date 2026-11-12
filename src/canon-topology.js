@@ -182,7 +182,22 @@ var FlowTopology = (function(){
       if(own(patch,'needsNarrow')){var needs=telemetryNeedsMerge(current.needsNarrow,patch.needsNarrow);if(needs)out.needsNarrow=needs;else delete out.needsNarrow;}
       return out;
     }};
-  function mergeTelemetry(inherited,overlay){return mergeOverlay(inherited,overlay,TELEMETRY_OVERLAY_RULES);}
+  function mergeTelemetry(inherited,overlay){
+    var out=mergeOverlay(inherited,overlay,TELEMETRY_OVERLAY_RULES);
+    // #1353: the carrier's query link opens the provider's query too; a board that narrows a signal
+    // here no longer gets it, unless it sets its own.
+    var narrows=object(overlay) && object(overlay.signals) && Object.keys(overlay.signals).some(function(name){var p=overlay.signals[name];return object(p) && !!telemetryNarrowMerge(null,p.narrow);});
+    if(narrows && object(out.links) && own(out.links,'query') && !(object(overlay.links) && own(overlay.links,'query'))){
+      delete out.links.query;if(!Object.keys(out.links).length)delete out.links;
+    }
+    return out;
+  }
+  // #1353: what the provider carrier asks every board to narrow by, over all its signals (true wins).
+  function telemetryCarrierNeeds(binding){
+    var needs=null,signals=object(binding) && object(binding.signals)?binding.signals:{};
+    Object.keys(signals).forEach(function(name){if(object(signals[name]))needs=telemetryNeedsMerge(needs,signals[name].needsNarrow);});
+    return needs;
+  }
   // #1290: trace spans always merge. A span names spans one way, so a patch that sets
   // operation removes an inherited operationPrefix and the reverse.
   var TRACE_OVERLAY_RULES={hide:'spans',fields:{spans:'entries'},
@@ -270,7 +285,16 @@ var FlowTopology = (function(){
     // #1266: an `extends` overlay merges with the inherited binding; any other consumer binding
     // replaces it (the original rule, so existing documents keep their meaning).
     if(own(addition,'telemetry')){
-      if(!telemetryMergeOverlay(addition.telemetry))value.telemetry=clone(addition.telemetry);
+      if(!telemetryMergeOverlay(addition.telemetry)){
+        // A replacing binding keeps what the provider carrier asks boards to narrow by (#1353): it
+        // belongs to the canon carrier, not to the query text, so each signal written here keeps it.
+        var needs=telemetryCarrierNeeds(value.telemetry);
+        value.telemetry=clone(addition.telemetry);
+        if(needs && object(value.telemetry) && object(value.telemetry.signals)){
+          Object.keys(value.telemetry.signals).forEach(function(name){var sig=value.telemetry.signals[name];if(object(sig))sig.needsNarrow=telemetryNeedsMerge(sig.needsNarrow,needs);});
+          if(note)note('warning','','this binding replaces the provider\'s on '+carrier+', whose signals must be narrowed'+(needs===true?'':' by '+telemetryList(needs))+'; each signal here keeps that requirement');
+        }
+      }
       else{
         if(note)telemetryPatchFindings(value.telemetry,addition.telemetry,carrier,note);
         // Hiding every signal leaves no binding for this consumer: the carrier is quietly unbound.

@@ -147,6 +147,8 @@ function textViewSignals(binding){
   if(!binding)return [];
   return Object.keys(binding.signals).map(function(name){
     var s=binding.signals[name],out={name:name,source:s.source,query:textViewClone(s.query),unit:s.unit};
+    // #1353: a signal that is not shown (it cannot be narrowed safely) says why instead of printing a query that is never sent.
+    if(s.error)out.notShown=s.error;
     ['scope','label','role','window','missingMeansZero','showOnCard','links'].forEach(function(k){if(textViewOwn(s,k))out[k]=textViewClone(s[k]);});
     out.pass=textViewOwn(binding.proof,name)?textViewClone(binding.proof[name]):null;
     return out;
@@ -403,7 +405,8 @@ function textViewFlat(model){
         if(el.card)leaves(kind,owner,'telemetry.card.',textViewLeaves(el.card,''));
         el.signals.forEach(function(s){
           var at='metric.'+s.name+'.';
-          if(typeof s.query==='string')add(kind,owner,at+'query',s.source+' '+s.query);
+          if(s.notShown){add(kind,owner,at+'source',s.source);add(kind,owner,at+'query','Not shown: '+s.notShown);}
+          else if(typeof s.query==='string')add(kind,owner,at+'query',s.source+' '+s.query);
           else{add(kind,owner,at+'source',s.source);leaves(kind,owner,at+'query.',textViewLeaves(s.query,''));}
           if(s.unit!=null)add(kind,owner,at+'unit',s.unit);
           ['scope','label','role','window','missingMeansZero','showOnCard'].forEach(function(k){if(textViewOwn(s,k))add(kind,owner,at+k,s[k]);});
@@ -481,6 +484,7 @@ function textViewSignalMeta(s){
   return bits;
 }
 function textViewQueryLines(s,indent){
+  if(s.notShown)return textViewValue(indent,'query','Not shown: '+s.notShown);
   if(typeof s.query==='string')return textViewValue(indent,'query',s.query);
   var out=[];textViewLeaves(s.query,'').forEach(function(leaf){out.push.apply(out,textViewValue(indent,leaf[0],leaf[1]));});return out;
 }

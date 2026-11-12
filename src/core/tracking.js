@@ -567,7 +567,7 @@ function carrierTelemetry(obj,templates,invalid,environment){
   }
   var clean=telemetryClean(expanded,warn,false);
   if(!clean)return null;
-  var signals={};
+  var signals={},unnarrowedLinks=false;
   Object.keys(clean.signals).forEach(function(name){
     var entry=clean.signals[name],source=TELEMETRY_SOURCES.filter(function(key){return telemetryOwn(entry,key);})[0];
     signals[name]={source:source,query:entry[source],unit:telemetryOwn(entry,'unit')?entry.unit:null};
@@ -584,11 +584,15 @@ function carrierTelemetry(obj,templates,invalid,environment){
     // #1348: narrowing is applied once, here, to the query that is sent; it fails closed with a reason.
     if(telemetryOwn(entry,'narrow') || telemetryOwn(entry,'needsNarrow')){
       var narrowed=telemetryNarrowQuery(source,signals[name].query,entry.narrow,entry.needsNarrow);
-      if(narrowed.error){if(!signals[name].error)signals[name].error=narrowed.error;signals[name].narrowFailure=narrowed.kind;if(narrowed.written)signals[name].narrowWritten=true;}
+      if(narrowed.error){if(!signals[name].error)signals[name].error=narrowed.error;signals[name].narrowFailure=narrowed.kind;if(narrowed.written)signals[name].narrowWritten=true;
+        // Its query links open the unnarrowed query: none for this signal, and none for the carrier.
+        delete signals[name].links;unnarrowedLinks=true;}
       else{signals[name].query=narrowed.query;if(narrowed.fragments.length)signals[name].narrow=narrowed.fragments;}
     }
   });
-  return {kind:clean.kind,signals:signals,proof:clean.proof || {},links:clean.links || {},card:clean.card || null};
+  var links=clean.links || {};
+  if(unnarrowedLinks && telemetryOwn(links,'query')){links=telemetryClone(links);delete links.query;}
+  return {kind:clean.kind,signals:signals,proof:clean.proof || {},links:links,card:clean.card || null};
 }
 function telemetryConfigUrl(value){try{var u=new URL(value);return typeof value==='string' && /^https?:\/\//i.test(value) && !/[\s\\]/.test(value) && !u.username && !u.password;}catch(e){return false;}}
 /* Load trace log lookups (#1099): a Loki log query whose lines carry a trace id

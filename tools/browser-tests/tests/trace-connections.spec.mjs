@@ -139,11 +139,14 @@ test('desktop native direct-only callbacks show an unmapped waterfall and reject
  // #1283 rule: a click on a row near the window's bottom reveals the row with its opened detail by the least scroll, and
  // the row never leaves the window (this page has no fixed bar, so Playwright does not scroll before the click).
  const low=root.locator('.dv-trace-span').nth(30);await low.evaluate(el=>el.scrollIntoView({block:'end'}));
+ // #1411: in the Trace view the panel body is the scroller (the panel stays on the page), so the reveal scrolls it.
+ const holder=root.locator('.pwidget.pt-live-status > .pbody').first(),bodyBefore=await holder.evaluate(el=>el.scrollTop);
  const lowBefore=await low.boundingBox(),yBefore=await page.evaluate(()=>window.scrollY);await low.click();await expect(low).toHaveAttribute('aria-pressed','true');
  await expect.poll(async()=>{const d=await root.locator('.dv-trace-span-detail').boundingBox(),v=page.viewportSize();return !!d && d.y+d.height<=v.height+1;},{message:'the opened detail is fully in the window'}).toBe(true);
  const lowAfter=await low.boundingBox(),lowDetail=await root.locator('.dv-trace-span-detail').boundingBox(),vp=page.viewportSize(),yAfter=await page.evaluate(()=>window.scrollY);
- expect(yAfter,'the page scrolled to show the detail').toBeGreaterThan(yBefore);expect(lowAfter.y,'the row is still in the window').toBeGreaterThanOrEqual(0);
- expect(lowDetail.y+lowDetail.height,'by the least: the detail ends at the window edge less 8px').toBeGreaterThanOrEqual(vp.height-12);
+ const bodyAfter=await holder.evaluate(el=>el.scrollTop),bodyBox=await holder.boundingBox(),edge=Math.min(vp.height,bodyBox.y+bodyBox.height);
+ expect(bodyAfter>bodyBefore || yAfter>yBefore,'the panel body (or the page) scrolled to show the detail: body '+bodyBefore+' then '+bodyAfter+', page '+yBefore+' then '+yAfter).toBe(true);expect(lowAfter.y,'the row is still in the window').toBeGreaterThanOrEqual(0);
+ expect(lowDetail.y+lowDetail.height,'by the least: the detail ends at the scroller\'s edge less 8px ('+Math.round(edge)+')').toBeGreaterThanOrEqual(edge-12);
  expect(Math.abs(lowDetail.y-(lowAfter.y+lowAfter.height)),'the detail sits directly below its row').toBeLessThan(10);expect(lowBefore.y+lowBefore.height).toBeLessThanOrEqual(vp.height+1);await info.attach('native-direct-unmapped-viewport',{body:await page.screenshot(),contentType:'image/png'});
  await openTraceConfiguration(root);await page.evaluate(()=>window.holdDirect=true);await root.getByRole('button',{name:'Verify trace connection',exact:true}).click();await page.waitForFunction(()=>!!window.releaseDirect);// Destroy removes the board above the spacer; with scroll anchoring off the page keeps its offset, so a move here would
  // be a reveal (CI run 42886692965 saw anchoring, not a reveal).

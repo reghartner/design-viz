@@ -651,7 +651,8 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
          nearest scrolling ancestor that overflows (the Workbench page preview), kept once chosen so the cap does not flip
          between the two. Lengths are divided by the card's scale (a scaled Explore window). The card is pinned (sticky)
          below the reader's bar only when it is the last card in its column; a card after it would slide under it.
-       The cap is re-measured on each paint and, once per frame, after a resize or any scroll while the Trace view is shown.
+       The cap is re-measured on each paint and, once per frame, after a resize or (for the last card, which is sticky) any
+       scroll while the Trace view is shown.
        A hidden card or a hidden bounding scroller keeps the last cap. */
     function boundingScroller(card,view){
       if(card._liveBound && !(card._liveBound.contains && card._liveBound.contains(card)))card._liveBound=null;
@@ -697,7 +698,10 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
       host.classList.add('dv-live-on-page-body');measurePageCap(card);
       if(watch || !view || !view.addEventListener)return;
       var frame=view.requestAnimationFrame?function(f){view.requestAnimationFrame(f);}:function(f){view.setTimeout(f,16);},queued=false;
-      watch=host._livePageWatch=function(){
+      watch=host._livePageWatch=function(ev){
+        // A card with a card after it is measured again on a resize, not on a scroll: growing as the page scrolls would push
+        // the next card down out of reach.
+        var c=host.parentElement;if(ev && ev.type==='scroll' && c && c.classList && !c.classList.contains('dv-live-sticky'))return;
         if(queued)return;queued=true;
         frame(function(){queued=false;var c=host.parentElement;if(live && host._livePageWatch===watch && c && c.isConnected && c.classList.contains('pwidget'))measurePageCap(c);});
       };

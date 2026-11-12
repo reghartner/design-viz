@@ -2672,9 +2672,11 @@ a span to focus it on the diagram", sits above the span list. The list has no
 scroll bar of its own: it is as tall as its spans (#1280). In the Trace view the
 Status panel's height is capped to the visible page (#1411): on screen, it ends at
 the bottom of the window (or of the scrolling Workbench preview that holds it), at
-least 160 px tall, and the cap is measured again on a scroll or a resize. In a
-fixed-size Explore window the panel fills the window. The panel is pinned (sticky)
-below the reader's bar only when it is the last card in its column. Its body (span
+least 160 px tall, and the cap is measured again on a resize. In a fixed-size
+Explore window the panel fills the window. The panel is pinned (sticky) below the
+reader's bar, and its cap is measured again as the page scrolls, only when it is the
+last card in its column; with a card after it, it does not grow as the page scrolls,
+so that card stays reachable. Its body (span
 list, focused-span detail, log search results, request details) is the one
 scroller, in Edit mode too, and the page does not scroll for the trace. Printing
 shows the whole list. A focused span's detail

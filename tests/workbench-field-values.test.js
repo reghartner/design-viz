@@ -17,15 +17,31 @@ const B=loadFields();
 test('patchSummaryLine caps summaries at two pairs and handles empty patches', () => {
   assert.strictEqual(B.patchSummaryLine({}), 'empty patch');
   assert.strictEqual(B.patchSummaryLine({state: 'held', label: 'hello', reason: 'hidden'}),
-    'state → held · label → hello');
+    'State → held · Label → hello · +1 more');
 });
 
 test('patchSummaryLine compacts arrays and objects and prints scalar values bare', () => {
   assert.strictEqual(B.patchSummaryLine({events: [{at: '1m'}, {}], subject: {x: 2}}),
-    'events → [2 items] · subject → {…}');
-  assert.strictEqual(B.patchSummaryLine({value: 12.5, cold: false}), 'value → 12.5 · cold → false');
-  assert.strictEqual(B.patchSummaryLine({label: 'bare string', alert: true}), 'label → bare string · alert → true');
-  assert.strictEqual(B.patchSummaryLine({cells: [], notify: null}), 'cells → [0 items] · notify → null');
+    'Events → [2 items] · Subject → {…}');
+  assert.strictEqual(B.patchSummaryLine({value: 12.5, cold: false}), 'Value → 12.5 · Cold → false');
+  assert.strictEqual(B.patchSummaryLine({label: 'bare string', alert: true}), 'Label → bare string · Alert → true');
+  assert.strictEqual(B.patchSummaryLine({cells: [], notify: null}), 'Cells → [0 items] · Notify → null');
+});
+
+test('patchSummaryLine uses the edit form labels and names temporary changes by field (#997)', () => {
+  B.PanelRegistry.define('summary-fixture',{authoring:{
+    patchFields:[['mode','enum',['live','recorded']],['banner','text'],['scenePlayback','text']],
+    transientFields:['mode','banner'],
+    fieldMeta:{mode:{label:'Screen mode'},banner:{label:'Banner text',step:{label:'Banner at this step'}}}}});
+  const decl={type:'summary-fixture'};
+  assert.strictEqual(B.patchSummaryLine({mode: 'live', enterOnce: {banner: 'Alarm'}}, decl),
+    'Screen mode → live · Banner at this step (this step only) → Alarm');
+  assert.strictEqual(B.patchSummaryLine({enterOnce: {mode: 'recorded', banner: 'x'}, scenePlayback: 'loop'}, decl),
+    'Scene playback → loop · Screen mode (this step only) → recorded · +1 more');
+  // The Inspect edit form may label a field through its panel editor; the summary follows it.
+  assert.strictEqual(B.patchSummaryLine({mode: 'live'}, decl, key => key === 'mode' ? 'What the screen shows' : null),
+    'What the screen shows → live');
+  assert.ok(!/enterOnce/.test(B.patchSummaryLine({enterOnce: {banner: 'x'}}, decl)));
 });
 
 test('panel field presentation merges compatible registry, tuple and context metadata', () => {

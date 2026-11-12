@@ -313,6 +313,19 @@ test('PANEL_PATCH_FIELDS covers all 20 panel types with supported kinds and none
 });
 
 
+test('every table-style setup column has a plain label, not its spec key (#997)', () => {
+  const missing = [];
+  for (const [type, fields] of Object.entries(B.PANEL_SETUP_FIELDS)){
+    for (const field of fields){
+      if (field[1] !== 'rows' && field[1] !== 'objf') continue;
+      for (const col of field[2].cols){
+        if (typeof col.label !== 'string' || !col.label.trim() || col.label === col.k) missing.push(type + '.' + field[0] + '.' + col.k);
+      }
+    }
+  }
+  assert.deepStrictEqual(missing, []);
+});
+
 test('PANEL_SETUP_FIELDS covers exactly the engine panel types with known control kinds', () => {
   assert.deepStrictEqual(Object.keys(B.PANEL_SETUP_FIELDS).sort(), [...V.PANEL_TYPES].sort());
   const kinds = new Set(['text', 'num', 'csv', 'scene', 'image', 'json', 'jsonArr', 'jsonAny',

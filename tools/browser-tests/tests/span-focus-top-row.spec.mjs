@@ -91,7 +91,8 @@ async function loadAndFocus(root){
  const span=root.locator('.dv-trace-span[data-span-id="'+CHARGE+'"]');await expect(span).toHaveCount(1);
  await expectTopRowShown(root,'trace loaded, before the span focus');
  await span.click();
- await expect(root.locator('.dv-trace-focus-overlay[data-trace-level="current"]')).toHaveCount(1);
+ // The focused span's carrier wears the current-level marker (an edge ring or node brackets).
+ await expect(root.locator('.dv-trace-edge-focus[data-trace-level="current"],.dv-trace-focus-overlay[data-trace-level="current"]').first()).toBeAttached();
  await expect.poll(()=>root.page().evaluate(()=>window.viewer.controller.sections[0].stepper.current().id),{message:'the Charge span focus jumps to its step'}).toBe('charge');
 }
 

@@ -647,9 +647,10 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
        scrolls inside the card and the card never reaches past what the reader can see.
        - In a fixed-size Explore window the card fills the window body (dv-live-fill, CSS only).
        - Elsewhere (no section layout, a tile that grows to its content, an automatic Explore window, the Workbench
-         previews) the card is sticky below the reader's bar and capped at the bottom of its bounding scroller: the window,
+         previews) the card is capped at the bottom of its bounding scroller: the window,
          or the nearest scrolling ancestor that overflows (the Workbench page preview), kept once chosen so the cap does not
          flip between the two. Lengths are divided by the card's scale (a scaled Explore window).
+       As the last card of its column it is also sticky below the reader's bar (a card after it would slide under it).
        The cap is measured on each paint and, once per frame, after a resize or any scroll while the Trace view is shown. */
     function boundingScroller(card,view){
       if(card._liveBound && !(card._liveBound.contains && card._liveBound.contains(card)))card._liveBound=null;
@@ -666,7 +667,13 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
       if(!view || !view.getComputedStyle || !card.getBoundingClientRect || !card.style || !card.style.setProperty)return;
       var win=card.closest && card.closest('.explore-window'),fill=!!(win && !win.classList.contains('explore-window-automatic'));
       card.classList.toggle('dv-live-fill',fill);card.classList.toggle('dv-live-on-page',!fill);if(fill)return;
-      var rect=card.getBoundingClientRect(),scale=card.offsetHeight?rect.height/card.offsetHeight || 1:1,scroller=boundingScroller(card,view),bar=pageTop(view);
+      // Sticky only as the last card of its column: a card after it (a log panel, Status controls) would slide under it.
+      var follows=false;for(var next=card.nextElementSibling;next;next=next.nextElementSibling)if(next.classList && next.classList.contains('pwidget') && next.getClientRects && next.getClientRects().length){follows=true;break;}
+      card.classList.toggle('dv-live-sticky',!follows);
+      var scroller=boundingScroller(card,view);
+      // A bounding scroller that is hidden (a closed Workbench page preview) has no box: keep the last cap until it shows.
+      if(scroller && scroller.getClientRects && !scroller.getClientRects().length)return;
+      var rect=card.getBoundingClientRect(),scale=card.offsetHeight?rect.height/card.offsetHeight || 1:1,bar=pageTop(view);
       var box=scroller?scroller.getBoundingClientRect():null,edge=box?Math.max(box.top,bar):bar,bottom=box?Math.min(box.bottom,view.innerHeight):view.innerHeight;
       var max=Math.max(160,Math.floor((bottom-Math.max(rect.top,edge)-8)/scale))+'px',sticky=Math.round(Math.max(0,edge-(box?box.top:0))/scale)+'px';
       if(card._livePageMax!==max){card._livePageMax=max;card.style.setProperty('--dv-live-card-max',max);}
@@ -678,7 +685,7 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
       if(!on || !card){
         if(host.classList)host.classList.remove('dv-live-on-page-body');
         if(card && card.classList && (card.classList.contains('dv-live-on-page') || card.classList.contains('dv-live-fill'))){
-          card.classList.remove('dv-live-on-page','dv-live-fill');card.style.removeProperty('--dv-live-card-max');card.style.removeProperty('--dv-live-sticky-top');
+          card.classList.remove('dv-live-on-page');card.classList.remove('dv-live-fill');card.classList.remove('dv-live-sticky');card.style.removeProperty('--dv-live-card-max');card.style.removeProperty('--dv-live-sticky-top');
           card._livePageMax=card._livePageSticky=card._liveBound=null;
         }
         if(watch){host._livePageWatch=null;watch._view.removeEventListener('resize',watch);watch._view.removeEventListener('scroll',watch,true);}
@@ -1057,11 +1064,13 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}.dv-trace-log-report>.dv-trace-direct-report{margin-top:0}.dv-trace-log-row:has(+.dv-trace-log-report){border-bottom:0}
 .dv-trace-selected{min-width:0}.dv-trace-slot{margin:10px 0;min-width:0}.dv-trace-slot-hint{margin:0;padding:10px;border:1px dashed var(--explore-border);border-radius:6px;color:var(--dfaint);font-size:11px}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
-/* #1411: the Trace view keeps the panel on the page (pageCap). Screen only: print shows the whole list. The card is sticky
-   below the reader's bar and ends at the bottom of what the reader sees; its min-height (a tile that grows to its content)
-   gives way. In a fixed-size Explore window it fills the window body. Either way the body scrolls inside the card. */
+/* #1411: the Trace view keeps the panel on the page (pageCap). Screen only: print shows the whole list. The card ends at the
+   bottom of what the reader sees, and its min-height (a tile that grows to its content) gives way; as the last card of its
+   column it is sticky below the reader's bar. In a fixed-size Explore window it fills the window body. Either way the body
+   scrolls inside the card. */
 @media screen{
-.docview .pwidget.pt-live-status.dv-live-on-page,.docview .section-layout-tile>.pwidget.pt-live-status.dv-live-on-page{display:flex;flex-direction:column;box-sizing:border-box;min-height:0;max-height:var(--dv-live-card-max,none);position:sticky;top:var(--dv-live-sticky-top,0px)}
+.docview .pwidget.pt-live-status.dv-live-on-page,.docview .section-layout-tile>.pwidget.pt-live-status.dv-live-on-page{display:flex;flex-direction:column;box-sizing:border-box;min-height:0;max-height:var(--dv-live-card-max,none)}
+.docview .pwidget.pt-live-status.dv-live-on-page.dv-live-sticky{position:sticky;top:var(--dv-live-sticky-top,0px)}
 body .docview .section-viewport .explore-window-body>.pwidget.pt-live-status.dv-live-fill{display:flex;flex-direction:column;box-sizing:border-box;height:100%;min-height:0;overflow:hidden}
 .docview .pwidget.pt-live-status:is(.dv-live-on-page,.dv-live-fill)>.ptitle{flex:none}.docview .pwidget.pt-live-status:is(.dv-live-on-page,.dv-live-fill)>.pbody.dv-live-on-page-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior-y:contain}
 }

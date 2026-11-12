@@ -5155,7 +5155,9 @@ test('#1280 #1411 the Spans list has no height cap or scroll of its own; the scr
  assert.ok(!css.includes('dv-trace-fill'),'no tile fill rule');
  const at=css.indexOf('@media screen{\n.docview .pwidget.pt-live-status.dv-live-on-page');assert.ok(at>=0,'the page cap is screen only, so print shows every span');
  const screen=css.slice(at,css.indexOf('\n}\n',at));
- assert.match(screen,/\.dv-live-on-page[^{]*\{[^}]*max-height:var\(--dv-live-card-max,none\)[^}]*position:sticky;top:var\(--dv-live-sticky-top,0px\)/,'the card is sticky and capped');
+ assert.match(screen,/\.dv-live-on-page[^{]*\{[^}]*max-height:var\(--dv-live-card-max,none\)/,'the card is capped');
+ assert.match(screen,/\.dv-live-on-page\.dv-live-sticky\{position:sticky;top:var\(--dv-live-sticky-top,0px\)\}/,'only the last card of its column is sticky');
+ assert.doesNotMatch(screen.replace(/[^{}]*\.dv-live-sticky\{[^}]*\}/,''),/position:sticky/,'no other page-cap rule is sticky');
  assert.match(screen,/>\.pbody\.dv-live-on-page-body\{[^}]*overflow-y:auto/,'its body scrolls');
  assert.match(screen,/\.explore-window-body>\.pwidget\.pt-live-status\.dv-live-fill\{[^}]*height:100%/,'in a fixed Explore window the card fills the window body');
  h.ctl.liveStatus.destroy();

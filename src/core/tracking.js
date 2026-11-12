@@ -542,13 +542,15 @@ function carrierTelemetry(obj,templates,invalid,environment){
   // Local templates take that same pass here, before exactly one environment pass.
   var expanded=telemetryExpand(raw,templates,warn);
   if(!expanded)return null;
-  var config=telemetryObject(environment)?environment:environment?{environment:environment}:null,errors=Object.create(null),breakdownErrors=Object.create(null),trendErrors=Object.create(null);
+  var config=telemetryObject(environment)?environment:environment?{environment:environment}:null,errors=Object.create(null),breakdownErrors=Object.create(null),trendErrors=Object.create(null),authoredNarrow=Object.create(null);
   if(config){
     var values=Object.assign(Object.create(null),config.variables || {});
     if(config.environment)values.env=config.environment;
     if(config.grafana && config.grafana.accountId)values.account=config.grafana.accountId;
     Object.keys(expanded).forEach(function(key){
       if(key==='signals' && telemetryObject(expanded[key]))Object.keys(expanded[key]).forEach(function(name){
+        // #1354: the narrowing as written, to tell a fragment broken by a filled-in variable from one written broken.
+        if(telemetryObject(expanded[key][name]) && telemetryOwn(expanded[key][name],'narrow'))authoredNarrow[name]=telemetryClone(expanded[key][name].narrow);
         var authored=expanded[key][name],logs=telemetryObject(authored) && authored.cloudwatchLogs,hasBreakdown=telemetryObject(logs) && telemetryOwn(logs,'breakdown'),breakdown=hasBreakdown?logs.breakdown:null,hasTrend=telemetryObject(logs) && telemetryOwn(logs,'trend'),trend=hasTrend?logs.trend:null;
         // Display-only fields cannot prevent the metric query from running.
         // Keep their one environment pass separate from source/query errors.
@@ -592,10 +594,16 @@ function carrierTelemetry(obj,templates,invalid,environment){
     // #1348: narrowing is applied once, here, to the query that is sent; it fails closed with a reason.
     if(telemetryOwn(entry,'narrow') || telemetryOwn(entry,'needsNarrow')){
       var narrowed=telemetryNarrowQuery(source,signals[name].query,entry.narrow,entry.needsNarrow);
+      if(narrowed.error && narrowed.kind==='shape' && authoredNarrow[name] && !telemetryNarrowProblem(source,authoredNarrow[name]))
+        narrowed.error='After its variables were filled in, '+narrowed.error.charAt(0).toLowerCase()+narrowed.error.slice(1);
       if(narrowed.error){if(!signals[name].error)signals[name].error=narrowed.error;signals[name].narrowFailure=narrowed.kind;if(narrowed.written)signals[name].narrowWritten=true;
         // Its query links open the unnarrowed query: none for this signal, and none for the carrier.
         delete signals[name].links;unnarrowedLinks=true;}
-      else{signals[name].query=narrowed.query;if(narrowed.fragments.length)signals[name].narrow=narrowed.fragments;}
+      else{
+        signals[name].query=narrowed.query;if(narrowed.fragments.length)signals[name].narrow=narrowed.fragments;
+        if(narrowed.breakdownError && !signals[name].breakdownError)signals[name].breakdownError=narrowed.breakdownError;
+        if(narrowed.trendError && !signals[name].trendError)signals[name].trendError=narrowed.trendError;
+      }
     }
   });
   var links=clean.links || {};

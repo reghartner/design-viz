@@ -292,6 +292,9 @@ var FlowTopology = (function(){
         value.telemetry=clone(addition.telemetry);
         // Kept on the binding, so it also reaches signals a consumer template writes when it is expanded.
         if(needs && object(value.telemetry)){
+          // A binding's own needsNarrow can only add to the carrier's (#1353 review c3): anything else is ignored, with a word.
+          if(own(value.telemetry,'needsNarrow') && !(value.telemetry.needsNarrow===true || Array.isArray(value.telemetry.needsNarrow) && value.telemetry.needsNarrow.length && value.telemetry.needsNarrow.every(function(f){return typeof f==='string' && f.trim();})))
+            if(note)note('warning','.needsNarrow','a board cannot drop the provider\'s needsNarrow — ignored');
           value.telemetry.needsNarrow=telemetryNeedsMerge(value.telemetry.needsNarrow,needs);
           var written=telemetryExpand(value.telemetry,templates || {},null),names=written && object(written.signals)?Object.keys(written.signals):[];
           if(note)note('warning','','this binding replaces the provider\'s on '+carrier+', whose signals must be narrowed'+(needs===true?'':' by '+telemetryList(needs))+'; '+(names.length?(names.length>1?'its signals ':'its signal ')+telemetryList(names)+(names.length>1?' keep':' keeps'):'each signal here keeps')+' that requirement');

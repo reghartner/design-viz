@@ -221,10 +221,26 @@ var FlowCanon = (function(){
   }
   /* Honeycomb trace attributes are text: get_trace table cells, and the run_query
      raw rows a Honeycomb profile reads its allowedAttributes from (#1197). */
+  /* #1413: an attribute value is a scalar or an object; a malformed operator object is a warning
+     (traceWarnings), not an error, and matches no span. */
+  function attributeValueShape(v){return ['string','number','boolean'].includes(typeof v) || object(v);}
+  function attributeProblem(v){return typeof traceAttributeProblem==='function'?traceAttributeProblem(v):(['string','number','boolean'].includes(typeof v)?null:'unsupported value; this attribute matches no span');}
   function traceWarnings(raw){
     var listed=profileAttributes(raw),warnings=[],connections=pageConnections(raw);
     // #1197: a Honeycomb profile reads allowedAttributes with run_query over its dataset.
     Object.keys(connections).forEach(function(id){var c=connections[id];if(c.provider==='honeycomb' && (c.allowedAttributes || []).length && !c.dataset)warnings.push('tracking.telemetry.traceConnections.'+id+': allowedAttributes on a Honeycomb profile need `dataset` to fetch span attributes; without it they stay Not observed');});
+    // #1413: a malformed operator object matches no span; say so where it is written.
+    function operators(attrs,at){if(object(attrs))Object.keys(attrs).forEach(function(k){if(object(attrs[k])){var why=attributeProblem(attrs[k]);if(why)warnings.push(at+'.attributes.'+k+': '+why);}});}
+    sections(raw).forEach(function(sec){
+      (Array.isArray(sec.diagram.steps)?sec.diagram.steps:[]).forEach(function(st){
+        if(!object(st))return;var many=Array.isArray(st.traceMatch);
+        (many?st.traceMatch:[st.traceMatch]).forEach(function(m,index){if(object(m))operators(m.attributes,'steps.'+(st.id || '?')+'.traceMatch'+(many?'['+index+']':''));});
+        if(object(st.traceScope))operators(st.traceScope.attributes,'steps.'+(st.id || '?')+'.traceScope');
+      });
+      function spanOperators(value,at){var spans=object(value) && object(value.trace) && object(value.trace.spans)?value.trace.spans:{};Object.keys(spans).forEach(function(key){if(object(spans[key]))operators(spans[key].attributes,at+'.trace.spans.'+key);});}
+      if(object(sec.diagram.nodes))Object.keys(sec.diagram.nodes).forEach(function(id){spanOperators(sec.diagram.nodes[id],'nodes.'+id);});
+      (Array.isArray(sec.diagram.edges)?sec.diagram.edges:[]).forEach(function(e){if(object(e))spanOperators(e,'edges.'+e.from+'->'+e.to);});
+    });
     sections(raw).forEach(function(sec){(Array.isArray(sec.diagram.steps)?sec.diagram.steps:[]).forEach(function(st){
       // An array lists alternatives; report each under traceMatch[index].
       var many=Array.isArray(st && st.traceMatch);
@@ -233,13 +249,13 @@ var FlowCanon = (function(){
         Object.keys(m.attributes).forEach(function(k){
           if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}))return;
           var at='steps.'+(st.id || '?')+'.traceMatch'+(many?'['+index+']':'')+'.attributes.'+k+': ';
-          if(typeof m.attributes[k]!=='string')warnings.push(at+'Honeycomb table cells are text; a '+typeof m.attributes[k]+' value never matches');
+          if(!object(m.attributes[k]) && typeof m.attributes[k]!=='string')warnings.push(at+'Honeycomb table cells are text; a '+typeof m.attributes[k]+' value never matches');
         });
       });
       // #1290: and for a step's traceScope.attributes.
       var scoped=st && object(st.traceScope) && object(st.traceScope.attributes)?st.traceScope.attributes:{};
       Object.keys(scoped).forEach(function(k){
-        if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}) || typeof scoped[k]==='string')return;
+        if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}) || typeof scoped[k]==='string' || object(scoped[k]))return;
         warnings.push('steps.'+(st.id || '?')+'.traceScope.attributes.'+k+': Honeycomb table cells are text; a '+typeof scoped[k]+' value never matches');
       });
     });
@@ -249,7 +265,7 @@ var FlowCanon = (function(){
       Object.keys(spans).forEach(function(key){
         var attrs=object(spans[key]) && object(spans[key].attributes)?spans[key].attributes:{};
         Object.keys(attrs).forEach(function(k){
-          if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}) || typeof attrs[k]==='string')return;
+          if(!Object.prototype.hasOwnProperty.call(listed,k) || listed[k].some(function(p){return p!=='honeycomb';}) || typeof attrs[k]==='string' || object(attrs[k]))return;
           warnings.push(at+'.trace.spans.'+key+'.attributes.'+k+': Honeycomb table cells are text; a '+typeof attrs[k]+' value never matches');
         });
       });
@@ -275,7 +291,7 @@ var FlowCanon = (function(){
     if(has('operation') && has('operationPrefix'))e.push('operation and operationPrefix cannot be combined');
     if(!has('operation') && !has('operationPrefix') && !(object(s.attributes) && Object.keys(s.attributes).length))e.push('needs operation, operationPrefix or attributes');
     if(has('namespace') && (typeof s.namespace!=='string' || !s.namespace.trim()))e.push('namespace must be a nonempty string');
-    if(has('attributes') && (!object(s.attributes) || Object.keys(s.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !['string','number','boolean'].includes(typeof s.attributes[k]);})))e.push('attributes: use supported operational attributes only');
+    if(has('attributes') && (!object(s.attributes) || Object.keys(s.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !attributeValueShape(s.attributes[k]);})))e.push('attributes: use supported operational attributes only');
     if(TRACE_SPAN_ROLES[kind].indexOf(s.role)<0)e.push('role must be one of '+TRACE_SPAN_ROLES[kind].join(', '));
     return e;
   }
@@ -339,7 +355,7 @@ var FlowCanon = (function(){
     Object.keys(sc).forEach(function(k){if(TRACE_SCOPE_FIELDS.indexOf(k)<0)e.push('traceScope: unknown field '+k);});
     if(sc.root!=null && (!object(sc.root) || Object.keys(sc.root).some(function(k){return k!=='serviceName' && k!=='operation';}) || typeof sc.root.serviceName!=='string' || !sc.root.serviceName.trim() || typeof sc.root.operation!=='string' || !sc.root.operation.trim()))e.push('traceScope.root: expected {serviceName, operation}');
     if(sc.parentStepId!=null && (typeof sc.parentStepId!=='string' || !ids.has(sc.parentStepId) || sc.parentStepId===st.id))e.push('traceScope: unknown or self parentStepId');
-    if(sc.attributes!=null && (!object(sc.attributes) || Object.keys(sc.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !['string','number','boolean'].includes(typeof sc.attributes[k]);})))e.push('traceScope.attributes: use supported operational attributes only');
+    if(sc.attributes!=null && (!object(sc.attributes) || Object.keys(sc.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !attributeValueShape(sc.attributes[k]);})))e.push('traceScope.attributes: use supported operational attributes only');
     if(sc.skip!=null && (!object(sc.skip) || Object.keys(sc.skip).some(function(k){return !Array.isArray(sc.skip[k]) || sc.skip[k].some(function(x){return typeof x!=='string' || !x.trim();});})))e.push('traceScope.skip: expected {<node or connection id>: [<span name or role:<role>>, …]}');
     if(sc.optional!==undefined && typeof sc.optional!=='boolean')e.push('traceScope.optional: expected true or false');
     ['maxDurationMs','maxQueueDepth'].forEach(function(k){if(sc[k]!=null && (typeof sc[k]!=='number' || !Number.isFinite(sc[k]) || sc[k]<0))e.push('traceScope.'+k+': nonnegative number required');});
@@ -409,7 +425,7 @@ var FlowCanon = (function(){
             if(m.repeat!=null && m.repeat!=='attempts')errors.push('traceMatch.repeat: expected attempts');
             if(m.repeat && m.occurrence)errors.push('traceMatch: occurrence and repeat cannot be combined');
             if(m.optional!==undefined && typeof m.optional!=='boolean')errors.push('traceMatch.optional: expected true or false');
-            if(m.attributes!=null && (!object(m.attributes) || Object.keys(m.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !['string','number','boolean'].includes(typeof m.attributes[k]);})))errors.push('traceMatch.attributes: use supported operational attributes only');
+            if(m.attributes!=null && (!object(m.attributes) || Object.keys(m.attributes).some(function(k){return !traceAttributes.includes(k) && !Object.prototype.hasOwnProperty.call(listed,k) || !attributeValueShape(m.attributes[k]);})))errors.push('traceMatch.attributes: use supported operational attributes only');
           }
         }
         if(many)for(var j=first;j<errors.length;j++)errors[j]=errors[j].replace(/^traceMatch/,'traceMatch['+index+']');

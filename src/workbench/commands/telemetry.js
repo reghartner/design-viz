@@ -1162,7 +1162,11 @@ function traceSpansEdit(spans,edit,kind,allowed){
     var service=typeof edit.serviceName==='string'?edit.serviceName.trim():'';if(!service)return {error:'Enter the service name, exactly as the trace shows it.',field:'serviceName'};
     if(roles.indexOf(edit.role)<0)return {error:'Choose a role: '+roles.join(', ')+'.',field:'role'};
     var mode=TRACE_SPAN_MODES[edit.mode]?edit.mode:'operation',entry={serviceName:service};
-    if(mode==='attributes'){
+    if(mode==='attributes' && telemetryObject(edit.attributes) && Object.keys(edit.attributes).length){
+      // #1413: an existing declaration's attributes, copied as they are (operator objects included).
+      var copyBad=null;Object.keys(edit.attributes).some(function(k){copyBad=unsupported(k,'value');return !!copyBad;});if(copyBad)return copyBad;
+      entry.attributes=telemetryClone(edit.attributes);
+    }else if(mode==='attributes'){
       var pair=typeof edit.value==='string'?edit.value.split('='):[];
       if(pair.length<2 || !pair[0].trim())return {error:'Attributes-only matching needs an attribute: enter it as name=value, for example db.system=redis.',field:'value'};
       var bad=unsupported(pair[0].trim(),'value');if(bad)return bad;
@@ -1199,7 +1203,9 @@ function traceSpansEdit(spans,edit,kind,allowed){
     }else{
       if(attr!==key && telemetryOwn(attrs,attr))return {error:'Attribute '+attr+' is already on this span.',field:'attribute'};
       var notAllowed=attr!==key?unsupported(attr,'attribute'):null;if(notAllowed)return notAllowed;
-      var type=edit.type || (key!=null?typeof attrs[key]:'string'),parsed=traceMatchAttributeValue(edit.value!==undefined?edit.value:key!=null?String(attrs[key]):'',type,attr);
+      var type=edit.type || (key!=null?traceAttributeKind(attrs[key]):'string');
+      if(!TRACE_ATTRIBUTE_KINDS.some(function(k){return k[0]===type;}))return {error:'Attribute kinds are text, number, true/false, starts with, ends with, contains or is one of.',field:'attribute'};
+      var parsed=traceMatchAttributeValue(edit.value!==undefined?edit.value:key!=null?traceAttributeText(attrs[key]):'',type,attr);
       if(parsed.error)return {error:parsed.error,field:'attribute'};
       var next={};
       if(key==null){Object.keys(attrs).forEach(function(k){next[k]=attrs[k];});next[attr]=parsed.value;}

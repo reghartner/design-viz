@@ -1,3 +1,35 @@
+/* #1413: a trace `attributes` value is a scalar (exact, ===) or an object with exactly one operator:
+   {"startsWith"|"endsWith"|"contains": "<non-empty text>"} or {"in": ["<text>", …]} (a non-empty list of
+   text). Operators compare text attribute values only. Anything else is malformed: the validator warns and
+   the attribute never matches (fail closed, never match-all). Shared by the matcher, the validator and the
+   Workbench forms. */
+var TRACE_ATTRIBUTE_OPERATORS=['startsWith','endsWith','contains','in'];
+function traceAttributeOperator(expected){
+  if(!expected || typeof expected!=='object' || Array.isArray(expected))return null;
+  var keys=Object.keys(expected);return keys.length===1 && TRACE_ATTRIBUTE_OPERATORS.indexOf(keys[0])>=0?keys[0]:null;
+}
+// Why an attribute value cannot match, or null when it is a scalar or a well-formed operator.
+function traceAttributeProblem(expected){
+  if(['string','number','boolean'].indexOf(typeof expected)>=0)return null;
+  var op=traceAttributeOperator(expected),operand=op && expected[op];
+  if(op==='in' && Array.isArray(operand) && operand.length && operand.every(function(x){return typeof x==='string' && x!=='';}))return null;
+  if(op && op!=='in' && typeof operand==='string' && operand!=='')return null;
+  return 'use a text, number or true/false value, or one operator: {"startsWith"|"endsWith"|"contains": "<text>"} or {"in": ["<text>", …]}; this attribute matches no span';
+}
+function traceAttributeMatches(actual,expected){
+  if(['string','number','boolean'].indexOf(typeof expected)>=0)return actual===expected;
+  if(traceAttributeProblem(expected) || typeof actual!=='string')return false;
+  var op=traceAttributeOperator(expected),operand=expected[op];
+  if(op==='startsWith')return actual.indexOf(operand)===0;
+  if(op==='endsWith')return actual.length>=operand.length && actual.lastIndexOf(operand)===actual.length-operand.length;
+  if(op==='contains')return actual.indexOf(operand)>=0;
+  return operand.indexOf(actual)>=0;
+}
+// Every key of `expected` matches the span attributes `actual` (an object or undefined).
+function traceAttributesMatch(actual,expected){
+  var have=actual && typeof actual==='object'?actual:{};
+  return Object.keys(expected || {}).every(function(k){return Object.prototype.hasOwnProperty.call(have,k) && traceAttributeMatches(have[k],expected[k]);});
+}
 /* Pure exact FlowCanon matching. Node and browser share this implementation.
    An omitted path keeps the historical first-path API; a supplied path is exact. */
 var FlowTraceMatch = (function(){
@@ -34,7 +66,7 @@ function mapTrace(d,trace,pathId){
   // Spans matching the selector (service, operation, namespace, attributes), before parent and occurrence rules.
   const named=m=>trace.spans.filter(s=>s.serviceName===m.serviceName && s.operation===m.operation &&
     (!m.namespace || s.attributes['service.namespace']===m.namespace) &&
-    Object.entries(m.attributes || {}).every(([k,v])=>s.attributes[k]===v));
+    traceAttributesMatch(s.attributes,m.attributes));
   // #1290 whole-branch review: results and sharing are keyed by the step itself, never by its id,
   // so id-less steps and steps sharing an id each get their own result. Messages name an id-less step
   // by its index in the diagram's steps, as the validator does.
@@ -111,7 +143,7 @@ function mapTrace(d,trace,pathId){
     // An edge step owns only its edge's send spans; a declared receive, like the receiving
     // node's process spans, only times the hand-off (so it never collides with that node's step).
     used.forEach(x=>{const list=Array.isArray(skip[x.id])?skip[x.id]:[];x.list.forEach(dc=>{if(x.kind==='edge' && dc.role!=='send' || list.includes(dc.key) || list.includes('role:'+dc.role))return;roles.push(dc.role);dc.spans.forEach(sp=>{if(!spans.includes(sp))spans.push(sp);});});});
-    if(scope && object(scope.attributes))spans=spans.filter(sp=>Object.keys(scope.attributes).every(k=>(sp.attributes || {})[k]===scope.attributes[k]));
+    if(scope && object(scope.attributes))spans=spans.filter(sp=>traceAttributesMatch(sp.attributes,scope.attributes));
     if(scope && object(scope.root)){
       const roots=trace.spans.filter(sp=>!sp.parentId && !(sp.links || []).some(id=>byId.has(id))).sort((a,b)=>a.startMs-b.startMs);
       if(!roots.length)notes.push('The trace\'s root span is not in this trace, so the root was not checked.');
@@ -217,7 +249,7 @@ function carrierSpans(d,trace){
       const named=trace.spans.filter(s=>s.serviceName===m.serviceName &&
         (own(m,'operation')?s.operation===m.operation:own(m,'operationPrefix')?typeof s.operation==='string' && s.operation.startsWith(m.operationPrefix):true) &&
         (!m.namespace || (s.attributes || {})['service.namespace']===m.namespace));
-      const matched=named.filter(s=>Object.keys(attrs).every(k=>(s.attributes || {})[k]===attrs[k]));
+      const matched=named.filter(s=>traceAttributesMatch(s.attributes,attrs));
       return {key,role:m.role,spans:matched,notRecorded:named.length?Object.keys(attrs).filter(k=>named.every(s=>(s.attributes || {})[k]===undefined)):[]};
     });
   }

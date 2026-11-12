@@ -90,7 +90,7 @@ token/epoch ownership when clicked.
   trace status and remains unknown. Never call absence of observed errors passing.
 - Up to 200 normalized `spans`: `{id,parentId,service,name,startMs,ms,error,time}`,
   plus allowlisted operational `attributes`, bounded `events` and `links`.
-  Secret/payload/message/stack attributes are not retained. Matching is exact;
+  Secret/payload/message/stack attributes are not retained. Matching is exact (attributes may use an [operator](#attribute-operators));
   attributes outside `TELEMETRY_TRACE_ATTRS` are intentionally unsupported.
 
 `observedAt` is the retrieval receipt time, **not the trace's age**. Use the
@@ -181,6 +181,31 @@ service/span shape already matches the pinned current native shape.
 
 For step-by-step setup on an existing local or imported diagram, follow
 [Trace-ready authoring](trace-ready-authoring.md).
+
+## Attribute operators
+
+An `attributes` value on a span declaration, a step `traceMatch` or a `traceScope` is
+either an exact value (text, number or true/false, compared with `===`) or an object
+with exactly one operator (#1413):
+
+| operator | matches a text attribute value that |
+|---|---|
+| `{"startsWith": "b."}` | starts with the text |
+| `{"endsWith": ".example.com"}` | ends with the text |
+| `{"contains": ".prd."}` | contains the text |
+| `{"in": ["GET", "HEAD"]}` | is one of the listed texts |
+
+Operators compare text values only; a number or true/false value never matches them.
+The operand must be non-empty text (`in`: a non-empty list of text). Any other object,
+such as an unknown operator, two operators or an empty prefix, matches no span (never
+every span), and the validator warns at its path. Example: service A's HTTP client
+spans are all named `POST`, and only the ones to B have `server.address`
+`b.internal.<environment>.example.com`, so the send span declares
+`"attributes": {"server.address": {"startsWith": "b."}}` once for every environment.
+Imports and exports, consumer overlay patches and step inheritance carry the object
+unchanged. In the Workbench, the type next to an attribute value (Trace spans, Trace
+match, Trace scope) also offers Starts with, Ends with, Contains and Is one of (values
+separated by commas); each change is one Undo step.
 
 ## Allowed match attributes
 

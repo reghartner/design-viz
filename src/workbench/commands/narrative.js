@@ -465,14 +465,33 @@ function traceMatchFormAlternatives(value){
   var ok=list.every(function(m){
     if(!traceMatchFormObject(m))return false;
     if(m.attributes===undefined)return true;
-    return traceMatchFormObject(m.attributes) && Object.keys(m.attributes).every(function(k){return ['string','number','boolean'].indexOf(typeof m.attributes[k])>=0;});
+    return traceMatchFormObject(m.attributes) && Object.keys(m.attributes).every(function(k){return !traceAttributeProblem(m.attributes[k]);});
   });
   return ok?list:null;
 }
 function traceMatchFormAdvanced(m){
   var out={};Object.keys(m || {}).forEach(function(k){if(TRACE_MATCH_FORM_KEYS.indexOf(k)<0)out[k]=m[k];});return out;
 }
+/* #1413: the forms' attribute kinds: a value type (exact) or an operator. */
+var TRACE_ATTRIBUTE_KINDS=[['string','Text'],['number','Number'],['boolean','True/false'],['startsWith','Starts with'],['endsWith','Ends with'],['contains','Contains'],['in','Is one of']];
+function traceAttributeKind(v){return traceAttributeOperator(v) || typeof v;}
+// The text a form shows for a value: the operand of an operator, a list as "a, b".
+function traceAttributeText(v){
+  var op=traceAttributeOperator(v);if(!op)return String(v);
+  return op==='in'?(Array.isArray(v.in)?v.in.join(', '):''):String(v[op]);
+}
+// One-line reading of an attribute for summaries: "k=v", "k starts with v", "k is one of a, b".
+function traceAttributeLabel(k,v){var op=traceAttributeOperator(v);return op?k+' '+{startsWith:'starts with',endsWith:'ends with',contains:'contains',in:'is one of'}[op]+' '+traceAttributeText(v):k+'='+String(v);}
 function traceMatchAttributeValue(text,type,name){
+  if(TRACE_ATTRIBUTE_OPERATORS.indexOf(type)>=0){
+    var raw=String(text==null?'':text).trim();
+    if(type==='in'){
+      var list=raw.split(',').map(function(x){return x.trim();}).filter(Boolean);
+      return list.length?{value:{in:list}}:{error:'Attribute '+name+': enter one or more values separated by commas.'};
+    }
+    if(!raw)return {error:'Attribute '+name+': enter the text to compare; an empty one would match every span.'};
+    var out={};out[type]=raw;return {value:out};
+  }
   if(type==='number'){
     var n=typeof text==='string' && text.trim()?Number(text.trim()):NaN;
     return Number.isFinite(n)?{value:n}:{error:'Attribute '+name+': enter a number.'};
@@ -544,9 +563,9 @@ function traceMatchFormEdit(value,edit){
       delete attrs[key];
     } else {
       if(name!==key && Object.prototype.hasOwnProperty.call(attrs,name))return {error:'Attribute '+name+' is already on this alternative.'};
-      var type=edit.type || (key!=null?typeof attrs[key]:'string');
-      if(['string','number','boolean'].indexOf(type)<0)return {error:'Attribute types are text, number or true/false.'};
-      var parsed=traceMatchAttributeValue(edit.value!==undefined?edit.value:key!=null?String(attrs[key]):'',type,name);
+      var type=edit.type || (key!=null?traceAttributeKind(attrs[key]):'string');
+      if(!TRACE_ATTRIBUTE_KINDS.some(function(k){return k[0]===type;}))return {error:'Attribute kinds are text, number, true/false, starts with, ends with, contains or is one of.'};
+      var parsed=traceMatchAttributeValue(edit.value!==undefined?edit.value:key!=null?traceAttributeText(attrs[key]):'',type,name);
       if(parsed.error)return parsed;
       var out={};
       if(key==null){Object.keys(attrs).forEach(function(k){out[k]=attrs[k];});out[name]=parsed.value;}
@@ -611,7 +630,7 @@ function traceScopeSpanText(x){
   if(typeof m.operation==='string')return x.key+' · '+svc+' '+m.operation;
   if(typeof m.operationPrefix==='string')return x.key+' · '+svc+' '+m.operationPrefix+'… (prefix)';
   var attrs=m.attributes && typeof m.attributes==='object'?m.attributes:{};
-  return x.key+' · '+svc+' where '+Object.keys(attrs).map(function(k){return k+'='+String(attrs[k]);}).join(', ');
+  return x.key+' · '+svc+' where '+Object.keys(attrs).map(function(k){return traceAttributeLabel(k,attrs[k]);}).join(', ');
   }
 /* The paths a step is on (every step when the board has no paths), as the core maps them. */
 function traceScopeRoutes(d,index){
@@ -679,9 +698,9 @@ function planStepTraceScope(text,raw,sectionIdx,stepIdx,edit,opts){
       var allowed=opts && Array.isArray(opts.allowed)?opts.allowed:null;
       if(allowed && allowed.indexOf(name)<0)return {error:'Attribute '+name+' is not one this board can match. Use a supported attribute such as db.system, or list it in a trace connection\'s allowedAttributes.',field:'attribute'};
       if(name!==key && Object.prototype.hasOwnProperty.call(attrs,name))return {error:'Attribute '+name+' is already on this trace scope.',field:'attribute'};
-      var type=edit.type || (key!=null?typeof attrs[key]:'string');
-      if(['string','number','boolean'].indexOf(type)<0)return {error:'Attribute types are text, number or true/false.',field:'attribute'};
-      var parsed=traceMatchAttributeValue(edit.value!==undefined?edit.value:key!=null?String(attrs[key]):'',type,name);
+      var type=edit.type || (key!=null?traceAttributeKind(attrs[key]):'string');
+      if(!TRACE_ATTRIBUTE_KINDS.some(function(k){return k[0]===type;}))return {error:'Attribute kinds are text, number, true/false, starts with, ends with, contains or is one of.',field:'attribute'};
+      var parsed=traceMatchAttributeValue(edit.value!==undefined?edit.value:key!=null?traceAttributeText(attrs[key]):'',type,name);
       if(parsed.error)return {error:parsed.error,field:'attribute'};
       var out={};
       if(key==null){Object.keys(attrs).forEach(function(k){out[k]=attrs[k];});out[name]=parsed.value;}

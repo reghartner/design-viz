@@ -21,7 +21,7 @@ const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
 const repo=path.join(__dirname,'..');
 const names=['canon','validator','compatibility','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology','workbench/commands/telemetry',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/log-searches-editor','workbench/inspector','workbench/io-model']
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/log-searches-editor','workbench/trace-connections-editor','workbench/inspector','workbench/io-model']
   .filter(name=>['canon','validator'].includes(name) || fs.existsSync(path.join(repo,'src',name+'.js')));
 const plain=v=>JSON.parse(JSON.stringify(v));
 const canonical=v=>JSON.stringify(v,(k,x)=>x && typeof x==='object' && !Array.isArray(x)?Object.keys(x).sort().reduce((o,key)=>(o[key]=x[key],o),{}):x);
@@ -128,7 +128,7 @@ test('E5 variables for this node or connection and for the import',()=>{
   assert.deepEqual(plain(p.state(NODE).variables),{own:{code:'A'},inherited:{}});
   p.apply(NODE,{op:'importVariables',value:'{"region":"eu"}'});
   assert.deepEqual(plain(diagramOf(p.raw).topologyImports[0].variables),{region:'eu'});
-  assert.deepEqual(plain(p.state(NODE).importVariables),{as:'fc',value:{region:'eu'}});
+  assert.deepEqual(plain(p.state(NODE).importVariables),{as:'fc',value:{region:'eu'},warnings:[]},'#1393 review c1: the read model carries the import variables\' validator warnings');
   p.refuse(NODE,{op:'importVariables',value:'{"region":""}'},/string/);
   p.refuse(LOCAL,{op:'importVariables',value:'{"region":"eu"}'},/imported/);
   p.apply(NODE,{op:'importVariables',value:null});assert.equal(Object.hasOwn(diagramOf(p.raw).topologyImports[0],'variables'),false);

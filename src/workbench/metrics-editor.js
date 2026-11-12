@@ -36,6 +36,50 @@ function flowMetricsDom(o){
     var ul=el('ul','metrics-warnings');ul.setAttribute('aria-label',label);
     list.forEach(function(text){ul.appendChild(el('li',null,text));});parent.appendChild(ul);
   }
+  /* #1240: a validator warning under the control(s) it names: the text without its path. */
+  var warnSerial=0;
+  function fieldWarning(parent,controls,texts){
+    if(!texts || !texts.length)return null;
+    var p=note(parent,texts.map(function(text){var m=text.slice(text.indexOf(': ')+2);return m.charAt(0).toUpperCase()+m.slice(1)+(/[.!?]$/.test(m)?'':'.');}).join(' '),'metrics-field-warning');
+    p.id=(o.idPrefix || 'dv-metrics')+'-warning-'+(warnSerial++)+'-'+Math.random().toString(36).slice(2,8);p.setAttribute('role','note');
+    controls.forEach(function(control){control.setAttribute('aria-invalid','true');control.setAttribute('aria-describedby',((control.getAttribute('aria-describedby') || '')+' '+p.id).trim());});
+    return p;
+  }
+  function warningsAt(list,path){return (list || []).filter(function(text){return text.indexOf(path+': ')===0;});}
+  /* #1240: named variables as rows. env is null for the shared variables, else an environment id (its
+     labels say "environment", so an environment named "shared" cannot collide with the shared rows);
+     commit takes a page edit {op:'variable', action, name, to?, value?} (environment is added by the
+     caller). path is the validator path of the variables object, for the warnings under each row. */
+  /* #1393: env may instead be {title, lower, legend, note} for a node, connection or import's scoped
+     variables; those rows commit the same {op:'variable', …} edits through their own commit. */
+  function variableRows(parent,vars,env,commit,list,path){
+    var custom=env && typeof env==='object',shared=env==null;
+    var title=custom?env.title:shared?'Shared':env+' environment',lower=custom?env.lower:shared?'shared':env+' environment';
+    var set=group(parent,'metrics-variables',custom?env.legend:shared?'Shared variables':env+' variables');
+    note(set,custom?env.note:shared?'Named values for ${name} in signal queries, links and scopes. An environment\'s variables override these.':'Override the shared variables while '+env+' is the environment. No row: the shared value applies.');
+    if(vars!=null && !telemetryObject(vars)){note(set,'These variables are not an object; repair them in JSON first.');fieldWarning(set,[],warningsAt(list,path));return set;}
+    var authored=telemetryObject(vars)?vars:{};
+    fieldWarning(set,[],warningsAt(list,path));
+    Object.keys(authored).forEach(function(name,index){
+      var n=index+1,item=el('div','metrics-variable'),value=authored[name];item.setAttribute('role','group');item.setAttribute('aria-label',title+' variable '+n);set.appendChild(item);
+      var nameControl=row(item,title+' variable '+n+' name',c.text(name,function(v){return commit({op:'variable',action:'rename',name:name,to:v});},{required:'A variable needs a name; use Remove to delete it.',placeholder:'team'}));
+      var valueControl=row(item,title+' variable '+n+' value',c.text(typeof value==='string'?value:JSON.stringify(value),function(v){return commit({op:'variable',action:'value',name:name,value:v});},{required:'A variable value is non-empty text; use Remove to delete it.',placeholder:'core'}));
+      nameControl.title='Write ${'+name+'} in a query, link or scope to use this value.';
+      fieldWarning(item,[nameControl,valueControl],warningsAt(list,path+'.'+name));
+      var remove=c.action('Remove '+lower+' variable '+name,function(){return commit({op:'variable',action:'remove',name:name});},'bdanger');
+      remove.title='Remove this variable. Undo brings it back.';item.appendChild(remove);
+    });
+    var newName=keptDraft(set,'New '+lower+' variable name','text',null,''),newValue=keptDraft(set,'New '+lower+' variable value','text',null,'');
+    newName.placeholder='team';newValue.placeholder='core';
+    function add(){
+      var ok=commit({op:'variable',action:'add',name:newName.value.trim(),value:newValue.value});
+      if(ok){forget(['New '+lower+' variable name','New '+lower+' variable value']);newName.value='';newValue.value='';}
+      return ok;
+    }
+    [newName,newValue].forEach(function(input){o.listen(input,'keydown',function(ev){if(ev.key==='Enter' && !ev.isComposing){ev.preventDefault();add();}});});
+    var addButton=c.action('Add '+lower+' variable',add);addButton.title='Save this name and value as one Undo step. Enter in either field does the same.';set.appendChild(addButton);
+    return set;
+  }
   var sourceOptions=TELEMETRY_SOURCES.map(function(source){return [source,TELEMETRY_SOURCE_LABELS[source]];});
   /* Signal rows and the Add signal group, shared by carrier raw bindings and
      page templates. prefix names the owner in every label ('' or 'kafka-topic '). */
@@ -48,7 +92,7 @@ function flowMetricsDom(o){
   }
   /* merge (#1266): an imported carrier's merge state. Inherited signals are tagged, can be hidden
      for this document and keep their provider name; edits store only the changed fields. */
-  function signalEditors(parent,binding,prefix,commit,extra,merge,state){
+  function signalEditors(parent,binding,prefix,commit,extra,merge,state,warnAt){
     var signals=telemetryObject(binding.signals)?binding.signals:{},names=Object.keys(signals);
     names.forEach(function(name){
       var inherited=!!merge && merge.inheritedNames.indexOf(name)>=0,overridden=inherited && merge.overridden.indexOf(name)>=0;
@@ -69,6 +113,14 @@ function flowMetricsDom(o){
       row(box,prefix+name+' query',c.text(source?telemetryQueryText(source,entry[source]):'',function(v){return commit({op:'signal',name:name,field:'query',value:v});},{textarea:true,placeholder:source==='honeycomb'?'{"calculations":[{"op":"COUNT"}],"filters":[]}':'Query text'}));
       row(box,prefix+name+' unit',c.text(telemetryObject(entry)?entry.unit:null,function(v){return commit({op:'signal',name:name,field:'unit',value:v});},{placeholder:'req/h, msgs, ms'}));
       row(box,prefix+name+' label',c.text(telemetryObject(entry)?entry.label:null,function(v){return commit({op:'signal',name:name,field:'label',value:v});},{placeholder:'Display name (optional, up to 120 characters)'}));
+      // #1240: role "error" turns the card red over its limit; window is this signal's own time range.
+      var role=row(box,prefix+name+' role',relabel(c.select(['error'],telemetryObject(entry) && typeof entry.role==='string'?entry.role:'',function(v){return commit({op:'signal',name:name,field:'role',value:v});},true),{'':'Normal','error':'Error: red card over its limit'}));
+      role.title='Error: the card turns red when this signal is over its limit. Normal: the usual proof colours.';
+      var hasWindow=telemetryObject(entry) && telemetryOwn(entry,'window');
+      var windowControl=row(box,prefix+name+' window',c.text(hasWindow?(typeof entry.window==='string'?entry.window:JSON.stringify(entry.window)):null,function(v){return commit({op:'signal',name:name,field:'window',value:v});},{placeholder:'Page window (e.g. 1h, 7d)'}));
+      windowControl.title=source==='cloudwatch'?'CloudWatch signals always cover the page window.':'Time range for this signal only, such as 1h, 7d or now-7d. Empty uses the page Metrics window.';
+      if(source==='cloudwatch' && !hasWindow){windowControl.disabled=true;note(box,'Window: CloudWatch signals always cover the page window.','metrics-window-note');}
+      if(warnAt){fieldWarning(box,[role],warnAt(name,'role'));fieldWarning(box,[windowControl],warnAt(name,'window'));}
       row(box,prefix+name+' show on card',c.checkbox(!entry || entry.showOnCard!==false,function(v){return commit({op:'signal',name:name,field:'showOnCard',value:v});}));
       if(source==='loki' || source==='grafana')row(box,prefix+name+' empty result reads 0',c.checkbox(entry.missingMeansZero!==false,function(v){return commit({op:'signal',name:name,field:'missingMeansZero',value:v});})).setAttribute('title','On: an empty Prometheus result reads 0 in Live; an empty Loki count/rate reads 0 in Live and Over time. Off: empty stays unobserved (missingMeansZero: false).');
       row(box,prefix+name+' query link',c.text(entry && entry.links?entry.links.query:null,function(v){return commit({op:'signal',name:name,field:'queryLink',value:v});},{placeholder:'https://… (stable source query)'}));
@@ -148,7 +200,7 @@ function flowMetricsDom(o){
       row(parent,label,c.text(telemetryObject(links)?links[link[0]]:null,function(v){return commit({op:'link',key:link[0],value:v});},{placeholder:placeholders && placeholders[link[0]]?'Template: '+placeholders[link[0]]:'https://…'}));
     });
   }
-  return {el:el,note:note,row:row,relabel:relabel,group:group,fold:fold,draft:draft,keptDraft:keptDraft,kept:kept,forget:forget,drafts:drafts,warnings:warnings,signalEditors:signalEditors,proofEditors:proofEditors,linkEditors:linkEditors,sourceOptions:sourceOptions};
+  return {el:el,note:note,row:row,relabel:relabel,group:group,fold:fold,draft:draft,keptDraft:keptDraft,kept:kept,forget:forget,drafts:drafts,warnings:warnings,fieldWarning:fieldWarning,warningsAt:warningsAt,variableRows:variableRows,signalEditors:signalEditors,proofEditors:proofEditors,linkEditors:linkEditors,sourceOptions:sourceOptions};
 }
 
 /* o: {document, state: telemetryCarrierState(...), controls:{row,text,select,number,action}, listen, commit(edit)} */
@@ -211,16 +263,24 @@ function createFlowMetricsEditor(o){
       names.forEach(function(name){d.proofEditors(d.fold(box,'metrics-signal','Signal '+name),effective.proof,names,name,'',commit);});
     }
   }else{
-    d.signalEditors(box,b || {},'',commit,function(edit){edit.kind=draftKind;},s.merge,s);
+    d.signalEditors(box,b || {},'',commit,function(edit){edit.kind=draftKind;},s.merge,s,function(name,field){return d.warningsAt(s.warnings,'telemetry.signals.'+name+'.'+field);});
   }
   // #1363: scoped variables for this carrier and, on an imported one, for its import.
   if(b){
-    var vars=s.variables || {own:{},inherited:{}};
-    d.row(box,'Variables for this '+(s.edge?'connection':'node'),c.text(Object.keys(vars.own).length?JSON.stringify(vars.own):null,function(v){return commit({op:'variables',value:v});},{textarea:true,placeholder:'{"code":"FULL_CHARGE"}'}));
-    if(Object.keys(vars.inherited).length)d.note(box,'Set by the provider: '+JSON.stringify(vars.inherited)+'.');
+    /* #1393: scoped variables as rows (the #1240 row control). Each row edit is a {op:'variableRow'} edit;
+       commands/telemetry.js checks the name and the scoped-value allowlist and refuses a value that would
+       keep one of this carrier's signals from being sent. */
+    var vars=s.variables || {own:{},inherited:{}},what=s.edge?'connection':'node',inheritedNames=Object.keys(vars.inherited);
+    var carrierSet=d.variableRows(box,vars.own,{title:what.charAt(0).toUpperCase()+what.slice(1),lower:what,legend:'Variables for this '+what,
+      note:'Named values for ${name} in this '+what+'\'s signal queries, links and scopes. They override the import\'s, the environment\'s and the shared variables. Letters, digits, _ . @ : and inner - (and spaces) only.'+
+        (inheritedNames.length?' Set by the provider: '+inheritedNames.map(function(k){return k+' = '+vars.inherited[k];}).join(', ')+'.':'')},
+      function(e){return commit(Object.assign({},e,{op:'variableRow',scope:'carrier'}));},s.warnings,'telemetry.variables');
+    carrierSet.classList.add('metrics-carrier-variables');
     if(s.importVariables){
-      d.row(box,'Variables for import '+s.importVariables.as,c.text(Object.keys(s.importVariables.value).length?JSON.stringify(s.importVariables.value):null,function(v){return commit({op:'importVariables',value:v});},{textarea:true,placeholder:'{"code":"FULL_CHARGE"}'}));
-      d.note(box,'Applies to every node and connection from import '+s.importVariables.as+'.');
+      var as=s.importVariables.as;
+      d.variableRows(box,s.importVariables.value,{title:'Import '+as,lower:'import '+as,legend:'Variables for import '+as,
+        note:'Apply to every node and connection from import '+as+', under this '+what+'\'s own. Letters, digits, _ . @ : and inner - (and spaces) only.'},
+        function(e){return commit(Object.assign({},e,{op:'variableRow',scope:'import'}));},s.importVariables.warnings || [],'variables');
     }
     if(s.merge && s.inherited){
       box.appendChild(c.action('Copy provider queries',function(){return commit({op:'copyProviderQuery'});}));
@@ -255,7 +315,8 @@ function createFlowMetricsSettings(o){
     var group=telemetryObject(t[field[0]])?t[field[0]]:{};
     d.row(box,field[2],c.text(group[field[1]],function(v){return commit({op:field[0],key:field[1],value:v});},{placeholder:field[3]}));
   });
-  d.row(box,'Shared metrics variables',c.text(t.variables?JSON.stringify(t.variables):null,function(v){return commit({op:'variables',value:v});},{textarea:true,placeholder:'{"iotAccount":"123456789012"}'}));
+  d.variableRows(box,t.variables,null,commit,s.warnings,'tracking.telemetry.variables');
+  var environmentWarnings=o.environmentWarnings || s.warnings || [];
   var profiles=telemetryObject(t.environments)?t.environments:{},environmentIds=Object.keys(profiles);
   // #1236: Status board settings passes its Environments section as o.environments.
   var environments=o.environments?o.environments.appendChild(d.el('div','metrics-environments')):d.fold(box,'metrics-environments','Environments');
@@ -263,11 +324,14 @@ function createFlowMetricsSettings(o){
   if(environmentIds.length)d.row(environments,'Default environment',c.select(environmentIds,t.environment || environmentIds[0],function(v){return commit({op:'environment',value:v});}));
   environmentIds.forEach(function(id){
     var profile=telemetryObject(profiles[id])?profiles[id]:{},set=d.group(environments,'metrics-environment','Environment '+id);
+    // #1240: rename keeps the profile's place and settings; a default that named it follows.
+    var idControl=d.row(set,id+' environment id',c.text(id,function(v){return commit({op:'renameEnvironment',name:id,to:v});},{required:'An environment needs an id; use Remove environment '+id+' to delete it.',placeholder:'qa, stg or prd'}));
+    idControl.title='Rename this environment. Its settings stay, and the default environment follows the new id.';
     [['grafana','prometheus','Grafana Prometheus UID'],['grafana','loki','Grafana Loki UID'],['grafana','tempo','Grafana Tempo UID'],['grafana','baseUrl','Grafana base URL'],['grafana','sql','Grafana SQL UID'],['grafana','cloudwatch','Grafana CloudWatch UID'],['grafana','accountId','CloudWatch account ID'],['honeycomb','environment','Honeycomb environment'],['honeycomb','dataset','Honeycomb dataset']].forEach(function(field){
       var group=telemetryObject(profile[field[0]])?profile[field[0]]:{};
       d.row(set,id+' '+field[2],c.text(group[field[1]],function(v){return commit({op:'environmentSetting',name:id,source:field[0],key:field[1],value:v});},{placeholder:'Inherit shared setting'}));
     });
-    d.row(set,id+' metrics variables',c.text(profile.variables?JSON.stringify(profile.variables):null,function(v){return commit({op:'environmentSetting',name:id,source:'variables',value:v});},{textarea:true,placeholder:'Named string values; inherit shared defaults'}));
+    d.variableRows(set,profile.variables,id,function(edit){edit.environment=id;return commit(edit);},environmentWarnings,'tracking.telemetry.environments.'+id+'.variables');
     set.appendChild(c.action('Remove environment '+id,function(){return commit({op:'removeEnvironment',name:id});}));
   });
   var environmentName=d.keptDraft(environments,'New environment id','text',null,'');environmentName.placeholder='qa, stg or prd';
@@ -287,7 +351,7 @@ function createFlowMetricsSettings(o){
     else{
       d.row(set,prefix+'template kind',d.relabel(c.select(TELEMETRY_KINDS,typeof template.kind==='string'?template.kind:'',function(v){return edit({op:'kind',value:v});},true),{'':'(set on each carrier)'}));
       d.row(set,prefix+'template parameters',c.text(Array.isArray(template.params)?template.params.join(', '):'',function(v){return commit({op:'params',template:name,value:v});},{placeholder:'topic, group'}));
-      d.signalEditors(set,template,prefix,edit);
+      d.signalEditors(set,template,prefix,edit,null,null,null,function(signal,field){return d.warningsAt(s.warnings,'tracking.telemetry.templates.'+name+'.signals.'+signal+'.'+field);});
       d.linkEditors(set,template.links,prefix,edit);
       var uses=s.uses[name] || 0;
       d.note(set,(uses?uses+(uses===1?' carrier uses':' carriers use')+' this template. ':'No carrier uses this template yet. ')+'Write $param or ${param} in queries and links; each carrier supplies the values.');

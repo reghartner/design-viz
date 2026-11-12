@@ -388,10 +388,11 @@ PanelRegistry.extend('signal', {
         'rows',
         {
           cols: [
-            { k: 'id', req: true },
-            { k: 'label' },
+            { k: 'id', label: 'Connection ID', req: true },
+            { k: 'label', label: 'Name' },
             {
               k: 'transport',
+              label: 'Transport',
               kind: 'enum',
               options: [
                 'wifi',

@@ -87,10 +87,9 @@ map selects only its entries; `"traceConnections": {}` disables direct loading f
 that board. Omitting `environments` in an entry enables all environments declared
 in that profile. An
 environment subset can override its declared `label`, `value`, `context` and
-`literals`; board `label` and existing top-level `literals` may also be overridden.
-Overrides cannot introduce literal/context keys or change server, tool, argument
-mapping or adapter. Alternatively a board may contain a full inline v1 profile
-instead of a company reference. Readers choose only resolved connections.
+`literals`; board `label` and top-level `literals` may be overridden, and `allowedAttributes` extended.
+Overrides cannot add literal/context keys or change server, tool, argument
+mapping or adapter. A board may instead hold a full inline v1 profile. Readers choose only resolved connections.
 `tracking.telemetry.enabled:false` and host `telemetry:false` win.
 Optional `allowedAttributes` (Honeycomb: with `dataset`):
 [provider traces](provider-traces.md#allowed-match-attributes).

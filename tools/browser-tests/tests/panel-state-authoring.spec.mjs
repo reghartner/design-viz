@@ -15,8 +15,8 @@ test('typed starting and step state show assignment meaning, effective origin, a
   await inspectPageElement(page,root.locator('.pt-gauge .ptitle'));
   const initial=guide.locator('.initialedit');await openInspectorGroup(initial);
   await expect(initial.getByLabel('Value assignment',{exact:true})).toHaveValue('set');
-  await expect(initial.getByLabel('value',{exact:true})).toHaveValue('12');
-  await initial.getByLabel('value',{exact:true}).fill('42');await initial.getByLabel('value',{exact:true}).press('Tab');
+  await expect(initial.getByLabel('Value',{exact:true})).toHaveValue('12');
+  await initial.getByLabel('Value',{exact:true}).fill('42');await initial.getByLabel('Value',{exact:true}).press('Tab');
   let edited=JSON.parse(await source());expect(edited.page.sections[0].diagram.panels[0].initial).toEqual({value:42,future:{keep:true}});
   const changed=await source();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);
@@ -25,9 +25,9 @@ test('typed starting and step state show assignment meaning, effective origin, a
   const patch=guide.locator('.patchedit[data-panel-state="step"]').filter({has:page.locator('summary').filter({hasText:/^chip ·/})});
   if(await patch.getAttribute('open')===null)await patch.locator(':scope > summary').click();
   await expect(patch.getByLabel('Current state assignment',{exact:true})).toHaveValue('omit');
-  await expect(patch.getByLabel('state',{exact:true})).toBeEnabled();
+  await expect(patch.getByLabel('Current state',{exact:true})).toBeEnabled();
   await expect(patch.locator('.panel-state-note')).toContainText('Inherited "ON" · Inherited from step 2');
   await patch.screenshot({path:testInfo.outputPath('typed-panel-state.png')});
-  await patch.getByLabel('state',{exact:true}).selectOption('OFF');
+  await patch.getByLabel('Current state',{exact:true}).selectOption('OFF');
   edited=JSON.parse(await source());expect(edited.page.sections[0].diagram.steps[2].panels.chip).toEqual({state:'OFF'});
 });

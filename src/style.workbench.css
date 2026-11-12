@@ -528,6 +528,9 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 .effective-panel>summary,.effective-json>summary{cursor:pointer;overflow-wrap:anywhere;}
 .effective-heading{display:flex;gap:6px;flex-wrap:wrap;align-items:baseline;}
 .effective-origin{font-size:10px;color:var(--sub);}
+.effective-label{font-weight:600;}
+.effective-heading>code,.effective-key{font-size:10px;color:var(--sub);}
+.effective-key{margin-left:4px;}
 .effective-origin[data-origin="transient"]{color:var(--accent);font-weight:600;}
 .effective-field{margin:9px 0;padding:7px;border:1px solid var(--line);border-radius:5px;}
 .effective-field pre{font:11px/1.45 'IBM Plex Mono',monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:150px;overflow:auto;margin:6px 0;}
@@ -739,6 +742,10 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .rowline.rowcard .fctl{flex:none; width:100%; box-sizing:border-box;}
 .rowcell{display:flex; flex-direction:column; gap:2px; min-width:0;}
 .rowk{font:600 9px 'IBM Plex Mono',monospace; color:var(--sub);}
+/* Narrow item rows caption every input too; captions sit above, actions align with the inputs. */
+.rowline:has(>.rowcell-compact){align-items:end;}
+.rowline>.rowcell-compact{flex:1 1 0; min-width:0;}
+.rowline>.rowcell-compact .fctl{flex:none; width:100%; box-sizing:border-box;}
 .rowcardacts{grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end;}
 /* Icon pickers in item cards take two tracks, so the name has room beside the
    preview and Choose. :where keeps this at zero specificity: a panel that sizes
@@ -819,6 +826,11 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .panel-state-subfield>.panel-state-mode{font-size:10px;min-height:29px;}
 .panel-setup-field{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;}
 .panel-setup-note{margin:0 0 2px 96px;line-height:1.45;}
+/* Rarely used setup fields: one collapsed section, styled like the node form's Advanced. */
+.panel-setup-advanced{min-width:0;margin-top:4px;border-top:1px solid var(--line);padding-top:7px;}
+.panel-setup-advanced>summary{cursor:pointer;font-weight:600;}
+.panel-setup-advanced>.frow,.panel-setup-advanced>.panel-setup-field{margin-top:7px;}
+.panel-setup-ignored{opacity:.6;}
 @container inspector (max-width:390px){.panel-state-assignment:not(.panel-state-subfield){grid-template-columns:minmax(0,1fr);}}
 .fchk{border:0; background:none; padding:0;}
 .node-color-control{display:flex;align-items:center;gap:8px;flex:1;min-width:0;}
@@ -859,6 +871,22 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .metrics-fold{min-width:0;margin:6px 0;}
 .metrics-fold>.frow,.metrics-fold>.fnote{margin-top:6px;}
 .metrics-fold .metrics-fold{margin-left:8px;}
+/* #1239 Status board settings → Traces. */
+.trace-connections .trace-connection,.trace-connections .trace-connections-resolved{min-width:0;margin:8px 0;padding:8px;border:1px solid var(--line);border-radius:7px;}
+.trace-connections fieldset>legend{padding:0 4px;font-weight:650;}
+.trace-connections .trace-connection-environments{min-width:0;margin:6px 0 0;padding:6px;border:1px dashed var(--line);border-radius:7px;}
+.trace-connections .trace-connection-attribute{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;}
+.trace-connections .trace-connection-attribute>span{min-width:0;overflow-wrap:anywhere;}
+.trace-connections .trace-connection-warning{margin:2px 0;padding-left:6px;border-left:3px solid #D99A1E;color:var(--ink);}
+.trace-connections .trace-connections-resolved-list{margin:4px 0 0;padding-left:18px;}
+.trace-connections .trace-connections-resolved-list li{overflow-wrap:anywhere;}
+/* #1240 Metrics variable rows and field warnings. */
+.metrics-variables{min-width:0;margin:8px 0;padding:8px;border:1px solid var(--line);border-radius:7px;}
+.metrics-variables>legend{padding:0 4px;font-weight:650;}
+.metrics-variable{margin-top:6px;padding-top:6px;border-top:1px solid var(--line);}
+.metrics-variable>.bbtn{margin-top:4px;}
+.metrics-variables>.frow,.metrics-variables>.fnote,.metrics-variables>.bbtn{margin-top:6px;}
+.metrics-field-warning{margin:2px 0;padding-left:6px;border-left:3px solid #D99A1E;color:var(--ink);}
 /* #1233 Status board settings → Log searches. */
 .log-searches .log-search-warning{margin:0 0 2px 96px;padding-left:6px;border-left:3px solid #D99A1E;color:var(--ink);}
 .log-searches .log-search-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
@@ -869,6 +897,16 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .board-section>.frow,.board-section>.fnote,.board-section>div,.board-section>ul{margin-top:6px;}
 .board-section>fieldset.metrics-settings{min-width:0;margin:0;padding:0;border:0;}
 .board-settings-link{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+/* #1237 Status board settings → Jira: dependencies, link names, no activity. */
+.board-jira-group{min-width:0;margin:10px 0 0;padding:8px;border:1px solid var(--line);border-radius:7px;}
+.board-jira-group>legend{padding:0 4px;font-weight:650;}
+.board-jira-group>.fnote,.board-jira-group>.frow{margin-top:6px;}
+.board-dependency{margin-top:8px;padding-top:6px;border-top:1px solid var(--line);}
+.board-dependency .frow{margin-top:4px;}
+.board-dependency-actions{margin-top:6px;gap:6px;}
+.board-link-name{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;}
+.board-link-name>span{min-width:0;overflow-wrap:anywhere;}
+.board-field-warning{margin:2px 0;padding-left:6px;border-left:3px solid #D99A1E;color:var(--ink);}
 .board-make{margin:6px 0;}
 /* builder: selection highlight on the rendered page (svg + widget cards) */
 .docview .grp, .docview .node, .docview .edge, .docview .halo, .docview .coin,

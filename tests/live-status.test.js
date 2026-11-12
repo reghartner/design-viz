@@ -5644,3 +5644,32 @@ test('#1371 a step that hides the Status controls panel brings the controls back
  assert.ok(status2.querySelector('.dv-status-modes') && status2.querySelector('button.dv-live-toggle'),'visible:false: the Status panel has the controls');
  panels.destroy();p2.destroy();h.ctl.liveStatus.destroy();h2.ctl.liveStatus.destroy();
 });
+/* #1241 desktop Workbench: with the demo or a snapshot showing, a Tickets row drags onto a node or connection
+   through the Edit mode drop targets, and renderOptions.ticketDrop(ref, key) writes it (the Workbench's one Undo
+   step). Only an authoring render with ticketDrop offers it; a reader page never does. */
+test('#1241 Workbench Tickets rows drag onto nodes and connections through the Edit mode drop targets',()=>{
+ const drag=key=>{const data={'application/x-flowview-ticket':key,'text/plain':key};return {types:Object.keys(data),getData:t=>data[t]||'',dropEffect:''};};
+ function drop(h,target,key){let allowed=false;h.view.dispatchEvent({type:'dragover',target,dataTransfer:drag(key),preventDefault(){allowed=true;}});h.view.dispatchEvent({type:'drop',target,dataTransfer:drag(key),preventDefault(){}});runTimers(h);return allowed;}
+ const calls=[],h=harness(fixture(),{},{authoring:true,ticketDrop:(ref,key)=>calls.push({ref:JSON.parse(JSON.stringify(ref)),key})}),m=mountStatus(h);h.ctl.liveStatus.apply(fixed);h.flush();
+ const row=m.body.querySelector('tr[data-live-ticket="BB-1"]');assert.ok(row,'the Tickets row is listed');
+ assert.equal(row.getAttribute('draggable'),'true','the row drags');assert.match(row.getAttribute('title')||'',/Drag onto a node or connection to attach BB-1/);
+ assert.ok(m.body.querySelector('.dv-live-tickets-hint'),'the list says how to attach a ticket, and the keyboard way');
+ assert.equal(drop(h,h.view.querySelector('g.node[data-dv-node="c"]'),'BB-1'),true,'a node card takes the drop');
+ assert.deepEqual(calls,[{ref:{section:0,kind:'node',id:'c'},key:'BB-1'}]);
+ assert.equal(drop(h,h.view.querySelector('path.edge[data-dv-edge="0"]'),'BB-2'),true,'an edge takes the drop');
+ assert.deepEqual(calls[1],{ref:{section:0,kind:'edge',index:0},key:'BB-2'});
+ assert.equal(drop(h,h.view.querySelector('g.node[data-dv-node="text"]'),'BB-1'),false,'a text box takes no ticket');assert.equal(calls.length,2);
+ h.ctl.liveStatus.destroy();
+ // Authoring without ticketDrop (no demo or snapshot showing) and a reader page with one: no drag, no drop.
+ for(const opts of [{authoring:true},{ticketDrop:()=>calls.push('reader')}]){
+  const x=harness(fixture(),{},opts),xm=mountStatus(x);x.ctl.liveStatus.apply(fixed);x.flush();
+  assert.notEqual(xm.body.querySelector('tr[data-live-ticket="BB-1"]').getAttribute('draggable'),'true');
+  assert.equal(drop(x,x.view.querySelector('g.node[data-dv-node="c"]'),'BB-1'),false);x.ctl.liveStatus.destroy();
+ }
+ assert.equal(calls.length,2,'neither calls ticketDrop');
+ // A refused Workbench drop says why in the panel's status line (review c1 MINOR 2).
+ const r=harness(fixture(),{},{authoring:true,ticketDrop:()=>({error:'BB-1 was not attached: the connection changed.'})});mountStatus(r);r.ctl.liveStatus.apply(fixed);r.flush();
+ drop(r,r.view.querySelector('g.node[data-dv-node="c"]'),'BB-1');
+ assert.deepEqual(JSON.parse(JSON.stringify(r.ctl.liveStatus.snapshot().note)),{text:'BB-1 was not attached: the connection changed.',kind:'warn'});
+ r.ctl.liveStatus.destroy();
+});

@@ -28,11 +28,16 @@ Epics and descendant stories, with separate Epic counts and story coverage.
 The desktop **Demo live status** preview uses sample states without querying
 Jira, so it cannot infer parent type from a key. **File → Load snapshot…** shows an agent's
 snapshot of real Jira and metrics data instead, labelled **Snapshot from <time>**; it is preview
-only and never saved or exported. See [live status](live-status.md).
+only and never saved or exported. While the demo or a snapshot shows, drag a row of the Epic
+status Tickets list onto a node or connection to attach that ticket (one Undo step). See [live status](live-status.md).
 
 **Status board settings** (the **Board settings** button at the top of Inspect and in Find objects)
 holds the board-level settings in five sections: Jira, Metrics, Traces,
 Environments and Log searches. Each section lists its own validator warnings.
+Jira also holds **Dependencies** (ticket waits on ticket, with an optional reason),
+the **"Waits on" link names** read from Jira, and **No activity after (days)**
+(an in-progress ticket with no Jira update for that long is marked; default 7);
+each edit is one Undo step.
 On a diagram that is not a status board yet, **Make this a status board** adds a
 page wrapper if needed, an empty `tracking` block and a Live status panel as one
 Undo step. Document settings and the Live status panel link to it.

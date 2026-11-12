@@ -116,7 +116,7 @@ PanelRegistry.extend('checks', {
       initial: { results: { auth: { status: 'pending' }, unique: { status: 'pending' } } },
     },
     setupFields: [
-      ['checks', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }], max: 12 }],
+      ['checks', 'rows', { cols: [{ k: 'id', label: 'Check ID', req: true }, { k: 'label', label: 'Name' }], max: 12 }],
       ['initial', 'json'],
     ],
     patchFields: [

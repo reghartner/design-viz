@@ -21,7 +21,7 @@ const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
 const repo=path.join(__dirname,'..');
 const names=['canon','validator','compatibility','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology','workbench/commands/telemetry',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/log-searches-editor','workbench/inspector','workbench/io-model']
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/log-searches-editor','workbench/trace-connections-editor','workbench/inspector','workbench/io-model']
   .filter(name=>['canon','validator'].includes(name) || fs.existsSync(path.join(repo,'src',name+'.js')));
 const plain=v=>JSON.parse(JSON.stringify(v));
 const canonical=v=>JSON.stringify(v,(k,x)=>x && typeof x==='object' && !Array.isArray(x)?Object.keys(x).sort().reduce((o,key)=>(o[key]=x[key],o),{}):x);
@@ -128,7 +128,7 @@ test('E5 variables for this node or connection and for the import',()=>{
   assert.deepEqual(plain(p.state(NODE).variables),{own:{code:'A'},inherited:{}});
   p.apply(NODE,{op:'importVariables',value:'{"region":"eu"}'});
   assert.deepEqual(plain(diagramOf(p.raw).topologyImports[0].variables),{region:'eu'});
-  assert.deepEqual(plain(p.state(NODE).importVariables),{as:'fc',value:{region:'eu'}});
+  assert.deepEqual(plain(p.state(NODE).importVariables),{as:'fc',value:{region:'eu'},warnings:[]},'#1393 review c1: the read model carries the import variables\' validator warnings');
   p.refuse(NODE,{op:'importVariables',value:'{"region":""}'},/string/);
   p.refuse(LOCAL,{op:'importVariables',value:'{"region":"eu"}'},/imported/);
   p.apply(NODE,{op:'importVariables',value:null});assert.equal(Object.hasOwn(diagramOf(p.raw).topologyImports[0],'variables'),false);
@@ -194,15 +194,16 @@ test('E7 the inspector edits narrowing, needsNarrow and variables on an imported
   assert.equal(sentQuery.value,'sum(count_over_time({app="dcf"} | json | code="A" [5m]))');
   oneStep(ui,()=>ui.set('sent boards must narrow by','type'),NODE);
   assert.deepEqual(overlay().signals.sent.needsNarrow,['type']);assert.equal(ui.control('sent boards must narrow by').value,'type');
-  oneStep(ui,()=>ui.set('Variables for this node','{"code":"A"}'),NODE);
+  // #1393: scoped variables are rows (the #1240 row control).
+  oneStep(ui,()=>{ui.type('New node variable name','code');ui.type('New node variable value','A');ui.click('Add node variable');},NODE);
   assert.deepEqual(overlay().variables,{code:'A'});
-  assert.ok(ui.notes().includes('Applies to every node and connection from import fc.'));
-  oneStep(ui,()=>ui.set('Variables for import fc','{"region":"eu"}'),NODE);
+  assert.ok(ui.notes().some(n=>n.startsWith('Apply to every node and connection from import fc')));
+  oneStep(ui,()=>{ui.type('New import fc variable name','region');ui.type('New import fc variable value','eu');ui.click('Add import fc variable');},NODE);
   assert.deepEqual(diagramOf(ui.raw).topologyImports[0].variables,{region:'eu'});
   oneStep(ui,()=>ui.click('Remove sent narrowing 1'),NODE);
   assert.equal(overlay().signals.sent.narrow,undefined);
   // A local node gets the same controls, without the import's.
-  ui.select(LOCAL);assert.ok(ui.row('n add narrowing'));assert.ok(ui.row('Variables for this node'));assert.equal(ui.row('Variables for import fc'),null);
+  ui.select(LOCAL);assert.ok(ui.row('n add narrowing'));assert.ok(ui.row('New node variable name'));assert.equal(ui.row('New import fc variable name'),null);
   assert.equal(ui.button('Copy provider queries'),null,'a local carrier has no provider to copy');
 });
 

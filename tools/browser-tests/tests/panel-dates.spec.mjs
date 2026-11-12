@@ -64,7 +64,7 @@ test('starting and step date edits preserve other state with exact Undo/Redo',as
   for(const [type,id,selector] of panels){
     await step(root,0);await inspectPageElement(page,panel(root,type).locator('.ptitle'));
     const initial=await openState(guide.locator('.initialedit[data-panel-id="'+id+'"]'));
-    const original=await src.inputValue(),date=type==='appscreens'?initial.getByLabel('date',{exact:true}):initial.getByLabel('Starting date',{exact:true});
+    const original=await src.inputValue(),date=initial.getByLabel('Starting date',{exact:true});
     await date.fill('Wed, Sep 23');await date.press('Tab');
     await expect(panel(root,type).locator(selector)).toHaveText('Wed, Sep 23');
     const edited=await src.inputValue(),expected=diagram(JSON.parse(original)).panels.find(p=>p.id===id);
@@ -74,7 +74,7 @@ test('starting and step date edits preserve other state with exact Undo/Redo',as
     await page.locator('#redo-builder').click();await expect(src).toHaveValue(edited);
     if(type==='appscreens'){
       await inspectPageElement(page,panel(root,type).locator('.ptitle'));
-      const time=initial.getByLabel('clock',{exact:true});await time.fill('10:05');await time.press('Tab');
+      const time=initial.getByLabel('Starting time',{exact:true});await time.fill('10:05');await time.press('Tab');
       await expect(panel(root,type).locator('.appscreen-clock')).toHaveText('10:05');
       await page.locator('#undo-builder').click();await expect(src).toHaveValue(edited);
     }
@@ -87,7 +87,7 @@ test('starting and step date edits preserve other state with exact Undo/Redo',as
     else{
       const patch=guide.locator('.patchedit').filter({has:page.locator(':scope > summary').filter({hasText:new RegExp('^'+id+' ·')})});
       if(await patch.getAttribute('open')===null)await patch.locator(':scope > summary').click();
-      input=patch.getByLabel('date',{exact:true});
+      input=patch.getByLabel('Date',{exact:true});
     }
     const before=await src.inputValue();await input.fill('Sun, Sep 27');await input.press('Tab');
     await expect(panel(root,type).locator(selector)).toHaveText('Sun, Sep 27');

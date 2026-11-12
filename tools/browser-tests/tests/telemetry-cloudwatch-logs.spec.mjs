@@ -18,8 +18,10 @@ test('desktop Logs editor variables round-trip, imported cards and Proof show co
  await openMetricsFold(guide,'Signal rate');let before=await source.inputValue();const field=guide.getByLabel('rate query',{exact:true});await field.fill(JSON.stringify(edited));await field.press('Tab');
  await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.edges[0].telemetry.signals.rate.cloudwatchLogs).toEqual(edited);
  let after=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);
- await page.locator('#status-board-settings').click();await openBoardSection(guide,'environments');const variables=guide.getByLabel('stg metrics variables',{exact:true});await expect(variables).toHaveValue(JSON.stringify(spec.page.tracking.telemetry.environments.stg.variables));
- before=await source.inputValue();await variables.fill(JSON.stringify({...spec.page.tracking.telemetry.environments.stg.variables,topic:'camera_message_power_state'}));await variables.press('Tab');
+ // #1240: environment variables are key/value rows.
+ await page.locator('#status-board-settings').click();await openBoardSection(guide,'environments');
+ for(const [index,[name,value]] of Object.entries(Object.entries(spec.page.tracking.telemetry.environments.stg.variables))){await expect(guide.getByLabel('stg environment variable '+(+index+1)+' name',{exact:true})).toHaveValue(name);await expect(guide.getByLabel('stg environment variable '+(+index+1)+' value',{exact:true})).toHaveValue(value);}
+ before=await source.inputValue();await guide.getByLabel('New stg environment variable name',{exact:true}).fill('topic');const variables=guide.getByLabel('New stg environment variable value',{exact:true});await variables.fill('camera_message_power_state');await variables.press('Enter');
  await expect.poll(async()=>JSON.parse(await source.inputValue()).page.tracking.telemetry.environments.stg.variables.topic).toBe('camera_message_power_state');
  after=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await page.locator('#redo-builder').click();await expect(source).toHaveValue(after);
  const input=path.join(server.root,'logs.spec.json'),output=path.join(server.root,'logs.html');await writeFile(input,after);execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output],{stdio:'pipe'});

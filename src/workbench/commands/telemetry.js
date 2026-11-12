@@ -822,7 +822,15 @@ function telemetryVariableRowValue(current,edit){
    Carrier scope: the selected carrier. Import scope (as): every node and connection of that import,
    except one whose own variables set the name (they win). The message names the carrier and signal. */
 function telemetryVariableBlocked(raw,target,context,as,name,value){
-  var resolved;try{resolved=typeof FlowTopology!=='undefined'?FlowTopology.resolveSource(raw,context):raw;}catch(ex){return null;}
+  /* Import scope (review c2): the resolver copies the import's variables into every carrier it owns, so
+     shadowing is read from a copy resolved without them: what is left is the provider's binding and the
+     board's overlay, the variables that win over the import's. */
+  var source=raw;
+  if(as!=null){
+    source=telemetryClone(raw);var paths=specSectionPaths(source)[target.section],d0=paths && specValueAt(source,paths.diagram);
+    (telemetryObject(d0) && Array.isArray(d0.topologyImports)?d0.topologyImports:[]).forEach(function(imp){if(telemetryObject(imp) && imp.as===as)delete imp.variables;});
+  }
+  var resolved;try{resolved=typeof FlowTopology!=='undefined'?FlowTopology.resolveSource(source,context):source;}catch(ex){return null;}
   var rec=specSectionPaths(resolved)[target.section],d=rec && specValueAt(resolved,rec.diagram);if(!telemetryObject(d))return null;
   var templates=telemetryPageTemplates(resolved),carriers=[],prefix=as==null?null:as+'::';
   if(prefix==null){
@@ -856,9 +864,10 @@ function planCarrierTelemetry(text,raw,target,edit,context){
     var current=importScope?before.importVariables.value:before.variables && before.variables.own;
     if(current!=null && !telemetryObject(current))return {error:'These variables are not an object; repair them in JSON first.'};
     var next=telemetryVariableRowValue(current,edit);if(next.error)return next;
-    // review c1: an added or changed value is checked for that one name, in every carrier it reaches.
-    if(edit.action==='add' || edit.action==='value'){
-      var block=telemetryVariableBlocked(raw,target,context,importScope?before.importVariables.as:null,edit.name,next.value[edit.name]);
+    // review c1/c2: an added, changed or renamed value is checked for its (new) name, in every carrier it reaches.
+    if(edit.action==='add' || edit.action==='value' || edit.action==='rename' && edit.to!==edit.name){
+      var checked=edit.action==='rename'?edit.to:edit.name;
+      var block=telemetryVariableBlocked(raw,target,context,importScope?before.importVariables.as:null,checked,next.value[checked]);
       if(block)return {error:block};
     }
     var whole=Object.keys(next.value).length?JSON.stringify(next.value):null;

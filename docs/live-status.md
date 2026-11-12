@@ -699,9 +699,10 @@ which applies to every node and connection from that import
 environment variables: **New node variable name** and **value** (or connection, or
 **import <as>**), then **Add … variable** or Enter; each row renames, changes or is
 removed in place, one Undo step each. A value must pass the scoped-value allowlist
-(letters, digits, `_ . @ : -` and spaces). An added or changed value is checked for
-that one name in every signal it reaches (this carrier, or for an import every node and
-connection of the import that does not set the name itself); one that would keep a
+(letters, digits, `_ . @ : -` and spaces). An added, changed or renamed value is checked
+under its (new) name in every signal it reaches (this carrier, or for an import every node
+and connection of the import whose provider binding or board overlay does not set the
+name itself); one that would keep a
 signal from being sent is refused, naming the carrier, the signal and the viewer's
 reason. Renaming or removing a variable a signal of this carrier uses is refused too.
 Validator warnings sit under the row they name, and variables that are not an object

@@ -1639,7 +1639,9 @@ is refused and the reason names the flag, and a failed resolution writes nothing
 provider. The resolved board is what the viewer shows: inherited signals with their
 [narrowing](#narrowing-inherited-signals), `needsNarrow` and [scoped variables](#variable-scopes).
 A signal the viewer would not show is never queried and is one recorded error with the viewer's
-reason (carrier id and signal name), such as an unmet `needsNarrow`. It takes today's state only (no Over time history). Every request ends after 30 s or at
+reason (carrier id and signal name), such as an unmet `needsNarrow`. With `--resolve-imports`, the
+provider boards' queries (SQL included) run with your own Grafana, Honeycomb and Jira credentials.
+Resolve imports only from a repository folder or registry you trust. It takes today's state only (no Over time history). Every request ends after 30 s or at
 `--timeout` (default 60 s), and the process exits once its line is printed.
 
 Credentials come from the environment and are never written to the snapshot:

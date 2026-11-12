@@ -101,6 +101,8 @@ function telemetryLogsFragmentProblem(fragment){
   var command='a Logs Insights narrowing is one filter command';
   if(typeof fragment!=='string' || !fragment.trim())return command;
   if(/[\r\n]/.test(fragment))return 'a narrowing is one line';
+  // No \ at all: the check never depends on how Logs Insights reads escapes (#1356 review c3).
+  if(fragment.indexOf('\\')>=0)return 'a Logs Insights narrowing may not contain \\';
   // A board's fragment is masked for strings only: any / left is refused (#1356 review c2).
   var t=fragment.trim(),m=telemetryNarrowMask(t,'"\'`');
   if(m===null)return 'its quotes are unbalanced';
@@ -202,6 +204,7 @@ function telemetryLogsPlace(query,commands){
   var before=at<0?parts:parts.slice(0,at);
   // Only commands known to keep every row's fields may come before the filter (#1356 review c2).
   var unknown=before.filter(function(p){var w=(/^[A-Za-z]+/.exec(p.masked) || [''])[0].toLowerCase();return TELEMETRY_LOGS_BEFORE_FILTER.indexOf(w)<0;})[0];
+  if(unknown && /(?:\blike|=~)\s*\//i.test(m))return {kind:'placement',error:'This Logs Insights query has a regex after like or =~ that Flowview cannot read, so a filter cannot be added safely; it is not shown.'};
   if(unknown){var word=(/^[A-Za-z]+/.exec(unknown.masked) || [''])[0];return {kind:'placement',error:'This Logs Insights query has '+(word?'a '+word+' command':'an empty command')+' before its stats, so a filter cannot be added safely; it is not shown.'};}
   var added=commands.map(function(c){return c.trim();}).join(' | ');
   if(at<0)return {query:query.replace(/\s+$/,'')+' | '+added};

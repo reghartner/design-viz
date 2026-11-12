@@ -3292,15 +3292,16 @@ fails closed:
   else (a `}`, `or`, `unless`, a trailing comma, an unquoted value) is refused.
 - Logs Insights: one `filter` command; a `|`, `#` or newline is refused, and so is any
   `/` outside a quoted string: no regex literal and no division ("a Logs Insights
-  narrowing may not contain / (use like "text" or a quoted string)"). `like "text"`
-  works, but pins nothing.
+  narrowing may not contain / (use like "text" or a quoted string)"). A `\` is refused
+  too, so the check never depends on how Logs Insights reads escapes (use the other
+  quote kind). `like "text"` works, but pins nothing.
 - In the provider's Logs Insights query, a `/regex/` is read only after `parse` and its
   field at the start of a command, or after `like`, `not like` or `=~` that follow an
   operand; any other `/` is a division. The provider's text is kept as written: the
   filter is spliced in at one point. Before that point only `fields`, `filter`,
   `filterIndex`, `parse`, `sort`, `unmask`, `unnest` and `SOURCE` may appear; any
   other command (`limit`, `dedup`, `pattern`, `diff` …) is not shown, named in the
-  reason.
+  reason; so is a regex after `like` or `=~` that Flowview cannot read.
 
 - **Merge.** Fragments accumulate in order: the provider's, then each importing level's
   (an identical fragment once). The provider's query stays literal, so its later

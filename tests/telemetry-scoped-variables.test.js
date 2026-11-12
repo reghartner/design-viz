@@ -14,6 +14,10 @@
 | V6 | Validator, on pages with a live-status panel only: a ${name} no scope sets, per environment profile, warns at the signal naming the environments and where to set it. |
 | V7 | The reason for an unset variable names the import, the node or connection and the environment. |
 | V8 | Shape warnings for bad scoped variables (reserved, bad name, empty, not a string), at their path; compatibility declares flow.telemetry-scoped-variables. |
+| V9 | (#1359 review c1 minor 1) The scan skips provider comments (SQL -- and block comments, PromQL, LogQL and Logs Insights #): an apostrophe in a comment never makes a bare placeholder look in-string; a placeholder inside a comment fails closed. |
+| V10 | (minor 2) A value in a SQL LIKE or ILIKE pattern string may hold no % or _. |
+| V11 | (minor 3) label_replace string arguments and LogQL regexp and pattern strings take the regex rule. |
+| V12 | (minor 4) TraceQL strings are "…" and `…` only: a ' does not open a string, so a placeholder after it takes the bare-token rule. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const loader=require('../tools/source-loader.cjs');
@@ -146,4 +150,50 @@ test('V8 shape warnings and compatibility',()=>{
   assert.ok(features(consumer([{spec:'provider',export:'core',as:'fc',variables:{code:'x'}}])).includes('flow.telemetry-scoped-variables'));
   assert.ok(features(spec('l',{nodes:{a:{telemetry:{kind:'service',variables:{code:'x'},signals:{s:{grafana:'up'}}}}},rows:[['a']]})).includes('flow.telemetry-scoped-variables'));
   assert.ok(!features(consumer([{spec:'provider',export:'core',as:'fc'}])).includes('flow.telemetry-scoped-variables'));
+});
+
+const scopedRun=(signal,vars)=>{const p=provider(signal);const c=consumer([{spec:'provider',export:'core',as:'fc',variables:vars}]);return sent(c,[p,c],'fc::dcf');};
+const unsafe=(name,why)=>'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';
+const BARE='outside a string it may hold only letters, digits and . _ : - @';
+
+test('V9 comments: an apostrophe in a comment never opens a string; a placeholder in a comment fails closed',()=>{
+  const sql={sql:"SELECT count(*) FROM events -- don't count tests\nWHERE code = ${code}"};
+  for(const v of ["x' OR '1'='1",'1 OR 1=1','*/ OR 1=1 --'])assert.equal(scopedRun(sql,{code:v}).error,unsafe('code',BARE),v);
+  assert.equal(scopedRun(sql,{code:'42'}).query,"SELECT count(*) FROM events -- don't count tests\nWHERE code = 42");
+  const block={sql:"SELECT count(*) FROM events /* it's the main table */ WHERE code = ${code}"};
+  assert.equal(scopedRun(block,{code:'1 OR 1=1'}).error,unsafe('code',BARE));
+  for(const q of ["SELECT count(*) FROM events -- ${code}\nWHERE 1=1","SELECT count(*) FROM events /* ${code} */"])assert.equal(scopedRun({sql:q},{code:'x'}).error,unsafe('code','it sits in a comment of the provider\'s query'),q);
+  const prom={grafana:'sum(rate(x_total{job="dcf"}[5m])) # it\'s ${code}'};
+  assert.equal(scopedRun(prom,{code:'x'}).error,unsafe('code','it sits in a comment of the provider\'s query'));
+  const logs={cloudwatchLogs:{logGroups:['g'],query:"filter a = 1 # it's\n| filter code = ${code} | stats count() as n",region:'us-east-1',valueField:'n'}};
+  assert.equal(scopedRun(logs,{code:'1 or 1=1'}).error,unsafe('code',BARE));
+  const loki={loki:'sum(count_over_time({app="dcf"} | code=${code} [5m])) # "'};
+  assert.equal(scopedRun(loki,{code:'"} or vector(1) #'}).error,unsafe('code',BARE));
+});
+
+test('V10 a SQL LIKE or ILIKE pattern string takes no % or _',()=>{
+  for(const op of ['LIKE','ilike','NOT LIKE']){
+    const q={sql:"SELECT count(*) FROM events WHERE code "+op+" '${code}'"};
+    for(const v of ['a%','a_b'])assert.equal(scopedRun(q,{code:v}).error,unsafe('code','it is filled into a LIKE pattern and holds % or _'),op+' '+v);
+    assert.equal(scopedRun(q,{code:'FULL'}).error,undefined,op);
+    assert.equal(scopedRun(q,{code:"x' OR '1'='1"}).error,unsafe('code','it would end the string it is filled into'));
+  }
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM events WHERE code = '${code}'"},{code:'a%'}).error,undefined,'= takes % literally');
+});
+
+test('V11 label_replace arguments and LogQL regexp and pattern strings take the regex rule',()=>{
+  const regex='it is filled into a regex and holds regex characters';
+  assert.equal(scopedRun({grafana:'label_replace(up{job="dcf"}, "dst", "$1", "src", "${code}")'},{code:'.*'}).error,unsafe('code',regex));
+  assert.equal(scopedRun({grafana:'label_replace(up{job="dcf"}, "dst", "$1", "src", "${code}")'},{code:'abc'}).error,undefined);
+  for(const stage of ['regexp','pattern'])assert.equal(scopedRun({loki:'sum(count_over_time({app="dcf"} | '+stage+' "${code}" [5m]))'},{code:'.*'}).error,unsafe('code',regex),stage);
+  assert.equal(scopedRun({grafana:'up{job="dcf", code="${code}"}'},{code:'.*'}).error,undefined,'a plain matcher string takes it literally');
+});
+
+test('V12 TraceQL: \' is not a string quote',()=>{
+  const q={tempo:"{ span.code = '${code}' }"};
+  assert.equal(scopedRun(q,{code:'x" || span.any = "'}).error,unsafe('code',BARE));
+  assert.equal(scopedRun(q,{code:'line\nbreak'}).error,unsafe('code',BARE));
+  assert.equal(scopedRun({tempo:'{ span.code = "${code}" }'},{code:'FULL'}).error,undefined);
+  assert.equal(scopedRun({tempo:'{ span.code = `${code}` }'},{code:'a`b'}).error,unsafe('code','it would end the string it is filled into'));
+  assert.equal(scopedRun({tempo:'{ span.code =~ "${code}" }'},{code:'.*'}).error,unsafe('code','it is filled into a regex and holds regex characters'));
 });

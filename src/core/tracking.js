@@ -298,15 +298,15 @@ function telemetryScopedVariables(value,warn,at){
    the query's meaning. One character allowlist covers every language and position (no quote, \,
    brace, bracket, angle bracket, %, *, |, #, / or $ can be filled in, so no value can end a string,
    template or comment in any dialect), plus a few coarse gates: SQL the scan cannot read, a SQL
-   query that uses patterns or regexes, a regex position, a [range], a bare comparison operand. */
+   query that uses patterns or regexes, a regex position, a [range], a bare value. */
 // String quotes per language. TraceQL strings are "…" and `…` only (Tempo's lexer); a ' is not one.
 var TELEMETRY_SCOPED_QUOTES={loki:'"`',grafana:'"\'`',tempo:'"`',sql:'\'"`',cloudwatchLogs:'"\'`'};
 var TELEMETRY_SCOPED_TOKEN='[A-Za-z0-9_.@:]+(?:-[A-Za-z0-9_.@:]+)*';
 var TELEMETRY_SCOPED_BARE=new RegExp('^'+TELEMETRY_SCOPED_TOKEN+'$'),TELEMETRY_SCOPED_SPACED=new RegExp('^'+TELEMETRY_SCOPED_TOKEN+'(?: +'+TELEMETRY_SCOPED_TOKEN+')*$');
 var TELEMETRY_SCOPED_ALLOWED='a telemetry variable may hold only letters, digits and _ . @ : - (and spaces inside a string)';
-var TELEMETRY_SCOPED_COMPARED='it is compared with a field, where only a number or a duration may be filled in';
+var TELEMETRY_SCOPED_NUMERIC='outside a string only a number or a duration may be filled in here';
 var TELEMETRY_SCOPED_SQL_PATTERN='in a SQL query that uses patterns or regexes, a variable may not hold _ or .';
-var TELEMETRY_TRACE_ENUMS=['error','ok','unset','server','client','producer','consumer','internal','unspecified'];
+var TELEMETRY_TRACE_ENUMS={status:['error','ok','unset'],kind:['unspecified','internal','server','client','producer','consumer']};
 /* SQL readability gate (VARTEST-1359): dialect forms the scan cannot follow in step. Any of them
    makes every scoped value in the query refused, naming the form. */
 function telemetrySqlUnreadable(text){
@@ -329,20 +329,29 @@ function telemetrySqlUnreadable(text){
   return null;
 }
 // Patterns and regexes anywhere in a SQL query: a scoped value there may not hold _ or . (VARTEST-1359).
-var TELEMETRY_SQL_PATTERNS=/\b(?:i?like|similar|regexp|rlike)\b|\bregexp_\w+|~|\bsubstring\b[\s\S]*\bfrom\b/i;
-/* Is a bare placeholder part of a comparison operand (#1359 review c4, VARTEST-1359)? It is when
-   only an arithmetic expression (names, numbers, + - * / %, calls, parentheses) stands between it
-   and = <> != < > <= >= == =~ !~ (PromQL: also a comparison's bool), when it is in IN ( … ) or
-   IN [ … ], or in BETWEEN … AND …. There a field name would compare a field with a field. */
-var TELEMETRY_SCOPED_EXPR_STOP=/\b(?:and|or|where|from|select|when|then|else|end|case|on|join|having|group|order|limit|union|filter|stats|fields|sort|by|without|ignoring|offset)\b/i;
-function telemetryScopedComparison(source,text,index,end){
-  var before=text.slice(0,index).replace(/\s+$/,''),after=text.slice(end).replace(/^\s+/,'');
-  var lead=/(?:<>|!=|<=|>=|==|=~|!~|=|<|>)(?:\s*bool)?([\w\s.@()+\-*\/%,]*)$/i.exec(before),trail=/^([\w\s.@()+\-*\/%,]*?)(?:<>|!=|<=|>=|==|=~|!~|=(?![>=])|<(?!-)|>)/.exec(after);
-  var op=lead && !TELEMETRY_SCOPED_EXPR_STOP.test(lead[1]) || trail && !TELEMETRY_SCOPED_EXPR_STOP.test(trail[1]);
-  var list=(source==='sql' || source==='cloudwatchLogs') && (/\bin\s*\([^()]*$/i.test(before) || /\bin\s*\[[^\[\]]*$/i.test(before));
-  var between=source==='sql' && (/\bbetween$/i.test(before) || /\bbetween\s+\S+\s+and$/i.test(before));
-  if(!(op || list || between))return null;
-  return {enums:source==='tempo' && /(?:^|[\s{(.:])(?:status|kind)\s*!?=$/.test(before)};
+var TELEMETRY_SQL_PATTERNS=/\b(?:i?like|similar|regexp|rlike|patindex)\b|\bregexp_\w+|~|\bsubstring\b[\s\S]*\bfrom\b/i;
+/* #1359 c5: a bare placeholder (outside any string) takes only a number or a duration, in every
+   language, except in a short named list of positions where it takes a plain token: a PromQL or
+   LogQL label list in by / without / on / ignoring / group_left / group_right ( … ), a SQL table
+   name right after FROM or JOIN, and a TraceQL status or kind comparison, which takes its enum
+   keywords. A SQL IS also takes NULL, TRUE or FALSE. */
+function telemetryScopedBarePosition(source,text,index,end){
+  // Strings and comments are masked first, so a slot keyword inside one never counts.
+  var mask=source==='sql'?/'[^']*'|"[^"]*"|`[^`]*`|--[^\n]*|\/\*[\s\S]*?\*\//g:/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`|#[^\n]*/g;
+  var before=text.slice(0,index).replace(mask,'\u0001').replace(/\s+$/,''),after=text.slice(end).replace(mask,'\u0001').replace(/^\s+/,'');
+  if((source==='grafana' || source==='loki') && /\b(?:by|without|on|ignoring|group_left|group_right)\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*$/.test(before) && /^(?:,\s*[A-Za-z_][A-Za-z0-9_]*\s*)*\)/.test(after))return 'label';
+  // A table name: after JOIN, or after the FROM of a SELECT at the same parenthesis depth (not
+  // IS DISTINCT FROM, substring(… FROM …), EXTRACT(… FROM …) or TRIM(… FROM …)).
+  if(source==='sql' && /\bjoin$/i.test(before))return 'table';
+  if(source==='sql' && /\bfrom$/i.test(before) && !/\bdistinct\s+from$/i.test(before)){
+    var bare=before,depth=0,open=-1;
+    for(var i=bare.length-1;i>=0;i--){if(bare[i]===')')depth++;else if(bare[i]==='('){if(depth===0){open=i;break;}depth--;}}
+    if(/\bselect\b/i.test(bare.slice(open+1)))return 'table';
+  }
+  var enumOf=source==='tempo' && /(?:^|[\s{(.:])(status|kind)\s*!?=$/.exec(before);
+  if(enumOf)return enumOf[1];
+  if(source==='sql' && /\bis(?:\s+not)?$/i.test(before))return 'is';
+  return null;
 }
 /* Where a placeholder sits: a forward scan that skips strings (with their escapes) and comments
    (SQL -- and block comments; # in PromQL, LogQL and Logs Insights) and keeps the call each (
@@ -363,7 +372,7 @@ function telemetryScopedPlacement(source,text,index,end){
   }
   if(!quote){
     var range=(source==='grafana' || source==='loki') && brackets>0;
-    return {string:false,range:range,compare:range?null:telemetryScopedComparison(source,text,index,end)};
+    return {string:false,range:range,position:telemetryScopedBarePosition(source,text,index,end)};
   }
   // A string that never closes after the placeholder is not one the scan can read.
   var k=end;
@@ -399,7 +408,7 @@ function telemetryScopedValueProblem(source,query,scoped,fragments){
       else if(at.string && at.regex && value.indexOf('.')>=0)why='it is filled into a regex and holds regex characters';
       else if(source==='sql' && TELEMETRY_SQL_PATTERNS.test(texts[t]) && /[_.]/.test(value))why=TELEMETRY_SCOPED_SQL_PATTERN;
       else if(!at.string && at.range && value.indexOf(':')>=0)why='inside a range it may not hold :, which turns the range into a subquery';
-      else if(!at.string && at.compare && !telemetryScopedNumber(value) && !(at.compare.enums && TELEMETRY_TRACE_ENUMS.indexOf(value)>=0))why=TELEMETRY_SCOPED_COMPARED;
+      else if(!at.string && !telemetryScopedNumber(value) && !(at.position==='label' || at.position==='table' || (at.position==='status' || at.position==='kind') && TELEMETRY_TRACE_ENUMS[at.position].indexOf(value)>=0 || at.position==='is' && /^(?:null|true|false)$/i.test(value)))why=TELEMETRY_SCOPED_NUMERIC;
       if(why)return 'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';
     }
   }

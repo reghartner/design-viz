@@ -3391,20 +3391,28 @@ literal, never expanded, and the same in every environment.
     string argument in PromQL or LogQL other than a matcher in its selector, a LogQL
     `regexp` or `pattern` string) a value may not hold `.`.
   - **SQL patterns.** If a SQL query uses `LIKE`, `ILIKE`, `SIMILAR`, `~`, `REGEXP`,
-    `RLIKE`, a `regexp_…` function or `substring … from` anywhere, no value in it may hold
-    `_` or `.`, wherever it sits. A value such as `full_charge` needs a query compared
-    with `=` only.
-  - **Comparisons.** A bare value that is (part of) a comparison operand takes only a
-    number or a duration (`200`, `0.25`, `1.5e3`, `5m`, `1h30m`, `250ms`): next to `=`,
-    `<>`, `!=`, `<`, `>`, `<=`, `>=`, `==`, `=~` or `!~` with only an arithmetic expression
-    between (`0 + ${n}`, `lower(${n})`, `-${n}`), inside `IN ( … )`, or in
-    `BETWEEN … AND …`. A field name there would compare a field with a field. TraceQL
-    `status` and `kind` comparisons also take `error`, `ok`, `unset`, `server`, `client`,
-    `producer`, `consumer`, `internal` and `unspecified`.
+    `RLIKE`, `PATINDEX`, a `regexp_…` function or `substring … from` anywhere, no value in
+    it may hold `_` or `.`, wherever it sits. A value such as `full_charge` needs a query
+    compared with `=` only.
+  - **Bare values are numbers.** Outside a string a value takes only a number or a
+    duration (`200`, `0.25`, `1.5e3`, `5m`, `1h30m`, `250ms`), in every language and every
+    position: comparisons (including PromQL `> bool …` and Logs Insights `in [ … ]`),
+    arithmetic, function arguments, `IN ( … )`, `BETWEEN`, `LIMIT`, `OFFSET`. A field name
+    there would compare or count a field instead of a literal. A plain token is allowed only
+    in these positions:
+    - a PromQL or LogQL label list in `by`, `without`, `on`, `ignoring`, `group_left` or
+      `group_right ( … )`;
+    - a SQL table name right after `JOIN`, or after the `FROM` of a `SELECT` (not
+      `IS DISTINCT FROM` or a `FROM` inside a call such as `EXTRACT`);
+    - a TraceQL `status` comparison, which takes `error`, `ok` or `unset`, and a `kind`
+      comparison, which takes `unspecified`, `internal`, `server`, `client`, `producer` or
+      `consumer`.
+    A SQL `IS` (or `IS NOT`) also takes `NULL`, `TRUE` or `FALSE`.
   - **Ranges.** Inside a PromQL or LogQL `[range]` a value may not hold `:` (it would make
     a subquery).
-  - **Comments.** The scan skips the provider's comments (SQL `--` and block comments;
-    `#` in PromQL, LogQL and Logs Insights). A placeholder inside one is refused. TraceQL
+  - **Comments and strings.** The scan skips the provider's comments (SQL `--` and block
+    comments; `#` in PromQL, LogQL and Logs Insights). A placeholder inside one is refused.
+    A placeholder in a string that never closes is refused in every language. TraceQL
     strings are `"…"` and `` `…` `` only.
   - **SQL the scan cannot read.** A SQL query with any of these refuses every scoped
     value, naming the form: a string that never closes, a `[bracket]` identifier,

@@ -98,6 +98,45 @@ for(const stacked of [false,true])test(`bottom panel ${stacked?'overlapping anot
   await expect(disclosure).toHaveText('Hide arrangement controls');await expect(disclosure).toHaveAttribute('aria-expanded','true');await expect(fields).toBeVisible();
 });
 
+/* #1375 (Chuck, 2026-11-12): a valid tile move or resize lands on the first
+   try, also when an Inspector edit is still pending: the edit is saved and the
+   gesture lands, each as its own Undo step. */
+async function tileGrid(tile){return tile.evaluate(el=>{const g=el.closest('.section-layout-grid'),r=g.getBoundingClientRect(),scale=g.offsetWidth?r.width/g.offsetWidth:1;return {cell:(g.clientWidth+8)*scale/24,row:40*scale};});}
+async function tileDrag(page,handle,dx,dy){
+  await handle.scrollIntoViewIfNeeded();const box=await handle.boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+  await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:8});await page.mouse.up();
+}
+const homeItem=text=>JSON.parse(text).page.blocks[0].diagram.layouts[0].sectionLayout.default.find(it=>it.panel==='home');
+test('Arrange tile move and resize land on the first try with an Inspector edit pending',async({page,server})=>{
+  const source=await open(page,server);
+  await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
+  await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
+  const outline=page.locator('#workspace-window-outline .workspace-window-close');if(await outline.isVisible())await outline.click();
+  const title=page.locator('#guide').getByLabel('Name',{exact:true}),tile=page.locator('[data-layout-key="panel:home"]');
+  await expect(title).toHaveValue('Doorbell');
+  const {cell,row}=await tileGrid(tile);
+  await title.fill('Pending before move');
+  await tileDrag(page,tile.locator('.section-tile-move'),4*cell,-8*row);
+  console.log('#1375 tile move feedback:',JSON.stringify(await page.locator('.fnote').allTextContents()));
+  await expect(page.locator('#src')).toHaveValue(/Pending before move/);
+  expect(homeItem(await page.locator('#src').inputValue())).toMatchObject({x:12,y:16,w:4,h:8});
+  await expect.poll(()=>tile.evaluate(el=>['--tile-x','--tile-y','--tile-w','--tile-h'].map(k=>Number(el.style.getPropertyValue(k))))).toEqual([13,17,4,8]);
+  const moved=await page.locator('#src').inputValue();
+  await expect(title).toBeVisible();await title.fill('Pending before resize');
+  await tileDrag(page,tile.locator('.section-tile-resize'),2*cell,2*row);
+  console.log('#1375 tile resize feedback:',JSON.stringify(await page.locator('.fnote').allTextContents()));
+  await expect(page.locator('#src')).toHaveValue(/Pending before resize/);
+  expect(homeItem(await page.locator('#src').inputValue())).toMatchObject({x:12,y:16,w:6,h:10});
+  await expect.poll(()=>tile.evaluate(el=>['--tile-x','--tile-y','--tile-w','--tile-h'].map(k=>Number(el.style.getPropertyValue(k))))).toEqual([13,17,6,10]);
+  // Undo: resize, then the second edit, then the move, then the first edit.
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(/Pending before resize/);
+  expect(homeItem(await page.locator('#src').inputValue())).toMatchObject({x:12,y:16,w:4,h:8});
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(moved);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(/Pending before move/);
+  expect(homeItem(await page.locator('#src').inputValue())).toMatchObject({x:8,y:24,w:4,h:8});
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+});
+
 test('Standard arrangement drag keeps the scrolled desktop viewport stable',async({page,server},testInfo)=>{
   await page.setViewportSize({width:1280,height:720});
   const raw=fixture(),d=raw.page.blocks[0].diagram;

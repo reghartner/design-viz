@@ -33,7 +33,8 @@ test('W1 desktop: narrowing an imported signal in Inspect makes the viewer send 
   await fold.getByLabel('sent add narrowing',{exact:true}).fill('| code="FULL"');
   await fold.getByRole('button',{name:'Add sent narrowing',exact:true}).click();
   await expect.poll(overlay).toEqual({extends:true,signals:{sent:{narrow:{loki:['| code="FULL"']}}}});
-  const narrowed=await openMetricsFold(guide,'Signal sent · inherited');
+  // A narrowed inherited signal is changed here, so its fold title says so (#1266 naming).
+  const narrowed=await openMetricsFold(guide,'Signal sent · inherited, changed here');
   await expect(narrowed.getByLabel('sent query sent',{exact:true})).toHaveValue('sum(count_over_time({app="dcf"} | json | code="FULL" [5m]))');
   await expect(narrowed).not.toContainText('Not shown:');
   const saved=await source.inputValue();

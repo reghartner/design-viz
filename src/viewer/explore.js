@@ -14,7 +14,7 @@ function exploreHandOffPress(ev,handle,key){
   if(exploreGestureHandoff || !exploreGestureStarts || !document.elementFromPoint)return;
   var root=document,hit=null;
   for(var depth=0;depth<8;depth++){var next=root.elementFromPoint(ev.clientX,ev.clientY);if(!next || next===hit)break;hit=next;if(!hit.shadowRoot)break;root=hit.shadowRoot;}
-  var target=hit && hit.closest && hit.closest('button'),start=target && target!==handle && exploreGestureStarts.get(target);
+  var target=hit && hit.closest && hit.closest('button,.explore-window-edge'),start=target && target!==handle && exploreGestureStarts.get(target);
   if(!start || exploreHandleKey(target)!==key)return;
   exploreGestureHandoff=true;
   try{start(ev);}finally{exploreGestureHandoff=false;}
@@ -314,7 +314,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(Math.abs(dx)<1 && x>1 && x<board.scrollWidth-board.clientWidth-1)marginX+=dx;
     if(Math.abs(dy)<1 && y>1 && y<board.scrollHeight-board.clientHeight-1)marginY+=dy;
     board.style.setProperty('--explore-margin-x',marginX+'px');board.style.setProperty('--explore-margin-y',marginY+'px');
-    objectLayer.style.transform='translate('+marginX+'px,'+marginY+'px) scale('+graphScale()+')';
+    objectLayer.style.transform='translate('+marginX+'px,'+marginY+'px) scale('+graphScale()+')';objectLayer.style.setProperty('--explore-graph-scale',String(graphScale()));
     rememberStableCamera();
   }
   function scrollState(){
@@ -666,7 +666,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       extent.x=Math.min(extent.x,follow.x);extent.y=Math.min(extent.y,follow.y);extent.w=right-extent.x;extent.h=bottom-extent.y;
     }
     marginX=Math.max(board.clientWidth*2,-extent.x*graphScale()+board.clientWidth);marginY=Math.max(board.clientHeight*2,-extent.y*graphScale()+board.clientHeight);
-    objectLayer.style.transform='translate('+marginX+'px,'+marginY+'px) scale('+graphScale()+')';
+    objectLayer.style.transform='translate('+marginX+'px,'+marginY+'px) scale('+graphScale()+')';objectLayer.style.setProperty('--explore-graph-scale',String(graphScale()));
     board.style.setProperty('--explore-width',graphPixels+'px');
     board.style.setProperty('--explore-margin-x',marginX+'px');board.style.setProperty('--explore-margin-y',marginY+'px');
     var svg=board.querySelector('.boardcanvas>svg'),graphHeight=svg && svg.viewBox.baseVal.width?graphPixels*svg.viewBox.baseVal.height/svg.viewBox.baseVal.width:0;

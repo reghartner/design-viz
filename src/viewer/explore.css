@@ -77,23 +77,37 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
 .explore-window-edge[data-edge="se"]{bottom:0;right:0;cursor:nwse-resize;}
 :not(.explore-stacked)>.explore-window-edge[data-edge="se"],.explore-stacked>.explore-window-edge[data-edge="sw"]{display:none;}
 [data-explore-width-locked]>.explore-window-edge:is([data-edge="n"],[data-edge="s"]){display:none;}
-/* Floating windows place their strips just outside the border, so the strips
-   cover no content, scrollbar or header control and take no space from the
-   body. The window stops clipping; the body clips its own rounded corners and
-   the header pads 8px on the right so Hide clears the corner square. Step
-   controls keep their strips inside; their content already pads 10px. */
+/* Floating windows: strips straddle the border, 4px out and 4px in. Stacked
+   windows are 8px apart, so neighbouring strips meet without overlapping. The
+   window stops clipping; the body clips its own rounded corners and keeps a
+   4px right gutter so the e strip clears its scrollbar. The header pads 8px on
+   the right so Hide clears the corner square. Step controls keep their strips
+   inside; their content already pads 10px. */
 .explore-stage>.explore-window{overflow:visible;}
-.explore-stage>.explore-window>.explore-window-body{border-radius:0 0 calc(11px / var(--explore-overlay-scale,1)) calc(11px / var(--explore-overlay-scale,1));}
+.explore-stage>.explore-window>.explore-window-body{width:calc((100% - 4px) / var(--explore-overlay-scale,1));border-radius:0 0 calc(11px / var(--explore-overlay-scale,1)) calc(11px / var(--explore-overlay-scale,1));}
 .explore-stage>.explore-window>.explore-window-resize{border-bottom-right-radius:11px;}
 .explore-stage>.explore-window>.explore-window-header{padding-right:8px;}
-.explore-stage>.explore-window>.explore-window-edge[data-edge="n"]{top:-8px;}
-.explore-stage>.explore-window>.explore-window-edge[data-edge="s"]{bottom:-8px;}
-.explore-stage>.explore-window>.explore-window-edge[data-edge="e"]{right:-8px;}
-.explore-stage>.explore-window>.explore-window-edge[data-edge="w"]{left:-8px;}
-.explore-stage>.explore-window>.explore-window-edge[data-edge="nw"]{top:-8px;left:-8px;}
-.explore-stage>.explore-window>.explore-window-edge[data-edge="ne"]{top:-8px;right:-8px;}
-.explore-stage>.explore-window>.explore-window-edge[data-edge="sw"]{bottom:-8px;left:-8px;}
-.explore-stage>.explore-window>.explore-window-edge[data-edge="se"]{bottom:-8px;right:-8px;}
+.explore-stage>.explore-window>.explore-window-edge[data-edge="n"]{top:-4px;}
+.explore-stage>.explore-window>.explore-window-edge[data-edge="s"]{bottom:-4px;}
+.explore-stage>.explore-window>.explore-window-edge[data-edge="e"]{right:-4px;}
+.explore-stage>.explore-window>.explore-window-edge[data-edge="w"]{left:-4px;}
+.explore-stage>.explore-window>.explore-window-edge[data-edge="nw"]{top:-4px;left:-4px;}
+.explore-stage>.explore-window>.explore-window-edge[data-edge="ne"]{top:-4px;right:-4px;}
+.explore-stage>.explore-window>.explore-window-edge[data-edge="sw"]{bottom:-4px;left:-4px;}
+.explore-stage>.explore-window>.explore-window-edge[data-edge="se"]{bottom:-4px;right:-4px;}
+/* Canvas windows and canvas step controls live in graph units; their strips
+   divide by the zoom so they stay 8px (corners 14px) on screen, straddling
+   the border. */
+.explore-canvas-objects>:is(.explore-window,.explore-player){--edge:calc(8px / var(--explore-graph-scale,1));--corner:calc(14px / var(--explore-graph-scale,1));--out:calc(-4px / var(--explore-graph-scale,1));}
+.explore-canvas-objects>*>.explore-window-edge[data-edge="n"]{top:var(--out);left:var(--corner);right:var(--corner);height:var(--edge);}
+.explore-canvas-objects>*>.explore-window-edge[data-edge="s"]{bottom:var(--out);left:var(--corner);height:var(--edge);}
+.explore-canvas-objects>*>.explore-window-edge[data-edge="e"]{right:var(--out);top:var(--corner);width:var(--edge);}
+.explore-canvas-objects>*>.explore-window-edge[data-edge="w"]{left:var(--out);top:var(--corner);bottom:var(--corner);width:var(--edge);}
+.explore-canvas-objects>*>.explore-window-edge:is([data-edge="nw"],[data-edge="ne"],[data-edge="sw"],[data-edge="se"]){width:var(--corner);height:var(--corner);}
+.explore-canvas-objects>*>.explore-window-edge[data-edge="nw"]{top:var(--out);left:var(--out);}
+.explore-canvas-objects>*>.explore-window-edge[data-edge="ne"]{top:var(--out);right:var(--out);}
+.explore-canvas-objects>*>.explore-window-edge[data-edge="sw"]{bottom:var(--out);left:var(--out);}
+.explore-canvas-objects>*>.explore-window-edge[data-edge="se"]{bottom:var(--out);right:var(--out);}
 .explore-window-edge:hover,.viewport-gesturing .explore-window-edge:active{background:color-mix(in srgb,var(--acc) 35%,transparent);}
 .explore-window :focus-visible,.explore-panel-menu summary:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
 .explore-player{position:absolute;z-index:20;left:var(--float-x);top:var(--float-y);width:var(--float-w);height:var(--float-h);box-sizing:border-box;overflow:hidden;overscroll-behavior:contain;border:1px solid var(--explore-border);border-radius:12px;box-shadow:0 6px 22px #14244224;background:var(--explore-bg);}

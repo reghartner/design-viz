@@ -16,12 +16,12 @@ const CURSORS={n:'ns-resize',s:'ns-resize',e:'ew-resize',w:'ew-resize',ne:'nesw-
 const SIDES=['nw','n','ne','e','se','s','sw','w'];
 async function box(locator){return locator.evaluate(el=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height].map(Math.round);});}
 function near(got,want,tolerance=1){return got.every((v,i)=>Math.abs(v-want[i])<=tolerance);}
-// Strips inside a window (step controls, canvas windows) are pressed 3px in, and
-// corners 6px in, clear of the 12px rounded corner. A floating window's strips
-// sit outside its border and are pressed 3px outside (inset -3); its
-// bottom-right is the resize button inside the window.
+// Strips inside a window (step controls) are pressed 3px in, and corners 6px
+// in, clear of the 12px rounded corner. Floating and canvas windows' strips
+// straddle the border (4px out, 4px in) and are pressed 2px outside (inset
+// -2); a floating window's bottom-right is the resize button inside it.
 function pointFor(r,edge,outside=false){
-  const inset=outside && edge!=='se'?-3:edge.length===2?6:3;
+  const inset=outside && edge!=='se'?-2:edge.length===2?6:3;
   return [edge.includes('w')?r[0]+inset:edge.includes('e')?r[0]+r[2]-inset:r[0]+r[2]/2,edge.includes('n')?r[1]+inset:edge.includes('s')?r[1]+r[3]-inset:r[1]+r[3]/2];
 }
 function outward(edge){return [edge.includes('w')?-40:edge.includes('e')?40:0,edge.includes('n')?-30:edge.includes('s')?30:0];}
@@ -114,7 +114,7 @@ test('canvas windows show edge handles only while selected; width-locked windows
   for(const edge of SIDES.filter(e=>e!=='se'))expect(await shown(notes,edge),`selected ${edge}`).toBe(true);
   // An ordinary canvas window: the north-west corner moves only the top and left sides.
   const before=await page.locator('#src').inputValue(),old=savedCanvas(before,'prose'),start=await box(notes),scale=start[2]/old.w;
-  await pointerDrag(page,pointFor(start,'nw'),-40,-30);
+  await pointerDrag(page,pointFor(start,'nw',true),-40,-30);
   const moved=await page.locator('#src').inputValue(),now=savedCanvas(moved,'prose');
   expect(near([now.x,now.y,now.w,now.h],[old.x-40/scale,old.y-30/scale,old.w+40/scale,old.h+30/scale]),`notes: ${JSON.stringify(old)} -> ${JSON.stringify(now)} at scale ${scale}`).toBe(true);
   expect(near([now.x+now.w,now.y+now.h],[old.x+old.w,old.y+old.h])).toBe(true);
@@ -123,10 +123,32 @@ test('canvas windows show edge handles only while selected; width-locked windows
   await clip.focus();await expect(clip).toHaveAttribute('aria-current','true');await closeTools(page);
   expect(await shown(clip,'n')).toBe(false);expect(await shown(clip,'s')).toBe(false);expect(await shown(clip,'w')).toBe(true);
   const clipBefore=await page.locator('#src').inputValue(),clipOld=savedCanvas(clipBefore,'clip'),clipStart=await box(clip),clipScale=clipStart[2]/clipOld.w;
-  await pointerDrag(page,pointFor(clipStart,'w'),-48,0);
+  await pointerDrag(page,pointFor(clipStart,'w',true),-48,0);
   const clipNow=savedCanvas(await page.locator('#src').inputValue(),'clip'),outer=await clip.evaluate(el=>el.offsetHeight);
   expect(Math.abs(clipNow.w-(clipOld.w+48/clipScale))).toBeLessThanOrEqual(1);
   expect(Math.abs(clipNow.x+clipNow.w-(clipOld.x+clipOld.w))).toBeLessThanOrEqual(1);
   expect(Math.abs(clipNow.h-outer)).toBeLessThanOrEqual(1);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(clipBefore);
+});
+
+test('stacked windows 8px apart: a press in the gap drags the nearer border only',async({page,server})=>{
+  await page.setViewportSize({width:1600,height:1000});
+  const raw=JSON.parse(floatingSpec()),d=raw.page.blocks[0].diagram;
+  d.panels.push({id:'below',type:'state',title:'Below panel',states:['Ready'],initial:{state:'Ready'}});
+  d.layouts[0].sectionLayout.default.push({panel:'below',x:8,y:8,w:4,h:6});
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
+  const upper=page.locator('[data-explore-panel=home]'),lower=page.locator('[data-explore-panel=below]');
+  await expect(upper).toHaveClass(/explore-stacked/);await expect(lower).toHaveClass(/explore-stacked/);
+  const [[top,a],[bottom,b]]=[[upper,await box(upper)],[lower,await box(lower)]].sort((p,q)=>p[1][1]-q[1][1]);
+  const edgeAt=point=>page.evaluate(([x,y])=>{const hit=document.elementFromPoint(x,y),owner=hit && hit.closest('[data-explore-panel]');return (hit && hit.getAttribute('data-edge'))+'|'+(owner && owner.getAttribute('data-explore-panel'));},point);
+  const gap=b[1]-(a[1]+a[3]);expect(gap).toBeGreaterThanOrEqual(7);expect(gap).toBeLessThanOrEqual(9);
+  // 2px below the upper window: its bottom edge, not the lower window's top.
+  const point=[a[0]+a[2]/2,a[1]+a[3]+2];
+  expect(await edgeAt(point)).toBe('s|'+await top.getAttribute('data-explore-panel'));
+  await pointerDrag(page,point,0,20);
+  const grown=await box(top);expect(near(grown,[a[0],a[1],a[2],a[3]+20]),`upper: ${grown}`).toBe(true);
+  await expect(bottom).toHaveClass(/explore-stacked/);
+  // 2px above the lower window's top border: the lower window's top edge.
+  await page.locator('#undo-builder').click();await expect.poll(async()=>near(await box(top),a)).toBe(true);
+  const c=await box(bottom);expect(await edgeAt([c[0]+c[2]/2,c[1]-2])).toBe('n|'+await bottom.getAttribute('data-explore-panel'));
 });

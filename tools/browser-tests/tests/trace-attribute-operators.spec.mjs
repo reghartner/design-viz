@@ -22,9 +22,19 @@ test('A1 desktop: a starts-with attribute on an imported connection\'s span is s
   const fold=page.locator('#guide details.trace-spans-editor');await expect(fold).toHaveCount(1);
   if(!await fold.evaluate(el=>el.open))await fold.locator(':scope > summary').click();
   const before=await source.inputValue();
-  const name=fold.getByLabel('send new attribute name',{exact:true});await name.click();await page.keyboard.type(A);
-  const value=fold.getByLabel('send new attribute value',{exact:true});await value.click();await page.keyboard.type('prd');
+  /* Local run 142af956: the Inspect form can rebuild once more after the connection is selected, and a rebuild
+     for a new selection drops unsaved New attribute text (the name typed first was lost, the value kept). Type
+     both, then make sure both are still there before Add; type again into a field a rebuild emptied. */
+  const name=fold.getByLabel('send new attribute name',{exact:true}),value=fold.getByLabel('send new attribute value',{exact:true});
+  async function typeInto(field,text){await field.click();await field.press('ControlOrMeta+a');await field.press('Backspace');await page.keyboard.type(text);}
+  await expect(async()=>{
+    if(await name.inputValue()!==A)await typeInto(name,A);
+    if(await value.inputValue()!=='prd')await typeInto(value,'prd');
+    await page.waitForTimeout(300);
+    expect(await name.inputValue()).toBe(A);expect(await value.inputValue()).toBe('prd');
+  }).toPass({timeout:10000});
   await fold.getByLabel('send new attribute match',{exact:true}).selectOption('startsWith');
+  await expect(name).toHaveValue(A);
   await fold.getByRole('button',{name:'Add attribute to send',exact:true}).click();
   const overlay=async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.topologyImports[0].edgeTracking?.['a->b']?.trace;
   await expect.poll(overlay).toEqual({spans:{send:{attributes:{[A]:{startsWith:'prd'}}}}});

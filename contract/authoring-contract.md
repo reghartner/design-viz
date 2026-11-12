@@ -1088,6 +1088,10 @@ perspectives" of one timeline). Types:
   declares it. Status stays in the runtime provider, never the exported spec.
   See [Live status panel](../docs/live-status.md#live-status-panel) for provider,
   coverage navigation and demo behavior.
+- `status-controls` — optional, beside `live-status`: the Status header's view controls
+  (Jira | Trace, Metrics, Live | Over time, the day, Refresh) in their own panel:
+  `{"id":"controls","type":"status-controls","title":"Status controls"}`. No authored state.
+  While it is shown the `live-status` panel omits them; hidden or absent, they return there.
 - `edit-history` — the board's hand-written save history (`page.editHistory`), read-only:
   `{"id":"history","type":"edit-history","title":"Edit history"}`.
   Lists `page.editHistory` newest first: one collapsible row per entry with the

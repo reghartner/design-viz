@@ -625,6 +625,8 @@ function buildPanels(asideEl, d, skin, options) {
           index: homeAmbient ? -1 : si};
         if (active && !printing) renderHost(hosts[pid], animate && shown);
       });
+      // #1371: a Status controls panel shown or hidden by this step moves the controls into or out of the Status panel.
+      if (typeof liveStatusPanelVisibility === 'function') liveStatusPanelVisibility();
     },
   };
 }

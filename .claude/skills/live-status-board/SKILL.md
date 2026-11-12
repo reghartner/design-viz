@@ -193,6 +193,10 @@ controls; no reader menu is needed. Use all three host profiles.
 }
 ```
 
+Optional: a `status-controls` panel (`{"id":"controls","type":"status-controls","title":"Status controls"}`)
+takes the view controls (Jira | Trace, Metrics, Live | Over time, the day, Refresh) out of the Status panel. For an
+Explore View, show it and hide the Status panel in that View's tiles. See `docs/live-status.md` § Live status panel.
+
 The `edit-history` panel (#827) lists the entries of `page.editHistory`
 (the board's Edit mode appends one per Save; your own change adds one agent
 entry, section 4b)

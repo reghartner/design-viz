@@ -452,8 +452,16 @@ five collapsible sections: **Jira**, **Metrics**, **Traces**, **Environments**
 and **Log searches**. Sections start closed, with a short status in each
 header; Metrics starts open when the page has a `tracking.telemetry` block. A
 section with validator warnings starts open and its header counts them, and
-each section lists the warnings for its own `tracking` paths. Dependencies,
-dependency link names and no-activity days are edited in JSON for now.
+each section lists the warnings for its own `tracking` paths. **Jira** (#1237) also
+edits `tracking.dependencies` (rows of **Ticket**, **Waits on** and an optional
+**Reason**, with Move up, Move down and Remove; **New dependency** plus **Add
+dependency** or Enter adds one; keys are upper-cased, and a self-dependency or a
+repeated pair is refused), `tracking.jira.dependencyLinks` (**"Waits on" link
+names**: the defaults are listed while unset; **Add link name** keeps them and adds
+the name; **Use default link names** removes the key) and `tracking.staleDays`
+(**No activity after (days)**: in-progress tickets only; empty uses 7). Each edit is one Undo step, entries the
+form cannot read stay as written, and a validator warning sits under the field it
+names. The Jira header counts the dependencies.
 **Traces** (#1239) edits `tracking.telemetry.traceConnections`
 ([trace connections](trace-connections.md)): each company profile of the build is
 **Inherited** (no board map), **Use** or **Disable**; the first Use or Disable lists every

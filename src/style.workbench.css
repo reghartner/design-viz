@@ -878,6 +878,16 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .board-section>.frow,.board-section>.fnote,.board-section>div,.board-section>ul{margin-top:6px;}
 .board-section>fieldset.metrics-settings{min-width:0;margin:0;padding:0;border:0;}
 .board-settings-link{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+/* #1237 Status board settings → Jira: dependencies, link names, no activity. */
+.board-jira-group{min-width:0;margin:10px 0 0;padding:8px;border:1px solid var(--line);border-radius:7px;}
+.board-jira-group>legend{padding:0 4px;font-weight:650;}
+.board-jira-group>.fnote,.board-jira-group>.frow{margin-top:6px;}
+.board-dependency{margin-top:8px;padding-top:6px;border-top:1px solid var(--line);}
+.board-dependency .frow{margin-top:4px;}
+.board-dependency-actions{margin-top:6px;gap:6px;}
+.board-link-name{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;}
+.board-link-name>span{min-width:0;overflow-wrap:anywhere;}
+.board-field-warning{margin:2px 0;padding-left:6px;border-left:3px solid #D99A1E;color:var(--ink);}
 .board-make{margin:6px 0;}
 /* builder: selection highlight on the rendered page (svg + widget cards) */
 .docview .grp, .docview .node, .docview .edge, .docview .halo, .docview .coin,

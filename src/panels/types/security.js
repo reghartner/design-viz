@@ -228,7 +228,8 @@
             return context.commit('scene', value == null ? null : JSON.stringify(value));
           }, true);
           Array.prototype.forEach.call(select.options, function (option) {
-            option.textContent = option.value ? (SCENE_LABELS[option.value] || option.value) : 'Default (static noise)';
+            if (!option.value) option.textContent = 'Default (static noise)';
+            else if (SCENE_NAMES.indexOf(option.value) >= 0) option.textContent = SCENE_LABELS[option.value] || option.value;
           });
           select.setAttribute('aria-label', 'Default camera scene');
           return context.controls.row('Default camera scene', select);

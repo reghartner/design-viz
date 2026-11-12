@@ -72,6 +72,7 @@ function panelFieldAssignment(field,raw,mode){
   if(kind==='num'){
     var number=Number(text);if(!isFinite(number))return {error:key+': "'+text+'" is not a number'};
     if(extra && (number<extra.min || number>extra.max))return {error:key+': use a number from '+extra.min+' to '+extra.max};
+    if(extra && extra.integer && !Number.isSafeInteger(number))return {error:key+': use a whole number'};
     return {value:number};
   }
   if(kind==='bool'){

@@ -34,6 +34,7 @@ function createPanelKeyedStateComposer(context,options,entries){
     if(entry.scalar && (value===undefined || value===null || typeof value==='number')){
       var number=controls.number(value,function(next){
         if(next!==null && next<0){context.error('Enter a non-negative value.');return false;}
+        if(next!==null && entry.integer && !Number.isSafeInteger(next)){context.error((entry.label || entry.id)+': enter a whole number.');return false;}
         return change(entry.id,null,next===null?undefined:next);
       });number.setAttribute('aria-label',(entry.label || entry.id)+' value');
       card.appendChild(controls.row(entry.unit?'Value ('+entry.unit+')':'Value',number));
@@ -45,6 +46,7 @@ function createPanelKeyedStateComposer(context,options,entries){
       /* Numeric snapshot fields commit numbers, never their text. */
       var input=field.kind==='num'?controls.number(cur,function(next){
         if(next!==null && field.min!=null && next<field.min){context.error(field.label+' must be '+field.min+' or more.');return false;}
+        if(next!==null && field.integer && !Number.isSafeInteger(next)){context.error(field.label+' must be a whole number.');return false;}
         return commit(next);
       }):field.options?controls.select(field.options,cur,commit,true):controls.text(cur,commit);
       if(field.options && input.options.length)input.options[0].textContent='Use default';

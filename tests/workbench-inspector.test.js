@@ -829,3 +829,29 @@ test('#1000 security setup scene is a dropdown of camera scenes',()=>{
   scene.value=other;scene.fire('change');h.flush();
   assert.equal(JSON.parse(h.text).panels[0].scene,other);h.session.undo();assert.equal(h.text,before);
 });
+
+test('#1000 counts and positions accept whole numbers only, with a visible reason',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[
+    {id:'f',type:'funnel',stages:[{id:'intake',label:'Received'},{id:'review',label:'Reviewed'}]},
+    {id:'r',type:'replicas',replicas:[{id:'primary',label:'Primary'}]}
+  ],steps:[{panels:{f:{counts:{intake:90}},r:{reference:{series:'log',position:5},replicas:{primary:{series:'log',position:4}}}}}]};
+  const h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();const before=h.text;
+  for(const [label,pattern] of [['Reviewed value',/whole number/],['Primary Position',/whole number/],['Position',/whole number/]]){
+    h.inspector.render();const input=aria(h.guide,label);assert.ok(input,label);
+    input.value='12.5';input.fire('change');h.flush();
+    assert.equal(h.text,before,label+' rejects a decimal');
+    assert.match(h.guide.querySelector('.ierr').textContent,pattern,label+' shows the reason');
+  }
+});
+
+test('#1000 trace span rows keep error flags and require service and name',()=>{
+  const spans=[{id:'request',service:'api',name:'handle',startMs:0,ms:100},{id:'db',parentId:'request',service:'db',name:'query',startMs:5,ms:20,error:true}];
+  const e=environment(),h=e.mount({nodes:{},rows:[[]],panels:[{id:'t',type:'trace',spans,initial:{selected:'request'}}]});
+  h.inspector.render();const before=h.text;
+  const names=h.guide.querySelectorAll('[aria-label="Name"]');assert.equal(names.length,2);
+  names[1].value='slow query';names[1].fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].spans[1],{...spans[1],name:'slow query'});
+  h.session.undo();assert.equal(h.text,before);h.inspector.render();
+  const service=h.guide.querySelectorAll('[aria-label="Service"]')[1];service.value='';service.fire('change');h.flush();
+  assert.equal(h.text,before,'a blank service is refused');assert.match(h.guide.querySelector('.ierr').textContent,/service is required/);
+});

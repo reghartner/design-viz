@@ -280,7 +280,7 @@ PanelRegistry.define('funnel', {
         return createPanelKeyedStateComposer(context, options, (Array.isArray(options.panel.stages) ? options.panel.stages : []).filter(function (stage) {
           return panelObject(stage) && typeof stage.id === 'string' && stage.id;
         }).map(function (stage) {
-          return { id: stage.id, label: stage.label || stage.id, scalar: true };
+          return { id: stage.id, label: stage.label || stage.id, scalar: true, integer: true };
         }));
       } };
     },

@@ -868,6 +868,10 @@ unchanged. In Proof:
 `proofVerdicts(input, {endToEndMetrics: true})` in `src/core/proof.js` is the one
 engine for the panel, the canvas cues and the step caption.
 
+In the desktop Workbench, **Status board settings → Metrics → End-to-end metrics
+applied** sets the flag (checked writes `true`, unchecked removes the key; one
+Undo step). An invalid authored value shows its warning next to the checkbox.
+
 ### Metrics and proof authoring
 
 Agent authors load the live-status board skill's conditional

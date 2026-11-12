@@ -82,12 +82,14 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
    window stops clipping. The body sits above the strips, so their inner half
    never takes a click or scrollbar press from it; it keeps a 4px right gutter
    where the e strip's inner half stays usable (a left gutter would cost content
-   width), and clips its own rounded corners. The header pads 8px on the right so Hide clears the corner
+   width), and clips its own rounded corners. The header also sits above the
+   strips, so the n strip's inner half never covers the grip or Hide (Linux
+   fonts put the grip within 4px of the top). The header pads 8px on the right so Hide clears the corner
    square. Step controls keep their strips inside; their content pads 10px. */
 .explore-stage>.explore-window{overflow:visible;}
 .explore-stage>.explore-window>.explore-window-body{position:relative;z-index:3;width:calc((100% - 4px) / var(--explore-overlay-scale,1));border-radius:0 0 calc(11px / var(--explore-overlay-scale,1)) calc(11px / var(--explore-overlay-scale,1));}
 .explore-stage>.explore-window>.explore-window-resize{border-bottom-right-radius:11px;}
-.explore-stage>.explore-window>.explore-window-header{padding-right:8px;}
+.explore-stage>.explore-window>.explore-window-header{padding-right:8px;position:relative;z-index:3;}
 .explore-stage>.explore-window>.explore-window-edge[data-edge="n"]{top:-4px;}
 .explore-stage>.explore-window>.explore-window-edge[data-edge="s"]{bottom:-4px;}
 .explore-stage>.explore-window>.explore-window-edge[data-edge="e"]{right:-4px;}

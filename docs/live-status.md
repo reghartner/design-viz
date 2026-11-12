@@ -3285,7 +3285,8 @@ before the narrowing is applied.
   across levels, so a re-exporter can require more, never less. A replacing binding
   (no `extends`) keeps the provider carrier's requirement on every signal it writes, so
   a restated query is not shown unless it narrows too; the validator warns at the
-  overlay.
+  overlay. A signal an `extends` overlay adds to such a carrier keeps the same
+  requirement, with the same warning: `needsNarrow` belongs to the canon carrier.
 - **Fail closed.** The signal is not queried and reads unobserved, with the reason in
   Proof ("Not shown: …") and the Metrics note, when: `needsNarrow` is unmet; a fragment is in another source's
   language (also after a source switch); a fragment is malformed; the Honeycomb query

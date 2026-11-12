@@ -298,7 +298,14 @@ var FlowTopology = (function(){
       else{
         if(note)telemetryPatchFindings(value.telemetry,addition.telemetry,carrier,note);
         // Hiding every signal leaves no binding for this consumer: the carrier is quietly unbound.
+        var carrierNeeds=telemetryCarrierNeeds(value.telemetry),inheritedSignals=object(value.telemetry) && object(value.telemetry.signals)?value.telemetry.signals:{};
         var merged=mergeTelemetry(value.telemetry,addition.telemetry);
+        // A signal this overlay adds keeps the carrier's needsNarrow too (#1353): it belongs to the canon carrier.
+        if(carrierNeeds && object(merged.signals) && object(addition.telemetry.signals))Object.keys(addition.telemetry.signals).forEach(function(name){
+          if(own(inheritedSignals,name) || !object(merged.signals[name]))return;
+          merged.signals[name].needsNarrow=telemetryNeedsMerge(merged.signals[name].needsNarrow,carrierNeeds);
+          if(note)note('warning','.signals.'+name,'this signal is added to the provider\'s binding on '+carrier+', whose signals must be narrowed'+(carrierNeeds===true?'':' by '+telemetryList(carrierNeeds))+'; it keeps that requirement');
+        });
         if(object(merged.signals) && Object.keys(merged.signals).length)value.telemetry=merged;else delete value.telemetry;
       }
     }

@@ -130,7 +130,7 @@ test('cost editor changes starting volume and rates with exact Undo/Redo',async(
   const root=page.locator('#docview'),guide=page.locator('#guide'),source=page.locator('#src');
   await inspectPageElement(page,root.locator('.pt-cost .ptitle'));
   const initial=guide.locator('.initialedit');await openInspectorGroup(initial);
-  const messages=initial.getByLabel('messages',{exact:true});
+  const messages=initial.getByLabel('Workload volume',{exact:true});
   await messages.fill('10000000');await messages.press('Tab');
   await expect(root.locator('.cost-total')).toHaveText(['USD 32.00','USD 26.00']);
   const changed=await source.inputValue();expect(changed).not.toBe(original);
@@ -144,6 +144,10 @@ test('cost editor changes starting volume and rates with exact Undo/Redo',async(
   expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.panels[0].items[1].node).toBe('bus');
   await page.locator('#undo-builder').click();await expect(source).toHaveValue(changed);
   await inspectPageElement(page,root.locator('.pt-cost .ptitle'));
+  // Display density sits in the collapsed Advanced section (#999).
+  const advanced=guide.locator('details.panel-setup-advanced');
+  const openAdvanced=async()=>{if(await advanced.getAttribute('open')===null)await advanced.locator(':scope > summary').click();};
+  await openAdvanced();
   const density=guide.getByLabel('Display density',{exact:true});
   await density.selectOption('compact');
   await expect(root.locator('.cost-panel')).toHaveClass(/cost-compact/);
@@ -153,7 +157,7 @@ test('cost editor changes starting volume and rates with exact Undo/Redo',async(
   await page.locator('#undo-builder').click();await expect(source).toHaveValue(changed);
   await page.locator('#redo-builder').click();await expect(source).toHaveValue(compact);
   await inspectPageElement(page,root.locator('.pt-cost .ptitle'));
-  await density.selectOption('expanded');
+  await openAdvanced();await density.selectOption('expanded');
   await page.setViewportSize({width:390,height:844});
   // CSS zoom can round the computed layout height by a fraction of a pixel.
   expect(await root.locator('.cost-plot').first().evaluate(el=>parseFloat(getComputedStyle(el).height))).toBeCloseTo(230,0);

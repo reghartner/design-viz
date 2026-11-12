@@ -330,14 +330,34 @@ PanelRegistry.extend('replicas', {
     },
     setupFields: [
       ['unit', 'text'],
-      ['replicas', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }], max: 8 }],
+      ['replicas', 'rows', { cols: [{ k: 'id', label: 'Replica ID', req: true }, { k: 'label', label: 'Name' }], max: 8 }],
       ['initial', 'json'],
     ],
     patchFields: [
-      ['reference', 'json'],
+      ['reference', 'objf', [['series', 'text', null, { label: 'Sequence' }], ['position', 'num', { min: 0, max: Number.MAX_SAFE_INTEGER, integer: true }, { label: 'Position' }]]],
       ['replicas', 'json'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      reference: { label: 'Reference position', help: 'One complete reference: set Sequence and Position together. A reference missing either shows as unavailable.' },
+      replicas: { label: 'Replica observations', help: 'Setting this at a step replaces the earlier observations: replicas and fields left blank show as unknown. Use default removes that replica’s observation at this step.' },
+      note: { label: 'Explanation' },
+    },
+    editor: function (context) {
+      return { patchControl: function (field, options) {
+        if (field[0] !== 'replicas') return null;
+        return createPanelKeyedStateComposer(context, options, replicaPanelItems(options.panel).map(function (item) {
+          return { id: item.id, label: typeof item.label === 'string' && item.label ? item.label : item.id, fields: [
+            { key: 'series', label: 'Sequence' },
+            { key: 'position', label: 'Position', kind: 'num', min: 0, integer: true },
+            { key: 'role', label: 'Role' },
+            { key: 'status', label: 'Status', options: REPLICA_STATUSES },
+            { key: 'lagMs', label: 'Lag (ms)', kind: 'num', min: 0 },
+            { key: 'observedAt', label: 'Observed at' },
+          ] };
+        }));
+      } };
+    },
     picker: {
       order: 4,
       name: 'Replica positions',

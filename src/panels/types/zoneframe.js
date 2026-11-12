@@ -269,7 +269,7 @@ PanelRegistry.extend('zoneframe', {
     ],
     patchFields: [
       ['zones', 'jsonArr'],
-      ['subject', 'json'],
+      ['subject', 'objf', [['x', 'num', null, { label: 'X' }], ['y', 'num', null, { label: 'Y' }]]],
       ['verdict', 'enum', ['alert', 'suppress', 'never-captured']],
     ],
     picker: {

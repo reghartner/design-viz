@@ -168,7 +168,7 @@ test('long step groups start collapsed with tinted headers and retain keyboard-o
   await page.screenshot({path:info.outputPath('long-step-collapsed-short.png')});
   const state=guide.locator('details[data-panel-state="step"][data-panel-id="state"]');
   await state.locator(':scope > summary').focus();await page.keyboard.press('Enter');await expect(state).toHaveAttribute('open');
-  await state.getByLabel('state',{exact:true}).selectOption('ON');
+  await state.getByLabel('Current state',{exact:true}).selectOption('ON');
   await expect.poll(async()=>JSON.parse(await src.inputValue()).page.sections[0].diagram.steps[0].panels.state.state).toBe('ON');
   await expect(state).toHaveAttribute('open');
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);

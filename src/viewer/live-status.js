@@ -36,6 +36,17 @@ function liveStatusReadableTime(at,seconds){
   var day=d.getFullYear()===new Date().getFullYear()?{month:'short',day:'numeric'}:{month:'short',day:'numeric',year:'numeric'};
   return d.toLocaleDateString([],day)+', '+d.toLocaleTimeString([],seconds?{hour:'numeric',minute:'2-digit',second:'2-digit'}:{hour:'numeric',minute:'2-digit'});
 }
+// #1404: the end-to-end headline, then the carriers that keep it from being proven, by title.
+function liveStatusEndToEndSentence(e2e,carriers,unbound){
+  function titles(ids){return ids.map(function(id){var binding=carriers.find(function(b){return b.id===id;});return binding && binding.title || id;}).join(', ');}
+  function some(n,text){return n+' carrier'+(n===1?'':'s')+' '+text;}
+  var parts=[!e2e.counted?'No carrier has a proof limit, so nothing is claimed':e2e.headline];
+  if(e2e.complete)parts.push(e2e.proven+' of '+e2e.counted+' carriers with limits proven');
+  [['degraded','Degraded'],['error','Error'],['unproven','Unproven'],['unmeasured','Not measured']].forEach(function(pair){if(e2e[pair[0]].length)parts.push(pair[1]+': '+titles(e2e[pair[0]]));});
+  if(e2e.uncounted.length)parts.push(some(e2e.uncounted.length,'without a limit not counted'));
+  if(unbound)parts.push(some(unbound,'unbound'));
+  return parts.join(' · ')+'.';
+}
 function liveStatusProofPresentation(snapshot,window,includeUnobserved){
   if(!snapshot)return null;
   // Map keys, links and markers are not measurements. Use only already-resolved
@@ -59,8 +70,12 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
     if(bucket)counts[bucket]--;counts.error=(counts.error || 0)+1;
   });
   counts.neutral=counts.bound-counts.proven-counts.degraded-counts.unproven-counts.liveEarly-(counts.error || 0);
-  var arcs=['proven','degraded','error','unproven','liveEarly'].filter(function(key){return key!=='error' || counts.error;}).map(function(key){
-    var size=counts.bound?100*counts[key]/counts.bound:0,arc={key:key,count:counts[key],size:size,offset:offset};offset+=size;return arc;
+  // #1404: with tracking.endToEndMetrics the ring divides the counted carriers (those with a limit), not every bound one.
+  var e2e=snapshot.verdicts.endToEnd || null;
+  if(e2e){counts.counted=e2e.counted;counts.unmeasured=e2e.unmeasured.length;counts.uncounted=e2e.uncounted.length;}
+  var whole=e2e?counts.counted:counts.bound;
+  var arcs=['proven','degraded','error','unproven'].concat(e2e?[]:['liveEarly']).filter(function(key){return key!=='error' || counts.error;}).map(function(key){
+    var size=whole?100*counts[key]/whole:0,arc={key:key,count:counts[key],size:size,offset:offset};offset+=size;return arc;
   });
   var duration=/^(\d+)([smhdw])$/.exec(window),windowMs=duration?Number(duration[1])*({s:1000,m:60000,h:3600000,d:86400000,w:604800000})[duration[2]]:86400000;
   function number(value){return Number(value.toPrecision(4)).toLocaleString('en-US');}
@@ -95,7 +110,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
       return {measuredAt:measuredAt,start:start,end:end,span:span,points:plotted,line:continuous?plotted.map(function(p){return p.x+','+p.y;}).join(' '):null};
     }
     var main=plot(primary),measuredAt=main.measuredAt,start=main.start,end=main.end,span=main.span;
-    var markers=(sample && sample.markers || []).filter(function(m){return m.kind==='done' || m.kind==='deploy';}).map(function(m){return {at:Date.parse(m.at),label:m.label || m.kind,kind:m.kind};});
+    var markers=(sample && sample.markers || []).filter(function(m){return m.kind==='deploy' || m.kind==='done' && !e2e;}).map(function(m){return {at:Date.parse(m.at),label:m.label || m.kind,kind:m.kind};});
     if(result.since.doneAt)markers.push({at:Date.parse(result.since.doneAt),label:'Done',kind:'done'});
     markers=markers.filter(function(m,i,all){return isFinite(end) && m.at>=start && m.at<=end && !all.slice(0,i).some(function(other){return other.at===m.at && other.kind===m.kind;});});
     var url=null,authored=binding.links || {},provider=sample && sample.links || {};
@@ -109,6 +124,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
     var limited=telemetryMetricProofNames(binding).some(function(name){var limit=binding.proof[name];return !proofVerdicts.isTraceSignal(binding.signals[name]) && limit && (telemetryNumber(limit.min) || telemetryNumber(limit.max));});
     // No combined verdict while Jira is unknown does not erase measured evidence.
     var label=result.label;
+    if(e2e && !result.counted)label=(measured?'OBSERVED':'UNOBSERVED')+' · not counted, no limit';
     if(!label){
       label=result.telemetry==='silent'?'SILENT':result.telemetry==='degraded'?'DEGRADED':measured?(result.telemetry==='unobserved'?'OBSERVED · evidence incomplete':'OBSERVED'):'UNOBSERVED';
       if(result.jira==='unknown')label+=' · Jira status unavailable';
@@ -132,8 +148,8 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
         markers:markers.map(function(m){return {x:2+96*(m.at-start)/span,label:m.label,kind:m.kind};})}};
   });
   var predicates=rows.map(function(row){return row.predicate;}).filter(function(value,i,all){return all.indexOf(value)===i;});
-  return {counts:counts,arcs:arcs,rows:rows,window:window,historical:!!snapshot.historical,states:TELEMETRY_PROOF_BUCKET_STATES,
-    sentence:counts.proven+' of '+counts.bound+' bound carriers proven · '+counts.unproven+' Done carriers unproven · '+(counts.error?counts.error+' error · ':'')+counts.unbound+' carriers unbound.',
+  return {counts:counts,arcs:arcs,rows:rows,window:window,historical:!!snapshot.historical,states:TELEMETRY_PROOF_BUCKET_STATES,endToEnd:e2e,
+    sentence:e2e?liveStatusEndToEndSentence(e2e,snapshot.carriers,counts.unbound):counts.proven+' of '+counts.bound+' bound carriers proven · '+counts.unproven+' Done carriers unproven · '+(counts.error?counts.error+' error · ':'')+counts.unbound+' carriers unbound.',
     predicate:predicates.length===1?predicates[0]:'Proof thresholds are shown for each carrier below.'};
 }
 /* Runtime Activity consumes only accepted live observations. Reconciliation
@@ -1523,7 +1539,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // Display titles can repeat and are never telemetry lookup keys.
     var input=telemetryProofInput(function(fn){fn(trigger._liveCarrier.value,id,scope.page);},function(){},map,evidence.map,evidence.environment);
     evidence.carriers=evidence.carriers.filter(function(binding){return binding.id!==id;}).concat(input.carriers);
-    evidence.verdicts=proofVerdicts({carriers:evidence.carriers,jiraMap:map,telemetryMap:evidence.map});
+    evidence.verdicts=proofVerdicts({carriers:evidence.carriers,jiraMap:map,telemetryMap:evidence.map},evidence.verdicts.endToEnd?{endToEndMetrics:true}:undefined);
     var proof=liveStatusProofPresentation(evidence,telemetryWindow,telemetry.enabled());
     return proof && proof.rows.find(function(row){return row.id===id;}) || null;
   }

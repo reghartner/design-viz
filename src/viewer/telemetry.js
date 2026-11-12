@@ -187,7 +187,9 @@ var TELEMETRY_RATE_UNIT=/\/\s*(s|sec|second|m|min|minute|h|hr|hour|d|day)s?$/i;
 var TELEMETRY_STREAM_KINDS=['call','service'];
 var TELEMETRY_CUE_CLASSES=['dv-metrics-bound','dv-metrics-flowing','dv-metrics-degraded','dv-metrics-silent','dv-metrics-unobserved','dv-metrics-unmeasured','dv-metrics-ghosted'];
 var TELEMETRY_SEALS={proven:'proven','done-degraded':'degraded','active-failing':'degraded','testing-failing':'degraded','todo-failing':'degraded',degraded:'degraded',
-  'done-unproven':'unproven','active-live-early':'live-early','testing-live-early':'live-early','todo-already-live':'live-early'};
+  'done-unproven':'unproven','active-live-early':'live-early','testing-live-early':'live-early','todo-already-live':'live-early',
+  // #1404 end-to-end metrics verdicts.
+  unproven:'unproven',error:'degraded'};
 var TELEMETRY_SEAL_GLYPHS={proven:'M-3.2 .2L-1 2.4L3.4-2.2',degraded:'M0-3.6V.8M0 2.7V3',unproven:'M-3 3L3-3','live-early':'M-4 .5Q-2-2.5 0 .5T4 .5'};
 /* Timestamp geometry shared by node and edge mini charts. Missing spans are
    gaps, not interpolated traffic. Even a sole observation remains visible. */
@@ -437,8 +439,9 @@ function createTelemetry(page,options,hooks){
   }
   function verdicts(){
     return proofVerdicts(telemetryProofInput(typeof hooks.carriers==='function'?hooks.carriers:function(){},typeof hooks.diagrams==='function'?hooks.diagrams:function(){},
-      typeof hooks.jira==='function'?hooks.jira():{},map,environment,telemetryEnvironmentConfig(page,environment)));
+      typeof hooks.jira==='function'?hooks.jira():{},map,environment,telemetryEnvironmentConfig(page,environment)),proofOptions());
   }
+  function proofOptions(){return trackingEndToEndMetrics(page)?{endToEndMetrics:true}:undefined;}
   hooks.view=function(){return enabled && !retired?{map:map,pending:past?(past.pending || {}):pending,verdicts:verdicts()}:null;};
   hooks.jiraChanged=emit;
   function setStatus(next){Object.keys(next).forEach(function(key){status[key]=next[key];});}
@@ -756,7 +759,7 @@ function createTelemetry(page,options,hooks){
     snapshot:function(){
       var input=telemetryProofInput(hooks.carriers || function(){},hooks.diagrams || function(){},typeof hooks.jira==='function'?hooks.jira():{},map,environment,telemetryEnvironmentConfig(page,environment));
       return {environment:environment,environments:permitted?Object.keys(trackingTelemetry(page).environments || {}):[],available:available && !retired,enabled:enabled,map:copy(map),pending:enabled?copy(past?past.pending || {}:pending):{},status:copy(status),carriers:copy(input.carriers),
-        historical:!!past,window:past && past.window?copy(past.window):null,at:past && past.days[past.index]?past.days[past.index].at:null,verdicts:copy(proofVerdicts(input))};
+        historical:!!past,window:past && past.window?copy(past.window):null,at:past && past.days[past.index]?past.days[past.index].at:null,verdicts:copy(proofVerdicts(input,proofOptions()))};
     },
     verdicts:function(){return copy(verdicts());},
     status:function(){return copy(status);},

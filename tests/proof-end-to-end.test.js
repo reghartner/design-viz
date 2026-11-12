@@ -194,3 +194,11 @@ test('controller: tracking.endToEndMetrics true reaches the snapshot verdicts; o
     api.destroy();
   }
 });
+
+test('validator: tracking.endToEndMetrics accepts a boolean and warns on anything else', () => {
+  const raw = flag => ({page: {title: 'E2E', tracking: {telemetry: {}, ...(flag === undefined ? {} : {endToEndMetrics: flag})},
+    sections: [{diagram: {nodes: {a: {title: 'A'}}, rows: [['a']], panels: [{id: 's', type: 'live-status'}]}}]}});
+  const warned = flag => plain(C.validate(C.normalize(raw(flag))).warnings).filter(w => /endToEndMetrics/.test(w));
+  for (const flag of [true, false, undefined]) assert.deepEqual(warned(flag), [], String(flag));
+  for (const flag of ['true', 1, null, {}]) assert.deepEqual(warned(flag), ['tracking.endToEndMetrics: must be true or false — ignored'], JSON.stringify(flag));
+});

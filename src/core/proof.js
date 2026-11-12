@@ -37,7 +37,8 @@
        tickets, from a step ticketFilter, maps a carrier id to the tickets this
        step judges it by (trackingStepProofTickets); carrier verdicts keep their own.
 
-   options  Reserved for page-level telemetry settings; nothing is read today.
+   options  {endToEndMetrics}: page-level `tracking.endToEndMetrics` (#1404). Only
+            the boolean true changes anything; see End-to-end metrics below.
 
    Output
      {carriers: {id: {bound, jira, telemetry, verdict, label, failing, since: {doneAt, firstTrafficAt}}},
@@ -63,7 +64,32 @@
      degraded    a limit does not hold
      unobserved  a limit is pending
      unmeasured  no observed signal has an authored finite minimum
-     flowing     an observed finite minimum exists and every limit holds */
+     flowing     an observed finite minimum exists and every limit holds
+
+   End-to-end metrics (options.endToEndMetrics === true, #1404): Jira is not an
+   input. jira is null, since.doneAt is null and step ticket narrowing is not
+   used. A bound carrier is counted when at least one signal has a finite min or
+   max limit; it then gets one verdict, first match wins:
+     null       nothing observed yet, or a limit or rate-like signal is pending
+     error      a signal with role "error" is outside its limit
+     unproven   silent (0 across the window), or no traffic: a min not met or
+                no observed authored minimum
+     degraded   a max limit is breached while traffic flows (or no rate-like
+                signal exists to say otherwise)
+     proven     an observed minimum is met and every limit holds
+   Order: null (nothing observed), error, unproven (silent), null (a rate-like
+   signal pending), degraded, unproven (min not met), null (a limit pending),
+   unproven (no observed minimum), proven. Uncounted carriers have no verdict.
+   Each carrier gains counted: true|false; the output gains
+     endToEnd {counted, proven, complete, headline, degraded, error, unproven,
+               unmeasured, uncounted}
+   where the lists hold carrier ids, complete is true only when every counted
+   carrier is proven (counted > 0), and headline is 'End to end proven', 'N of M
+   proven', or null when no carrier is counted (nothing is claimed). rollups
+   count proven, degraded and unproven verdicts; error carriers are left to the
+   presentation's error count (#1201). A step takes the worst of its counted
+   carriers: error, degraded, unproven, then null if any is pending, else
+   proven. */
 
 var proofVerdicts = (function(){
   function isTraceSignal(s){ return !!s && (s.source === 'tempo' || s.source === 'honeycomb' && proofObject(s.query) && Object.prototype.hasOwnProperty.call(s.query, 'query_spec')); }
@@ -138,6 +164,10 @@ var proofVerdicts = (function(){
     return latest;
   }
 
+  PROOF_VERDICT_LABELS.unproven = 'UNPROVEN';
+  PROOF_VERDICT_LABELS.error = 'ERROR';
+  var PROOF_END_TO_END_COUNTS = {proven: ['proven'], degraded: ['degraded'], unproven: ['unproven']};
+
   Object.keys(PROOF_MATRIX).forEach(function(jira){ PROOF_MATRIX[jira].unmeasured = jira === 'done' ? 'done-traffic-unmeasured' : jira === 'none' ? null : jira; });
   PROOF_VERDICT_LABELS['done-traffic-unmeasured'] = 'DONE · traffic not measured';
   PROOF_TELEMETRY_ORDER.splice(2, 0, 'unmeasured');
@@ -206,7 +236,41 @@ var proofVerdicts = (function(){
     var minimumObserved = rateLike.some(function(name){ return readings[name] && proofObject(proof[name]) && proofNumber(proof[name].min) !== null; });
     var state = !observed ? 'unobserved' : silent ? 'silent' : rateLike.length && !traffic ? 'unobserved' :
       failing.length ? 'degraded' : pending ? 'unobserved' : !minimumObserved ? 'unmeasured' : 'flowing';
-    return {state: state, minimumObserved: minimumObserved, failing: failing, readings: readings, rateLike: rateLike};
+    return {state: state, minimumObserved: minimumObserved, failing: failing, readings: readings, rateLike: rateLike,
+      proof: proof, observed: observed, pending: pending, traffic: traffic};
+  }
+  /* #1404: a max limit (plain or ratio) that does not hold; min failures are not breaches. */
+  function proofMaxBreached(limit, reading, readings){
+    var max = proofNumber(limit.max);
+    if (max === null || !reading) return false;
+    if (typeof limit.maxRatioOf !== 'string') return reading.value > max;
+    var base = proofOwn(readings, limit.maxRatioOf);
+    return !!base && (base.value === 0 ? reading.value !== 0 : reading.value / base.value > max);
+  }
+  function proofCounted(judged){
+    return !!judged && Object.keys(judged.proof).some(function(name){
+      var limit = judged.proof[name];
+      return proofObject(limit) && (proofNumber(limit.min) !== null || proofNumber(limit.max) !== null);
+    });
+  }
+  function proofEndToEndVerdict(carrier, judged){
+    if (!judged.observed) return null;
+    if (judged.failing.some(function(name){ return proofObject(carrier.signals[name]) && carrier.signals[name].role === 'error'; })) return 'error';
+    if (judged.state === 'silent') return 'unproven';
+    if (judged.rateLike.length && !judged.traffic) return null;
+    if (judged.failing.some(function(name){ return proofMaxBreached(judged.proof[name], judged.readings[name], judged.readings); })) return 'degraded';
+    if (judged.failing.length) return 'unproven';
+    if (judged.pending) return null;
+    return judged.minimumObserved ? 'proven' : 'unproven';
+  }
+  function proofEndToEndStep(results){
+    var counted = results.filter(function(result){ return proofObject(result) && result.counted === true; });
+    if (!counted.length) return null;
+    var worst = ['error', 'degraded', 'unproven'].filter(function(verdict){
+      return counted.some(function(result){ return result.verdict === verdict; });
+    })[0];
+    if (worst) return worst;
+    return counted.every(function(result){ return result.verdict === 'proven'; }) ? 'proven' : null;
   }
   function proofFirstTraffic(judged, doneAt){
     var first = null;
@@ -244,8 +308,16 @@ var proofVerdicts = (function(){
     var jiraMap = proofObject(page.jiraMap) ? page.jiraMap : {}, telemetryMap = proofObject(page.telemetryMap) ? page.telemetryMap : {};
     var carriers = Object.create(null), steps = Object.create(null);
     var rollups = {bound: 0, unbound: 0, proven: 0, degraded: 0, unproven: 0, liveEarly: 0};
-    var inputs = Object.create(null);
+    var inputs = Object.create(null), endToEnd = proofObject(options) && options.endToEndMetrics === true;
+    function judgeEndToEnd(carrier){
+      var judged = proofTelemetry(carrier, proofOwn(telemetryMap, carrier.id)), counted = proofCounted(judged);
+      var verdict = counted ? proofEndToEndVerdict(carrier, judged) : null;
+      return {bound: !!judged, jira: null, telemetry: judged ? judged.state : null,
+        verdict: verdict, label: proofLabel(verdict), failing: judged ? judged.failing : [], counted: counted,
+        since: {doneAt: null, firstTrafficAt: judged ? proofISO(proofFirstTraffic(judged, null)) : null}};
+    }
     function judge(carrier, list){
+      if (endToEnd) return judgeEndToEnd(carrier);
       var tickets = (Array.isArray(list) ? list : []).filter(function(key){ return typeof key === 'string'; });
       var jira = proofJira(tickets, jiraMap), doneAt = jira === 'done' ? proofDoneAt(tickets, jiraMap) : null;
       var judged = proofTelemetry(carrier, proofOwn(telemetryMap, carrier.id));
@@ -260,20 +332,39 @@ var proofVerdicts = (function(){
       var result = judge(carrier, carrier.tickets);
       carriers[carrier.id] = result;inputs[carrier.id] = carrier;
       rollups[result.bound ? 'bound' : 'unbound']++;
-      Object.keys(PROOF_COUNTS).forEach(function(bucket){ if (PROOF_COUNTS[bucket].indexOf(result.verdict) >= 0) rollups[bucket]++; });
+      var buckets = endToEnd ? PROOF_END_TO_END_COUNTS : PROOF_COUNTS;
+      Object.keys(buckets).forEach(function(bucket){ if (buckets[bucket].indexOf(result.verdict) >= 0) rollups[bucket]++; });
     });
     (Array.isArray(page.steps) ? page.steps : []).forEach(function(step){
       if (!proofObject(step) || typeof step.id !== 'string' || Object.prototype.hasOwnProperty.call(steps, step.id)) return;
       var ids = (Array.isArray(step.carriers) ? step.carriers : []).filter(function(id, index, all){
         return typeof id === 'string' && all.indexOf(id) === index && Object.prototype.hasOwnProperty.call(carriers, id);
       });
-      var narrowed = proofObject(step.tickets) ? step.tickets : null;
-      var verdict = proofStepVerdict(ids.map(function(id){
+      var narrowed = !endToEnd && proofObject(step.tickets) ? step.tickets : null;
+      var results = ids.map(function(id){
         return narrowed && Object.prototype.hasOwnProperty.call(narrowed, id) ? judge(inputs[id], narrowed[id]) : carriers[id];
-      }));
+      });
+      var verdict = endToEnd ? proofEndToEndStep(results) : proofStepVerdict(results);
       steps[step.id] = {verdict: verdict, label: proofLabel(verdict)};
     });
-    return {carriers: carriers, rollups: rollups, steps: steps};
+    var output = {carriers: carriers, rollups: rollups, steps: steps};
+    if (endToEnd) output.endToEnd = proofEndToEndSummary(carriers);
+    return output;
+  }
+  function proofEndToEndSummary(carriers){
+    var summary = {counted: 0, proven: 0, complete: false, headline: null, degraded: [], error: [], unproven: [], unmeasured: [], uncounted: []};
+    Object.keys(carriers).forEach(function(id){
+      var result = carriers[id];
+      if (!result.bound) return;
+      if (!result.counted){ summary.uncounted.push(id); return; }
+      summary.counted++;
+      if (result.verdict === 'proven') summary.proven++;
+      else if (result.verdict === null) summary.unmeasured.push(id);
+      else summary[result.verdict].push(id);
+    });
+    summary.complete = summary.counted > 0 && summary.proven === summary.counted;
+    summary.headline = !summary.counted ? null : summary.complete ? 'End to end proven' : summary.proven + ' of ' + summary.counted + ' proven';
+    return summary;
   }
   proofVerdicts.isTraceSignal = isTraceSignal;
   proofVerdicts.counts = JSON.parse(JSON.stringify(PROOF_COUNTS));

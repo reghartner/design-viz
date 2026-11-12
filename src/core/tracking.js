@@ -812,6 +812,8 @@ function telemetryLookups(raw,warn){
   });
   return out;
 }
+// #1404: page-level `tracking.endToEndMetrics: true` makes Proof roll up from metric limits only (src/core/proof.js).
+function trackingEndToEndMetrics(page){return !!page && telemetryObject(page.tracking) && page.tracking.endToEndMetrics===true;}
 function trackingTelemetry(page,invalid){
   var warn=telemetryWarn(invalid),out={enabled:true,grafana:{},honeycomb:{},window:TELEMETRY_DEFAULT_WINDOW,refreshMs:null,templates:{}};
   var tracking=page && page.tracking;

@@ -120,7 +120,7 @@ test('V5 fragments, SQL placeholders and structured sources',()=>{
   assert.equal(run('x" | drop code').error,not(allowed));
   // #1359: a fragment is read like the query: bare, a space is refused and a comparison takes a number.
   assert.equal(run('a b','| code=${code}').error,not(allowed));
-  assert.equal(run('FULL','| code = ${code}').error,not('outside a string only a number or a duration may be filled in here'));
+  assert.equal(run('FULL','| code = ${code}').error,not('outside a string only a number or a duration may be filled in here; a name may be filled in only inside by (…) / without (…) or as a TraceQL status/kind value'));
   assert.equal(run('500','| code = ${code}').query,'sum(count_over_time({app="dcf"} | code = 500 [5m]))');
   const sql=provider({sql:"SELECT count(*) FROM events WHERE code = '${code}'"});
   let c=consumer([{spec:'provider',export:'core',as:'fc',variables:{code:'FULL'}}]);
@@ -173,7 +173,7 @@ const unsafe=(name,why)=>'Variable ${'+name+'} from this import or carrier canno
 const ALLOWED='a telemetry variable may hold only letters, digits and _ . @ : - (and spaces inside a string)';
 const REGEX='it is filled into a regex and holds regex characters';
 const PATTERN='in a SQL query that uses patterns or regexes, a variable may not hold _ or .';
-const NUMERIC='outside a string only a number or a duration may be filled in here';
+const NUMERIC='outside a string only a number or a duration may be filled in here; a name may be filled in only inside by (…) / without (…) or as a TraceQL status/kind value';
 const unreadable=f=>'this SQL query uses '+f+', which Flowview cannot read safely';
 
 test('V9 comments: an apostrophe in a comment never opens a string; a placeholder in a comment fails closed',()=>{
@@ -312,7 +312,7 @@ test('V17 a bare comparison operand is a number or a duration, never a field nam
   for(const [q,v] of [['{ status = ${code} }','error'],['{ status != ${code} }','ok'],['{ kind = ${code} }','server'],['{ span:kind = ${code} }','consumer']])
     assert.equal(scopedRun({tempo:q},{code:v}).error,undefined,'TraceQL '+q+' takes '+v);
   assert.equal(scopedRun({tempo:'{ status = ${code} }'},{code:'span.name'}).error,unsafe('code',NUMERIC));
-  assert.equal(scopedRun({sql:"SELECT count(*) FROM ${code} WHERE a = 1"},{code:'events'}).error,undefined,'a table name takes a plain token');
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM ${code} WHERE a = 1"},{code:'events'}).error,unsafe('code','a table name cannot come from a telemetry variable'),'a table name may widen the query');
   assert.equal(scopedRun({grafana:'topk(${code}, sum by (job) (rate(x_total[5m])))'},{code:'5'}).error,undefined);
 });
 
@@ -368,16 +368,21 @@ test('V19 a bare value is a number or a duration except in a named list of token
   for(const v of ['NULL','true','False'])assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE flag IS ${code}"},{code:v}).error,undefined,'IS takes '+v);
   assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE flag IS NOT ${code}"},{code:'NULL'}).error,undefined,'IS NOT takes NULL');
   const tokens=[
-    ['grafana','sum by (${code}) (rate(x_total[5m]))'],['grafana','sum without (job, ${code}) (rate(x_total[5m]))'],
-    ['grafana','x_total / on(${code}) group_left(job) y_total'],['grafana','x_total / ignoring(${code}) y_total'],['grafana','x_total / on(job) group_left(${code}) y_total'],
-    ['loki','sum by (${code}) (count_over_time({app="dcf"}[5m]))'],
-    ['sql',"SELECT count(*) FROM ${code} WHERE a = 1"],['sql',"SELECT count(*) FROM t JOIN ${code} ON t.id = u.id"]];
+    ['grafana','sum by (${code}) (rate(x_total[5m]))'],['grafana','sum without (job, ${code}) (rate(x_total[5m]))'],['grafana','sum BY (${code}) (rate(x_total[5m]))'],
+    ['grafana','sum(rate(x_total[5m])) Without (${code})'],['loki','sum by (${code}) (count_over_time({app="dcf"}[5m]))']];
   for(const [src,q] of tokens)assert.equal(scopedRun({[src]:q},{code:'service_name'}).error,undefined,src+' '+q+' takes a token');
+  // #1359 c6: a label name is [A-Za-z_][A-Za-z0-9_]* only.
+  for(const v of ['svc.name','a-b','@x','a:b','1abc'])assert.equal(scopedRun({grafana:'sum by (${code}) (rate(x_total[5m]))'},{code:v}).error,unsafe('code','a label name may hold only letters, digits and _, and may not start with a digit'),v);
+  assert.equal(scopedRun({grafana:'sum by (${code}) (rate(x_total[5m]))'},{code:'5'}).error,undefined,'a number still passes');
+  // #1359 c6: a table name and a vector-matching label can widen by design, so neither takes a name.
+  for(const q of ['x_total and on(${code}) y_total','x_total / ON(${code}) group_left(job) y_total','x_total / ignoring(${code}) y_total','x_total / on(job) group_left(${code}) y_total','x_total / on(job) group_right(${code}) y_total'])
+    assert.equal(scopedRun({grafana:q},{code:'service_name'}).error,unsafe('code','a vector-matching label cannot come from a telemetry variable'),q);
+  for(const q of ["SELECT count(*) FROM ${code} WHERE a = 1","SELECT count(*) FROM t JOIN ${code} ON t.id = u.id","SELECT count(*) FROM t WHERE id IN (SELECT id FROM ${code})"])
+    assert.equal(scopedRun({sql:q},{code:'other'}).error,unsafe('code','a table name cannot come from a telemetry variable'),q);
   for(const [q,v] of [['{ status = ${code} }','status'],['{ kind = ${code} }','kind'],['{ status = ${code} }','span.status'],['{ status = ${code} && kind = server }','server'],['{ kind = ${code} }','error']])
     assert.equal(scopedRun({tempo:q},{code:v}).error,unsafe('code',NUMERIC),'TraceQL '+q+' refuses '+v);
   for(const q of ["SELECT count(*) FROM events WHERE code IS NOT DISTINCT FROM ${code}","SELECT count(*) FROM t WHERE y = EXTRACT(year FROM ${code})","SELECT count(*) FROM t WHERE x = ')' AND y = substring(a FROM ${code})"])
     assert.equal(scopedRun({sql:q},{code:'code'}).error,unsafe('code',NUMERIC),q+': not a table name');
-  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE id IN (SELECT id FROM ${code})"},{code:'other'}).error,undefined,'a subquery FROM takes a table name');
   // A slot keyword inside a string or a comment never makes a slot.
   for(const [src,q] of [['grafana','sum(x_total) > # by (\n${code})'],['grafana','label_replace(x_total, "a", "by (", "b", "c") > ${code}'],
     ['sql',"SELECT count(*) FROM t WHERE note = 'from' AND x = /* JOIN */ ${code}"],['sql',"SELECT count(*) FROM t WHERE x = -- from\n${code}"],['sql',"SELECT count(*) FROM t WHERE x = 'SELECT a FROM' || ${code}"]])

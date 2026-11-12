@@ -748,8 +748,12 @@ function carrierTelemetry(obj,templates,invalid,environment){
       var narrowed=telemetryNarrowQuery(source,signals[name].query,entry.narrow,entry.needsNarrow);
       if(narrowed.error && narrowed.kind==='shape' && authoredNarrow[name] && !telemetryNarrowProblem(source,authoredNarrow[name]))
         narrowed.error='After its variables were filled in, '+narrowed.error.charAt(0).toLowerCase()+narrowed.error.slice(1);
-      // #1360: a refused narrowing names the other way out.
-      if(narrowed.error && narrowed.kind==='shape')narrowed.error+=' '+telemetryCopyHint('Change the narrowing');
+      // #1360: a narrowing the provider's query cannot take (placement, Honeycomb OR) names the copy
+      // route; a malformed one (shape) does too, unless needsNarrow means a copy needs a narrowing anyway.
+      var needs=entry.needsNarrow===true || Array.isArray(entry.needsNarrow) && entry.needsNarrow.length>0;
+      if(narrowed.error && (narrowed.kind==='placement' || narrowed.kind==='or'))
+        narrowed.error+=needs?' Copy the provider\'s query and edit it, keeping a narrowing that pins what the provider requires.':' Copy the provider\'s query and edit it.';
+      else if(narrowed.error && narrowed.kind==='shape' && !needs)narrowed.error+=' '+telemetryCopyHint('Change the narrowing');
       if(narrowed.error){if(!signals[name].error)signals[name].error=narrowed.error;signals[name].narrowFailure=narrowed.kind;if(narrowed.written)signals[name].narrowWritten=true;
         // Its query links open the unnarrowed query: none for this signal, and none for the carrier.
         delete signals[name].links;unnarrowedLinks=true;}

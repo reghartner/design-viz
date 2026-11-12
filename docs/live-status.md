@@ -3446,11 +3446,23 @@ binding for that carrier (a `telemetry` overlay without `extends`) and edit the 
   shown only when its own `narrow` pins those fields (see
   [Narrowing inherited signals](#narrowing-inherited-signals)). Editing the copied query
   text does not meet it.
+- The copy still receives the import's and the provider's scoped variables, so replace a
+  refused `${name}` placeholder with the literal value in the copy rather than keeping it.
 
-The reasons for a refused fragment and a refused scoped variable end with this way out:
-"… Change the narrowing, or copy the provider's query and edit it." and "… Use another
-value, or copy the provider's query and edit it." An unmet `needsNarrow` does not, because
-a copy must meet it too.
+The reasons name this way out where copying helps:
+- the provider's query cannot take the narrowing (a LogQL `drop`, `keep`, `label_format`
+  or `line_format`, a Logs Insights command before `stats`, no stream selector, and the
+  like) or a Honeycomb query combines its filters with OR: "… Copy the provider's query
+  and edit it.", or, with `needsNarrow`, "… Copy the provider's query and edit it, keeping
+  a narrowing that pins what the provider requires.";
+- a malformed narrowing on a signal without `needsNarrow`: "… Change the narrowing, or
+  copy the provider's query and edit it.";
+- a refused scoped variable: "… Use another value, or copy the provider's query and edit
+  it."
+
+A malformed narrowing under `needsNarrow` and an unmet `needsNarrow` do not, because a
+copy must still carry a valid narrowing that pins. The SQL and Tempo "cannot be narrowed"
+reason keeps its own route: a provider `${name}` placeholder that the import sets.
 
 ### Named environment variables and counting scope
 

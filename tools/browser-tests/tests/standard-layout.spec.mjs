@@ -98,6 +98,54 @@ for(const stacked of [false,true])test(`bottom panel ${stacked?'overlapping anot
   await expect(disclosure).toHaveText('Hide arrangement controls');await expect(disclosure).toHaveAttribute('aria-expanded','true');await expect(fields).toBeVisible();
 });
 
+/* #1375 (Chuck, 2026-11-12): a valid tile move or resize lands on the first
+   try, also when an Inspector edit is still pending: the edit is saved and the
+   gesture lands, each as its own Undo step. */
+async function tileGrid(tile){return tile.evaluate(el=>{const g=el.closest('.section-layout-grid'),r=g.getBoundingClientRect(),scale=g.offsetWidth?r.width/g.offsetWidth:1;return {cell:(g.clientWidth+8)*scale/24,row:40*scale};});}
+async function tileDrag(page,handle,dx,dy){
+  await handle.scrollIntoViewIfNeeded();const box=await handle.boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+  // The press must reach the handle itself, not a tool window over it.
+  expect(await handle.evaluate((el,[x,y])=>{const hit=document.elementFromPoint(x,y);return el===hit || el.contains(hit);},[x,y])).toBe(true);
+  await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:8});await page.mouse.up();
+}
+const homeItem=text=>JSON.parse(text).page.blocks[0].diagram.layouts[0].sectionLayout.default.find(it=>it.panel==='home');
+test('Arrange tile move and resize land on the first try with an Inspector edit pending',async({page,server})=>{
+  // A 24-column grid: diagram and step controls fill columns 0-15 down to row
+  // 16; the home tile sits at columns 16-23, rows 24-31, with free cells around.
+  const raw=fixture(),layout=raw.page.blocks[0].diagram.layouts[0].sectionLayout;
+  layout.columns=24;layout.default=[{x:0,y:0,w:16,h:12},{panel:'home',x:16,y:24,w:8,h:8},{controls:'steps',attachTo:'diagram',x:0,y:12,w:16,h:4}];
+  await open(page,server,raw);
+  await page.getByRole('button',{name:'Hide arrangement controls',exact:true}).click();await expect(page.locator('.section-arrange-fields')).toBeHidden();
+  await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
+  await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
+  const outline=page.locator('#workspace-window-outline .workspace-window-close');if(await outline.isVisible())await outline.press('Enter');
+  const title=page.locator('#guide').getByLabel('Name',{exact:true}),tile=page.locator('[data-layout-key="panel:home"]');
+  await expect(title).toHaveValue('Doorbell');
+  // Inspect floats over the right side of the grid; keep it clear of the tiles.
+  const grip=page.locator('#workspace-window-inspect .workspace-window-grip');await grip.focus();
+  for(let i=0;i<20;i++)await grip.press('Shift+ArrowLeft');
+  const {cell,row}=await tileGrid(tile),src=page.locator('#src');
+  const tileVars=()=>tile.evaluate(el=>['--tile-x','--tile-y','--tile-w','--tile-h'].map(k=>Number(el.style.getPropertyValue(k))));
+  const before=await src.inputValue();expect(homeItem(before)).toMatchObject({x:16,y:24,w:8,h:8});
+  await title.fill('Pending before move');
+  await tileDrag(page,tile.locator('.section-tile-move'),-4*cell,-8*row);
+  await expect(src).toHaveValue(/Pending before move/);
+  const moved=await src.inputValue();expect(homeItem(moved)).toMatchObject({x:12,y:16,w:8,h:8});
+  await expect.poll(tileVars).toEqual([13,17,8,8]);
+  await expect(title).toBeVisible();await title.fill('Pending before resize');
+  await tileDrag(page,tile.locator('.section-tile-resize'),2*cell,2*row);
+  await expect(src).toHaveValue(/Pending before resize/);
+  expect(homeItem(await src.inputValue())).toMatchObject({x:12,y:16,w:10,h:10});
+  await expect.poll(tileVars).toEqual([13,17,10,10]);
+  // Undo: the resize, then the second edit, then the move, then the first edit.
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(/Pending before resize/);
+  expect(homeItem(await src.inputValue())).toMatchObject({x:12,y:16,w:8,h:8});
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(moved);
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(/Pending before move/);
+  expect(homeItem(await src.inputValue())).toMatchObject({x:16,y:24,w:8,h:8});
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);
+});
+
 test('Standard arrangement drag keeps the scrolled desktop viewport stable',async({page,server},testInfo)=>{
   await page.setViewportSize({width:1280,height:720});
   const raw=fixture(),d=raw.page.blocks[0].diagram;

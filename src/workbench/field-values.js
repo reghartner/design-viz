@@ -31,6 +31,10 @@ var PANEL_PATCH_FIELDS = panelAuthoringMap('patchFields');
    authoring.fieldMeta.<key> and tuple[3] accept:
      label / help / group / advanced / hidden / assignment
      setup / initial / step — context-specific overrides of those properties
+     ignoredWhen(panel) — setup form only (declare it at the top level or under
+                          setup): returns the reason the renderer ignores the
+                          field for the given panel, or nothing; Inspect then
+                          shows the field disabled, described by that reason
      unsetLabel — copy for an omitted assignment
      nullLabel — opt in to an explicit JSON null assignment
    Context metadata is merged last. */
@@ -47,6 +51,7 @@ function panelFieldPresentation(decl,field,mode){
     ['label','help','group','unsetLabel','nullLabel'].forEach(function(name){if(Object.prototype.hasOwnProperty.call(meta,name))out[name]=meta[name];});
     ['advanced','hidden'].forEach(function(name){if(Object.prototype.hasOwnProperty.call(meta,name))out[name]=meta[name]===true;});
     if(Object.prototype.hasOwnProperty.call(meta,'assignment'))out.assignment=meta.assignment!==false;
+    if(typeof meta.ignoredWhen==='function')out.ignoredWhen=meta.ignoredWhen;
   }
   merge(registered);merge(tuple);merge(registered && registered[mode]);merge(tuple && tuple[mode]);
   if(!out.unsetLabel)out.unsetLabel=mode==='initial'?'Use panel default':mode==='step'?'Inherit previous':'Leave unset';
@@ -67,6 +72,7 @@ function panelFieldAssignment(field,raw,mode){
   if(kind==='num'){
     var number=Number(text);if(!isFinite(number))return {error:key+': "'+text+'" is not a number'};
     if(extra && (number<extra.min || number>extra.max))return {error:key+': use a number from '+extra.min+' to '+extra.max};
+    if(extra && extra.integer && !Number.isSafeInteger(number))return {error:key+': use a whole number'};
     return {value:number};
   }
   if(kind==='bool'){
@@ -85,15 +91,38 @@ function panelFieldAssignment(field,raw,mode){
   return {value:text};
 }
 
-function patchSummaryLine(patchObj){
-  var keys = Object.keys(patchObj || {}).slice(0, 2);
-  if (!keys.length) return 'empty patch';
-  return keys.map(function(key){
-    var value = patchObj[key];
+/* Plain label of one step field, as the Inspect edit form shows it. */
+function panelFieldLabel(decl,key,mode){
+  var fields=decl && panelPatchFields(decl) || [],field=null;
+  for(var i=0;i<fields.length;i++)if(fields[i] && fields[i][0]===key){field=fields[i];break;}
+  return panelFieldPresentation(decl,field || [key],mode || 'step').label;
+}
+
+/* Collapsed summary of one step's panel change: the first two assignments by
+   their form labels. labelFor(key) may supply the label a panel editor shows. */
+function patchSummaryLine(patchObj, decl, labelFor){
+  var entries = [];
+  function label(key){
+    var custom = labelFor && labelFor(key);
+    return custom || panelFieldLabel(decl, key, 'step');
+  }
+  function add(source, once){
+    Object.keys(source || {}).forEach(function(key){
+      if (!once && key === 'enterOnce' && panelObject(source[key])) return;
+      entries.push({label: label(key) + (once ? ' (this step only)' : ''), value: source[key]});
+    });
+  }
+  add(patchObj, false);
+  if (patchObj && panelObject(patchObj.enterOnce)) add(patchObj.enterOnce, true);
+  if (!entries.length) return 'empty patch';
+  var shown = entries.slice(0, 2).map(function(entry){
+    var value = entry.value;
     var compact = Array.isArray(value) ? '[' + value.length + ' items]' :
       value !== null && typeof value === 'object' ? '{…}' : String(value);
-    return key + ' → ' + compact;
-  }).join(' · ');
+    return entry.label + ' → ' + compact;
+  });
+  if (entries.length > 2) shown.push('+' + (entries.length - 2) + ' more');
+  return shown.join(' · ');
 }
 
 function panelPatchFields(decl){

@@ -8,6 +8,11 @@ const source=JSON.stringify(exploreSpec(),null,2);
 
 async function open(page,server){await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);}
 async function geometry(el){return el.evaluate(el=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height].map(Math.round);});}
+// Landed rect equals the start rect plus the pointer delta (1px rounding).
+async function expectLanded(el,before,dx,dy){
+  const want=[before[0]+dx,before[1]+dy,before[2],before[3]];
+  await expect.poll(async()=>{const got=await geometry(el);return got.every((v,i)=>Math.abs(v-want[i])<=1)?want:got;}).toEqual(want);
+}
 async function drag(page,handle,dx,dy){
   await handle.hover();const r=await handle.boundingBox();
   await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();
@@ -170,17 +175,23 @@ test('a clamped canvas arrow movement is a no-op and preserves Redo',async({page
   await expect(page.locator('#redo-builder')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(source);
 });
 
-test('leaving a changed Inspector field cannot start a drag on a retired canvas',async({page,server})=>{
+/* #1375 (Chuck, 2026-11-12): the first drag after an uncommitted Inspector
+   edit must work. The edit is saved and the drag lands in the same gesture;
+   Undo removes the drag first, then the edit. */
+test('the first canvas drag after an uncommitted Inspector edit saves the edit and lands the drag',async({page,server})=>{
   await open(page,server);await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();
   await drag(page,page.locator('#workspace-window-inspect .workspace-window-grip'),-900,0);
   const title=page.locator('#guide').getByLabel('Name',{exact:true}),panel=page.locator('[data-explore-panel=home]');
   const before=await geometry(panel),old=await panel.elementHandle();await title.fill('Committed on leaving Inspector');
   await drag(page,panel.locator('.explore-window-grip'),-350,60);
   await expect(page.locator('#src')).toHaveValue(/Committed on leaving Inspector/);
-  expect(await old.evaluate(el=>el.isConnected)).toBe(false);await expect.poll(()=>geometry(panel)).toEqual(before);
+  // The commit rebuilt the viewport, so the replacement window took over the press.
+  expect(await old.evaluate(el=>el.isConnected)).toBe(false);
+  await expectLanded(panel,before,-350,60);
+  const both=await page.locator('#src').inputValue();expect(JSON.parse(both).page.blocks[0].diagram.layouts[0].exploreLayout).toBeTruthy();
+  await page.locator('#undo-builder').click();await expect.poll(()=>geometry(panel)).toEqual(before);
+  await expect(page.locator('#src')).toHaveValue(/Committed on leaving Inspector/);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
-  await drag(page,panel.locator('.explore-window-grip'),-350,60);expect(await geometry(panel)).not.toEqual(before);
-  await page.keyboard.press('ControlOrMeta+z');await expect.poll(()=>geometry(panel)).toEqual(before);await expect(page.locator('#src')).toHaveValue(source);
 });
 
 test('removing an authored Explore view in handwritten JSON preserves the full source history and draft on Redo',async({page,server})=>{

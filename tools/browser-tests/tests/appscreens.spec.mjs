@@ -57,7 +57,7 @@ test('upload, replace, starting screen and per-step choices use the real inspect
   await expect(panel(root).locator('figcaption strong')).toHaveText('Home screen');
   const initial=guide.locator('.initialedit[data-panel-id="product"]');
   if(await initial.getAttribute('open')===null)await initial.locator(':scope > summary').click();
-  await initial.getByLabel('screen',{exact:true}).selectOption('connecting');await screen(root,'connecting');
+  await initial.getByLabel('Starting screen',{exact:true}).selectOption('connecting');await screen(root,'connecting');
   const starting=await src.inputValue();await page.locator('#undo-builder').click();await screen(root,'home');
   await page.locator('#redo-builder').click();await expect(src).toHaveValue(starting);
   await inspectStep(page,1);await openInspectorGroup(guide.locator('.panel-step-group'));await guide.getByLabel('App screen · Product experience',{exact:true}).selectOption('id:home');await screen(root,'home');

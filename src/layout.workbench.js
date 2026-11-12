@@ -394,6 +394,18 @@ function initSectionLayoutEditor(opts){
   life.listen(view,'pointerdown',function(ev){
     if(ev.target.closest('[data-dv-detail-preview]'))return;
     var handle=ev.target.closest('.section-tile-move,.section-tile-resize,.section-controls-resize');if(!handle || ev.button!==0 || ev.isPrimary===false)return;
+    // #1375: focus the handle before reading the source. Leaving a changed
+    // Inspector field commits that edit and can re-render this section; the
+    // gesture then continues on the same handle of the re-rendered tile.
+    if(document.activeElement!==handle){
+      var kind=['section-tile-move','section-tile-resize','section-controls-resize'].find(function(name){return handle.classList.contains(name);}),owner=handle.closest('.section-layout-tile'),key=owner && owner.getAttribute('data-layout-key');
+      handle.focus({preventScroll:true});
+      if(!handle.isConnected){
+        var hit=document.elementFromPoint(ev.clientX,ev.clientY),next=hit && hit.closest('.'+kind),tile=next && next.closest('.section-layout-tile');
+        if(!next || !view.contains(next) || !tile || tile.getAttribute('data-layout-key')!==key)return;
+        handle=next;handle.focus({preventScroll:true});
+      }
+    }
     var section=handle.closest('.doc-sec'),index=Number(section.getAttribute('data-dv-section'));if(editing!==index||!ready())return;
     var grid=handle.closest('.section-layout-grid');if(getComputedStyle(grid).display!=='grid'){feedback('Use size / position fields on narrow screens, or widen the preview to drag.');return;}
     ev.preventDefault();ev.stopPropagation();cancel();selected=handle.closest('.section-layout-tile').getAttribute('data-layout-key');

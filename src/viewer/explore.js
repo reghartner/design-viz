@@ -1,6 +1,24 @@
 /* One section owns its viewing surface. Existing panels and playback DOM move
    into it. Readers keep session overrides; the workbench supplies an explicit
    commit seam for undoable authored defaults. */
+/* #1375: pressing a window handle moves focus to it. Leaving a changed
+   Workbench field commits that edit, which can replace this viewport before
+   the gesture starts. The matching handle of the replacement viewport, under
+   the same pointer, then takes over the same press. */
+var exploreGestureStarts=typeof WeakMap!=='undefined'?new WeakMap():null,exploreGestureHandoff=false;
+function exploreHandleKey(handle){
+  var host=handle.closest('.explore-window,.explore-player');
+  return handle.className+'|'+(host?host.getAttribute('data-explore-panel') || host.getAttribute('data-explore-content') || (host.classList.contains('explore-player')?'player':''):'');
+}
+function exploreHandOffPress(ev,handle,key){
+  if(exploreGestureHandoff || !exploreGestureStarts || !document.elementFromPoint)return;
+  var root=document,hit=null;
+  for(var depth=0;depth<8;depth++){var next=root.elementFromPoint(ev.clientX,ev.clientY);if(!next || next===hit)break;hit=next;if(!hit.shadowRoot)break;root=hit.shadowRoot;}
+  var target=hit && hit.closest && hit.closest('button'),start=target && target!==handle && exploreGestureStarts.get(target);
+  if(!start || exploreHandleKey(target)!==key)return;
+  exploreGestureHandoff=true;
+  try{start(ev);}finally{exploreGestureHandoff=false;}
+}
 /* Restore only temporary panel geometry, including a view not visited since a
    preview rebuild. This never selects the view or changes its camera. */
 function restoreCanvasPanelMemory(d, memories, id, value){
@@ -92,8 +110,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   controlsPlacement.addEventListener('change',function(){changePlacement(controlsPlacement.value,playerWindow);});
   player.addEventListener('pointerdown',function(){if(canvasWindow(playerWindow))selectCanvasWindow(playerWindow);});
   player.addEventListener('focusin',function(){if(canvasWindow(playerWindow))selectCanvasWindow(playerWindow);});
-  playerGrip.addEventListener('pointerdown',function(ev){begin(ev,playerWindow,'move',playerGrip);});
-  playerResize.addEventListener('pointerdown',function(ev){begin(ev,playerWindow,'resize',playerResize);});
+  gestureHandle(playerGrip,playerWindow,'move');gestureHandle(playerResize,playerWindow,'resize');
   playerGrip.addEventListener('keydown',function(ev){keyboard(ev,playerWindow,'move');});
   playerResize.addEventListener('keydown',function(ev){keyboard(ev,playerWindow,'resize');});
   var legend=board.querySelector('.lg');
@@ -684,18 +701,23 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       else{g.w.state.automatic=false;rememberRect(g.w);if(canvasWindow(g.w))sizeGraph(true);if(!publish(g.token)){Object.assign(g.w.state,g.before);if(g.w===playerWindow && g.automatic)memory.controls=null;paint();}}
     }
   }
+  function gestureHandle(handle,w,kind){
+    function start(ev){begin(ev,w,kind,handle);}
+    handle.addEventListener('pointerdown',start);if(exploreGestureStarts)exploreGestureStarts.set(handle,start);
+  }
   function begin(ev,w,kind,handle){
     if(!active || ev.button!==0 || gesture)return;
     manualCamera();cancelDeferredFit();
-    ev.preventDefault();ev.stopPropagation();handle.focus({preventScroll:true});
+    ev.preventDefault();ev.stopPropagation();
+    var key=exploreHandleKey(handle);handle.focus({preventScroll:true});
     /* Leaving an Inspector field can synchronously rebuild this viewport. */
-    if(retired || !active || !handle.isConnected)return;
+    if(retired || !active || !handle.isConnected){exploreHandOffPress(ev,handle,key);return;}
     clearScrollEdit();var token=beginEdit(true);if(token===false)return;
     raise(w);
     var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !canvasWindow(w) && !memory.controls;
     if(w===playerWindow && !canvasWindow(w))memory.controls=w.state=scaledRect(w,r,true);
     else w.state.automatic=false;
-    gesture={w:w,kind:kind,handle:handle,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,rect:r,before:before,token:token,automatic:automatic};
+    gesture={w:w,kind:kind,handle:handle,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,rect:r,before:before,token:token,automatic:automatic,stageW:stage.clientWidth,stageH:stage.clientHeight};
     handle.setPointerCapture(ev.pointerId);shell.classList.add('viewport-gesturing');
   }
   function pointerMove(ev){
@@ -771,13 +793,17 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       if(notes){var hint=document.createElement('div');hint.className='explore-placement-hint explore-notes-size-hint';hint.textContent='Section notes ignore floating-panel and step-control sizing. Resize the notes window.';row.appendChild(hint);}
     }
     check.addEventListener('change',function(){setWindowHidden(w,!check.checked);if(check.checked)memory.focus=false;paint();});
-    grip.addEventListener('pointerdown',function(ev){begin(ev,w,'move',grip);});resize.addEventListener('pointerdown',function(ev){begin(ev,w,'resize',resize);});
+    gestureHandle(grip,w,'move');gestureHandle(resize,w,'resize');
     grip.addEventListener('keydown',function(ev){keyboard(ev,w,'move');});resize.addEventListener('keydown',function(ev){keyboard(ev,w,'resize');});
     el.addEventListener('pointerdown',function(){if(canvasWindow(w))selectCanvasWindow(w);else raise(w);});
     el.addEventListener('focusin',function(){if(canvasWindow(w))selectCanvasWindow(w);else raise(w);});
     windows.push(w);
   }
-  var observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(){if(gesture)finish(true);paint();}):null;
+  var observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(){
+    // A first observation of a new stage reports its size without a change.
+    // Only a real stage resize cancels a window gesture.
+    if(gesture && (gesture.kind==='pan' || stage.clientWidth!==gesture.stageW || stage.clientHeight!==gesture.stageH))finish(true);paint();
+  }):null;
   var contentObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(){if(active && !gesture)paint();}):null;
   if(observer)observer.observe(stage);
   if(bar)bar.addEventListener('dv:pathlayout',paint);

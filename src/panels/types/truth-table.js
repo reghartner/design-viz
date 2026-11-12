@@ -156,7 +156,7 @@ PanelRegistry.define('truth-table', {
       ],
       initial: {active: 'solar'}
     },
-    setupFields: [['columns', 'rows', {cols: [{k: 'id', req: true}, {k: 'label'}, {k: 'kind', label: 'Column kind', kind: 'enum', options: ['value', 'icons'], unsetLabel: 'value (default)'}, {k: 'empty', label: 'Empty cell text'}], max: 8, wide: true}], ['cases', 'jsonArr'], ['initial', 'json']],
+    setupFields: [['columns', 'rows', {cols: [{k: 'id', label: 'Column ID', req: true}, {k: 'label', label: 'Header'}, {k: 'kind', label: 'Column kind', kind: 'enum', options: ['value', 'icons'], unsetLabel: 'value (default)'}, {k: 'empty', label: 'Empty cell text'}], max: 8, wide: true}], ['cases', 'jsonArr'], ['initial', 'json']],
     patchFields: [['note', 'text']],
     expandPatchFields: function (panel) { return [['active', 'enum', truthTableCases(panel).map(function (row) { return row.id; }), {label: 'Active case', nullLabel: 'No active case', assignment: false, help: 'Highlight an authored case. Omitted steps inherit the previous highlight.'}], ['note', 'text']]; },
     fieldMeta: {columns: {label: 'Properties', group: 'Content', help: 'Declare column IDs and headers. Value columns hold typed properties; Icons columns hold independent shared icon lists. An empty icon cell shows its column’s Empty cell text, or a small n/a when blank.'}, cases: {label: 'Cases and UX icons', group: 'Content', help: 'Authored combinations, not inferred device behavior. Each case card holds its typed property values and its output icons.'}, note: {label: 'Explanation', nullLabel: 'Clear explanation'}},

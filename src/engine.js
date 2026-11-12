@@ -3259,12 +3259,14 @@ function createBoardNavigation(board, group, legend, changed){
     var svg=graph(),origin=svg.viewBox.baseVal,display=displayScale(),rect=svg.getBoundingClientRect(),b=board.getBoundingClientRect(),r=ratio();
     // Establish the scroll gutter before measuring the available height: its
     // controls can add a legend row. Keep the drawn graph in its actual place.
-    var ink=boardContentBounds(svg) || {x:origin.x,y:origin.y,w:origin.width,h:origin.height};
+    var ink=boardContentBounds(svg) || {x:origin.x,y:origin.y,w:origin.width,h:origin.height},toolbar=legend.offsetHeight;
     followFrame={x:ink.x,y:ink.y,right:ink.x+ink.w,bottom:ink.y+ink.h};
     grownFrom=null;board.style.setProperty('--board-viewport-height',b.height/display+'px');
     board.style.setProperty('--board-zoom-width',origin.width*r+'px');board.classList.add('board-zoomed');changed();
     if(board.clientHeight-legend.offsetHeight<=72){reset();restore(saved);return;}
-    var framed=svg.getBoundingClientRect();board.scrollLeft+=(framed.left-rect.left)/display;board.scrollTop+=(framed.top-rect.top)/display;
+    // #1172: the graph keeps its place below the toolbar. When the Scroll row appears the toolbar grows, and
+    // keeping the graph's old screen position would put its top under the new row.
+    var framed=svg.getBoundingClientRect();board.scrollLeft+=(framed.left-rect.left)/display;board.scrollTop+=(framed.top-rect.top)/display-(legend.offsetHeight-toolbar);
     rect=svg.getBoundingClientRect();b=board.getBoundingClientRect();
     var cx=board.clientWidth/2,cy=legend.offsetHeight+(board.clientHeight-legend.offsetHeight)/2;
     var from={x:origin.x+(cx-(rect.left-b.left)/display)/r,y:origin.y+(cy-(rect.top-b.top)/display)/r,zoom:r};

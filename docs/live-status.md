@@ -541,6 +541,16 @@ state for (an `unknown` ticket does not count; a warning when none, since they w
 recorded with the first one. A file that is not a snapshot, or larger than 8 MB, is refused there
 with its reason.
 
+While **Demo live status** or a snapshot shows (#1241), the Epic status panel's Tickets rows
+drag onto a node or connection on the desktop canvas, as in the shared board's Edit mode and
+with the same drop targets (the card or line highlights while a row is over it). The drop
+adds the ticket key there (a move is not offered; an imported carrier gets the consumer
+overlay), as one Undo step, and selects that carrier so Inspect → Tracking shows it. With a
+snapshot this includes the epic's tickets that are on no element yet (**NOT ON DIAGRAM**).
+A drop that cannot be made says why in the Epic status line.
+The Workbench never calls Jira: the list comes only from the demo or a loaded snapshot.
+The keyboard way is Inspect → Tracking → **Add ticket**, which the list's hint names.
+
 ### Trace spans on a node or connection
 
 Select a node or connection and open **Inspect → Tracking → Trace spans** (desktop) to edit
@@ -695,7 +705,18 @@ query the viewer would send; nothing is queried. **Variables for this node** (or
 connection) sets the carrier's `telemetry.variables`; on an imported carrier it is stored
 in its overlay, and **Variables for import <as>** sets `topologyImports[i].variables`,
 which applies to every node and connection from that import
-([Variable scopes](#variable-scopes)). On an imported carrier, **Copy provider queries**
+([Variable scopes](#variable-scopes)). Both are rows (#1393), like the shared and
+environment variables: **New node variable name** and **value** (or connection, or
+**import <as>**), then **Add … variable** or Enter; each row renames, changes or is
+removed in place, one Undo step each. A value must pass the scoped-value allowlist
+(letters, digits, `_ . @ : -` and spaces). An added, changed or renamed value is checked
+under its (new) name in every signal it reaches (this carrier, or for an import every node
+and connection of the import whose provider binding or board overlay does not set the
+name itself); one that would keep a
+signal from being sent is refused, naming the carrier, the signal and the viewer's
+reason. Renaming or removing a variable a signal of this carrier uses is refused too.
+Validator warnings sit under the row they name, and variables that are not an object
+are shown as such, with no Add field. On an imported carrier, **Copy provider queries**
 stores the provider's signals, with every narrowing and change made here, as this
 document's own binding, to edit their queries; a note beside it says so
 ([When narrowing or a variable cannot express the filter](#when-narrowing-or-a-variable-cannot-express-the-filter));

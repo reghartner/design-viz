@@ -303,10 +303,10 @@ PanelRegistry.extend('waterfall', {
         'rows',
         {
           cols: [
-            { k: 'id', req: true },
-            { k: 'label' },
-            { k: 'ms', kind: 'num', req: true },
-            { k: 'startMs', kind: 'num' },
+            { k: 'id', label: 'Span ID', req: true },
+            { k: 'label', label: 'Name' },
+            { k: 'ms', label: 'Duration (ms)', kind: 'num', req: true },
+            { k: 'startMs', label: 'Start (ms)', kind: 'num' },
           ],
         },
       ],

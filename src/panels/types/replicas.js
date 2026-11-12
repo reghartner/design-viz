@@ -334,10 +334,30 @@ PanelRegistry.extend('replicas', {
       ['initial', 'json'],
     ],
     patchFields: [
-      ['reference', 'json'],
+      ['reference', 'objf', [['series', 'text', null, { label: 'Sequence' }], ['position', 'num', null, { label: 'Position' }]]],
       ['replicas', 'json'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      reference: { label: 'Reference position' },
+      replicas: { label: 'Replica observations', help: 'Each replica keeps fields you leave blank; Use default removes its observation at this step.' },
+      note: { label: 'Explanation' },
+    },
+    editor: function (context) {
+      return { patchControl: function (field, options) {
+        if (field[0] !== 'replicas') return null;
+        return createPanelKeyedStateComposer(context, options, replicaPanelItems(options.panel).map(function (item) {
+          return { id: item.id, label: typeof item.label === 'string' && item.label ? item.label : item.id, fields: [
+            { key: 'series', label: 'Sequence' },
+            { key: 'position', label: 'Position', kind: 'num', min: 0 },
+            { key: 'role', label: 'Role' },
+            { key: 'status', label: 'Status', options: REPLICA_STATUSES },
+            { key: 'lagMs', label: 'Lag (ms)', kind: 'num', min: 0 },
+            { key: 'observedAt', label: 'Observed at' },
+          ] };
+        }));
+      } };
+    },
     picker: {
       order: 4,
       name: 'Replica positions',

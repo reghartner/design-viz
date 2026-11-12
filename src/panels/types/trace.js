@@ -455,7 +455,14 @@ PanelRegistry.extend('trace', {
       initial: { selected: 'request' },
     },
     setupFields: [
-      ['spans', 'jsonArr'],
+      ['spans', 'rows', { max: 200, wide: true, cols: [
+        { k: 'id', label: 'Span ID', req: true },
+        { k: 'parentId', label: 'Parent span ID' },
+        { k: 'service', label: 'Service' },
+        { k: 'name', label: 'Name' },
+        { k: 'startMs', label: 'Start (ms)', kind: 'num', req: true },
+        { k: 'ms', label: 'Duration (ms)', kind: 'num', req: true },
+      ] }],
       ['initial', 'json'],
     ],
     patchFields: [['selected', 'text']],

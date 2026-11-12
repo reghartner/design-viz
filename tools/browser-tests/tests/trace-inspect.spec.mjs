@@ -20,7 +20,10 @@ test('trace spans edited in Inspect save, render and undo in one step',async({pa
   await expect(names.filter({hasText:'parse input'})).toHaveCount(1);
 
   await inspectPageElement(page,root.locator('.pt-trace .ptitle'));
-  const field=guide.getByLabel('Spans',{exact:true});
+  // Spans use a row editor since #1000; its raw JSON fallback still saves a whole list.
+  const rows=guide.locator('.frow').filter({has:page.locator(':scope > .flab',{hasText:/^Spans$/})});
+  await rows.locator('details.rawjson > summary').click();
+  const field=rows.locator('details.rawjson textarea');
   await expect(field).toHaveValue(JSON.stringify(spans));
   const edited=spans.map(s=>s.id==='parse'?{...s,name:'validate input'}:s);
   await field.click();

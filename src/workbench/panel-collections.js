@@ -42,7 +42,11 @@ function createPanelKeyedStateComposer(context,options,entries){
     }else entry.fields.forEach(function(field){
       var cur=panelOwn(value,field.key)?value[field.key]:undefined;
       var commit=function(next){return change(entry.id,field.key,next==null?undefined:next);};
-      var input=field.options?controls.select(field.options,cur,commit,true):controls.text(cur,commit);
+      /* Numeric snapshot fields commit numbers, never their text. */
+      var input=field.kind==='num'?controls.number(cur,function(next){
+        if(next!==null && field.min!=null && next<field.min){context.error(field.label+' must be '+field.min+' or more.');return false;}
+        return commit(next);
+      }):field.options?controls.select(field.options,cur,commit,true):controls.text(cur,commit);
       if(field.options && input.options.length)input.options[0].textContent='Use default';
       input.setAttribute('aria-label',(entry.label || entry.id)+' '+field.label);
       card.appendChild(controls.row(field.label,input));

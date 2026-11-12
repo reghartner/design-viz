@@ -274,10 +274,20 @@ PanelRegistry.define('funnel', {
     expandPatchFields: function (panel) {
       return [['counts', 'json', { nullable: true }], ['active', 'enum', funnelStageIds(panel)], ['note', 'text']];
     },
+    editor: function (context) {
+      return { patchControl: function (field, options) {
+        if (field[0] !== 'counts') return null;
+        return createPanelKeyedStateComposer(context, options, (Array.isArray(options.panel.stages) ? options.panel.stages : []).filter(function (stage) {
+          return panelObject(stage) && typeof stage.id === 'string' && stage.id;
+        }).map(function (stage) {
+          return { id: stage.id, label: stage.label || stage.id, scalar: true };
+        }));
+      } };
+    },
     fieldMeta: {
       unit: { label: 'Item noun', help: 'What is being counted, e.g. records, requests, seats. Default items.' },
       stages: { label: 'Stages', help: 'Declare 2–12 stages in pipeline order with unique ids. Optional tone colours that stage’s bar.' },
-      counts: { label: 'Counts by stage', help: 'An object keyed by stage id, e.g. {"review": 9800}. Keys merge into the carried counts; a key set to null forgets that stage; null clears every count.', nullLabel: 'Clear every count' },
+      counts: { label: 'Counts by stage', help: 'One count per stage. Counts merge into the carried counts; Use default keeps the carried count, No data forgets that stage, and Clear every count clears them all.', nullLabel: 'Clear every count' },
       active: { label: 'Stage being computed', help: 'Shows an animated stripe on this stage while the story explains it.', nullLabel: 'No stage active' },
       note: { label: 'Explanation' },
     },

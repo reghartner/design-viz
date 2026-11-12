@@ -17,8 +17,8 @@ const spec={page:{sections:[{heading:'Setup groups',diagram:{nodes:{api:{title:'
 const rowsField=(block,caption,value)=>({kind:'rows',block,caption,value});
 const CASES={
   radar:{groups:['Sensor','Alert','Starting state'],advanced:['Rings','Scale','Zones'],fields:[
-    ['Sensor','sensor','{"x":150,"y":140}',{x:150,y:140}],['Facing','facing','45',45],['Spread','spread','60',60],['Range','range','180',180],
-    ['Threshold','threshold','90',90],['Rings','rings','4',4,true],['Scale','scale','{"pxPerUnit":2}',{pxPerUnit:2},true],['Zones','zones','[]',[],true]]},
+    ['Sensor X','sensor','150',{x:150,y:150}],['Facing','facing','45',45],['Spread','spread','60',60],['Range','range','180',180],
+    ['Threshold','threshold','90',90],['Rings','rings','4',4,true],['Pixels per unit','scale','2',{pxPerUnit:2},true],['Zones','zones','[]',[],true]]},
   cost:{groups:['Units','Notes','Cost model'],advanced:['Display density'],fields:[
     ['Currency','currency','EUR','EUR'],['Workload unit','unit','requests','requests'],['Cost period','period','per day','per day'],
     ['Basis & exclusions','assumptions','Example rates','Example rates'],

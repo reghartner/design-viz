@@ -15,6 +15,15 @@ function gridAxis(panel, key) {
     return { id: item.id, label: typeof item.label === 'string' && item.label.trim() ? item.label : item.id };
   });
 }
+/* Step highlight sub-fields: choices from the declared axes when known. */
+function gridHighlightFields(panel) {
+  function field(key, label, ids) {
+    return ids && ids.length ? [key, 'enum', ids, { label: label }] : [key, 'text', null, { label: label }];
+  }
+  var rows = panel ? gridAxis(panel, 'rows').map(function (row) { return row.id; }) : null;
+  var cols = panel ? gridAxis(panel, 'cols').map(function (col) { return col.id; }) : null;
+  return [field('row', 'Row', rows), field('col', 'Column', cols), field('cell', 'Cell', panel ? gridKeys(panel) : null)];
+}
 function gridKeys(panel) {
   var keys = [];
   gridAxis(panel, 'rows').forEach(function (row) {
@@ -324,18 +333,21 @@ PanelRegistry.define('grid', {
     setupFields: [
       ['rows', 'rows', { max: GRID_MAX_AXIS, cols: [{ k: 'id', label: 'Row ID', req: true }, { k: 'label', label: 'Row name' }] }],
       ['cols', 'rows', { max: GRID_MAX_AXIS, cols: [{ k: 'id', label: 'Column ID', req: true }, { k: 'label', label: 'Column name' }] }],
-      ['scale', 'json'], ['decimals', 'num', { min: 0, max: 4 }], ['unit', 'text'], ['initial', 'json'],
+      ['scale', 'objf', { cols: [{ k: 'min', label: 'Minimum', kind: 'num' }, { k: 'max', label: 'Maximum', kind: 'num' }, { k: 'kind', label: 'Scale kind', kind: 'enum', options: ['sequential', 'diverging'], unsetLabel: 'sequential (default)' }, { k: 'mid', label: 'Midpoint', kind: 'num' }] }], ['decimals', 'num', { min: 0, max: 4 }], ['unit', 'text'], ['initial', 'json'],
     ],
-    patchFields: [['cells', 'json', { nullable: true }], ['marks', 'json', { nullable: true }], ['highlight', 'json', { nullable: true }], ['note', 'text']],
+    patchFields: [['cells', 'json', { nullable: true }], ['marks', 'json', { nullable: true }], ['highlight', 'objf', gridHighlightFields(null)], ['note', 'text']],
+    expandPatchFields: function (panel) {
+      return [['cells', 'json', { nullable: true }], ['marks', 'json', { nullable: true }], ['highlight', 'objf', gridHighlightFields(panel)], ['note', 'text']];
+    },
     fieldMeta: {
       rows: { label: 'Rows', help: 'Declare 1–12 rows with unique ids (letters, digits, - or _; no dots).' },
       cols: { label: 'Columns', help: 'Declare 1–12 columns with unique ids (letters, digits, - or _; no dots).' },
-      scale: { label: 'Colour scale', help: '{"min","max","kind","mid"}. Kind is sequential (default) or diverging; min/max default to the current values; mid defaults to the midpoint.' },
+      scale: { label: 'Colour scale', help: 'Kind is sequential (default) or diverging. Blank minimum and maximum use the current values; a blank midpoint uses the middle of the range.' },
       decimals: { label: 'Decimals', help: 'Digits after the decimal point, 0–4. Default 2.' },
       unit: { label: 'Unit suffix', help: 'Optional text appended to values in tooltips and the key, e.g. points or %.' },
       cells: { label: 'Cell values', help: 'An object keyed "<rowId>.<colId>", e.g. {"groupA.period1": 1.4}. Keys merge into the carried values; null forgets a cell; null for the whole field clears every value.', nullLabel: 'Clear every value' },
       marks: { label: 'Significance marks', help: 'An object keyed like cells with "*", "**", "***", "ns" or "". Merges like cells.', nullLabel: 'Clear every mark' },
-      highlight: { label: 'Highlight', help: '{"row","col","cell"}: outline one row, one column and/or one cell ("<rowId>.<colId>").', nullLabel: 'No highlight' },
+      highlight: { label: 'Highlight', help: 'Outline one row, one column and/or one cell.', nullLabel: 'No highlight' },
       note: { label: 'Explanation' },
     },
     picker: {

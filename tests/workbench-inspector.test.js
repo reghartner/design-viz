@@ -788,12 +788,12 @@ test('#1000 step objf conversions edit one sub-field and keep the rest of the ob
     ['radar',{id:'p',type:'radar'},{subject:{x:10,y:20,r:30,deg:40,future:1}},'X',['x',11]],
     ['zoneframe',{id:'p',type:'zoneframe',zones:[]},{subject:{x:10,y:20,future:1}},'Y',['y',21]],
     ['replicas',{id:'p',type:'replicas',replicas:[{id:'a'}]},{reference:{series:'log',position:5,future:1}},'Position',['position',6]],
-    ['grid',{id:'p',type:'grid',rows:[{id:'r1'}],cols:[{id:'c1'}]},{highlight:{row:'r1',col:'c1',cell:'r1.c1',future:1}},'Row',['row','']]
+    ['grid',{id:'p',type:'grid',rows:[{id:'r1'},{id:'r2'}],cols:[{id:'c1'}]},{highlight:{row:'r1',col:'c1',cell:'r1.c1',future:1}},'Row',['row','r2']]
   ];
   for(const [type,decl,patch,label,[key,value]] of cases){
     const e=environment(),spec={nodes:{},rows:[[]],panels:[decl],steps:[{panels:{p:patch}}]},h=e.mount(spec);
     h.session.target={kind:'step',section:0,index:0};h.inspector.render();const before=h.text;
-    const field=Object.keys(patch)[0],input=h.guide.querySelector('.patchedit [aria-label="'+label+'"]');
+    const field=Object.keys(patch)[0],input=aria(h.guide,label);
     assert.ok(input,type+' '+label+' control');
     input.value=String(value);input.fire('change');h.flush();
     const expected={...patch[field]};if(value==='')delete expected[key];else expected[key]=value;

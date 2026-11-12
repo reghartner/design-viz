@@ -362,9 +362,9 @@ test('every key the palette starter templates carry has a setup control', () => 
   }
 });
 
-test('trace spans is a list field in Inspect (#996)', () => {
+test('trace spans is a list field in Inspect (#996, row editor since #1000)', () => {
   const spans = B.PANEL_SETUP_FIELDS.trace.find(f => f[0] === 'spans');
-  assert.strictEqual(spans && spans[1], 'jsonArr');
+  assert.strictEqual(spans && spans[1], 'rows');
 });
 
 test('every JSON setup field accepts its palette starter value (#996)', () => {

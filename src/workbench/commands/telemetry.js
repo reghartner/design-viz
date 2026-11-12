@@ -340,6 +340,127 @@ function telemetryEditBinding(binding,edit,options){
   }
   return {error:'Unknown metrics edit.'};
 }
+/* #1239: Status board settings → Traces edits tracking.telemetry.traceConnections
+   (docs/trace-connections.md). edit: {op:'traceConnections', action, company, ...}; company is the
+   build's company profile map (TELEMETRY_COMPANY_TRACE_CONNECTIONS).
+   - inherit: remove the key, so the board inherits every company profile again.
+   - mode {profile, value:'use'|'disable', inherited}: list or unlist a company profile. Leaving
+     inheritance first lists the profiles the board inherits now (edit.inherited: every company profile
+     on a board that uses traces, none otherwise), so only the chosen one changes.
+   - label {profile, value}: the board label of that profile's connection.
+   - environment {profile, env, on}: the environment subset (all environments: no key).
+   - envField {profile, env, field:'label'|'value'|'context', key?, value}: one environment override.
+   - attribute {id | profile, name, remove?}: add (or with remove, drop) one allowedAttributes name of an
+     inline profile, or one board addition to a company profile's list (Chuck 2026-11-12).
+   - json {value}: the whole map as JSON text (Advanced); null removes the key.
+   Every edit but json is checked with FlowTraceConnections.resolve first: an edit that would make
+   its connection fail to resolve is refused with the resolver's message. */
+function telemetryTraceEntryId(map,profile){
+  var found=null;Object.keys(map).some(function(id){if(telemetryObject(map[id]) && map[id].profile===profile)found=id;return !!found;});return found;
+}
+function telemetryEditTraceConnections(t,edit,done){
+  var company=telemetryObject(edit.company)?edit.company:{},action=edit.action,present=telemetryOwn(t,'traceConnections');
+  if(action==='inherit'){delete t.traceConnections;return done();}
+  if(action==='json'){
+    if(edit.value==null){delete t.traceConnections;return done();}
+    var parsed;try{parsed=JSON.parse(edit.value);}catch(ex){return {error:'Trace connections are a JSON object of connections, such as {"operations":{"profile":"operations"}}.'};}
+    if(!telemetryObject(parsed))return {error:'Trace connections are a JSON object of connections, such as {"operations":{"profile":"operations"}}.'};
+    t.traceConnections=parsed;return done();
+  }
+  if(present && !telemetryObject(t.traceConnections))return {error:'Trace connections are not an object; fix them in Advanced JSON first.'};
+  var map=present?t.traceConnections:null,touched=null,profile=edit.profile;
+  function companyProfile(){return typeof profile==='string' && telemetryOwn(company,profile) && telemetryObject(company[profile])?company[profile]:null;}
+  if(action==='mode' || action==='label' || action==='environment' || action==='envField' || action==='attribute' && edit.profile!=null){
+    if(!companyProfile())return {error:'Unknown company trace profile "'+profile+'".'};
+    if(!map){
+      var inherited=(Array.isArray(edit.inherited)?edit.inherited:[]).filter(function(id){return telemetryOwn(company,id);});
+      // A board that inherits nothing (no traces, or metrics off) has nothing to disable.
+      if(action==='mode' && edit.value==='disable' && inherited.indexOf(profile)<0)return {error:'This board does not inherit '+profile+', so there is nothing to disable.'};
+      map={};inherited.forEach(function(id){map[id]={profile:id};});
+    }
+    var at=telemetryTraceEntryId(map,profile);
+    if(action==='mode'){
+      if(edit.value==='use'){
+        if(!at){at=profile;for(var n=2;telemetryOwn(map,at);n++)at=profile+'-'+n;map[at]={profile:profile};}
+        touched=at;
+      }else if(edit.value==='disable')Object.keys(map).forEach(function(id){if(telemetryObject(map[id]) && map[id].profile===profile)delete map[id];});
+      else return {error:'Choose Use or Disable.'};
+    }else{
+      if(!at)return {error:'Set '+profile+' to Use first.'};
+      touched=at;var entry=map[at],envIds=telemetryObject(company[profile].environments)?Object.keys(company[profile].environments):[];
+      if(action==='attribute'){
+        // #1239 (Chuck 2026-11-12): the board's additions to the company list; the company's own stay read only.
+        var own=Array.isArray(company[profile].allowedAttributes)?company[profile].allowedAttributes:[],added=Array.isArray(entry.allowedAttributes)?entry.allowedAttributes.slice():[],attr=typeof edit.name==='string'?edit.name.trim():'';
+        if(!edit.remove){
+          if(!attr)return {error:'Type a span attribute name, such as device.model.'};
+          if(own.indexOf(attr)>=0)return {error:'"'+attr+'" is already allowed by the company profile.'};
+          if(added.indexOf(attr)>=0)return {error:'"'+attr+'" is already allowed.'};
+          added.push(attr);
+        }else{if(added.indexOf(attr)<0)return {error:'"'+attr+'" is not one of this board\'s additions.'};added=added.filter(function(x){return x!==attr;});}
+        if(added.length)entry.allowedAttributes=added;else delete entry.allowedAttributes;
+      }else if(action==='label'){
+        if(edit.value==null)delete entry.label;
+        else if(!telemetryText(edit.value) || edit.value.length>200 || /[\x00-\x1f<>]/.test(edit.value))return {error:'A label is 1–200 characters without < or >.'};
+        else entry.label=edit.value.trim();
+      }else{
+        var envs=telemetryObject(entry.environments)?entry.environments:null,env=edit.env;
+        if(envIds.indexOf(env)<0)return {error:'Unknown environment "'+env+'" in '+profile+'.'};
+        if(!envs){envs={};envIds.forEach(function(id){envs[id]={};});}
+        if(action==='environment'){
+          if(edit.on){if(!telemetryOwn(envs,env))envs[env]={};}
+          else{
+            delete envs[env];
+            if(!Object.keys(envs).length)return {error:'Keep at least one environment, or set '+profile+' to Disable.'};
+          }
+          // Company order, so the source reads like the profile.
+          var ordered={};envIds.forEach(function(id){if(telemetryOwn(envs,id))ordered[id]=envs[id];});envs=ordered;
+        }else{
+          if(!telemetryOwn(envs,env))return {error:'Turn on '+env+' first.'};
+          var over=telemetryObject(envs[env])?envs[env]:{},field=edit.field,value=edit.value==null?null:String(edit.value).trim();
+          if(field==='label' || field==='value'){if(value==null)delete over[field];else over[field]=value;}
+          else if(field==='context'){
+            var context=telemetryObject(over.context)?over.context:{};
+            if(value==null)delete context[edit.key];else context[edit.key]=value;
+            if(Object.keys(context).length)over.context=context;else delete over.context;
+          }else return {error:'Unknown environment field.'};
+          envs[env]=over;
+        }
+        var all=envIds.every(function(id){return telemetryOwn(envs,id);}),bare=Object.keys(envs).every(function(id){return !Object.keys(envs[id] || {}).length;});
+        if(all && bare)delete entry.environments;else entry.environments=envs;
+      }
+    }
+  }else if(action==='attribute'){
+    var id=edit.id;
+    if(!map || !telemetryOwn(map,id) || !telemetryObject(map[id]) || telemetryOwn(map[id],'profile'))return {error:'Allowed attributes are set on an inline profile; company profiles set their own.'};
+    var item=map[id],list=Array.isArray(item.allowedAttributes)?item.allowedAttributes.slice():[],name=typeof edit.name==='string'?edit.name.trim():'';
+    if(!edit.remove){
+      if(!name)return {error:'Type a span attribute name, such as device.model.'};
+      if(list.indexOf(name)>=0)return {error:'"'+name+'" is already allowed.'};
+      list.push(name);
+    }else{if(list.indexOf(name)<0)return {error:'"'+name+'" is not in the list.'};list=list.filter(function(x){return x!==name;});}
+    if(list.length)item.allowedAttributes=list;else delete item.allowedAttributes;
+    touched=id;
+  }else return {error:'Unknown trace connection edit.'};
+  t.traceConnections=map;
+  if(touched!=null){
+    var problem=null;
+    FlowTraceConnections.resolve({tracking:{telemetry:{traceConnections:map}}},company,function(path,message){if(!problem && path==='.traceConnections.'+touched)problem=message;});
+    if(problem)return {error:problem.replace(/^configuration: /,'')};
+  }
+  return done();
+}
+/* #1239: read model for Status board settings → Traces. */
+function telemetryTraceConnectionState(raw,company){
+  var doc=builderDocumentPage(raw),page=doc && doc.page,t=page && telemetryObject(page.tracking) && telemetryObject(page.tracking.telemetry)?page.tracking.telemetry:{};
+  company=telemetryObject(company)?company:{};
+  var present=telemetryOwn(t,'traceConnections'),valid=!present || telemetryObject(t.traceConnections),map=present && valid?telemetryClone(t.traceConnections):null;
+  var profiles={};Object.keys(company).forEach(function(id){try{profiles[id]={profile:FlowTraceConnections.profile(company[id])};}catch(ex){profiles[id]={error:String(ex.message).replace(/^configuration: /,'')};}});
+  var entries={};Object.keys(company).forEach(function(id){var at=map?telemetryTraceEntryId(map,id):null;entries[id]=at?{id:at,entry:map[at],more:Object.keys(map).filter(function(k){return k!==at && telemetryObject(map[k]) && map[k].profile===id;})}:null;});
+  var inline=map?Object.keys(map).filter(function(id){return telemetryObject(map[id]) && !telemetryOwn(map[id],'profile');}):[];
+  var resolved={};try{resolved=page?FlowTraceConnections.resolve(page,company):{};}catch(ex){resolved={};}
+  return {present:present,valid:valid,map:map,companyIds:Object.keys(company),profiles:profiles,entries:entries,inline:inline,
+    resolved:resolved,usesTraces:!!page && FlowTraceConnections.usesTraces(page),enabled:t.enabled!==false};
+}
 /* #1240: one shared (edit.environment null) or environment variable row: action add, rename,
    value or remove. Names and values follow the validator: a non-reserved name and non-empty text.
    Entries the rows cannot read stay as written. */
@@ -455,6 +576,10 @@ function telemetryEditPage(telemetry,edit){
     else if(!telemetryNumber(edit.value) || edit.value<TELEMETRY_MIN_REFRESH_MS)return {error:'Use at least '+TELEMETRY_MIN_REFRESH_MS+' ms (five minutes), or clear it for the default of five minutes.'};
     else t.refreshMs=edit.value;
     return done();
+  }
+  if(op==='traceConnections'){
+    if(telemetry!=null && !telemetryObject(telemetry))return {error:'Metrics settings are not an object; repair tracking.telemetry in JSON first.'};
+    return telemetryEditTraceConnections(t,edit,done);
   }
   if(op==='lookupsEnabled' || op==='addLookup' || op==='removeLookup' || op==='moveLookup' || op==='lookup'){
     if(telemetry!=null && !telemetryObject(telemetry))return {error:'Metrics settings are not an object; repair tracking.telemetry in JSON first.'};

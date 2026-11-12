@@ -226,7 +226,7 @@ test('N13 LogQL: only one safe stage per entry; every escape attempt fails close
   bad('| a',stage);bad('a="x"',stage);bad('| a="x" b="y"',stage);bad('|= x',stage);bad('',stage);
   // A variable value that adds a quote breaks the stage after it is filled in.
   const s=plain(C.carrierTelemetry({telemetry:{kind:'service',signals:{logs:{loki:'sum(count_over_time({app="a"}[5m]))',narrow:{loki:'| code="${code}"'}}}}},{},undefined,{variables:{code:'x" | line_format "y'}}).signals.logs);
-  assert.equal(s.error,'After its variables were filled in, a LogQL narrowing of this signal is not valid (one stage per entry: this one has a second "|"), so it is not shown.');
+  assert.equal(s.error,'After its variables were filled in, a LogQL narrowing of this signal is not valid (one stage per entry: this one has a second "|"), so it is not shown. Change the narrowing, or copy the provider\'s query and edit it.');
   assert.equal(s.query,'sum(count_over_time({app="a"}[5m]))','nothing is spliced');
 });
 

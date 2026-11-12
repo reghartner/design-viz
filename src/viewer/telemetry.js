@@ -30,6 +30,8 @@
                   links: {query: <http(s) URL>, dashboard: <http(s) URL>}}}
              value is the headline number for the window; series points ascend
              in time, t in epoch ms or ISO text. Every field is optional.
+             A signal {empty: true} with no value or point is a query that
+             succeeded with no data (#1404); a failed or pending query is absent.
              apply() keeps exactly this shape: malformed entries, points and
              links are dropped, times become ISO text, and each kept carrier
              always has signals, observedAt (or null), markers and links.
@@ -113,6 +115,8 @@ function telemetrySample(raw,allowedFor){
     if(value.provenance==='formatted-text')entry.provenance='formatted-text';
     var aggregate=telemetryAggregate(value,out.observedAt);if(aggregate)entry.aggregate=aggregate;
     if(telemetryOwn(value,'breakdown'))entry.breakdown=telemetryLogDetails(value.breakdown);
+    // #1404: the query succeeded and returned no data; only kept while there is no value or point.
+    if(value.empty===true && !telemetryOwn(entry,'value') && !(entry.series || []).length)entry.empty=true;
     out.signals[name]=entry;
   });
   if(Array.isArray(raw.markers))raw.markers.forEach(function(marker){

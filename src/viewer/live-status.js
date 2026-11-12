@@ -56,7 +56,7 @@ function liveStatusProofPresentation(snapshot,window,includeUnobserved){
     var sample=(snapshot.map || {})[binding.id];
     return telemetryMetricNames(binding).some(function(name){
       var entry=sample && sample.signals && sample.signals[name];
-      return telemetryObject(entry) && (telemetryNumber(entry.value) || Array.isArray(entry.series) && entry.series.some(telemetryPoint));
+      return telemetryObject(entry) && (telemetryNumber(entry.value) || Array.isArray(entry.series) && entry.series.some(telemetryPoint) || !!snapshot.verdicts.endToEnd && entry.empty===true);
     });
   });
   var pending=snapshot.pending || {},querying=snapshot.carriers.some(function(binding){return telemetryMetricNames(binding).some(function(name){return pending[binding.id] && pending[binding.id][name];});});

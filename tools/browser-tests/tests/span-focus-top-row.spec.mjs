@@ -1,7 +1,8 @@
-// #1172: focusing a span (Trace view, Auto view, a trace loaded by ID) frames the step and can show the
-// diagram's Scroll row. The taller toolbar must not cover the top row of nodes: every top-row node that was
-// fully visible stays fully inside the visible diagram frame, below the toolbar. N4 setup (Metrics overlay on)
-// and a guard with the overlay off. Desktop only.
+// #1172: focusing a span (Trace view, Auto view, a trace loaded by ID) follows its step and can show the
+// diagram's Scroll row. The taller toolbar must not cover the top row of nodes: before the focus every top-row
+// card is fully shown; after it the focused step's cards (Checkout service, Payment service) are fully inside
+// the visible diagram frame below the toolbar, and no top-row card is partly hidden under the toolbar. N4 setup
+// (Metrics overlay on) and a guard with the overlay off. The camera animates (no reduced motion). Desktop only.
 import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {test,expect} from '../helpers/test.mjs';
@@ -31,6 +32,8 @@ function checkout(){
 }
 async function setup(page,server){
  const key=(a,b)=>a+'->'+b;
+ // The reader's camera animates (the project default is reduced motion, which jumps straight to the follow frame).
+ await page.emulateMedia({reducedMotion:'no-preference'});
  const spec={page:{title:'Checkout request path',tracking:{telemetry:{traceConnections:{company:PROFILE}}},sections:[{id:'main',heading:'Checkout',diagram:checkout()}]}};
  const series=base=>Array.from({length:24},(_,k)=>[new Date(Date.now()-(23-k)*3600000).toISOString(),Math.round(base*(1+.15*Math.sin(k/3)))]);
  const signals=(rate,errors,p95)=>({rate:{value:rate,unit:'req/h',series:series(rate)},errors:{value:errors,unit:'req/h',series:series(errors)},p95:{value:p95,unit:'ms',series:series(p95)}});
@@ -46,25 +49,33 @@ async function setup(page,server){
  return root;
 }
 // Runs in the page from #host's shadow root. For each top-row node card: its box, the visible diagram frame (the
-// section's .board cut by every clipping ancestor and the window) with the toolbar (.lg) bottom as its top, and
-// whether elementFromPoint at points just inside the card's corners and top edge finds the card's own node.
+// section's .board cut by every clipping ancestor and the window) with the toolbar (the board's .lg) bottom as its
+// top, whether the card is fully inside it, whether it straddles the toolbar's bottom edge (partly under the
+// toolbar), and whether elementFromPoint at points just inside its corners and top edge finds its own node.
+// The toolbar and every clipping ancestor are returned for the failure message.
 function topRow(host,ids){
  const scope=host.shadowRoot || host,box=el=>{const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom};};
  const cut=(a,b)=>({left:Math.max(a.left,b.left),top:Math.max(a.top,b.top),right:Math.min(a.right,b.right),bottom:Math.min(a.bottom,b.bottom)});
+ const round=r=>Object.fromEntries(Object.entries(r).map(([k,v])=>[k,Math.round(v)]));
  const section=scope.querySelector('#section-main'),boards=section?Array.from(section.querySelectorAll('.board')):[];
  if(boards.length!==1)return {boards:boards.length};
- const board=boards[0],lg=board.querySelector(':scope>.lg');let frame=box(board);
- for(let a=board.parentElement || (board.parentNode && board.parentNode.host);a && a!==document.body;a=a.parentElement || (a.parentNode && a.parentNode.host)){const cs=getComputedStyle(a);if(cs.overflowX!=='visible' || cs.overflowY!=='visible')frame=cut(frame,box(a));}
+ const board=boards[0],lg=board.querySelector(':scope>.lg'),ancestors=[];let frame=box(board);
+ for(let a=board.parentElement || (board.parentNode && board.parentNode.host);a && a!==document.body;a=a.parentElement || (a.parentNode && a.parentNode.host)){
+  const cs=getComputedStyle(a);if(cs.overflowX!=='visible' || cs.overflowY!=='visible'){frame=cut(frame,box(a));ancestors.push((a.id?'#'+a.id:a.tagName.toLowerCase()+'.'+String(a.className).trim().split(/\s+/).join('.'))+' '+JSON.stringify(round(box(a))));}
+ }
  frame=cut(frame,{left:0,top:0,right:innerWidth,bottom:innerHeight});
- const visible={...frame,top:Math.max(frame.top,lg?box(lg).bottom:frame.top)},round=r=>Object.fromEntries(Object.entries(r).map(([k,v])=>[k,Math.round(v)]));
+ const bar=lg?box(lg):null,visible={...frame,top:Math.max(frame.top,bar?bar.bottom:frame.top)};
  const nodes=ids.map(id=>{
   const g=board.querySelector('g.node[data-dv-node="'+id+'"]'),card=g && g.querySelector('.card');if(!card)return {id,found:false};
   const b=box(card),inset=3,points=[[b.left+inset,b.top+inset],[b.right-inset,b.top+inset],[(b.left+b.right)/2,b.top+inset],[b.left+inset,b.bottom-inset],[b.right-inset,b.bottom-inset]];
   const hidden=points.filter(([x,y])=>{const at=scope.elementFromPoint(x,y);return !(at && g.contains(at));}).map(([x,y])=>{const at=scope.elementFromPoint(x,y);return Math.round(x)+','+Math.round(y)+' → '+(at?(at.getAttribute('class') || at.tagName):'nothing');});
-  return {id,found:true,card:round(b),inside:b.left>=visible.left-.5 && b.right<=visible.right+.5 && b.top>=visible.top-.5 && b.bottom<=visible.bottom+.5,hidden};
+  const across=Math.min(b.right,frame.right)-Math.max(b.left,frame.left)>.5;
+  return {id,found:true,card:round(b),inside:b.left>=visible.left-.5 && b.right<=visible.right+.5 && b.top>=visible.top-.5 && b.bottom<=visible.bottom+.5,
+   underToolbar:!!bar && across && b.top<bar.bottom-.5 && b.bottom>bar.bottom+.5,hidden};
  });
  const pan=board.querySelector('.board-pan'),zoom=board.querySelector('.board-zoom-value');
- return {boards:1,frame:round(frame),toolbar:lg?Math.round(box(lg).height):0,scrollRow:!!(pan && !pan.hidden),zoom:zoom && zoom.textContent,scrollTop:Math.round(board.scrollTop),nodes};
+ return {boards:1,frame:round(frame),toolbar:bar?{element:'.lg.'+String(lg.className).trim().split(/\s+/).join('.'),rect:round(bar),height:Math.round(bar.bottom-bar.top)}:null,ancestors,
+  scrollRow:!!(pan && !pan.hidden),zoom:zoom && zoom.textContent,scrollTop:Math.round(board.scrollTop),pageY:Math.round(scrollY),nodes};
 }
 // The camera has settled once the zoom, the viewBox, the scroll offsets and the toolbar height hold for two frames.
 async function settled(root){
@@ -74,36 +85,47 @@ async function settled(root){
   const first=read();requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(first===read()))));
  })),{message:'the board camera has settled'}).toBe(true);
 }
-async function expectTopRowShown(root,when){
+// all: every listed card is fully inside the visible frame below the toolbar and nothing covers it.
+// Otherwise (after a focus that may zoom in): the focused step's cards are fully shown, and no top-row card
+// is partly hidden under the toolbar (straddles its bottom edge).
+async function expectTopRowShown(root,when,shown=TOP){
  await settled(root);
  const g=await root.evaluate(topRow,TOP);expect(g.boards,'one diagram board in the section').toBe(1);
- const where=' ('+when+'; frame '+JSON.stringify(g.frame)+', toolbar '+g.toolbar+' px, Scroll row '+g.scrollRow+', zoom '+g.zoom+', scrollTop '+g.scrollTop+')';
+ const where=' ('+when+'; frame '+JSON.stringify(g.frame)+', toolbar '+JSON.stringify(g.toolbar)+', clipping ancestors '+JSON.stringify(g.ancestors)+', Scroll row '+g.scrollRow+', zoom '+g.zoom+', board scrollTop '+g.scrollTop+', page scrollY '+g.pageY+')';
+ expect(g.toolbar,'the board toolbar (.lg) was found'+where).not.toBeNull();
+ expect(g.frame.bottom-g.frame.top,'the diagram frame is on screen'+where).toBeGreaterThan(200);
  for(const n of g.nodes){
   expect(n.found,n.id+' node card found in the shadow root').toBe(true);
+  expect(n.underToolbar,n.id+' card '+JSON.stringify(n.card)+' is not partly hidden under the toolbar'+where).toBe(false);
+  if(!shown.includes(n.id))continue;
   expect(n.inside,n.id+' card '+JSON.stringify(n.card)+' lies inside the visible diagram frame below the toolbar'+where).toBe(true);
   expect(n.hidden,n.id+' card: nothing covers its corners or top edge'+where).toEqual([]);
  }
  return g;
 }
 async function loadAndFocus(root){
+ const page=root.page();
  await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
  await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await root.getByRole('button',{name:'Load trace',exact:true}).click();
  const span=root.locator('.dv-trace-span[data-span-id="'+CHARGE+'"]');await expect(span).toHaveCount(1);
  await expectTopRowShown(root,'trace loaded, before the span focus');
+ const pageY=await page.evaluate(()=>scrollY);
  await span.click();
  // The focused span's carrier wears the current-level marker (an edge ring or node brackets).
  await expect(root.locator('.dv-trace-edge-focus[data-trace-level="current"],.dv-trace-focus-overlay[data-trace-level="current"]').first()).toBeAttached();
- await expect.poll(()=>root.page().evaluate(()=>window.viewer.controller.sections[0].stepper.current().id),{message:'the Charge span focus jumps to its step'}).toBe('charge');
+ await expect.poll(()=>page.evaluate(()=>window.viewer.controller.sections[0].stepper.current().id),{message:'the Charge span focus jumps to its step'}).toBe('charge');
+ // The focus may scroll the page to the panel; bring the page back so the diagram is on screen (the board's own camera is unchanged).
+ await settled(root);await page.evaluate(y=>scrollTo(0,y),pageY);
 }
 
 test('desktop N4: with the Metrics overlay on, focusing the Charge span keeps the top row of nodes below the toolbar',async({page,server})=>{
  const root=await setup(page,server),metrics=root.getByRole('switch',{name:'Metrics overlay',exact:true});
  await metrics.click();await expect(metrics).toHaveAttribute('aria-checked','true');await expect(root.locator('.dv-metrics-card')).toHaveCount(3);
  await loadAndFocus(root);
- await expectTopRowShown(root,'after the Charge span focus, overlay on');
+ await expectTopRowShown(root,'after the Charge span focus, overlay on',['checkout','payment']);
 });
 test('desktop guard: with the Metrics overlay off, focusing the Charge span keeps the top row of nodes below the toolbar',async({page,server})=>{
  const root=await setup(page,server);
  await loadAndFocus(root);await expect(root.locator('.dv-metrics-card')).toHaveCount(0);
- await expectTopRowShown(root,'after the Charge span focus, overlay off');
+ await expectTopRowShown(root,'after the Charge span focus, overlay off',['checkout','payment']);
 });

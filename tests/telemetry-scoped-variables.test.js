@@ -90,7 +90,7 @@ test('V3 the same canon imported twice reads one value per import',()=>{
 
 test('V4 a scoped value can never escape or widen the query it is filled into',()=>{
   const run=(signal,value)=>{const p=provider(signal);const c=consumer([{spec:'provider',export:'core',as:'fc',variables:{code:value}}]);return sent(c,[p,c],'fc::dcf');};
-  const not=(why)=>'Variable ${code} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';
+  const not=(why)=>'Variable ${code} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown. Use another value, or copy the provider\'s query and edit it.';
   const allowed='a telemetry variable may hold only letters, digits and _ . @ : - (and spaces inside a string)';
   assert.equal(run({loki:LOKI},'FULL_CHARGE').error,undefined);
   for(const v of ['x"} or vector(1) #','a\\"b','line\nbreak'])assert.equal(run({loki:LOKI},v).error,not(allowed),JSON.stringify(v));
@@ -101,7 +101,7 @@ test('V4 a scoped value can never escape or widen the query it is filled into',(
   const bare={grafana:'sum(rate(x_total{job="dcf"}[${window}]))'};
   const runBare=v=>{const p=provider(bare);const c=consumer([{spec:'provider',export:'core',as:'fc',variables:{window:v}}]);return sent(c,[p,c],'fc::dcf');};
   assert.equal(runBare('5m').query,'sum(rate(x_total{job="dcf"}[5m]))');
-  assert.equal(runBare('5m] or vector(1) [5m').error,'Variable ${window} from this import or carrier cannot be filled in safely here ('+allowed+'), so the signal is not shown.');
+  assert.equal(runBare('5m] or vector(1) [5m').error,'Variable ${window} from this import or carrier cannot be filled in safely here ('+allowed+'), so the signal is not shown. Use another value, or copy the provider\'s query and edit it.');
   const logs={cloudwatchLogs:{logGroups:['g'],query:'filter code = "${code}" and @message like /${code}/ | stats count() as n',region:'us-east-1',valueField:'n'}};
   assert.equal(run(logs,'FULL').query.query,'filter code = "FULL" and @message like /FULL/ | stats count() as n');
   assert.equal(run(logs,'a/b').error,not(allowed));
@@ -111,7 +111,7 @@ test('V4 a scoped value can never escape or widen the query it is filled into',(
 });
 
 test('V5 fragments, SQL placeholders and structured sources',()=>{
-  const not=(why)=>'Variable ${code} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';
+  const not=(why)=>'Variable ${code} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown. Use another value, or copy the provider\'s query and edit it.';
   const allowed='a telemetry variable may hold only letters, digits and _ . @ : - (and spaces inside a string)';
   const p=provider({loki:'sum(count_over_time({app="dcf"}[5m]))',needsNarrow:['code']});
   const run=(value,fragment='| code="${code}"')=>{const c=consumer([{spec:'provider',export:'core',as:'fc',variables:{code:value},nodeTracking:{dcf:{telemetry:{extends:true,signals:{sent:{narrow:{loki:fragment}}}}}}}]);return sent(c,[p,c],'fc::dcf');};
@@ -168,7 +168,7 @@ test('V8 shape warnings and compatibility',()=>{
 });
 
 const scopedRun=(signal,vars)=>{const p=provider(signal);const c=consumer([{spec:'provider',export:'core',as:'fc',variables:vars}]);return sent(c,[p,c],'fc::dcf');};
-const unsafe=(name,why)=>'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';
+const unsafe=(name,why)=>'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown. Use another value, or copy the provider\'s query and edit it.';
 // #1359 VARTEST-1359: one allowlist for every scoped value, in every language and position.
 const ALLOWED='a telemetry variable may hold only letters, digits and _ . @ : - (and spaces inside a string)';
 const REGEX='it is filled into a regex and holds regex characters';
@@ -389,4 +389,12 @@ test('V19 a bare value is a number or a duration except in a named list of token
     assert.equal(scopedRun({[src]:q},{code:'total'}).error,unsafe('code',NUMERIC),src+' '+JSON.stringify(q));
   for(const q of ["SELECT count(*) FROM t WHERE PATINDEX('%' + '${code}' + '%', code) > 0","SELECT count(*) FROM t WHERE patindex('${code}', code) > 0"])
     assert.equal(scopedRun({sql:q},{code:'a_b'}).error,unsafe('code',PATTERN),q);
+});
+
+test('V20 #1360: a refused narrowing or scoped variable names the other way out; an unmet needsNarrow does not',()=>{
+  assert.equal(scopedRun({loki:LOKI},{code:'a b"'}).error,'Variable ${code} from this import or carrier cannot be filled in safely here (a telemetry variable may hold only letters, digits and _ . @ : - (and spaces inside a string)), so the signal is not shown. Use another value, or copy the provider\'s query and edit it.');
+  const p=provider({loki:'sum(count_over_time({app="dcf"}[5m]))',needsNarrow:['code']});
+  const run=fragment=>{const c=consumer([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{extends:true,signals:{sent:{narrow:{loki:fragment}}}}}}}]);return sent(c,[p,c],'fc::dcf');};
+  assert.equal(run('| code="A" | drop code').error,'A LogQL narrowing of this signal is not valid (one stage per entry: this one has a second "|"), so it is not shown. Change the narrowing, or copy the provider\'s query and edit it.');
+  assert.equal(run('| other="A"').error,'The provider asks each board to narrow this signal by code, and nothing narrows it here, so it is not shown.','copying cannot meet needsNarrow, so no hint');
 });

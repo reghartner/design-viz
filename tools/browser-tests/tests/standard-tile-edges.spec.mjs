@@ -27,11 +27,12 @@ async function open(page,server,raw){
   await page.getByRole('button',{name:'Hide arrangement controls',exact:true}).click();
 }
 async function grid(tile){return tile.evaluate(el=>{const g=el.closest('.section-layout-grid'),r=g.getBoundingClientRect(),scale=g.offsetWidth?r.width/g.offsetWidth:1;return {cell:(g.clientWidth+8)*scale/24,row:40*scale};});}
-// Edges are pressed on the tile's border line, corners 2px inside it; the
-// bottom-right is the resize button inside the tile.
+// Strips straddle the grid gap; tile content sits above their inner half, so
+// they are pressed 2px outside the tile. The bottom-right is the resize button
+// inside the tile.
 function pointFor(r,edge){
   if(edge==='se')return [r.x+r.width-12,r.y+r.height-12];
-  const inset=edge.length===2?2:1;
+  const inset=-2;
   return [edge.includes('w')?r.x+inset:edge.includes('e')?r.x+r.width-inset:r.x+r.width/2,edge.includes('n')?r.y+inset:edge.includes('s')?r.y+r.height-inset:r.y+r.height/2];
 }
 async function pointerDrag(page,[x,y],dx,dy){await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:8});await page.mouse.up();}

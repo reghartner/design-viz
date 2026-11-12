@@ -125,10 +125,11 @@ function telemetryTempoTrace(result,id,allowed){
 }
 /* #1197: Honeycomb get_trace returns no span attributes. One run_query raw-row query
    for the loaded trace returns the allowed columns per span id. run_query takes at
-   most 30 raw columns, so at most 29 attributes are asked for besides trace.span_id. */
-// A Honeycomb profile without a dataset cannot fetch attributes, so it adds none (#1205).
+   most 30 raw columns, so at most 29 attributes are asked for besides trace.span_id.
+   #1414: without a dataset the query runs environment-wide (environment_wide_query),
+   so spans of every service's dataset join on trace.span_id. */
 function telemetryTraceAllowed(page,provider){
-  try{var ps=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS),out=[];Object.keys(ps).forEach(function(id){if(ps[id].provider===provider && (provider!=='honeycomb' || ps[id].dataset))(ps[id].allowedAttributes || []).forEach(function(k){if(out.indexOf(k)<0)out.push(k);});});return out;}catch(e){return [];}
+  try{var ps=FlowTraceConnections.resolve(page,TELEMETRY_COMPANY_TRACE_CONNECTIONS),out=[];Object.keys(ps).forEach(function(id){if(ps[id].provider===provider)(ps[id].allowedAttributes || []).forEach(function(k){if(out.indexOf(k)<0)out.push(k);});});return out;}catch(e){return [];}
 }
 function telemetryTraceAttributeQuery(tool,base,allowed){
   var schema=tool && tool.inputSchema,prop=schema && schema.properties && schema.properties.query_spec,a=tool && tool.annotations || {},types=prop && (Array.isArray(prop.type)?prop.type:[prop.type]);
@@ -136,9 +137,11 @@ function telemetryTraceAttributeQuery(tool,base,allowed){
   if(!types || !types.some(function(t){return t==='object' || t==='string';}))telemetryTraceFail('Unsupported run_query query_spec type.');
   // Profile literals and context reach run_query as they reach get_trace, where its schema names them.
   var columns=allowed.slice(0,29),spec={filters:[{column:'trace.trace_id',op:'=',value:base.traceId}],from:base.from},input={},props=schema && schema.properties || {};
-  Object.keys(base.args || {}).forEach(function(k){if(telemetryOwn(props,k) && ['dataset_slug','query_spec','raw_row_columns','results_limit'].indexOf(k)<0)input[k]=base.args[k];});
+  Object.keys(base.args || {}).forEach(function(k){if(telemetryOwn(props,k) && ['dataset_slug','environment_wide_query','query_spec','raw_row_columns','results_limit'].indexOf(k)<0)input[k]=base.args[k];});
   if(!telemetryOwn(input,'environment_slug') && base.environment!==undefined)input.environment_slug=base.environment;
   if(telemetryTraceString(base.dataset))input.dataset_slug=base.dataset;
+  else if(telemetryOwn(props,'environment_wide_query'))input.environment_wide_query=true;
+  else telemetryTraceFail('no dataset is set and this run_query takes no environment_wide_query, so it cannot read the whole environment.');
   input.query_spec=types.indexOf('object')<0?JSON.stringify(spec):spec;input.raw_row_columns=['trace.span_id'].concat(columns);input.results_limit=TELEMETRY_TRACE_SPANS;
   FlowTraceConnections.validate(input,schema);
   return {input:input,columns:columns,warnings:allowed.length>columns.length?['Span attributes not loaded ('+allowed.slice(29).join(', ')+'): run_query takes at most 30 columns.']:[]};

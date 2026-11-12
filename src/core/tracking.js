@@ -228,7 +228,7 @@ function trackingExistsWhen(value){
       window: <duration such as '1h'; default '24h', the previous 24 hours>,
       refreshMs: <number of ms, at least 300000>|null,
       templates: {<name>: {kind?, params: [<name>], signals, proof?, links?}},
-      lookups?: {<id>: {label, query, values?, datasource?, fields: {traceId, spanId}}}}
+      lookups?: {<id>: {label, query, values?, datasource?, fields: {traceId, spanId}, requireTraceId?: boolean}}}
    Templates keep their authored form so `use` can expand them by pure string
    substitution of the declared $param / ${param} placeholders. Lookups are
    present only when authored; see telemetryLookups. */
@@ -774,7 +774,7 @@ function telemetryConfigUrl(value){try{var u=new URL(value);return typeof value=
    its $value slot and environment placeholders; the viewer fills them when the
    reader finds lines. A value never contains a quote, backtick or backslash, so
    it cannot leave the LogQL string it is placed in. */
-var TELEMETRY_LOOKUP_FIELDS=['label','query','values','datasource','fields'];
+var TELEMETRY_LOOKUP_FIELDS=['label','query','values','datasource','fields','requireTraceId'];
 var telemetryLogFieldPattern=/^[A-Za-z_][A-Za-z0-9_]{0,79}$/;
 var telemetryLookupValuePattern=/^[^"`\\\x00-\x1f\x7f]{1,200}$/;
 function telemetryLookupSlot(query){return typeof query==='string' && /\$\{value\}|\$value(?![A-Za-z0-9_])/.test(query);}
@@ -795,6 +795,9 @@ function telemetryLookups(raw,warn){
       if(telemetryText(entry.query) && !telemetryLookupSlot(entry.query))bad('.query','has suggested values but no $value slot');
     }
     if(telemetryOwn(entry,'datasource') && !telemetryText(entry.datasource))bad('.datasource','must be a non-empty Loki datasource UID');
+    // #1415: whether "Only lines with a trace ID" starts checked for this search (default true, #1158). A bad value
+    // falls back to the default and keeps the search.
+    if(telemetryOwn(entry,'requireTraceId') && typeof entry.requireTraceId!=='boolean')warn(at+'.requireTraceId','must be true or false — the default true is used');
     var fields={traceId:'trace_id',spanId:'span_id'};
     if(telemetryOwn(entry,'fields')){
       if(!telemetryObject(entry.fields))bad('.fields','must be an object {traceId?, spanId?}');
@@ -808,6 +811,7 @@ function telemetryLookups(raw,warn){
     var clean={label:entry.label.trim(),query:entry.query};
     if(entry.values)clean.values=entry.values.slice();
     if(entry.datasource)clean.datasource=entry.datasource;
+    if(typeof entry.requireTraceId==='boolean')clean.requireTraceId=entry.requireTraceId;
     clean.fields=fields;out[id]=clean;
   });
   return out;

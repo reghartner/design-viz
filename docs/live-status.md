@@ -486,8 +486,9 @@ profiles", "Not used (no traces)", "N connections", "None" or "Off" (Allow metri
 **Log searches** (#1233) edits `tracking.telemetry.lookups`: **Offer log searches
 in the Trace view** adds or removes the block (`{}` offers only the typed LogQL
 box), each search is a fold titled by its id with its label, query, suggested
-values (one per line), Loki datasource UID and trace and span ID field names, plus
-Move up, Move down and Remove. **New log search** takes a label and a query (the id
+values (one per line), Loki datasource UID, trace and span ID field names and
+**Only lines with a trace ID starts checked** (unchecked writes `requireTraceId:
+false`; checked removes it), plus Move up, Move down and Remove. **New log search** takes a label and a query (the id
 is made from the label unless typed, accents dropped, and shown before saving) and
 keeps typed text while the form refreshes; Enter in the label adds it, opens the new
 search and moves focus to its label. After Move, focus stays on a usable Move
@@ -2669,13 +2670,22 @@ trace** are icons at the right end of the request line, outside its summary, wit
 those accessible names. The request card also holds **Pin as evidence**, **Source
 and limitations** and **All operation mappings**. A header row, "Spans · 55 · click
 a span to focus it on the diagram", sits above the span list. The list has no
-scroll bar of its own: it is as tall as its spans (#1280). In a section layout the
-Live status tile grows with it, so the page scrolls instead. A focused span's detail
+scroll bar of its own: it is as tall as its spans (#1280). In the Trace view the
+Status panel's height is capped to the visible page (#1411): on screen, it ends at
+the bottom of the window (or of the scrolling Workbench preview that holds it), at
+least 160 px tall, and the cap is measured again on a resize. In a fixed-size
+Explore window the panel fills the window. The panel is pinned (sticky) below the
+reader's bar, and its cap is measured again as the page scrolls, only when it is the
+last card in its column; with a card after it, it does not grow as the page scrolls,
+so that card stays reachable. Its body (span
+list, focused-span detail, log search results, request details) is the one
+scroller, in Edit mode too, and the page does not scroll for the trace. Printing
+shows the whole list. A focused span's detail
 (duration, service, operation, the matched step or the step choices, **Clear trace
 focus**) opens directly under its row. A span the reader focuses (a row, a step
-choice, or the log line it was loaded from) is scrolled into view by the least page
-scroll. A focus nobody asked for, such as the failed span focused when a trace loads
-or a focus kept across an Edit-mode change, never scrolls the page.
+choice, or the log line it was loaded from) is scrolled into view by the least
+scroll of the panel body. A focus nobody asked for, such as the failed span focused
+when a trace loads or a focus kept across an Edit-mode change, never scrolls the page.
 
 Each annotated node or uniquely matched edge gets one label from its rows: one row per
 step on the current path whose `traceMatch` names it (#1154). Connection timing (#1196):
@@ -3933,6 +3943,7 @@ names lookups in `tracking.telemetry.lookups`:
 | `values` | optional suggested values (1–50) the reader can pick; the query must then have a `$value` slot |
 | `datasource` | optional Loki datasource UID; default `tracking.telemetry.grafana.loki` of the active environment |
 | `fields` | optional `{traceId, spanId}` field names; default `trace_id` and `span_id` |
+| `requireTraceId` | optional `true` or `false` (#1415): whether **Only lines with a trace ID** starts checked for this search; default `true`. Use `false` for a search whose useful lines may have no trace ID. Any other value gives a warning and uses `true`; the search stays |
 
 The reader opens Status → Trace → **Load trace**, chooses a connection and
 environment, then uses **Find a trace from a log line** (#1349). One **Log search**
@@ -3974,7 +3985,9 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   so it cannot leave the LogQL string it is placed in. The typed box is limited
   to 2000 characters. LogQL cannot write; the call is bounded by the window and
   10 lines. A Find with no answer after 30 seconds stops with a timeout message.
-- **Only lines with a trace ID** (#1158) is checked by default. Find then adds
+- **Only lines with a trace ID** (#1158) is checked by default; a lookup with
+  `requireTraceId: false` starts unchecked (#1415). Each search keeps its own
+  box state, and the box shows the selected search's. Checked, Find adds
   a label filter on the lookup's `fields.traceId` (`trace_id` for a typed
   query) on a new line at the end of the query, so a trailing `#` comment
   cannot hide it: `| trace_id =~ "[0-9a-fA-F]{16,32}"`, the
@@ -3983,11 +3996,13 @@ tool (the one `loki` signals use, preferring a connector named Grafana):
   written. A returned line without a valid trace ID is not listed. An empty
   result says, for example, "No log lines with a trace ID in the last 2h. Clear
   "Only lines with a trace ID" to see every line." Unchecked, Find sends the
-  query as written and lists every line. Changing the checkbox clears the
-  results without a call. It is reader state; nothing is written to the board.
+  query as written and lists every line. Changing the checkbox clears that
+  search's results without a call. It is reader state; nothing is written to the board.
 - The result lists up to 10 lines, newest first: time (local, with seconds; the
-  UTC time is its tooltip, #1252), the value (or the
-  line text for a typed query), and the trace ID. The IDs are read from the
+  UTC time is its tooltip, #1252), the line text as Loki returns it (so a
+  `line_format` in the query shapes it; #1415), and the trace ID. The line's
+  tooltip is the full line; for a search with a `$value` slot it adds the
+  label and value, for example "Camera model: arch". The IDs are read from the
   line's structured metadata, then parsed labels, then stream labels, because
   Loki before 3.0 reports every label as a stream label. Unchecked, a line without the
   trace ID field says "This log line has no trace_id" (with the configured

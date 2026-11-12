@@ -184,9 +184,10 @@ export interface DirectTraceRequest {
     links: Array<{origin: string; path: string; query: Record<string, string>; timeEncoding: 'relative' | 'iso8601' | 'unix-seconds' | 'unix-milliseconds'}>;
     /** Span attribute names retained for traceMatch.attributes. */
     allowedAttributes?: string[];
-    /** Honeycomb dataset for allowedAttributes; without it they stay unobserved. With it Load makes a second
+    /** Honeycomb dataset that narrows the allowedAttributes query. Load makes a second
      * describe/call pair with `tool: 'run_query'` on the same server, for the loaded
-     * trace's attributes (#1197). A failure there only drops those attributes. */
+     * trace's attributes (#1197); without a dataset that query is environment-wide
+     * (`environment_wide_query: true`, #1414). A failure there only drops those attributes. */
     dataset?: string;
   };
 }

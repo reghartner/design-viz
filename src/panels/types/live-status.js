@@ -261,7 +261,7 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
         if(running){go.setAttribute('aria-busy','true');go.setAttribute('aria-disabled','true');}else{go.removeAttribute('aria-busy');go.removeAttribute('aria-disabled');}
         return go;
       }
-      // #1158: checked by default; Find then lists only lines with a trace ID. It applies to every box.
+      // #1158: checked by default; Find then lists only lines with a trace ID. #1415: it shows the shown search's own state.
       var traced=control(section,'traced','Only lines with a trace ID','checkbox');if(traced.checked!==logs.form.traced)traced.checked=logs.form.traced;
       // #1141: in Over time Find searches the selected day; name it.
       if(logs.search)el(section,'p','window','dv-trace-logs-window',logs.search);
@@ -307,7 +307,7 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
           // #1252: local time like the trace card it loads; the UTC time is in the title.
           var stamp=el(item,'time','time','dv-trace-log-time',row.time?liveStatusReadableTime(row.time,true):'time unavailable');
           if(row.time){stamp.setAttribute('datetime',row.time);stamp.setAttribute('title',row.time.replace('T',' ').replace(/(?:\.\d+)?Z$/,' UTC'));}else{stamp.removeAttribute('datetime');stamp.removeAttribute('title');}
-          el(item,'span','value','dv-trace-log-value',row.value).title=row.line;
+          el(item,'span','value','dv-trace-log-value',row.line).title=row.title;
           if(!row.traceId){el(item,'span','missing','dv-trace-log-missing',row.missing);return;}
           el(item,'code','trace','dv-trace-log-id',row.traceId);
           var load=el(item,'button','load','reader-button dv-trace-log-load tbtn','Load');load.type='button';load.setAttribute('aria-label','Load trace '+row.traceId);load._logIndex=i;load.disabled=!direct.available || direct.busy;
@@ -497,7 +497,7 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
         });
       }
       // Focus inside the card when it goes away (a Load's gap; it is swept after this render) returns to the next card's line once.
-      if(!trace.selected){stopListCap();var gone=host.querySelector('details.dv-trace-request');if(gone && gone.contains(doc.activeElement))host._traceCardFocus=true;if(slot)el(slot,'p','hint','dv-trace-slot-hint',trace.direct.busy?'Loading trace…':'Load a trace to show it here');if(trace.entries.length)returnedTraces(body);return;}
+      if(!trace.selected){var gone=host.querySelector('details.dv-trace-request');if(gone && gone.contains(doc.activeElement))host._traceCardFocus=true;if(slot)el(slot,'p','hint','dv-trace-slot-hint',trace.direct.busy?'Loading trace…':'Load a trace to show it here');if(trace.entries.length)returnedTraces(body);return;}
       var selected=trace.selected,e=selected.exemplar,model=selected.model,detail=el(slot || body,'section','selected','dv-trace-selected');detail.setAttribute('data-trace-id',e.traceId);
       // #1173: the request card (Returned traces and the selected request's details) is one collapsed line while it is shown.
       // #1186: the card shares its line with Show on diagram and Open trace, which sit outside the summary so they never toggle it.
@@ -572,10 +572,8 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
       var extent=Math.max.apply(null,e.spans.map(function(s){return s.startMs+s.ms;}).concat([1]));
       // #1177: in Edit mode a span row drags onto a step, a node or an edge to map it.
       var dragSpans=!!(value.edit && value.edit.active && model.mapSteps);
-      // #1280 (Chuck, option A): only while Edit-mode span dragging is on, the list is capped at about one screen and scrolls
-      // itself, so any row and the diagram it is dropped on are on screen together. Reading view has no inner scroll.
-      var capped=waterfall.classList.contains('dv-trace-waterfall-edit');waterfall.classList.toggle('dv-trace-waterfall-edit',dragSpans);
-      if(dragSpans && !capped)measureListCap(waterfall);watchListCap(dragSpans?waterfall:null);
+      // #1411: the list never scrolls itself. The panel body (pageCap) holds it, so in Edit mode too any row can be scrolled
+      // next to the diagram it is dropped on; this replaces #1280's Edit-mode list cap.
       e.spans.forEach(function(span){
         var item=el(waterfall,'div',span.id,'dv-trace-span-item'),row=el(item,'button','row','dv-trace-span'+(dragSpans && span.service && span.name?' dv-live-draggable':''));row.type='button';
         if(dragSpans && span.service && span.name)row.setAttribute('draggable','true');else row.removeAttribute('draggable');
@@ -645,33 +643,75 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
     function revealLoadedTrace(){
       var target=traceRevealTarget();if(target && target.getClientRects && target.getClientRects().length)revealInView(target,false);
     }
-    // #1280: the Edit-mode cap runs from the list's top to the window's bottom (CSS --dv-trace-list-top). It is measured when
-    // the cap turns on, and again once per animation frame after a resize or any scroll while it is on, so every row reaches
-    // the screen by scrolling the list alone wherever the page is scrolled. The listeners exist only while the cap is on.
-    function measureListCap(list){
-      if(!list.getBoundingClientRect || !list.style || !list.style.setProperty)return;
-      var view=doc.defaultView || (typeof window!=='undefined'?window:null),top=Math.round(Math.max(pageTop(view),list.getBoundingClientRect().top))+'px';if(list._traceCapTop===top)return;
-      list._traceCapTop=top;list.style.setProperty('--dv-trace-list-top',top);
+    /* #1411 (Chuck 2026-11-12: "stay ON THE PAGE"): in the Trace view the panel body scrolls inside the card, and the card's
+       height is capped to the visible page.
+       - In a fixed-size Explore window the card fills the window body (dv-live-fill, CSS only).
+       - Elsewhere (no section layout, a tile that grows to its content, an automatic Explore window, the Workbench
+         previews) the card's max-height runs from its top to the bottom of its bounding scroller: the window, or the
+         nearest scrolling ancestor that overflows (the Workbench page preview), kept once chosen so the cap does not flip
+         between the two. Lengths are divided by the card's scale (a scaled Explore window). The card is pinned (sticky)
+         below the reader's bar only when it is the last card in its column; a card after it would slide under it.
+       The cap is re-measured on each paint and, once per frame, after a resize or (for the last card, which is sticky) any
+       scroll while the Trace view is shown.
+       A hidden card or a hidden bounding scroller keeps the last cap. */
+    function boundingScroller(card,view){
+      if(card._liveBound && !(card._liveBound.contains && card._liveBound.contains(card)))card._liveBound=null;
+      for(var at=card.parentElement || (card.parentNode && card.parentNode.host) || null;at && at!==doc.body && at!==doc.documentElement;at=at.parentElement || (at.parentNode && at.parentNode.host) || null){
+        if(at.classList && at.classList.contains('explore-window'))return null;
+        if(at===card._liveBound)return at;
+        var style=view.getComputedStyle(at);
+        if(style && /(auto|scroll)/.test(style.overflowY) && at.scrollHeight>at.clientHeight+1){card._liveBound=at;return at;}
+      }
+      return null;
     }
-    function watchListCap(list){
-      var view=doc.defaultView;if(!list){stopListCap();return;}
-      host._traceCapList=list;if(host._traceCapWatch || !view || !view.addEventListener)return;
+    function measurePageCap(card){
+      var view=doc.defaultView || (typeof window!=='undefined'?window:null);
+      if(!view || !view.getComputedStyle || !card.getBoundingClientRect || !card.style || !card.style.setProperty)return;
+      var win=card.closest && card.closest('.explore-window'),fill=!!(win && !win.classList.contains('explore-window-automatic'));
+      card.classList.toggle('dv-live-fill',fill);card.classList.toggle('dv-live-on-page',!fill);if(fill)return;
+      // A hidden card (the Status panel hidden at a step) has no box: keep the last cap until it shows again.
+      if(card.getClientRects && !card.getClientRects().length)return;
+      // Sticky only as the last card of its column: a card after it (a log panel, Status controls) would slide under it.
+      var follows=false;for(var next=card.nextElementSibling;next;next=next.nextElementSibling)if(next.classList && next.classList.contains('pwidget') && next.getClientRects && next.getClientRects().length){follows=true;break;}
+      card.classList.toggle('dv-live-sticky',!follows);
+      var scroller=boundingScroller(card,view);
+      // A bounding scroller that is hidden (a closed Workbench page preview) has no box: keep the last cap until it shows.
+      if(scroller && scroller.getClientRects && !scroller.getClientRects().length)return;
+      var rect=card.getBoundingClientRect(),scale=card.offsetHeight?rect.height/card.offsetHeight || 1:1,bar=pageTop(view);
+      var box=scroller?scroller.getBoundingClientRect():null,edge=box?Math.max(box.top,bar):bar,bottom=box?Math.min(box.bottom,view.innerHeight):view.innerHeight;
+      var max=Math.max(160,Math.floor((bottom-Math.max(rect.top,edge)-8)/scale))+'px',sticky=Math.round(Math.max(0,edge-(box?box.top:0))/scale)+'px';
+      if(card._livePageMax!==max){card._livePageMax=max;card.style.setProperty('--dv-live-card-max',max);}
+      if(card._livePageSticky!==sticky){card._livePageSticky=sticky;card.style.setProperty('--dv-live-sticky-top',sticky);}
+    }
+    function pageCap(on){
+      var card=host.parentElement,view=doc.defaultView,watch=host._livePageWatch;
+      if(card && !(card.classList && card.classList.contains('pwidget')))card=null;
+      if(!on || !card){
+        if(host.classList)host.classList.remove('dv-live-on-page-body');
+        if(card && card.classList && (card.classList.contains('dv-live-on-page') || card.classList.contains('dv-live-fill'))){
+          card.classList.remove('dv-live-on-page');card.classList.remove('dv-live-fill');card.classList.remove('dv-live-sticky');card.style.removeProperty('--dv-live-card-max');card.style.removeProperty('--dv-live-sticky-top');
+          card._livePageMax=card._livePageSticky=card._liveBound=null;
+        }
+        if(watch){host._livePageWatch=null;watch._view.removeEventListener('resize',watch);watch._view.removeEventListener('scroll',watch,true);}
+        return;
+      }
+      host.classList.add('dv-live-on-page-body');measurePageCap(card);
+      if(watch || !view || !view.addEventListener)return;
       var frame=view.requestAnimationFrame?function(f){view.requestAnimationFrame(f);}:function(f){view.setTimeout(f,16);},queued=false;
-      var watch=host._traceCapWatch=function(){
+      watch=host._livePageWatch=function(ev){
+        // A card with a card after it is measured again on a resize, not on a scroll: growing as the page scrolls would push
+        // the next card down out of reach.
+        var c=host.parentElement;if(ev && ev.type==='scroll' && c && c.classList && !c.classList.contains('dv-live-sticky'))return;
         if(queued)return;queued=true;
-        frame(function(){queued=false;var l=host._traceCapList;if(live && host._traceCapWatch===watch && l && l.isConnected)measureListCap(l);});
+        frame(function(){queued=false;var c=host.parentElement;if(live && host._livePageWatch===watch && c && c.isConnected && c.classList.contains('pwidget'))measurePageCap(c);});
       };
       watch._view=view;view.addEventListener('resize',watch);view.addEventListener('scroll',watch,true);
-    }
-    function stopListCap(){
-      var watch=host._traceCapWatch;host._traceCapList=null;if(!watch)return;host._traceCapWatch=null;
-      watch._view.removeEventListener('resize',watch);watch._view.removeEventListener('scroll',watch,true);
     }
     // #1280: a successful Load reveals the loaded trace's top line (its request line). The trace itself can be taller than the
     // window now that the Spans list grows, and revealing all of it would align its top to the window's and move the page.
     function traceRevealTarget(){var selected=host.querySelector('.dv-trace-selected');return selected && (selected.querySelector('.dv-trace-request-line') || selected);}
-    // The closest element above `node` (crossing a shadow root) whose content scrolls vertically: the list itself while
-    // its Edit-mode cap is on (#1280), else the panel's container or none (the page).
+    // The closest element above `node` (crossing a shadow root) whose content scrolls vertically: in the Trace view the panel
+    // body (#1411), else the panel's container or none (the page).
     function scrollHolder(node){
       var view=doc.defaultView || (typeof window!=='undefined'?window:null);if(!view || !view.getComputedStyle)return null;
       for(var at=node.parentElement || (node.parentNode && node.parentNode.host) || null;at;at=at.parentElement || (at.parentNode && at.parentNode.host) || null){
@@ -834,8 +874,8 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
       epoch=host._livePaintEpoch=(host._livePaintEpoch || 0)+1;var focused=activeElement();host._liveFocusControls={};
       away=controlsElsewhere();
       sharedHeader(value,away?'edit':'all');
-      if(value && value.mode==='trace'){traceBody(value);sweep(host);revealTraceFocus();settleFocus(value);return;}
-      stopListCap();
+      if(value && value.mode==='trace'){traceBody(value);sweep(host);pageCap(true);revealTraceFocus();settleFocus(value);return;}
+      pageCap(false);
       var head=el(host,'div','head','dv-live-head');host._liveHead=head;
       // #986/#1162: the first row is the counts, then the provider action, then First blocker in a fixed slot at its top right, so
       // neither changing counts nor a button appearing can move it. The counts wrap onto more lines so every one shows in full;
@@ -985,7 +1025,7 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
     function controlsChanged(){var now=panelShown(host);if(now===seen)return;seen=now;if(api)repaintStatus(api);}
     entry.check=controlsChanged;
     if(role==='controls' && typeof ResizeObserver!=='undefined'){watch=new ResizeObserver(controlsChanged);watch.observe(host);}
-    function cleanup(){if(!live)return;live=false;stopFocusWatch();stopListCap();
+    function cleanup(){if(!live)return;live=false;stopFocusWatch();pageCap(false);
       var list=role==='controls'?controlPanels:statusPanels,at=list.indexOf(entry);if(at>=0)list.splice(at,1);if(watch)watch.disconnect();
       var owner=api;host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();
       if(role==='controls' && owner && !ending)repaintStatus(owner,[entry]);}
@@ -1031,7 +1071,17 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
 .dv-trace-source-select{display:block;width:100%;max-width:100%;margin-bottom:6px;font:inherit;color:inherit;background:transparent;border:1px solid var(--explore-border);padding:6px;border-radius:4px}.dv-trace-metadata,.dv-trace-all{margin-top:10px}.dv-trace-metadata summary,.dv-trace-all summary{cursor:pointer;color:var(--dfaint)}.dv-trace-mappings{max-height:220px;overflow:auto}.dv-trace-candidates{max-height:120px;overflow:auto;border:1px solid var(--explore-border);border-radius:6px;padding:8px}.dv-trace-source{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.dv-trace-source-label{width:100%;font-size:11px;color:var(--dfaint);overflow-wrap:anywhere}
 .dv-trace-logs{margin:12px 0 4px;padding-top:10px;border-top:1px solid var(--explore-border)}.dv-trace-logs-title{margin:0 0 4px;font-size:12px}.dv-trace-logs-window{margin:4px 0;color:var(--dfaint)}textarea.dv-trace-input{resize:vertical}.dv-trace-log-results{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}.dv-trace-log-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--explore-border);font-size:11px}.dv-trace-log-row:last-child{border-bottom:0}.dv-trace-log-time{color:var(--dfaint);white-space:nowrap}.dv-trace-log-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-log-id{grid-column:1/3;font-size:10px;overflow-wrap:anywhere}.dv-trace-log-missing{grid-column:1/-1;color:var(--dfaint)}.dv-trace-log-load{grid-column:3;grid-row:1/3}.dv-trace-log-report>.dv-trace-direct-report{margin-top:0}.dv-trace-log-row:has(+.dv-trace-log-report){border-bottom:0}
 .dv-trace-selected{min-width:0}.dv-trace-slot{margin:10px 0;min-width:0}.dv-trace-slot-hint{margin:0;padding:10px;border:1px dashed var(--explore-border);border-radius:6px;color:var(--dfaint);font-size:11px}.dv-trace-identity{overflow-wrap:anywhere}.dv-trace-age,.dv-trace-selection{font-size:10px;color:var(--dfaint)}
-.dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall.dv-trace-waterfall-edit{max-height:max(240px,calc(100vh - var(--dv-trace-list-top,200px) - 16px));overflow:auto}.dv-trace-waterfall{margin:0 0 12px;border:1px solid var(--explore-border);border-top:0;border-radius:0 0 6px 6px;padding:0 8px 8px}
+/* #1411: the Trace view keeps the panel on the page (pageCap). Screen only: print shows the whole list. The card ends at the
+   bottom of what the reader sees, and its min-height (a tile that grows to its content) gives way; as the last card of its
+   column it is sticky below the reader's bar. In a fixed-size Explore window it fills the window body. Either way the body
+   scrolls inside the card. */
+@media screen{
+.docview .pwidget.pt-live-status.dv-live-on-page,.docview .section-layout-tile>.pwidget.pt-live-status.dv-live-on-page{display:flex;flex-direction:column;box-sizing:border-box;min-height:0;max-height:var(--dv-live-card-max,none)}
+.docview .pwidget.pt-live-status.dv-live-on-page.dv-live-sticky{position:sticky;top:var(--dv-live-sticky-top,0px)}
+body .docview .section-viewport .explore-window-body>.pwidget.pt-live-status.dv-live-fill{display:flex;flex-direction:column;box-sizing:border-box;height:100%;min-height:0;overflow:hidden}
+.docview .pwidget.pt-live-status:is(.dv-live-on-page,.dv-live-fill)>.ptitle{flex:none}.docview .pwidget.pt-live-status:is(.dv-live-on-page,.dv-live-fill)>.pbody.dv-live-on-page-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior-y:contain}
+}
+.dv-trace-warnings{max-height:90px;overflow:auto}.dv-trace-waterfall{margin:0 0 12px;border:1px solid var(--explore-border);border-top:0;border-radius:0 0 6px 6px;padding:0 8px 8px}
 .dv-trace-span{width:100%;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;align-items:center;padding:5px 0;font-size:10px}.dv-trace-span[aria-pressed="true"]{background:color-mix(in srgb,var(--dv-live-active) 10%,transparent)}.dv-trace-span:focus-visible{outline:2px solid var(--dv-live-active)}.dv-trace-operation-detail{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;gap:6px;margin-top:12px;padding:8px;border:1px solid var(--explore-border);border-radius:6px}.dv-trace-operation-detail>*{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}.dv-trace-operation-detail small{grid-column:1/-1}.dv-trace-duration{font:700 13px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}.dv-trace-span .dv-trace-duration{grid-column:2;grid-row:1;white-space:nowrap}.dv-trace-operation-detail .dv-trace-duration{font-size:20px;line-height:1.4}.dv-trace-span-name{grid-column:1;grid-row:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-trace-track{grid-column:1/-1;grid-row:2;height:10px;background:color-mix(in srgb,var(--dink) 7%,transparent)}.dv-trace-bar{display:block;box-sizing:border-box;max-width:100%;height:10px;background:var(--dv-live-active)}.dv-trace-span[data-error="true"] .dv-trace-bar{background:var(--dv-live-blocked)}
 .dv-trace-mappings{display:grid;gap:5px}.dv-trace-mapping{display:grid;grid-template-columns:1fr auto;gap:2px 8px;border-left:3px solid var(--dfaint);padding:5px 8px}.dv-trace-mapping small{grid-column:1/-1;color:var(--dfaint)}.dv-trace-mapping[data-tone="error"]{border-color:var(--dv-live-blocked)}.dv-trace-mapping[data-tone="warning"]{border-color:#d49620}
 [data-trace-tone="error"]{--dv-trace-color:#d64b68}[data-trace-tone="warning"]{--dv-trace-color:#c88b14}[data-trace-tone="observed"]{--dv-trace-color:#368cc9}[data-trace-tone="unknown"]{--dv-trace-color:#87929e}

@@ -10,6 +10,7 @@
 | L6 | New log search drafts survive a re-render of the same selection; Enter in the label adds; the drafts clear after Add | board | input values after a re-render; after Enter | drafts lost on a repaint |
 | L7 | The section header names the count; one fold per search keyed by its id; a pick-list, typed or fixed search says which it is | two searches | header text; fold titles; kind notes | |
 | L8 | Command errors: bad id, duplicate id, missing label or query; an unknown search | telemetryEditPage | error texts | silent no-ops |
+| L9 (#1415) | "Only lines with a trace ID starts checked" writes requireTraceId false when cleared and removes the key when checked, one Undo step each; a non-boolean value is marked at the checkbox | one search | source; undo; aria-invalid + note | a string "false"; the key kept as true; a bad value dropping the search |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -162,4 +163,20 @@ test('L8 command errors name the problem',()=>{
   assert.equal(C.telemetryLookupId('注文',{}),'search-1');assert.equal(C.telemetryLookupId('注文',{'search-1':{}}),'search-2');
   assert.ok(C.telemetryLookupId('a'.repeat(100),{}).length<=40);assert.ok(!/-$/.test(C.telemetryLookupId('x'.repeat(39)+' y',{})));
   assert.equal(C.telemetryLookupId('Order ID',{}),'order-id');assert.equal(C.telemetryLookupId('Order ID',{'order-id':{}}),'order-id-2');assert.equal(C.telemetryLookupId('42 things',{}),'search-42-things');
+});
+
+test('L9 #1415 the "Only lines with a trace ID starts checked" checkbox writes requireTraceId false, or removes it when checked',()=>{
+  const ui=harness(board({lookups:{order:{label:'Order',query:QUERY}}})),start=ui.text,label='order Only lines with a trace ID starts checked';
+  const box=ui.control(label);assert.equal(box.type,'checkbox');assert.equal(box.checked,true,'checked by default, as in the Trace view');
+  assert.match(ui.row(label).closest('.frow').getAttribute('title') || box.title || '',/requireTraceId/,'the tooltip says what it writes');
+  box.checked=false;box.fire('change');ui.settle();assert.strictEqual(ui.lookups.order.requireTraceId,false);
+  ui.render();assert.equal(ui.control(label).checked,false,'the repaint shows it unchecked');
+  const again=ui.control(label);again.checked=true;again.fire('change');ui.settle();
+  assert.deepEqual(plain(ui.lookups.order),{label:'Order',query:QUERY},'checked is the default: the key is removed');
+  assert.equal(ui.undoSteps(),2,'one Undo step per change');assert.equal(ui.text,start);
+  // An authored non-boolean is marked at the checkbox with the validator's reason; the search keeps working with the default.
+  const bad=harness(board({lookups:{order:{label:'Order',query:QUERY,requireTraceId:'no'}}})),mark=bad.control(label);
+  assert.equal(mark.getAttribute('aria-invalid'),'true');
+  assert.equal(bad.section().querySelectorAll('p').find(p=>p.id===mark.getAttribute('aria-describedby'))?.textContent,'Must be true or false — the default true is used.','#1415: the search is kept, so no "drops this search"');
+  assert.equal(mark.checked,true,'the checkbox shows the default it falls back to');
 });

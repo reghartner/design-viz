@@ -109,8 +109,8 @@ function createTelemetryDirect(page,transport,hooks){
       update({requestAccepted:true,stage:'response'});stage='response';
       var trace=p.adapter==='honeycomb-table-v1'?telemetryHoneycombTrace(result,resolved.traceId,p.allowedAttributes):telemetryTempoTrace(result,resolved.traceId,p.allowedAttributes);check();
       // #1197: one run_query on the same server reads the allowed attributes Honeycomb get_trace omits.
-      if(p.provider==='honeycomb' && (p.allowedAttributes || []).length && trace.spans.length && !p.dataset)trace.warnings.push('Span attributes not loaded ('+p.allowedAttributes.join(', ')+'): the Honeycomb profile names no dataset.');
-      else if(p.provider==='honeycomb' && (p.allowedAttributes || []).length && trace.spans.length){
+      // #1414: without a dataset the query runs environment-wide.
+      if(p.provider==='honeycomb' && (p.allowedAttributes || []).length && trace.spans.length){
         // The trace is already accepted: the query has its own deadline (the time left of
         // this request's 30 seconds) and a timeout drops only the attributes.
         if(timeout){clearTimeout(timeout);timeout=null;}

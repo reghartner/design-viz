@@ -219,6 +219,13 @@ var FlowCanon = (function(){
     Object.keys(connections).forEach(function(id){(connections[id].allowedAttributes || []).forEach(function(k){(out[k]=out[k] || []).push(connections[id].provider);});});
     return out;
   }
+  /* #1414: a Honeycomb profile with allowedAttributes and no dataset reads them with an
+     environment-wide run_query; the validator says so as a note. */
+  function traceNotes(raw){
+    var connections=pageConnections(raw),notes=[];
+    Object.keys(connections).forEach(function(id){var c=connections[id];if(c.provider==='honeycomb' && (c.allowedAttributes || []).length && !c.dataset)notes.push('tracking.telemetry.traceConnections.'+id+': no `dataset`, so the allowedAttributes query (run_query) runs environment-wide across every dataset; add `dataset` to narrow it');});
+    return notes;
+  }
   /* Honeycomb trace attributes are text: get_trace table cells, and the run_query
      raw rows a Honeycomb profile reads its allowedAttributes from (#1197). */
   /* #1413: an attribute value is a scalar or an object; a malformed operator object is a warning
@@ -227,8 +234,6 @@ var FlowCanon = (function(){
   function attributeProblem(v){return typeof traceAttributeProblem==='function'?traceAttributeProblem(v):(['string','number','boolean'].includes(typeof v)?null:'unsupported value; this attribute matches no span');}
   function traceWarnings(raw){
     var listed=profileAttributes(raw),warnings=[],connections=pageConnections(raw);
-    // #1197: a Honeycomb profile reads allowedAttributes with run_query over its dataset.
-    Object.keys(connections).forEach(function(id){var c=connections[id];if(c.provider==='honeycomb' && (c.allowedAttributes || []).length && !c.dataset)warnings.push('tracking.telemetry.traceConnections.'+id+': allowedAttributes on a Honeycomb profile need `dataset` to fetch span attributes; without it they stay Not observed');});
     // #1413: a malformed operator object matches no span; say so where it is written.
     function operators(attrs,at){if(object(attrs))Object.keys(attrs).forEach(function(k){if(object(attrs[k])){var why=attributeProblem(attrs[k]);if(why)warnings.push(at+'.attributes.'+k+': '+why);}});}
     sections(raw).forEach(function(sec){
@@ -459,6 +464,6 @@ var FlowCanon = (function(){
   }
   /* #1238: the attribute names traceMatch.attributes accepts on this page, for the Workbench form. */
   function traceAttributeNames(raw){return traceAttributes.concat(Object.keys(profileAttributes(raw)).filter(function(k){return traceAttributes.indexOf(k)<0;}));}
-  return {version:1,traceWarnings:traceWarnings,traceDeclarationErrors:traceDeclarationErrors,traceReferenceMiss:traceReferenceMiss,referenceSpans:referenceSpans,referenceLit:referenceLit,traceCarrierErrors:traceCarrierErrors,traceAttributeNames:traceAttributeNames,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
+  return {version:1,traceWarnings:traceWarnings,traceNotes:traceNotes,traceDeclarationErrors:traceDeclarationErrors,traceReferenceMiss:traceReferenceMiss,referenceSpans:referenceSpans,referenceLit:referenceLit,traceCarrierErrors:traceCarrierErrors,traceAttributeNames:traceAttributeNames,clone:clone,http:http,entityRef:entityRef,pageOf:pageOf,sections:sections,contentSearchText:contentSearchText,serviceSummaries:serviceSummaries,sortServiceSummaries:sortServiceSummaries,catalog:catalog,binding:binding,
     referenceErrors:referenceErrors,locate:locate,codeUrl:codeUrl,references:references,validate:validate,links:links};
 })();

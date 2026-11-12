@@ -5,13 +5,13 @@ import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 /* #1411 (Chuck 2026-11-12): "the trace panel should not infinitely scroll that was a bad idea - you want it to stay ON THE
    PAGE so it's always next to the diagram." In the Trace view, with a 60-span trace loaded, the Status panel never reaches
-   past the window's bottom; the diagram stays on screen beside it; a real mouse wheel over the span list moves the spans
-   inside the panel while the panel and the page stay put (window.scrollY 0).
+   past the window's bottom; the diagram stays on screen beside it; a real mouse wheel over the span list scrolls the panel
+   body (the one scroller) while the panel and the page stay put (window.scrollY 0).
 | surface | fixture | broken implementation it rejects |
 |---|---|---|
 | plain | published reader (template/flowview.html, claude.ai host stub), no section layout | a panel that grows with its spans so the page scrolls |
 | tile | the same with a section layout whose tiles fit the window (the Status tile grows to its content) | a tile that grows past the window |
-| explore | the same board's Explore View: the Status panel in its floating window | a window that grows past the window or scrolls the page |
+| explore | the same board's Explore View: the Status panel in its floating window | a window that grows past the window, scrolls the page, or holds the panel in a second scroller |
 | workbench | the board pasted in the Workbench; the Status panel in the preview | a preview panel that grows past the window |
 Desktop only (1440x900). Page functions check the counts they find. */
 const PROFILE=JSON.parse(await readFile(path.join(repo,'tests/fixtures/trace-connection-profile.json'),'utf8'));
@@ -72,8 +72,8 @@ async function open(page,server,surface){
 const geometry=panel=>panel.evaluate(card=>{
  const box=el=>{const r=el.getBoundingClientRect();return {left:Math.round(r.left),top:Math.round(r.top),right:Math.round(r.right),bottom:Math.round(r.bottom)};};
  const shell=card.closest('.explore-window') || card,section=card.closest('.doc-sec') || document,boards=Array.from(section.querySelectorAll('.board')).filter(b=>b.getClientRects().length);
- const rows=card.querySelectorAll('.dv-trace-span');
- return {panel:box(shell),board:boards.length?box(boards[0]):null,boards:boards.length,rows:rows.length,firstRow:rows.length?rows[0].getBoundingClientRect().top:null,
+ const rows=card.querySelectorAll('.dv-trace-span'),body=card.querySelector(':scope>.pbody'),win=card.closest('.explore-window-body');
+ return {bodyTop:body?Math.round(body.scrollTop):null,windowBody:win?{scroll:win.scrollHeight,client:win.clientHeight}:null,panel:box(shell),board:boards.length?box(boards[0]):null,boards:boards.length,rows:rows.length,firstRow:rows.length?rows[0].getBoundingClientRect().top:null,
   pageY:Math.round((document.scrollingElement || document.documentElement).scrollTop),innerHeight};
 });
 const frames=page=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))));
@@ -88,6 +88,8 @@ for(const surface of ['plain','tile','explore','workbench']){
   expect(g.panel.bottom,'the Status panel ends inside the window'+where).toBeLessThanOrEqual(g.innerHeight);
   expect(g.pageY,'loading the trace did not scroll the page'+where).toBe(0);
   expect(g.board.top,'the diagram is on screen beside the panel; board '+JSON.stringify(g.board)).toBeLessThan(g.innerHeight-150);
+  // One scroller: in Explore the window body itself never overflows (no second scroller around the panel body).
+  if(surface==='explore')expect(g.windowBody.scroll,'the Explore window body does not scroll '+JSON.stringify(g.windowBody)).toBeLessThanOrEqual(g.windowBody.client+1);
   await page.screenshot({path:info.outputPath('trace-panel-on-page-'+surface+'.png')});
   // A real wheel over the span list moves the spans inside the panel; the panel and the page stay where they are.
   const row=panel.locator('.dv-trace-span').nth(2),b=await row.boundingBox();
@@ -96,5 +98,6 @@ for(const surface of ['plain','tile','explore','workbench']){
   await frames(page);const after=await geometry(panel);
   expect(after.panel,'the panel did not move'+where).toEqual(g.panel);
   expect(after.pageY,'the page did not scroll'+where).toBe(0);
+  expect(after.bodyTop,'what scrolled is the panel body'+where).toBeGreaterThan(100);
  });
 }

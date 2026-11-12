@@ -166,7 +166,7 @@ var BUILDER_GUIDES = {
   },
   edge: {
     title: 'Edge — one hop between nodes',
-    how: 'Edit the selected JSON, then click Render. from/to are node ids; the arrow, packets, and legend all follow kind.',
+    how: 'Edit the fields above. Text fields save when you leave them; choices save at once. from/to are node ids; the arrow, packets, and legend all follow kind.',
     fields: [
       ['from, to', 'node ids the hop connects'],
       ['fromPort, toPort', 'Exit/Entry side and position (%) pin the arrow on each card; Auto restores routing'],
@@ -182,7 +182,7 @@ var BUILDER_GUIDES = {
   },
   step: {
     title: 'Step — one numbered narrative beat',
-    how: 'Edit the selected JSON, then click Render. The same steps array drives the ambient packet schedule, the numbered coins, and the click-through.',
+    how: 'Edit the fields above. Text fields save when you leave them; choices save at once. The same steps array drives the ambient packet schedule, the numbered coins, and the click-through.',
     fields: [
       ['id', 'stable step identity used by paths and detail mappings; renaming updates those references'],
       ['edge', '"from->to" — the hop this step fires (or edges: [..] for hops that fire together)'],
@@ -208,7 +208,7 @@ var BUILDER_GUIDES = {
   },
   panel: {
     title: 'Panel — one synchronized inspector widget',
-    how: 'Edit the selected JSON, then click Render. Steps patch the panel by id; patches are sparse and folded, so jumping to any step is consistent.',
+    how: 'Edit the fields above. Text fields save when you leave them; choices save at once. Steps patch the panel by id; patches are sparse and folded, so jumping to any step is consistent.',
     fields: [
       ['id', 'the handle steps patch: "panels": {"<id>": {...}}'],
       ['type', 'widget kind: state leds gauge log screen queue inflight phone timeline … (full list in the authoring contract)'],
@@ -232,7 +232,7 @@ var BUILDER_GUIDES = {
   },
   para: {
     title: 'Paragraph — section prose',
-    how: 'Edit the text and Render. section.text is one string or a list of paragraph strings.',
+    how: 'Edit the text; it saves when you leave the field. section.text is one string or a list of paragraph strings.',
     fields: [
       ['text', 'plain prose; `code` spans render in monospace']
     ]
@@ -244,7 +244,7 @@ var BUILDER_GUIDES = {
   },
   crow: {
     title: 'Contract field — one "on the wire" row',
-    how: 'Edit the row and Render. Rows without a k key are skipped by the renderer.',
+    how: 'Edit the row. Text fields save when you leave them; choices save at once. Rows without a k key are skipped by the renderer.',
     fields: [
       ['k', 'field name (required)'],
       ['v', 'sample value'],
@@ -258,7 +258,7 @@ var BUILDER_GUIDES = {
   },
   tab: {
     title: 'Tab — one labeled group of sections',
-    how: 'Clicking a tab shows it AND selects it here. Edit the label and Render; + tab adds a sibling after this one; the arrows reorder; delete removes the tab and every section inside it.',
+    how: 'Clicking a tab shows it AND selects it here. Edit the tab here (text fields save when you leave them; choices save at once); + tab adds a sibling after this one; the arrows reorder; delete removes the tab and every section inside it.',
     fields: [
       ['label', 'the tab button text — tab identity for deep links and re-renders'],
       ['highlight', 'true, an accent token, or "#RRGGBB" — emphasizes the tab button'],
@@ -267,7 +267,7 @@ var BUILDER_GUIDES = {
   },
   section: {
     title: 'Section — one accent-colored box',
-    how: 'Edit the selected JSON, then click Render. Everything inside is optional; a section is prose, optional contract blocks, and an optional diagram.',
+    how: 'Edit the fields above. Text fields save when you leave them; choices save at once. Everything inside is optional; a section is prose, optional contract blocks, and an optional diagram.',
     fields: [
       ['heading', 'section heading'],
       ['collapsed', 'Initially collapse prose: starts paragraphs and bullets folded; diagrams and contracts stay visible'],

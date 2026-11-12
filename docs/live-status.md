@@ -3284,8 +3284,9 @@ before the narrowing is applied.
   counts every value, so it does not count. `true` needs one pinning filter. Lists join
   across levels, so a re-exporter can require more, never less. A replacing binding
   (no `extends`) keeps the provider carrier's requirement on every signal it writes, so
-  a restated query is not shown unless it narrows too; the validator warns at the
-  overlay. A signal an `extends` overlay adds to such a carrier keeps the same
+  a restated query is not shown unless it narrows too, also a signal a `use` template
+  writes (the requirement is kept on the binding); the validator warns at the overlay,
+  naming those signals. A signal an `extends` overlay adds to such a carrier keeps the same
   requirement, with the same warning: `needsNarrow` belongs to the canon carrier.
 - **Fail closed.** The signal is not queried and reads unobserved, with the reason in
   Proof ("Not shown: …") and the Metrics note, when: `needsNarrow` is unmet; a fragment is in another source's
@@ -3302,7 +3303,8 @@ before the narrowing is applied.
   get the provider's signal-level or carrier-level `links.query` unless it sets its
   own; a narrowed signal's card never falls back to the carrier's query link; and a
   signal that is not shown loses its query links. The text view prints "Not shown:
-  <reason>" in place of that signal's query.
+  <reason>" in place of that signal's query. A carrier's `links.dashboard` stays: it
+  opens the provider's own dashboard, which is not narrowed.
 - Pages need `flow.telemetry-narrow`.
 
 ### Named environment variables and counting scope

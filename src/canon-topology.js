@@ -194,7 +194,7 @@ var FlowTopology = (function(){
   }
   // #1353: what the provider carrier asks every board to narrow by, over all its signals (true wins).
   function telemetryCarrierNeeds(binding){
-    var needs=null,signals=object(binding) && object(binding.signals)?binding.signals:{};
+    var needs=object(binding)?telemetryNeedsMerge(null,binding.needsNarrow):null,signals=object(binding) && object(binding.signals)?binding.signals:{};
     Object.keys(signals).forEach(function(name){if(object(signals[name]))needs=telemetryNeedsMerge(needs,signals[name].needsNarrow);});
     return needs;
   }
@@ -275,7 +275,7 @@ var FlowTopology = (function(){
       else note('note',at,who+'this '+label+' patch replaces the provider\'s whole query; later provider changes to it no longer reach this board');
     });
   }
-  function applyTracking(value,addition,note,carrier){
+  function applyTracking(value,addition,note,carrier,templates){
     if(!addition)return;
     if(addition.missingWork===true)value.missingWork=true;
     if(addition.existsWhen==='tickets-done')value.existsWhen=addition.existsWhen;
@@ -290,9 +290,11 @@ var FlowTopology = (function(){
         // belongs to the canon carrier, not to the query text, so each signal written here keeps it.
         var needs=telemetryCarrierNeeds(value.telemetry);
         value.telemetry=clone(addition.telemetry);
-        if(needs && object(value.telemetry) && object(value.telemetry.signals)){
-          Object.keys(value.telemetry.signals).forEach(function(name){var sig=value.telemetry.signals[name];if(object(sig))sig.needsNarrow=telemetryNeedsMerge(sig.needsNarrow,needs);});
-          if(note)note('warning','','this binding replaces the provider\'s on '+carrier+', whose signals must be narrowed'+(needs===true?'':' by '+telemetryList(needs))+'; each signal here keeps that requirement');
+        // Kept on the binding, so it also reaches signals a consumer template writes when it is expanded.
+        if(needs && object(value.telemetry)){
+          value.telemetry.needsNarrow=telemetryNeedsMerge(value.telemetry.needsNarrow,needs);
+          var written=telemetryExpand(value.telemetry,templates || {},null),names=written && object(written.signals)?Object.keys(written.signals):[];
+          if(note)note('warning','','this binding replaces the provider\'s on '+carrier+', whose signals must be narrowed'+(needs===true?'':' by '+telemetryList(needs))+'; '+(names.length?(names.length>1?'its signals ':'its signal ')+telemetryList(names)+(names.length>1?' keep':' keeps'):'each signal here keeps')+' that requirement');
         }
       }
       else{
@@ -521,6 +523,8 @@ var FlowTopology = (function(){
           if(sources.some(function(other){return other.d!==provider;}))fail(where,'cannot merge exports from different provider sections; use separate imports and namespaces');
           var exp=Array.isArray(imp.export)?mergeExports(provider,names):clone(source.exp),nodes=provider.nodes || {};
           var providerTemplates=trackingTelemetry(byId.get(imp.spec).page).templates;
+          // The importing page's own templates, to name the signals a replacing `use` binding writes (#1353).
+          var consumerTemplates=trackingTelemetry(spec.page).templates;
           var providerRecord=typeof sectionRecords==='function'?sectionRecords(byId.get(imp.spec).page).find(function(record){return record.section.diagram===provider;}):null;
           var providerAt=(providerRecord?providerRecord.path:'section')+'.diagram';
           function dropped(kind,id,path){return function(problem){drops.push({kind:kind,id:id,spec:imp.spec,path:path+'.telemetry'+problem.path,message:problem.message});};}
@@ -563,7 +567,7 @@ var FlowTopology = (function(){
               else {if(value.handoff!=null)fail(where,'nodeDetails '+key+' conflicts with its inherited handoff');value.detail=clone(imp.nodeDetails[key]);}
             }
             if(own(imp.nodeCodeRefs || {},key))value.codeRefs=(value.codeRefs || []).concat(clone(imp.nodeCodeRefs[key]));
-            inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));applyTracking(value,(imp.nodeTracking || {})[key],telemetryNoted('nodeTracking',key),'node '+key);
+            inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));applyTracking(value,(imp.nodeTracking || {})[key],telemetryNoted('nodeTracking',key),'node '+key,consumerTemplates);
             inheritTrace(value,(imp.nodeTracking || {})[key],'node',spec,byId.get(imp.spec),traceDropped('nodes',prefix+key,providerAt+'.nodes.'+key),traceNoted('nodeTracking',key),referenceLit.nodes.indexOf(prefix+key)>=0?referenceSpans:null);
             if(imp.presentation)value.presentation=imp.presentation;
             Object.keys((imp.nodeOverrides || {})[key] || {}).forEach(function(field){var override=imp.nodeOverrides[key][field];if(override===null)delete value[field];else value[field]=clone(override);});
@@ -592,7 +596,7 @@ var FlowTopology = (function(){
           exp.edges.forEach(function(key){
             var matches=(provider.edges || []).filter(function(e){return e && edgeKey(e)===key;});
             if(matches.length!==1)fail(where,'missing or ambiguous exported edge '+key);
-            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));applyTracking(edge,(imp.edgeTracking || {})[key],telemetryNoted('edgeTracking',key),'connection '+key);
+            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));applyTracking(edge,(imp.edgeTracking || {})[key],telemetryNoted('edgeTracking',key),'connection '+key,consumerTemplates);
             inheritTrace(edge,(imp.edgeTracking || {})[key],'edge',spec,byId.get(imp.spec),traceDropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'),traceNoted('edgeTracking',key),referenceLit.edges.indexOf(importedEdge(key))>=0?referenceSpans:null);
             if(imp.presentation)edge.presentation=imp.presentation;
             if(!selected.has(edge.from) || !selected.has(edge.to))fail(where,'exported edge '+key+' must include both endpoints in exported nodes');

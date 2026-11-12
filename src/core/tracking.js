@@ -236,7 +236,8 @@ var TELEMETRY_KINDS=['call','queue','service','log-event','device'];
 var TELEMETRY_SOURCES=['grafana','loki','tempo','sql','honeycomb','cloudwatch','cloudwatchLogs'];
 var TELEMETRY_CARD_SIDES=['right','left','above','below'];
 var TELEMETRY_LINKS=['dashboard','query'];
-var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card'];
+// #1353: a binding-level needsNarrow applies to every signal of the binding, also ones a template writes.
+var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card','needsNarrow'];
 var TELEMETRY_RESERVED=TELEMETRY_BINDING_FIELDS.concat(['use','params']);
 var TELEMETRY_DEFAULT_WINDOW='24h',TELEMETRY_MIN_REFRESH_MS=300000,TELEMETRY_CARD_OFFSET_MAX=1000,TELEMETRY_CARD_WIDTH_MIN=140,TELEMETRY_CARD_WIDTH_MAX=480;
 var telemetryNamePattern=/^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -390,6 +391,10 @@ function telemetryClean(raw,warn,template){
     if(!Object.keys(signals).length){warn('.signals','needs at least one valid signal — '+(template?'template':'binding')+' ignored');ok=false;}
   }
   out.signals=signals;
+  if(!template && telemetryOwn(raw,'needsNarrow') && raw.needsNarrow!==null){
+    if(telemetryNeedsNarrowValid(raw.needsNarrow))out.needsNarrow=telemetryClone(raw.needsNarrow);
+    else warn('.needsNarrow','must be true or a list of the field names a board must narrow by — ignored');
+  }
   if(telemetryOwn(raw,'proof')){
     out.proof={};
     if(!telemetryObject(raw.proof))warn('.proof','must be an object of per-signal limits — ignored');
@@ -462,7 +467,7 @@ function telemetryExpand(raw,templates,invalid){
   if(missing)return null;
   var base={};Object.keys(template).forEach(function(key){if(key!=='params' && key!=='card')base[key]=telemetryClone(template[key]);});
   var out=telemetrySubstitute(base,values);
-  ['kind','card'].forEach(function(key){if(telemetryOwn(raw,key))out[key]=telemetryClone(raw[key]);});
+  ['kind','card','needsNarrow'].forEach(function(key){if(telemetryOwn(raw,key))out[key]=telemetryClone(raw[key]);});
   ['signals','proof','links'].forEach(function(key){
     if(!telemetryOwn(raw,key))return;
     if(!telemetryObject(raw[key])){warn('.'+key,'must be an object — carrier '+key+' ignored');return;}
@@ -568,6 +573,9 @@ function carrierTelemetry(obj,templates,invalid,environment){
   var clean=telemetryClean(expanded,warn,false);
   if(!clean)return null;
   var signals={},unnarrowedLinks=false;
+  // #1353: the binding's needsNarrow (the canon carrier's, kept by an importer's replacing binding)
+  // joins every signal's, after template expansion, so a template cannot write around it.
+  if(clean.needsNarrow)Object.keys(clean.signals).forEach(function(name){clean.signals[name].needsNarrow=telemetryNeedsMerge(clean.signals[name].needsNarrow,clean.needsNarrow);});
   Object.keys(clean.signals).forEach(function(name){
     var entry=clean.signals[name],source=TELEMETRY_SOURCES.filter(function(key){return telemetryOwn(entry,key);})[0];
     signals[name]={source:source,query:entry[source],unit:telemetryOwn(entry,'unit')?entry.unit:null};

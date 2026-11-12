@@ -526,6 +526,16 @@ state for (an `unknown` ticket does not count; a warning when none, since they w
 recorded with the first one. A file that is not a snapshot, or larger than 8 MB, is refused there
 with its reason.
 
+While **Demo live status** or a snapshot shows (#1241), the Epic status panel's Tickets rows
+drag onto a node or connection on the desktop canvas, as in the shared board's Edit mode and
+with the same drop targets (the card or line highlights while a row is over it). The drop
+adds the ticket key there (a move is not offered; an imported carrier gets the consumer
+overlay), as one Undo step, and selects that carrier so Inspect → Tracking shows it. With a
+snapshot this includes the epic's tickets that are on no element yet (**NOT ON DIAGRAM**).
+A drop that cannot be made says why in the Epic status line.
+The Workbench never calls Jira: the list comes only from the demo or a loaded snapshot.
+The keyboard way is Inspect → Tracking → **Add ticket**, which the list's hint names.
+
 ### Trace spans on a node or connection
 
 Select a node or connection and open **Inspect → Tracking → Trace spans** (desktop) to edit

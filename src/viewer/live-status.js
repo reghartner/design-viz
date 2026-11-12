@@ -816,6 +816,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // #828: the shared-board editor outlives this controller (each edit re-renders the page); Workbench authoring never edits here.
   var editor=!authoring && renderOptions && renderOptions.boardEditor || null;
   function editing(){return !!(editor && editor.state().active);}
+  /* #1241: in the desktop Workbench a Tickets row drags onto a node or connection through the same drop
+     targets as Edit mode; ticketDrop(ref, key) writes it into the authored source (one Undo step). */
+  var ticketDrop=authoring && renderOptions && typeof renderOptions.ticketDrop==='function'?renderOptions.ticketDrop:null;
   var destroyListeners=[],listeners=[],bindings=[],observer=null,frame=0,firstPaint=0,painting=false;
   var provider=typeof options.provider==='function'?options.provider:null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
@@ -1396,7 +1399,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       overTime:overTimeState(),
       // #1253: no provider, no host-applied map and no connector adapter: the page cannot show live status here.
       noProvider:!provider && !applied && !demoMode && connection.state==='none' && (refs().tickets.length || refs().epics.length)?{prs:refs().prs.slice()}:null,
-      editHistory:copy(editHistory),edit:editState(),
+      editHistory:copy(editHistory),edit:editState(),ticketDrag:!!ticketDrop,
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
       connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+clockTime(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}},
       metrics:metricsSnapshot(),mode:statusMode,trace:traceSnapshot()};
@@ -1845,7 +1848,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
      carrier of this page. Detail pages loaded from other specs are not editable. */
   var EDIT_TICKET_TYPE='application/x-flowview-ticket',dropOver=null;
   function dropRef(target){
-    if(!editing() || !target || !target.closest)return null;
+    if(!(editing() || ticketDrop) || !target || !target.closest)return null;
     var inside=bindings.filter(function(binding){return binding.ordinal!=null && binding.el.contains(target);});
     var binding=inside.filter(function(candidate){return !inside.some(function(other){return other!==candidate && candidate.el.contains(other.el);});})[0];
     if(!binding)return null;
@@ -1890,11 +1893,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
     ev.preventDefault();
     var key=ev.dataTransfer.getData(EDIT_TICKET_TYPE);if(!trackingKeyPattern.test(key))return;
     // The editor re-renders the page; leave this event's dispatch first.
-    setTimeout(function(){if(editor)editor.add(hit.ref,key);},0);
+    setTimeout(function(){
+      if(editor){editor.add(hit.ref,key);return;}
+      if(!ticketDrop || retired)return;
+      // #1241: a refused Workbench drop says why in the panel's status line.
+      var result=ticketDrop(hit.ref,key);
+      if(result && typeof result.error==='string' && !retired){noteText=result.error;noteKind='warn';notify();}
+    },0);
   }
-  if(editor){
+  if(editor || ticketDrop){
     view.addEventListener('dragover',dragOver);view.addEventListener('dragleave',dragLeave);view.addEventListener('drop',drop);view.addEventListener('dragend',dragEnd);
-    var offEditor=editor.onChange(function(){if(!retired){paint();notify();}});
+    var offEditor=editor?editor.onChange(function(){if(!retired){paint();notify();}}):function(){};
     destroyListeners.push(function(){offEditor();setDropOver(null);view.removeEventListener('dragover',dragOver);view.removeEventListener('dragleave',dragLeave);view.removeEventListener('drop',drop);view.removeEventListener('dragend',dragEnd);restoreTitles();});
   }
   function sourceBindings(){

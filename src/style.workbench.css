@@ -871,6 +871,15 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .metrics-fold{min-width:0;margin:6px 0;}
 .metrics-fold>.frow,.metrics-fold>.fnote{margin-top:6px;}
 .metrics-fold .metrics-fold{margin-left:8px;}
+/* #1239 Status board settings → Traces. */
+.trace-connections .trace-connection,.trace-connections .trace-connections-resolved{min-width:0;margin:8px 0;padding:8px;border:1px solid var(--line);border-radius:7px;}
+.trace-connections fieldset>legend{padding:0 4px;font-weight:650;}
+.trace-connections .trace-connection-environments{min-width:0;margin:6px 0 0;padding:6px;border:1px dashed var(--line);border-radius:7px;}
+.trace-connections .trace-connection-attribute{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;}
+.trace-connections .trace-connection-attribute>span{min-width:0;overflow-wrap:anywhere;}
+.trace-connections .trace-connection-warning{margin:2px 0;padding-left:6px;border-left:3px solid #D99A1E;color:var(--ink);}
+.trace-connections .trace-connections-resolved-list{margin:4px 0 0;padding-left:18px;}
+.trace-connections .trace-connections-resolved-list li{overflow-wrap:anywhere;}
 /* #1240 Metrics variable rows and field warnings. */
 .metrics-variables{min-width:0;margin:8px 0;padding:8px;border:1px solid var(--line);border-radius:7px;}
 .metrics-variables>legend{padding:0 4px;font-weight:650;}

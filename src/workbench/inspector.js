@@ -10,6 +10,8 @@ function createBuilderInspector(opts){
   var proseDraft={key:null,fields:Object.create(null)};
   // #1233: uncommitted New log search text in Status board settings; cleared when the selection changes.
   var LOG_SEARCH_DRAFTS=new Map();
+  // #1239: uncommitted new allowed attribute text in Status board settings → Traces; cleared when the selection changes.
+  var TRACE_CONNECTION_DRAFTS=new Map();
   // #1237: uncommitted New dependency text and the focus target after a dependency edit; cleared when the selection changes.
   var JIRA_DRAFTS=new Map();
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
@@ -52,7 +54,7 @@ function createBuilderInspector(opts){
     if(!same){
       OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_SPAN_DRAFTS.clear();TRACE_SCOPE_VIEW.clear();TRACE_MATCH_REVEALED.clear();
       OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;FORM_NOTICE=null;
-      LOG_SEARCH_DRAFTS.clear();JIRA_DRAFTS.clear();
+      LOG_SEARCH_DRAFTS.clear();TRACE_CONNECTION_DRAFTS.clear();JIRA_DRAFTS.clear();
     }
     if(!same)METRICS_DRAFTS.clear();
     retireForm();
@@ -1103,6 +1105,17 @@ function logSearchesControls(warnings){
     var state=telemetryLookupState(snapshot.raw);state.warnings=warnings || [];
     return createFlowLogSearches({document:document,state:state,controls:metricsControlKit(),listen:listen,drafts:LOG_SEARCH_DRAFTS,idPrefix:prefix+'-log-search',
       later:function(fn){opts.schedule(function(){if(!disposed)fn();},0);},commit:function(edit){
+      return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
+    }});
+  }
+/* #1239: Status board settings → Traces (tracking.telemetry.traceConnections). */
+function companyTraceProfiles(){return typeof TELEMETRY_COMPANY_TRACE_CONNECTIONS!=='undefined' && specObject(TELEMETRY_COMPANY_TRACE_CONNECTIONS)?TELEMETRY_COMPANY_TRACE_CONNECTIONS:{};}
+function traceConnectionsControls(warnings){
+    var snapshot=parseEditor();if(snapshot.error)return null;
+    var company=companyTraceProfiles(),state=telemetryTraceConnectionState(snapshot.raw,company),doc=builderDocumentPage(snapshot.raw);state.warnings=warnings || [];
+    var t=doc && specObject(doc.page.tracking) && specObject(doc.page.tracking.telemetry)?doc.page.tracking.telemetry:{};
+    state.company=company;
+    return createFlowTraceConnections({document:document,state:state,company:company,authored:t.traceConnections,controls:metricsControlKit(),listen:listen,drafts:TRACE_CONNECTION_DRAFTS,idPrefix:prefix+'-trace-connections',commit:function(edit){
       return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }
@@ -3288,7 +3301,14 @@ function boardForm(){
     var hasTelemetry=Object.prototype.hasOwnProperty.call(tracking,'telemetry');
     var jira=section('jira','Jira',count(warnings.jira) || jiraStatus.join(' · ') || 'Not set',warnings.jira.length>0);
     var metrics=section('metrics','Metrics',count(warnings.metrics) || (!hasTelemetry?(statusBoardHasBindings(raw)?'No page settings':'Not set'):telemetry.enabled===false?'Off':''),hasTelemetry || warnings.metrics.length>0);
-    var traces=section('traces','Traces',count(warnings.traces) || 'No settings yet',warnings.traces.length>0);
+    // #1239: the header names how many connections readers can choose, or that the board inherits them.
+    var traceState=telemetryTraceConnectionState(raw,companyTraceProfiles()),traceCount=Object.keys(traceState.resolved).length;
+    // It names what readers get: the resolver's answer, never the number of company profiles.
+    var traceStatus=!traceState.enabled && (traceState.present || traceState.companyIds.length)?'Off':
+      traceState.present?(traceCount?traceCount+(traceCount===1?' connection':' connections'):'None'):
+      traceCount?'Inherits '+traceCount+(traceCount===1?' company profile':' company profiles'):
+      traceState.companyIds.length?(traceState.usesTraces?'None':'Not used (no traces)'):'Not set';
+    var traces=section('traces','Traces',count(warnings.traces) || traceStatus,warnings.traces.length>0);
     var environments=section('environments','Environments',count(warnings.environments) || environmentIds.join(', '),warnings.environments.length>0);
     var lookupSet=specObject(telemetry.lookups)?Object.keys(telemetry.lookups).length:0;
     var lookups=section('lookups','Log searches',count(warnings.lookups) || (!Object.prototype.hasOwnProperty.call(telemetry,'lookups')?'Not set':lookupSet?lookupSet+(lookupSet===1?' search':' searches'):'Typed query only'),warnings.lookups.length>0);
@@ -3297,8 +3317,7 @@ function boardForm(){
     warningList(jira,warnings.jira,'Jira warnings');
     var metricsForm=metricsSettingsControls(environments,warnings.metrics,warnings.environments);if(metricsForm)metrics.appendChild(metricsForm);
     warningList(environments,warnings.environments,'Environments warnings');
-    note(traces,'No settings yet. Trace connections choose which company trace profiles this board uses; for now, edit tracking.telemetry.traceConnections in JSON.'+
-      (Object.prototype.hasOwnProperty.call(telemetry,'traceConnections')?' This board sets it.':''));
+    var tracesForm=traceConnectionsControls(warnings.traces);if(tracesForm)traces.appendChild(tracesForm);
     warningList(traces,warnings.traces,'Traces warnings');
     var lookupsForm=logSearchesControls(warnings.lookups);if(lookupsForm)lookups.appendChild(lookupsForm);
     return rows;

@@ -233,6 +233,16 @@ function telemetryEditBinding(binding,edit,options){
     }else if(edit.field==='showOnCard' || edit.field==='missingMeansZero'){
       if(typeof edit.value!=='boolean')return {error:edit.field==='showOnCard'?'Show on card must be a boolean.':'missingMeansZero must be a boolean.'};
       if(source)next[source]=entry[source];
+    }else if(edit.field==='role'){
+      // #1240: "error" is the only role; null removes it.
+      if(edit.value!=null && edit.value!=='error')return {error:'A signal role is "error" or none.'};
+      if(source)next[source]=entry[source];
+    }else if(edit.field==='window'){
+      if(edit.value!=null){
+        if(source==='cloudwatch')return {error:'CloudWatch signals always cover the page window; set the window in the CloudWatch query.'};
+        if(!telemetryWindowDuration(edit.value))return {error:'Use a duration such as 30m, 1h, 7d or now-7d, or clear it to use the page window.'};
+      }
+      if(source)next[source]=entry[source];
     }else if(edit.field==='unit' || edit.field==='scope' || edit.field==='label' || edit.field==='queryLink'){
       if(source)next[source]=entry[source];
       // #1194: scope "" is authored on purpose: it hides the scope line.
@@ -244,8 +254,10 @@ function telemetryEditBinding(binding,edit,options){
     var showOnCard=edit.field==='showOnCard'?edit.value:entry.showOnCard;if(typeof showOnCard==='boolean')next.showOnCard=showOnCard;
     // Checking the box returns to the default by removing the key.
     var missingMeansZero=edit.field==='missingMeansZero'?(edit.value===false?false:null):entry.missingMeansZero;if(typeof missingMeansZero==='boolean' && (next.loki!==undefined || next.grafana!==undefined))next.missingMeansZero=missingMeansZero;
-    if(telemetryOwn(entry,'window'))next.window=entry.window;
-    if(telemetryOwn(entry,'role'))next.role=entry.role;
+    if(edit.field==='window'){if(edit.value!=null)next.window=edit.value.trim();}
+    else if(telemetryOwn(entry,'window'))next.window=entry.window;
+    if(edit.field==='role'){if(edit.value!=null)next.role=edit.value;}
+    else if(telemetryOwn(entry,'role'))next.role=entry.role;
     var label=edit.field==='label'?edit.value:entry.label;
     if(label!=null){if(!telemetryText(label) || label.length>120 || /[\x00-\x1f\x7f]/.test(label))return {error:'A label is 1–120 plain-text characters without control characters.'};next.label=label.trim();}
     var queryLink=edit.field==='queryLink'?edit.value:entry.links && entry.links.query;
@@ -449,6 +461,48 @@ function telemetryTraceConnectionState(raw,company){
   return {present:present,valid:valid,map:map,companyIds:Object.keys(company),profiles:profiles,entries:entries,inline:inline,
     resolved:resolved,usesTraces:!!page && FlowTraceConnections.usesTraces(page),enabled:t.enabled!==false};
 }
+/* #1240: one shared (edit.environment null) or environment variable row: action add, rename,
+   value or remove. Names and values follow the validator: a non-reserved name and non-empty text.
+   Entries the rows cannot read stay as written. */
+var TELEMETRY_RESERVED_VARIABLES=['env','account','constructor','prototype','__proto__'];
+function telemetryEditVariable(t,edit,done){
+  var holder=t,env=edit.environment;
+  if(env!=null){
+    var profiles=telemetryObject(t.environments)?t.environments:{};
+    if(typeof env!=='string' || !telemetryOwn(profiles,env) || !telemetryObject(profiles[env]))return {error:'Choose a configured environment.'};
+    holder=profiles[env];
+  }
+  if(telemetryOwn(holder,'variables') && !telemetryObject(holder.variables))return {error:'Variables here are not an object; repair them in JSON first.'};
+  var vars=telemetryObject(holder.variables)?holder.variables:{},name=edit.name,action=edit.action;
+  function nameProblem(n){
+    if(typeof n!=='string' || !telemetryParamPattern.test(n))return 'Variable names start with a letter and use letters, digits and _.';
+    return TELEMETRY_RESERVED_VARIABLES.indexOf(n)>=0?'"'+n+'" is reserved; choose another name.':'';
+  }
+  function valueProblem(v){return telemetryText(v)?'':'A variable value is non-empty text; use Remove to delete the variable.';}
+  var problem;
+  if(action==='add'){
+    if(name==null || name==='')return {error:'Type a variable name.'};
+    if((problem=nameProblem(name)))return {error:problem};
+    if(telemetryOwn(vars,name))return {error:'Variable "'+name+'" already exists; edit its value instead.'};
+    if((problem=valueProblem(edit.value)))return {error:problem};
+    vars[name]=edit.value.trim();
+  }else{
+    if(typeof name!=='string' || !telemetryOwn(vars,name))return {error:'Variable "'+name+'" not found. Reopen Status board settings.'};
+    if(action==='remove')delete vars[name];
+    else if(action==='rename'){
+      if(edit.to==null)return {error:'A variable needs a name; use Remove to delete it.'};
+      if(edit.to===name)return done();
+      if((problem=nameProblem(edit.to)))return {error:problem};
+      if(telemetryOwn(vars,edit.to))return {error:'Variable "'+edit.to+'" already exists.'};
+      vars=telemetryRenameKey(vars,name,edit.to);
+    }else if(action==='value'){
+      if((problem=valueProblem(edit.value)))return {error:problem};
+      vars[name]=edit.value.trim();
+    }else return {error:'Unknown variable edit.'};
+  }
+  if(Object.keys(vars).length)holder.variables=vars;else delete holder.variables;
+  return done();
+}
 /* One edit of the page `tracking.telemetry` block; null removes the block. */
 function telemetryEditPage(telemetry,edit){
   var t=telemetryObject(telemetry)?telemetryClone(telemetry):{},op=edit && edit.op;
@@ -459,7 +513,7 @@ function telemetryEditPage(telemetry,edit){
     // #1254 item 9: true is the default, so it is not written.
     if(edit.value)delete t.enabled;else t.enabled=false;return done();
   }
-  if(op==='addEnvironment' || op==='removeEnvironment' || op==='environment' || op==='environmentSetting'){
+  if(op==='addEnvironment' || op==='removeEnvironment' || op==='environment' || op==='environmentSetting' || op==='renameEnvironment'){
     var profiles=telemetryObject(t.environments)?t.environments:{},id=edit.name;
     if(op==='environment'){
       if(typeof edit.value!=='string' || !telemetryOwn(profiles,edit.value))return {error:'Choose a configured environment.'};
@@ -470,6 +524,15 @@ function telemetryEditPage(telemetry,edit){
       if(telemetryOwn(profiles,id))return {error:'Environment "'+id+'" already exists.'};
       Object.defineProperty(profiles,id,{value:{},enumerable:true,writable:true,configurable:true});
       if(!t.environment)t.environment=id;
+    }else if(op==='renameEnvironment'){
+      // #1240: the profile keeps its place and settings; a default that named it follows the new id.
+      if(!telemetryOwn(profiles,id))return {error:'Choose a configured environment.'};
+      if(edit.to==null)return {error:'An environment needs an id; use Remove environment '+id+' to delete it.'};
+      if(typeof edit.to!=='string' || !telemetryNamePattern.test(edit.to))return {error:'Environment ids start with a letter and use letters, digits, - and _.'};
+      if(edit.to===id)return done();
+      if(telemetryOwn(profiles,edit.to))return {error:'Environment "'+edit.to+'" already exists.'};
+      profiles=telemetryRenameKey(profiles,id,edit.to);
+      if(t.environment===id)t.environment=edit.to;
     }else{
       if(!telemetryOwn(profiles,id))return {error:'Choose a configured environment.'};
       if(op==='removeEnvironment'){
@@ -482,6 +545,10 @@ function telemetryEditPage(telemetry,edit){
     }
     if(Object.keys(profiles).length)t.environments=profiles;else {delete t.environments;delete t.environment;}
     return done();
+  }
+  if(op==='variable'){
+    if(telemetry!=null && !telemetryObject(telemetry))return {error:'Metrics settings are not an object; repair tracking.telemetry in JSON first.'};
+    return telemetryEditVariable(t,edit,done);
   }
   if(op==='variables'){
     if(edit.value==null || edit.value===''){delete t.variables;return done();}

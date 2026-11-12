@@ -132,7 +132,8 @@ test('T18 focus stays in the form after Remove and Add buttons and lands on the 
   assert.equal(ui.focused,ui.button('Remove ticket 1'),'the next row takes the removed row\'s place and its focus');
   ui=harness(page({tracking:{telemetry:{grafana:{prometheus:'prom'}}}}),BOARD);
   ui.control('New environment id').value='qa';ui.click('Add environment');
-  assert.equal(ui.focused,ui.control('qa Grafana Prometheus UID'),'focus moves into the new environment');
+  // #1240: a new environment's first control is its id (rename).
+  assert.equal(ui.focused?.getAttribute('aria-label'),'qa environment id','focus moves into the new environment');
   const edge=page();edge.page.sections[0].diagram.edges[0].telemetry={kind:'call',signals:{rate:{grafana:'up',unit:'req/s'}}};
   ui=harness(edge,EDGE);
   ui.control('New signal name').value='errors';ui.control('New signal query').value='errors_total';ui.click('Add signal');

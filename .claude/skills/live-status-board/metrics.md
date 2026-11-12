@@ -43,7 +43,7 @@ does not answer:
   canonical duration is `6h`; Honeycomb receives signed `from: "-6h"` for metrics
   and native trace search/detail, including imported carriers. Other providers
   retain their conventions, such as Grafana `now-6h` and Tempo RFC3339 bounds.
-  Invalid values warn and use `24h`.
+  Future offsets, zero and dates warn and use `24h`.
 
 Bind only the carriers the author selects. Never derive a query, datasource,
 dataset or trace id from a node id, title or service-like name. A matching name

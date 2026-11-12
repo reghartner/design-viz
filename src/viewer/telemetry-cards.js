@@ -9,7 +9,9 @@ function telemetryClearCards(scope){
 function telemetryCardValue(binding,sample,name,pending,window){
   if(!name || !binding.signals[name] || proofVerdicts.isTraceSignal(binding.signals[name]))return 'not bound';
   var reading=telemetryReading(sample,name),unit=binding.signals[name].unit,span=window?telemetrySpanNote(binding.signals[name],window):'';
-  return reading.value===null?(pending && pending[name]?'Loading…':'unobserved'):(Number.isSafeInteger(reading.value)?reading.value.toLocaleString('en-US'):Math.abs(reading.value)>=1e9 || reading.value!==0 && Math.abs(reading.value)<.0001?reading.value.toExponential(3):Number(reading.value.toPrecision(4)).toLocaleString('en-US'))+(unit?' '+unit:'')+(span?' · '+span:'')+(sample && sample.signals && sample.signals[name] && sample.signals[name].provenance==='formatted-text'?' (formatted text; may be rounded)':'')+(pending && pending[name]?' · Refreshing…':'');
+  // #1404: a query that succeeded with no data reads "no data", not unobserved.
+  var empty=sample && telemetryObject(sample.signals) && telemetryObject(sample.signals[name]) && sample.signals[name].empty===true;
+  return reading.value===null?(pending && pending[name]?'Loading…':empty?'no data':'unobserved'):(Number.isSafeInteger(reading.value)?reading.value.toLocaleString('en-US'):Math.abs(reading.value)>=1e9 || reading.value!==0 && Math.abs(reading.value)<.0001?reading.value.toExponential(3):Number(reading.value.toPrecision(4)).toLocaleString('en-US'))+(unit?' '+unit:'')+(span?' · '+span:'')+(sample && sample.signals && sample.signals[name] && sample.signals[name].provenance==='formatted-text'?' (formatted text; may be rounded)':'')+(pending && pending[name]?' · Refreshing…':'');
 }
 /* Display metadata never changes the pure proof inputs. Carrier query links are
    a legacy fallback only for a single numeric signal; mixed rows own their URLs. */

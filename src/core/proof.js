@@ -31,6 +31,9 @@
               milliseconds or an ISO string.
      Adapters distinguish successful empty counts from unobserved results. A
      signal with neither a finite value nor a finite point is unobserved.
+     empty    true when the query succeeded but returned no data (#1404). Only
+              end-to-end metrics reads it, as a measured 0; otherwise such a
+              signal stays unobserved.
 
    input.steps  [{id, carriers: [carrier id, ...], tickets?}]: each step's
        directly selected carriers (liveStatusStepCarriers(diagram, step, true)).
@@ -67,7 +70,7 @@
      flowing     an observed finite minimum exists and every limit holds
 
    End-to-end metrics (options.endToEndMetrics === true, #1404): Jira is not an
-   input. jira is null, since.doneAt is null and step ticket narrowing is not
+   input. A signal sample {empty: true} without a value reads as 0. jira is null, since.doneAt is null and step ticket narrowing is not
    used. A bound carrier is counted when at least one signal has a finite min or
    max limit; it then gets one verdict, first match wins:
      null       nothing observed yet, or a limit or rate-like signal is pending
@@ -183,7 +186,7 @@ var proofVerdicts = (function(){
     var signals = proofObject(carrier) && proofObject(carrier.signals) ? carrier.signals : {};
     return Object.keys(signals).filter(function(name){ return proofObject(signals[name]) && !isTraceSignal(signals[name]); });
   }
-  function proofReading(sample, name, unit){
+  function proofReading(sample, name, unit, emptyIsZero){
     var entry = proofObject(sample) ? proofOwn(sample.signals, name) : undefined;
     if (!proofObject(entry)) return null;
     var points = (Array.isArray(entry.series) ? entry.series : []).filter(function(point){
@@ -191,6 +194,7 @@ var proofVerdicts = (function(){
     });
     var value = proofNumber(entry.value);
     if (value === null && points.length) value = points[points.length - 1][1];
+    if (value === null && emptyIsZero && entry.empty === true) value = 0;
     if (value === null) return null;
     return {value: value, points: points, unit: unit || (typeof entry.unit === 'string' ? entry.unit : ''),
       zero: value === 0 && points.every(function(point){ return point[1] === 0; })};
@@ -214,7 +218,7 @@ var proofVerdicts = (function(){
     return checks.indexOf(null) >= 0 ? null : true;
   }
   /* {state, failing, readings, rateLike} for a bound carrier; null when unbound. */
-  function proofTelemetry(carrier, sample){
+  function proofTelemetry(carrier, sample, emptyIsZero){
     var names = proofSignals(carrier);
     if (!names.length) return null;
     var proof = {}, authored = proofObject(carrier.proof) ? carrier.proof : {}, readings = Object.create(null), observed = 0;
@@ -222,7 +226,7 @@ var proofVerdicts = (function(){
     var rateLike = [], failing = [], pending = false;
     names.forEach(function(name){
       var declared = typeof carrier.signals[name].unit === 'string' ? carrier.signals[name].unit : '';
-      var reading = proofReading(sample, name, declared);
+      var reading = proofReading(sample, name, declared, emptyIsZero);
       if (reading){ readings[name] = reading; observed++; }
       if (proofRateLike(name, proof, reading ? reading.unit : declared)) rateLike.push(name);
     });
@@ -310,7 +314,7 @@ var proofVerdicts = (function(){
     var rollups = {bound: 0, unbound: 0, proven: 0, degraded: 0, unproven: 0, liveEarly: 0};
     var inputs = Object.create(null), endToEnd = proofObject(options) && options.endToEndMetrics === true;
     function judgeEndToEnd(carrier){
-      var judged = proofTelemetry(carrier, proofOwn(telemetryMap, carrier.id)), counted = proofCounted(judged);
+      var judged = proofTelemetry(carrier, proofOwn(telemetryMap, carrier.id), true), counted = proofCounted(judged);
       var verdict = counted ? proofEndToEndVerdict(carrier, judged) : null;
       return {bound: !!judged, jira: null, telemetry: judged ? judged.state : null,
         verdict: verdict, label: proofLabel(verdict), failing: judged ? judged.failing : [], counted: counted,

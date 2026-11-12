@@ -1024,6 +1024,18 @@ to a section's panels so viewers see the rollup`. A panel on an untracked page
 warns “this page has no ticket references — the panel will be empty”. These are
 warnings, never errors. Strongly prefer adding the panel on every tracked page.
 
+### Status boards in Explore (#1366)
+
+A status board can have a View with `"presentation": "explore"` like any other
+board ([section layouts](section-layouts.md#explore-presentation)). Explore shows
+the diagram on a full-browser canvas with the Live status panel floating over it,
+and the panel behaves as in Standard: carriers keep their Jira colors and refresh,
+Demo and Snapshot repaint the canvas, Metrics cards sit on the canvas with Proof
+and Over time in the panel, the Trace view finds log lines and loads traces, and
+Edit mode drops tickets on canvas nodes. The panel moves, resizes and hides like
+any Explore panel, and the **Panels** menu shows it again.
+`tools/browser-tests/tests/status-explore.spec.mjs` covers these.
+
 ### Proof summary and table
 
 Proof uses the same normalized samples and `proofVerdicts` results as the Metrics

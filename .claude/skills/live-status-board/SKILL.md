@@ -219,6 +219,10 @@ warnings, never errors. In the Workbench the same fields live under
 **Inspect → Tracking** on a selected node or connection, and **Demo live
 status** beside Preview paints sample colors without touching Jira.
 
+For a full-canvas board, add a View with `"presentation": "explore"`; the Live
+status panel floats over the canvas and keeps every mode (see "Status boards in
+Explore" in docs/live-status.md).
+
 ## 2b. Dependencies
 
 Waiting is dependency evidence: ticket X waits while an upstream ticket Y is not

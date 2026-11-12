@@ -13,6 +13,7 @@
 | E7 | The inspector shows inherited fragments read-only, the board's with Remove, Add narrowing, Not shown, Query sent, needsNarrow, both Variables rows and Copy provider queries; each edit is one Undo step; a refused fragment shows its reason and changes nothing. | E1 fixture in the inspector | control labels, notes, one Undo each | edits outside the Inspect panel; multi-step history |
 | E8 | Copy provider queries turns an imported carrier's merge overlay into a replacing binding with the same resolved metrics, one Undo step; a local carrier refuses it. | E1 fixture | overlay is the effective binding without extends; resolved telemetry unchanged | a copy that loses the narrowing or needsNarrow |
 | E9 | docs/live-status.md "Workbench" names the narrowing and variables controls. | docs | each control name | missing docs |
+| E10 | (review c1) What the provider requires is read-only and cannot be dropped: a provider's binding-level needsNarrow on an imported carrier, and the carrier's requirement on a copied (replacing) binding; the editable field holds only the board's own fields. | provider binding with a binding-level needsNarrow; the E1 fixture after Copy provider queries | read model needs; read-only control; plan errors | a field that clears the provider's requirement without a word |
 | W1 | Workbench → spec → viewer, desktop: tools/browser-tests/tests/metrics-narrow-editor.spec.mjs. | n/a | n/a | n/a |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
@@ -177,8 +178,9 @@ test('E7 the inspector edits narrowing, needsNarrow and variables on an imported
   const f=fixtures(),ui=inspector(f).select(NODE),overlay=()=>diagramOf(ui.raw).topologyImports[0].nodeTracking?.dcf?.telemetry;
   assert.ok(ui.notes().includes('sent narrowing from the provider: | json'),'an inherited fragment is shown read-only');
   assert.ok(ui.notes().includes('Not shown: The provider asks each board to narrow this signal by code, and nothing narrows it here, so it is not shown.'),'the editor shows the viewer\'s reason');
-  assert.equal(ui.control('sent boards must narrow by').value,'code');
-  assert.equal(ui.button('Remove sent narrowing 1'),null,'an inherited fragment has no Remove');
+  const required=ui.control('sent required by the provider');assert.equal(required.readOnly,true);assert.equal(required.value,'code','the provider\'s requirement is read-only');
+  assert.equal(ui.control('sent boards must narrow by').value,'','the field holds only the board\'s own fields');
+  assert.ok(!ui.h.guide.querySelectorAll('button').some(b=>/^Remove sent narrowing/.test(b.textContent)),'an inherited fragment has no Remove');
   ui.type('sent add narrowing','| code="A" | drop x');
   const before=ui.text;ui.click('Add sent narrowing');
   assert.match(ui.error(),/second "\|"/,'a refused fragment shows its reason');assert.equal(ui.text,before,'and is not stored');
@@ -186,18 +188,18 @@ test('E7 the inspector edits narrowing, needsNarrow and variables on an imported
   oneStep(ui,()=>ui.click('Add sent narrowing'),NODE);
   assert.deepEqual(overlay(),{extends:true,signals:{sent:{narrow:{loki:['| code="A"']}}}});
   assert.ok(ui.notes().includes('sent narrowing: | code="A"'));
-  assert.ok(ui.button('Remove sent narrowing 2'),'the board\'s fragment has Remove');
+  assert.ok(ui.button('Remove sent narrowing 1'),'the board\'s first own fragment is number 1');assert.equal(ui.button('Remove sent narrowing 2'),null);
   assert.ok(!ui.notes().some(n=>/^Not shown/.test(n)),'the narrowed signal is shown');
   const sentQuery=ui.control('sent query sent');assert.equal(sentQuery.readOnly,true);
   assert.equal(sentQuery.value,'sum(count_over_time({app="dcf"} | json | code="A" [5m]))');
-  oneStep(ui,()=>ui.set('sent boards must narrow by','code, type'),NODE);
-  assert.deepEqual(overlay().signals.sent.needsNarrow,['type']);
+  oneStep(ui,()=>ui.set('sent boards must narrow by','type'),NODE);
+  assert.deepEqual(overlay().signals.sent.needsNarrow,['type']);assert.equal(ui.control('sent boards must narrow by').value,'type');
   oneStep(ui,()=>ui.set('Variables for this node','{"code":"A"}'),NODE);
   assert.deepEqual(overlay().variables,{code:'A'});
   assert.ok(ui.notes().includes('Applies to every node and connection from import fc.'));
   oneStep(ui,()=>ui.set('Variables for import fc','{"region":"eu"}'),NODE);
   assert.deepEqual(diagramOf(ui.raw).topologyImports[0].variables,{region:'eu'});
-  oneStep(ui,()=>ui.click('Remove sent narrowing 2'),NODE);
+  oneStep(ui,()=>ui.click('Remove sent narrowing 1'),NODE);
   assert.equal(overlay().signals.sent.narrow,undefined);
   // A local node gets the same controls, without the import's.
   ui.select(LOCAL);assert.ok(ui.row('n add narrowing'));assert.ok(ui.row('Variables for this node'));assert.equal(ui.row('Variables for import fc'),null);
@@ -215,6 +217,7 @@ test('E8 Copy provider queries turns the merge overlay into a replacing binding 
   p.refuse(NODE,{op:'copyProviderQuery'},/already/);
   p.refuse(LOCAL,{op:'copyProviderQuery'},/imported/);
   const ui=inspector(fixtures()).select(NODE);
+  assert.ok(ui.notes().includes('Saves the provider\'s queries in this document; later provider changes no longer reach it. Required narrowing still applies.'),'the consequence is visible beside the button');
   oneStep(ui,()=>ui.click('Copy provider queries'),NODE);
   assert.equal(diagramOf(ui.raw).topologyImports[0].nodeTracking.dcf.telemetry.extends,undefined);
 });
@@ -223,4 +226,30 @@ test('E9 docs name the narrowing and variables controls',()=>{
   const doc=fs.readFileSync(path.join(repo,'docs/live-status.md'),'utf8');
   for(const name of ['Add <signal> narrowing','boards must narrow by','query sent','Variables for this node','Variables for import','Copy provider queries'])
     assert.ok(doc.includes(name),'docs/live-status.md names '+name);
+});
+
+test('E10 what the provider requires is read-only and cannot be dropped: binding-level needsNarrow, and on a copied binding',()=>{
+  // A provider binding-level needsNarrow applies to every signal of the carrier.
+  const f=fixtures(),bound=f.provider.page.sections[0].diagram.nodes.dcf.telemetry;bound.needsNarrow=['tenant'];
+  const p=planner(f);
+  assert.ok(p.state(NODE).narrow,'the read model lists each signal\'s narrowing');
+  assert.deepEqual(plain(p.state(NODE).narrow.up.needs),{inherited:['tenant'],own:[]},'a binding-level requirement is the provider\'s');
+  assert.deepEqual(plain(p.state(NODE).narrow.sent.needs),{inherited:['code','tenant'],own:[]});
+  p.refuse(NODE,{op:'needsNarrow',name:'up',value:null},/tenant/);
+  p.refuse(NODE,{op:'needsNarrow',name:'up',value:'x'},/never remove/);
+  p.apply(NODE,{op:'needsNarrow',name:'up',value:'tenant, x'});
+  assert.ok(p.overlay().signals.up.needsNarrow.includes('x'));
+  // After Copy provider queries, the carrier's requirement still applies and stays read-only.
+  const g=fixtures(),q=planner(g);
+  q.apply(NODE,{op:'copyProviderQuery'});
+  assert.deepEqual(plain(q.state(NODE).narrow.sent.needs),{inherited:['code'],own:[]});
+  assert.deepEqual(plain(q.state(NODE).narrow.up.needs),{inherited:['code'],own:[]},'every signal of a copy gets the carrier\'s requirement');
+  q.refuse(NODE,{op:'needsNarrow',name:'sent',value:null},/provider/);
+  q.apply(NODE,{op:'needsNarrow',name:'sent',value:'code, type'});
+  assert.deepEqual(plain(q.overlay().signals.sent.needsNarrow),['code','type']);
+  const ui=inspector(fixtures()).select(NODE);ui.click('Copy provider queries');ui.select(NODE);
+  const required=ui.control('sent required by the provider');assert.equal(required.readOnly,true);assert.equal(required.value,'code');
+  assert.equal(ui.control('sent boards must narrow by').value,'');
+  oneStep(ui,()=>ui.set('sent boards must narrow by','type'),NODE);
+  assert.deepEqual(diagramOf(ui.raw).topologyImports[0].nodeTracking.dcf.telemetry.signals.sent.needsNarrow,['code','type'],'the copy keeps the requirement and adds the board\'s field');
 });

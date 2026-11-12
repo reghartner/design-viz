@@ -1504,7 +1504,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // marker; a repaint or a re-render only redraws it, so the question stays pending.
     if(asked && !painting && !retired && editor)editor.endQuestion();
     var trigger=active;active=null;asked=false;
-    document.removeEventListener('click',outside,true);document.removeEventListener('keydown',escape,true);
+    document.removeEventListener('click',outside,true);document.removeEventListener('keydown',escape,true);window.removeEventListener('resize',resized);
     if(trigger)trigger.setAttribute('aria-expanded','false');
     if(pop){if(pop.hidePopover && pop.matches(':popover-open'))pop.hidePopover();pop.hidden=true;}
     if(focus && trigger && trigger.isConnected)trigger.focus();
@@ -1513,6 +1513,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(active && pop.querySelector('.dv-live-production') && view.contains(ev.target) && ev.target.closest('.dv-live-over-time-slider,.dv-live-step'))return;
     if(active && !active.contains(ev.target) && !pop.contains(ev.target) && carrierFrom(ev.target)!==active)close(true);
   }
+  function resized(){if(active && pop && !pop.hidden && active.isConnected)place(active);}
   function escape(ev){if(ev.key==='Escape' && active){ev.preventDefault();ev.stopPropagation();close(true);}}
   function productionRow(trigger){
     if(authoring || !trigger || !trigger._liveCarrier)return null;
@@ -1683,28 +1684,42 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }
     return frame.right-frame.left>=80 && frame.bottom-frame.top>=80?frame:{left:0,top:0,right:window.innerWidth,bottom:window.innerHeight};
   }
+  // Explore view: the floating panel windows and the step player sit on the canvas; the popover keeps clear of them.
+  function popoverObstacles(trigger){
+    var board=trigger.closest && trigger.closest('.board.explore-board'),stage=board && board.closest('.explore-stage');
+    if(!stage)return [];
+    return Array.prototype.map.call(stage.querySelectorAll('.explore-window,.explore-player'),function(el){return el.getBoundingClientRect();}).filter(function(r){return r.width>0 && r.height>0;});
+  }
   // Below the trigger when it fits, else above, right or left where it fits, else the side with the most room;
-  // then clamped to the frame. A popover taller or wider than the frame is capped to it and its body scrolls.
+  // then clamped to the frame. A placement clear of the Explore windows wins over one that is not. A popover taller
+  // or wider than the frame is capped to it and its body scrolls; a re-place keeps the reader's scroll position.
   function place(trigger){
+    var scrollTop=pop.scrollTop,scrollLeft=pop.scrollLeft;
     var rect=trigger.getBoundingClientRect(),frame=popoverFrame(trigger),gap=6;
     var m=Math.min(8,(frame.right-frame.left)/20,(frame.bottom-frame.top)/20),inner={left:frame.left+m,top:frame.top+m,right:frame.right-m,bottom:frame.bottom-m};
     pop.style.maxWidth='';pop.style.maxHeight='';
     if(pop.offsetWidth>inner.right-inner.left)pop.style.maxWidth=(inner.right-inner.left)+'px';
     if(pop.offsetHeight>inner.bottom-inner.top)pop.style.maxHeight=(inner.bottom-inner.top)+'px';
-    var w=pop.offsetWidth,h=pop.offsetHeight;
+    var w=pop.offsetWidth,h=pop.offsetHeight,obstacles=popoverObstacles(trigger);
     var sides=[
       {room:inner.bottom-rect.bottom-gap,size:h,left:rect.left,top:rect.bottom+gap},
       {room:rect.top-gap-inner.top,size:h,left:rect.left,top:rect.top-gap-h},
       {room:inner.right-rect.right-gap,size:w,left:rect.right+gap,top:rect.top},
-      {room:rect.left-gap-inner.left,size:w,left:rect.left-gap-w,top:rect.top}];
-    var side=sides.find(function(s){return s.room>=s.size;}) || sides.reduce(function(best,s){return s.room/s.size>best.room/best.size?s:best;});
-    pop.style.left=Math.max(inner.left,Math.min(inner.right-w,side.left))+'px';
-    pop.style.top=Math.max(inner.top,Math.min(inner.bottom-h,side.top))+'px';
+      {room:rect.left-gap-inner.left,size:w,left:rect.left-gap-w,top:rect.top}].map(function(s){
+      s.left=Math.max(inner.left,Math.min(inner.right-w,s.left));s.top=Math.max(inner.top,Math.min(inner.bottom-h,s.top));
+      s.clear=!obstacles.some(function(o){return Math.min(s.left+w,o.right)-Math.max(s.left,o.left)>0 && Math.min(s.top+h,o.bottom)-Math.max(s.top,o.top)>0;});
+      return s;
+    });
+    function fits(s){return s.room>=s.size;}
+    var side=sides.find(function(s){return fits(s) && s.clear;}) || sides.find(function(s){return s.clear;}) || sides.find(fits) ||
+      sides.reduce(function(best,s){return s.room/s.size>best.room/best.size?s:best;});
+    pop.style.left=side.left+'px';pop.style.top=side.top+'px';
+    pop.scrollTop=scrollTop;pop.scrollLeft=scrollLeft;
   }
   function reveal(trigger,dismiss,ask){
     active=trigger;asked=ask;trigger.setAttribute('aria-expanded','true');pop.hidden=false;if(pop.showPopover)pop.showPopover();
-    place(trigger);
-    dismiss.focus({preventScroll:true});document.addEventListener('click',outside,true);document.addEventListener('keydown',escape,true);
+    pop.scrollTop=0;pop.scrollLeft=0;place(trigger);
+    dismiss.focus({preventScroll:true});document.addEventListener('click',outside,true);document.addEventListener('keydown',escape,true);window.addEventListener('resize',resized);
   }
   /* Cards and edge labels remain the single keyboard ticket triggers. Small
      Jira cues are pointer aliases, never an additional status badge or tab stop.
@@ -2553,7 +2568,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
       events.forEach(function(type){view.removeEventListener(type,schedule);});
-      if(pop)pop.remove();listeners=[];
+      if(typeof window!=='undefined')window.removeEventListener('resize',resized);if(pop)pop.remove();listeners=[];
       view.querySelectorAll('.dv-live-board-lane').forEach(function(el){el.classList.remove('dv-live-board-lane');});
       view.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').forEach(function(el){el.remove();});
       if(applied || availabilityOn || refs().tickets.length){

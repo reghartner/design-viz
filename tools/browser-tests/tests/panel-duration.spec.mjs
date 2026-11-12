@@ -34,7 +34,7 @@ for(const type of ['screen','phone'])test(type+' temporary state editing preserv
  }
  await expect(patch.getByLabel('audio duration',{exact:true})).toHaveValue('both');
  await output('silent');
- const before=await source();await patch.getByLabel('microphone',{exact:true}).selectOption('listening');
+ const before=await source();await patch.getByLabel('Microphone',{exact:true}).selectOption('listening');
  await expect.poll(async()=>(await diagram()).steps[1].panels.p.enterOnce.audio.microphone).toBe('listening');
  expect((await diagram()).steps[1].panels.p.audio).toEqual({output:'chime'});
  const edited=await source();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
@@ -56,14 +56,14 @@ for(const type of ['screen','phone'])test(type+' temporary state editing preserv
  await selectStep(1);
  if(type==='screen'){
   await expect(root.locator('.banner')).toHaveText('FLASH');
-  await patch.getByLabel('banner',{exact:true}).fill('FLASH EDITED');await patch.getByLabel('banner',{exact:true}).press('Tab');
+  await patch.getByLabel('Banner',{exact:true}).fill('FLASH EDITED');await patch.getByLabel('Banner',{exact:true}).press('Tab');
   await expect(root.locator('.banner')).toHaveText('FLASH EDITED');expect((await diagram()).steps[1].panels.p.banner).toBe('LATER');
   await selectStep(2);await expect(root.locator('.banner')).toHaveText('LATER');
   await selectStep(1);await patch.getByLabel('banner duration',{exact:true}).selectOption('once');
   await selectStep(2);await expect(root.locator('.banner')).toHaveText('BASE');
   await selectStep(1);
   await expect(patch.getByLabel('spotlight duration',{exact:true})).toBeDisabled();
-  await patch.getByLabel('spotlight',{exact:true}).selectOption('flash');
+  await patch.getByLabel('Spotlight',{exact:true}).selectOption('flash');
   await expect(patch.getByLabel('spotlight duration',{exact:true})).toBeEnabled();
   await expect(patch.getByLabel('spotlight duration',{exact:true})).toHaveValue('carry');
   await patch.getByLabel('spotlight duration',{exact:true}).selectOption('once');

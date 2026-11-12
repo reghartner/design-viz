@@ -169,6 +169,8 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   if(snapshotOn){try{snapshotMap=liveSnapshot.map(Object.keys(demoMap));snapshotTelemetry=liveSnapshot.telemetry();}catch(ex){snapshotOn=false;snapshotFailure=true;}}
   var demoOn=demoWanted && !snapshotOn,metricsOn=metricsWanted && !snapshotOn;
   var renderOptions={autoplay:false,authoring:true,layoutTarget:'default',telemetry:false,metricsPreview:metricsOn,loadDetail:lifecycle && lifecycle.loadDetail};
+  // #1241: with the demo or a snapshot showing, a Tickets row drags onto a node or connection; the Workbench writes it.
+  if((demoOn || snapshotOn) && lifecycle && typeof lifecycle.ticketDrop==='function')renderOptions.ticketDrop=lifecycle.ticketDrop;
   if(snapshotOn){
     // The connection and Metrics lines read "Snapshot from <time>", never connected or demo. No provider: nothing
     // refreshes a snapshot, so the connection line never claims a refresh.
@@ -381,6 +383,7 @@ function createWorkbenchPreviewController(opts){
         liveSnapshot:function(){return liveSnapshot;},snapshotLiveStatus:function(on){if(ctl===nextCtl)setSnapshotLiveStatus(on);},
         metricsPreview:function(on){if(ctl===nextCtl)setMetricsPreview(on);},
         previewButton:opts.previewButton,loadDetail:opts.loadDetail,restoreDetails:opts.restoreDetails,
+        ticketDrop:opts.ticketDrop?function(ref,key){return ctl===nextCtl && opts.ticketDrop(ref,key);}:null,
         arrangementSection:opts.arrangementSection?opts.arrangementSection(request,next,page):null,
         beforeReplace:function(){
           if(opts.beforeReplace)opts.beforeReplace(request);

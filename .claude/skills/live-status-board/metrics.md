@@ -43,9 +43,7 @@ does not answer:
   canonical duration is `6h`; Honeycomb receives signed `from: "-6h"` for metrics
   and native trace search/detail, including imported carriers. Other providers
   retain their conventions, such as Grafana `now-6h` and Tempo RFC3339 bounds.
-  Parsing preserves source; the desktop editor keeps the
-  trimmed spelling with Undo/Redo. Future offsets, zero and date expressions
-  are refused by the editor (authored invalid values warn and use `24h`).
+  Future offsets, zero and dates warn and use `24h`.
 
 Bind only the carriers the author selects. Never derive a query, datasource,
 dataset or trace id from a node id, title or service-like name. A matching name
@@ -332,7 +330,8 @@ This complete example is validator-compatible:
 
 Keep datasource UIDs in `tracking.telemetry.grafana`; keep exact query text or
 Honeycomb query objects on signals. Write only proof limits the author agreed
-to. Add a template only when at least three carriers genuinely share one query
+to. Once agreed limits cover the whole path, set `tracking.endToEndMetrics: true`
+([end-to-end metrics](../../../docs/live-status.md#end-to-end-metrics)). Add a template only when at least three carriers genuinely share one query
 shape; declare parameters and keep provider-owned syntax such as
 `$__rate_interval` intact. A consumer overlay replaces an imported binding as a
 whole; provider and consumer signals never merge.

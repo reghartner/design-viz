@@ -5644,3 +5644,78 @@ test('#1371 a step that hides the Status controls panel brings the controls back
  assert.ok(status2.querySelector('.dv-status-modes') && status2.querySelector('button.dv-live-toggle'),'visible:false: the Status panel has the controls');
  panels.destroy();p2.destroy();h.ctl.liveStatus.destroy();h2.ctl.liveStatus.destroy();
 });
+
+/* #1404 tracking.endToEndMetrics: the canvas seals, the step caption and the metrics popup use the flag-on
+   verdicts, and the flag-off cases stay as before. */
+const E2E_PAGE=()=>{const raw=cuePage();raw.page.tracking.endToEndMetrics=true;return raw;};
+test('#1404 canvas: flag on seals and edge verdicts come from limits and traffic; flag off unchanged',async()=>{
+ const seal=(h,id)=>h.node(id).querySelector('.dv-metrics-seal')?.getAttribute('data-seal') ?? null;
+ const on=cueHarness(E2E_PAGE());await on.on();
+ assert.deepEqual(Object.fromEntries(['a','b','c','f'].map(id=>[id,seal(on,id)])),{a:'unproven',b:'proven',c:'unproven',f:'unproven'},'flag on node seals');
+ assert.deepEqual([0,1,2,4].map(i=>on.edge(i).getAttribute('data-metrics-verdict')),['proven','unproven','degraded','unproven'],'flag on edge verdicts');
+ assert.equal(on.ghost(1).length,0,'flag on: no Done ghost on a silent edge');
+ on.ctl.liveStatus.destroy();
+ const off=cueHarness();await off.on();
+ assert.deepEqual(Object.fromEntries(['a','b','c','f'].map(id=>[id,seal(off,id)])),{a:null,b:'live-early',c:'unproven',f:'degraded'},'flag off node seals');
+ assert.equal(off.ghost(1).length,1,'flag off: the silent Done edge keeps its ghost');
+ off.ctl.liveStatus.destroy();
+ const C=on.C;assert.equal(C.TELEMETRY_SEALS.unproven,'unproven');assert.equal(C.TELEMETRY_SEALS.error,'degraded');
+});
+test('#1404 step caption: flag on judges the step from its counted carriers; flag off keeps the Jira matrix',async()=>{
+ for(const [raw,want] of [[E2E_PAGE(),['proven','unproven','unproven']],[cuePage(),['proven','done-unproven','active-failing']]]){
+  const h=cueHarness(raw);await h.on();const d=h.ctl.page.sections[0].diagram,path=h.C.diagramPathList(d)[0].id,snap=h.ctl.telemetry.snapshot();
+  const got=[0,1,2].map(i=>h.C.telemetryStepModel(d,i,path,h.ctl.page,snap,CUE_JIRA,true));
+  assert.deepEqual(got.map(m=>m.verdict),want,raw.page.tracking.endToEndMetrics?'flag on':'flag off');
+  if(raw.page.tracking.endToEndMetrics)assert.match(got[2].caption,/^UNPROVEN/);else assert.match(got[2].caption,/^IN PROGRESS · FAILING/);
+  h.ctl.liveStatus.destroy();
+ }
+});
+test('#1404 metrics popup: the recompute uses the flag, so a query with no data reads silent with it and unobserved without it',async()=>{
+ for(const flag of [true,false]){
+  const raw={page:{tracking:{jira:{site:'https://jira.test'},telemetry:{},...(flag?{endToEndMetrics:true}:{})},sections:[{id:'main',diagram:{nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'PlaceOrder',tickets:['EE-1'],telemetry:TCALL()}]}}]}};
+  const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({'a->b':{signals:{rate:{empty:true},errors:{empty:true}}}})}}),api=h.ctl.liveStatus,matrix={a:1,b:0,c:0,d:1,e:0,f:0,inverse(){return this;},multiply(m){return m;}};
+  h.doc.defaultView={getComputedStyle:()=>({display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+  const make=h.doc.createElementNS;h.doc.createElementNS=(ns,tag)=>Object.assign(make(ns,tag),{getComputedTextLength(){return 6*String(this.textContent||'').length;}});
+  for(const el of h.view.querySelectorAll('svg,path.edge'))el.getCTM=()=>matrix;
+  api.apply({'EE-1':{state:'active',updatedAt:'2026-11-05T12:00:00.000Z'}});h.ctl.telemetry.setEnabled(true);for(let i=0;i<6;i++)await settle();h.flush();
+  assert.equal(h.ctl.telemetry.verdicts().carriers['a->b'].verdict,flag?'unproven':'active',(flag?'flag on':'flag off')+' verdict');
+  workPresentation(h,h.view.querySelector('g.dv-metrics-card[data-metrics-card="a->b"]'));
+  const block=h.view.querySelector('.dv-live-popover .dv-live-production');
+  assert.ok(block!==null,'the popup shows metric evidence');assert.match(textOf(block),/no data/,'the card value says no data');
+  // The popup recomputes verdicts for the clicked carrier; with the flag the empty answer is a measured 0 (silent).
+  if(flag)assert.match(textOf(block),/SILENT/,'flag on: the popup reads the empty answer as silent');
+  else assert.match(textOf(block),/UNOBSERVED/,'flag off: an empty answer stays unobserved');
+  for(const word of [/\bDONE\b/,/IN PROGRESS/,/LIVE EARLY/])assert.doesNotMatch(textOf(block),word);
+  api.destroy();
+ }
+});
+
+/* #1241 desktop Workbench: with the demo or a snapshot showing, a Tickets row drags onto a node or connection
+   through the Edit mode drop targets, and renderOptions.ticketDrop(ref, key) writes it (the Workbench's one Undo
+   step). Only an authoring render with ticketDrop offers it; a reader page never does. */
+test('#1241 Workbench Tickets rows drag onto nodes and connections through the Edit mode drop targets',()=>{
+ const drag=key=>{const data={'application/x-flowview-ticket':key,'text/plain':key};return {types:Object.keys(data),getData:t=>data[t]||'',dropEffect:''};};
+ function drop(h,target,key){let allowed=false;h.view.dispatchEvent({type:'dragover',target,dataTransfer:drag(key),preventDefault(){allowed=true;}});h.view.dispatchEvent({type:'drop',target,dataTransfer:drag(key),preventDefault(){}});runTimers(h);return allowed;}
+ const calls=[],h=harness(fixture(),{},{authoring:true,ticketDrop:(ref,key)=>calls.push({ref:JSON.parse(JSON.stringify(ref)),key})}),m=mountStatus(h);h.ctl.liveStatus.apply(fixed);h.flush();
+ const row=m.body.querySelector('tr[data-live-ticket="BB-1"]');assert.ok(row,'the Tickets row is listed');
+ assert.equal(row.getAttribute('draggable'),'true','the row drags');assert.match(row.getAttribute('title')||'',/Drag onto a node or connection to attach BB-1/);
+ assert.ok(m.body.querySelector('.dv-live-tickets-hint'),'the list says how to attach a ticket, and the keyboard way');
+ assert.equal(drop(h,h.view.querySelector('g.node[data-dv-node="c"]'),'BB-1'),true,'a node card takes the drop');
+ assert.deepEqual(calls,[{ref:{section:0,kind:'node',id:'c'},key:'BB-1'}]);
+ assert.equal(drop(h,h.view.querySelector('path.edge[data-dv-edge="0"]'),'BB-2'),true,'an edge takes the drop');
+ assert.deepEqual(calls[1],{ref:{section:0,kind:'edge',index:0},key:'BB-2'});
+ assert.equal(drop(h,h.view.querySelector('g.node[data-dv-node="text"]'),'BB-1'),false,'a text box takes no ticket');assert.equal(calls.length,2);
+ h.ctl.liveStatus.destroy();
+ // Authoring without ticketDrop (no demo or snapshot showing) and a reader page with one: no drag, no drop.
+ for(const opts of [{authoring:true},{ticketDrop:()=>calls.push('reader')}]){
+  const x=harness(fixture(),{},opts),xm=mountStatus(x);x.ctl.liveStatus.apply(fixed);x.flush();
+  assert.notEqual(xm.body.querySelector('tr[data-live-ticket="BB-1"]').getAttribute('draggable'),'true');
+  assert.equal(drop(x,x.view.querySelector('g.node[data-dv-node="c"]'),'BB-1'),false);x.ctl.liveStatus.destroy();
+ }
+ assert.equal(calls.length,2,'neither calls ticketDrop');
+ // A refused Workbench drop says why in the panel's status line (review c1 MINOR 2).
+ const r=harness(fixture(),{},{authoring:true,ticketDrop:()=>({error:'BB-1 was not attached: the connection changed.'})});mountStatus(r);r.ctl.liveStatus.apply(fixed);r.flush();
+ drop(r,r.view.querySelector('g.node[data-dv-node="c"]'),'BB-1');
+ assert.deepEqual(JSON.parse(JSON.stringify(r.ctl.liveStatus.snapshot().note)),{text:'BB-1 was not attached: the connection changed.',kind:'warn'});
+ r.ctl.liveStatus.destroy();
+});

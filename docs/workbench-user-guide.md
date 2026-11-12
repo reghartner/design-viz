@@ -28,7 +28,8 @@ Epics and descendant stories, with separate Epic counts and story coverage.
 The desktop **Demo live status** preview uses sample states without querying
 Jira, so it cannot infer parent type from a key. **File → Load snapshot…** shows an agent's
 snapshot of real Jira and metrics data instead, labelled **Snapshot from <time>**; it is preview
-only and never saved or exported. See [live status](live-status.md).
+only and never saved or exported. While the demo or a snapshot shows, drag a row of the Epic
+status Tickets list onto a node or connection to attach that ticket (one Undo step). See [live status](live-status.md).
 
 **Status board settings** (the **Board settings** button at the top of Inspect and in Find objects)
 holds the board-level settings in five sections: Jira, Metrics, Traces,
@@ -49,6 +50,11 @@ cards for bound edges using the reader’s placement. Select a card to edit its
 side/offset. The preview makes no connector calls, adds no Undo entry, and is
 not exported. It survives same-document edits and resets for a new project or
 import. The Services & evidence chapter explains both controls.
+
+**Status board settings → Metrics → End-to-end metrics applied** writes
+`tracking.endToEndMetrics: true` (one Undo step; unchecking removes it). Check it
+once the board's metrics and limits cover the whole path: Proof then rolls up from
+metrics only ([End-to-end metrics](live-status.md#end-to-end-metrics)).
 
 The workspace chapter explains top inspector actions, collapsed muted section
 headers, same-selection expansion retention, and group-scoped Apply controls.

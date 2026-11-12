@@ -1119,6 +1119,29 @@ function traceConnectionsControls(warnings){
       return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }
+/* #1404: Status board settings → Metrics → End-to-end metrics applied (page tracking.endToEndMetrics).
+   Checked writes true; unchecked removes the key. One Undo step either way. */
+function endToEndControl(box,tracking,warnings,inactive){
+    var control=checkboxControl(tracking.endToEndMetrics===true,function(on){
+      return commitPageTracking(function(jira,page,next){if(on)next.endToEndMetrics=true;else delete next.endToEndMetrics;});
+    }),input=control.querySelector('input'),id=prefix+'-e2e-metrics-note';
+    input.setAttribute('aria-label','End-to-end metrics applied');
+    input.title='Proof rolls up from metric limits and traffic only, not Jira. Check this once the metrics and their limits cover the whole path.';
+    box.appendChild(frow('End-to-end metrics applied',control));
+    var note=document.createElement('p');note.className='fnote';note.id=id;
+    note.textContent='When checked, Proof reads "End to end proven" only when every carrier with a limit is proven; Jira state is not used. Check it after the metrics and limits on this board cover the whole path and were agreed.';
+    box.appendChild(note);
+    var describedBy=[id];
+    // An inactive setting says so beside the box: Allow metrics is off, or the board has no metrics at all.
+    if(inactive){var idle=document.createElement('p');idle.className='fnote board-e2e-inactive';idle.id=id+'-inactive';idle.textContent=inactive;box.appendChild(idle);describedBy.push(idle.id);}
+    var own=(warnings || []).filter(function(text){return /^tracking\.endToEndMetrics:/.test(text);});
+    if(own.length){
+      var warn=document.createElement('p');warn.className='fnote board-field-warning';warn.id=id+'-warning';
+      warn.textContent=own.map(function(text){var m=text.slice(text.indexOf(': ')+2);return m.charAt(0).toUpperCase()+m.slice(1)+'.';}).join(' ');
+      box.appendChild(warn);input.setAttribute('aria-invalid','true');describedBy.push(warn.id);
+    }
+    input.setAttribute('aria-describedby',describedBy.join(' '));
+  }
 function metricsSettingsControls(environments,warnings,environmentWarnings){
     var snapshot=parseEditor();if(snapshot.error)return null;
     var state=telemetryPageState(snapshot.raw);if(warnings)state.warnings=warnings;
@@ -2238,10 +2261,17 @@ function effectiveStateControl(target){
           if (ev.target!==box || !guide.contains(box)) return;
           if (box.open) OPEN_EFFECTIVE_PANELS.add(p.id); else OPEN_EFFECTIVE_PANELS.delete(p.id);
         });
-        var label=document.createElement('summary'); label.textContent=p.id+' · '+p.type+' · '+p.fields.length+' fields'; box.appendChild(label);
+        var decl=(Array.isArray(d.panels)?d.panels:[]).find(function(item){return item && item.id===p.id;}) || {id:p.id,type:p.type};
+        var editor=panelEditor(p.type);
+        var label=document.createElement('summary');
+        label.appendChild(document.createTextNode((typeof decl.title==='string' && decl.title.trim()?decl.title.trim():p.id)+' · '+p.fields.length+(p.fields.length===1?' field ':' fields ')));
+        var panelKey=document.createElement('code'); panelKey.className='effective-key'; panelKey.textContent=p.id+' · '+p.type; label.appendChild(panelKey);
+        box.appendChild(label);
         p.fields.forEach(function(field){
           var row=document.createElement('div'); row.className='effective-field'; row.setAttribute('data-effective-field',field.key);
           var heading=document.createElement('div'); heading.className='effective-heading';
+          var custom=editor.patchLabel && editor.patchLabel(field.key);
+          var plain=document.createElement('span'); plain.className='effective-label'; plain.textContent=custom && custom!==field.key?custom:panelFieldLabel(decl,field.key,'step'); heading.appendChild(plain);
           var name=document.createElement('code'); name.textContent=field.key; heading.appendChild(name);
           var origin=document.createElement('span'); origin.className='effective-origin'; origin.setAttribute('data-origin',field.origin.kind); origin.textContent=field.origin.label; heading.appendChild(origin); row.appendChild(heading);
           var value=document.createElement('pre'); value.textContent=JSON.stringify(field.value,null,2); row.appendChild(value);
@@ -2284,7 +2314,10 @@ function panelPatchControl(pid, patch, decl, target, options){
       else OPEN_PATCH_EDITORS.delete(pid);
     });
     var summary = document.createElement('summary');
-    summary.textContent = initial ? 'Starting state' : pid + ' · ' + patchSummaryLine(patch);
+    summary.textContent = initial ? 'Starting state' : pid + ' · ' + patchSummaryLine(patch, decl, function(key){
+      var custom=editor.patchLabel && editor.patchLabel(key);
+      return custom && custom!==key?custom:null;
+    });
     det.appendChild(summary);
     var body = document.createElement('div');
     body.className = 'rowsedit';
@@ -2373,7 +2406,7 @@ function panelPatchControl(pid, patch, decl, target, options){
         input = colInput({k: f[0], kind: f[1]}, value);
         if (f[1] === 'num') input.className += ' fnum';
       }
-      input.setAttribute('aria-label', f[0]);
+      input.setAttribute('aria-label', meta ? stateLabel(f[0],meta) : f[0]);
       if (editor.patchField) editor.patchField(f,input,options);
       if(input.tagName==='SELECT' && input.options.length && input.options[0].value==='')input.options[0].textContent='Choose value…';
       return input;
@@ -2639,6 +2672,9 @@ function jsonFieldControl(key, value, kind, after){
     return det;
   }
 
+/* Columns name themselves in plain words; the spec key is only a fallback. */
+function rowColumnLabel(col){return col.label || builderFieldLabel(col.k);}
+
 function colInput(col, value){
     var input;
     var options = col.kind === 'icon' ? ICON_SET : (col.options || []);
@@ -2646,7 +2682,7 @@ function colInput(col, value){
       input = document.createElement('select');
       input.className = 'fctl';
       var none = document.createElement('option');
-      none.value = ''; none.textContent = col.unsetLabel || '(' + (col.label || col.k) + ')';
+      none.value = ''; none.textContent = col.unsetLabel || '(' + rowColumnLabel(col) + ')';
       input.appendChild(none);
       options.forEach(function(o){
         var op = document.createElement('option');
@@ -2665,10 +2701,10 @@ function colInput(col, value){
     } else {
       input = document.createElement('input');
       input.type = 'text'; input.className = 'fctl';
-      input.placeholder = (col.label || col.k) + (col.req ? ' *' : '') + (col.kind === 'clock' ? ' (5m, 2h…)' : '');
+      input.placeholder = rowColumnLabel(col) + (col.req ? ' *' : '') + (col.kind === 'clock' ? ' (5m, 2h…)' : '');
       input.value = value == null ? '' : String(value);
     }
-    input.setAttribute('aria-label',col.label || col.k);
+    input.setAttribute('aria-label',rowColumnLabel(col));
     return input;
   }
 
@@ -2738,16 +2774,16 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true,l
         var input = colInput(col, base ? base[col.k] : null);
         wireCommit(input, commitRows);
         ref.inputs[col.k] = input;
-        if (wide){
-          var cell = document.createElement('label');
-          cell.className = 'rowcell';
-          var cap = document.createElement('span');
-          cap.className = 'rowk';
-          cap.textContent = (col.label || col.k) + (col.req ? ' *' : '');
-          cell.appendChild(cap);
-          if (!options.cell || !options.cell({column:col,input:input,cell:cell,ref:ref,base:base})) cell.appendChild(col.kind==='icon'?iconPickerControl(input):input);
-          line.appendChild(cell);
-        } else line.appendChild(col.kind==='icon'?iconPickerControl(input):input);
+        /* Every input keeps a visible caption: a placeholder alone disappears
+           once a value is typed. */
+        var cell = document.createElement('label');
+        cell.className = wide ? 'rowcell' : 'rowcell rowcell-compact';
+        var cap = document.createElement('span');
+        cap.className = 'rowk';
+        cap.textContent = rowColumnLabel(col) + (col.req ? ' *' : '');
+        cell.appendChild(cap);
+        if (!wide || !options.cell || !options.cell({column:col,input:input,cell:cell,ref:ref,base:base})) cell.appendChild(col.kind==='icon'?iconPickerControl(input):input);
+        line.appendChild(cell);
       });
 
       var acts = line;
@@ -2839,7 +2875,7 @@ function objFieldsControl(key, cur, shape){
     var wrap = document.createElement('div');
     wrap.className = 'rowsedit';
     var line = document.createElement('div');
-    line.className = 'rowline' + ((shape.cols || []).some(function(col){return col.label;}) ? ' obj-fields' : '');
+    line.className = 'rowline obj-fields';
     var base = (cur && typeof cur === 'object' && !Array.isArray(cur)) ? cur : {};
     var inputs = {};
     function commitObj(){
@@ -2857,10 +2893,8 @@ function objFieldsControl(key, cur, shape){
       if (col.kind === 'num') input.inputMode = 'decimal';
       wireCommit(input, commitObj);
       inputs[col.k] = input;
-      if (col.label){
-        var field=document.createElement('label'); field.className='obj-field'; field.textContent=col.label;
-        field.appendChild(input); line.appendChild(field);
-      } else line.appendChild(input);
+      var field=document.createElement('label'); field.className='obj-field'; field.textContent=rowColumnLabel(col);
+      field.appendChild(input); line.appendChild(field);
     });
     wrap.appendChild(line);
     if (shape.hint){
@@ -2908,22 +2942,49 @@ function panelEditorForCard(card){
     return section ? panelEditorForTarget({kind:'panel',section:Number(section.getAttribute('data-dv-section')),index:Number(card.getAttribute('data-dv-panel'))}) : {};
   }
 
+var ignoredNoteSerial=0;
 function panelSetupRows(val){
     var fields = PANEL_SETUP_FIELDS[val.type] || [['initial', 'json']];
     var entries=fields.map(function(f,index){return {field:f,index:index,meta:panelFieldPresentation(val,f,'setup')};})
       .filter(function(entry){return !entry.meta.hidden;})
-      .sort(function(a,b){return Number(a.meta.advanced)-Number(b.meta.advanced) || a.index-b.index;});
-    var rows=[],lastGroup=null;
+      .sort(function(a,b){return setupRank(a)-setupRank(b) || a.index-b.index;});
+    /* Grouped fields, then the Advanced section, then Starting state last. */
+    function setupRank(entry){return entry.field[0]==='initial'?2:entry.meta.advanced?1:0;}
+    var out=[],lastGroup=null,advancedFold=null;
     function annotated(row,meta){
-      if(!meta.help)return row;
+      var reason=typeof meta.ignoredWhen==='function'?meta.ignoredWhen(val):null;
+      if(!meta.help && !reason)return row;
       var wrap=document.createElement('div');wrap.className='panel-setup-field';wrap.appendChild(row);
-      var note=document.createElement('p');note.className='fnote panel-setup-note';note.textContent=meta.help;wrap.appendChild(note);return wrap;
+      [reason,meta.help].forEach(function(text){
+        if(!text)return;
+        var note=document.createElement('p');note.className='fnote panel-setup-note';note.textContent=text;wrap.appendChild(note);
+        if(text!==reason)return;
+        /* The renderer ignores this field in the current setup: show it read-only, described by the reason. */
+        note.id='panel-setup-ignored-'+(++ignoredNoteSerial);note.classList.add('panel-setup-reason');
+        Array.prototype.forEach.call(row.querySelectorAll('input,select,textarea,button'),function(control){
+          control.disabled=true;control.setAttribute('aria-describedby',note.id);
+        });
+        row.classList.add('panel-setup-ignored');
+      });
+      return wrap;
     }
     entries.forEach(function(entry){
       var f=entry.field,meta=entry.meta,key = f[0], kind = f[1], cur = val[key], editor=panelEditor(val.type),row;
-      var groupName=meta.advanced?'Advanced settings':meta.group;
-      if(groupName && groupName!==lastGroup){var heading=document.createElement('h4');heading.className='panel-state-group panel-setup-group';heading.textContent=groupName;rows.push(heading);}
-      lastGroup=groupName || lastGroup;
+      /* Rarely used fields share one collapsed Advanced section, like the node form's. */
+      var rows=out;
+      if(meta.advanced){
+        if(!advancedFold){
+          advancedFold=document.createElement('details');advancedFold.className='panel-setup-advanced';
+          var foldSummary=document.createElement('summary');foldSummary.textContent='Advanced';advancedFold.appendChild(foldSummary);
+          out.push(advancedFold);
+        }
+        rows={push:function(row){advancedFold.appendChild(row);}};
+      }else{
+        /* Starting state is named once: its own disclosure summary, or a heading above a raw JSON row. */
+        var groupName=key==='initial'?(!panelAuthoring(val.type).initialFields && (lastGroup || advancedFold)?'Starting state':''):meta.group;
+        if(groupName && groupName!==lastGroup){var heading=document.createElement('h4');heading.className='panel-state-group panel-setup-group';heading.textContent=groupName;rows.push(heading);}
+        lastGroup=groupName || lastGroup;
+      }
       if(key==='initial' && panelAuthoring(val.type).initialFields){rows.push(panelPatchControl(val.id,val.initial===undefined?{}:val.initial,val,Object.assign({},session.target),{initial:true}));return;}
       var custom=editor.setupField && editor.setupField(f,val);
       if(custom){rows.push(annotated(custom,meta));return;}
@@ -2961,7 +3022,7 @@ function panelSetupRows(val){
       if(!row)row=frow(meta.label, jsonFieldControl(key, cur, kind));
       rows.push(annotated(row,meta));
     });
-    return rows;
+    return out;
   }
 
 function panelForm(val, ctx){
@@ -3277,7 +3338,10 @@ function boardForm(){
     pageTrackingControls(doc.page,jira);
     jiraDependencyControls(doc.page,jira,warnings.jira);
     warningList(jira,warnings.jira,'Jira warnings');
-    var metricsForm=metricsSettingsControls(environments,warnings.metrics,warnings.environments);if(metricsForm)metrics.appendChild(metricsForm);
+    endToEndControl(metrics,tracking,warnings.metrics,telemetry.enabled===false?'No effect until metrics are on: Allow metrics is off.':
+      !hasTelemetry && !statusBoardHasBindings(raw)?'No effect until metrics are on: no node or connection on this board has metrics yet.':'');
+    // The end-to-end warning sits next to its checkbox, not again in the section list.
+    var metricsForm=metricsSettingsControls(environments,warnings.metrics.filter(function(text){return !/^tracking\.endToEndMetrics:/.test(text);}),warnings.environments);if(metricsForm)metrics.appendChild(metricsForm);
     warningList(environments,warnings.environments,'Environments warnings');
     var tracesForm=traceConnectionsControls(warnings.traces);if(tracesForm)traces.appendChild(tracesForm);
     warningList(traces,warnings.traces,'Traces warnings');

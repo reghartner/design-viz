@@ -541,6 +541,16 @@ state for (an `unknown` ticket does not count; a warning when none, since they w
 recorded with the first one. A file that is not a snapshot, or larger than 8 MB, is refused there
 with its reason.
 
+While **Demo live status** or a snapshot shows (#1241), the Epic status panel's Tickets rows
+drag onto a node or connection on the desktop canvas, as in the shared board's Edit mode and
+with the same drop targets (the card or line highlights while a row is over it). The drop
+adds the ticket key there (a move is not offered; an imported carrier gets the consumer
+overlay), as one Undo step, and selects that carrier so Inspect → Tracking shows it. With a
+snapshot this includes the epic's tickets that are on no element yet (**NOT ON DIAGRAM**).
+A drop that cannot be made says why in the Epic status line.
+The Workbench never calls Jira: the list comes only from the demo or a loaded snapshot.
+The keyboard way is Inspect → Tracking → **Add ticket**, which the list's hint names.
+
 ### Trace spans on a node or connection
 
 Select a node or connection and open **Inspect → Tracking → Trace spans** (desktop) to edit
@@ -695,7 +705,18 @@ query the viewer would send; nothing is queried. **Variables for this node** (or
 connection) sets the carrier's `telemetry.variables`; on an imported carrier it is stored
 in its overlay, and **Variables for import <as>** sets `topologyImports[i].variables`,
 which applies to every node and connection from that import
-([Variable scopes](#variable-scopes)). On an imported carrier, **Copy provider queries**
+([Variable scopes](#variable-scopes)). Both are rows (#1393), like the shared and
+environment variables: **New node variable name** and **value** (or connection, or
+**import <as>**), then **Add … variable** or Enter; each row renames, changes or is
+removed in place, one Undo step each. A value must pass the scoped-value allowlist
+(letters, digits, `_ . @ : -` and spaces). An added, changed or renamed value is checked
+under its (new) name in every signal it reaches (this carrier, or for an import every node
+and connection of the import whose provider binding or board overlay does not set the
+name itself); one that would keep a
+signal from being sent is refused, naming the carrier, the signal and the viewer's
+reason. Renaming or removing a variable a signal of this carrier uses is refused too.
+Validator warnings sit under the row they name, and variables that are not an object
+are shown as such, with no Add field. On an imported carrier, **Copy provider queries**
 stores the provider's signals, with every narrowing and change made here, as this
 document's own binding, to edit their queries; a note beside it says so
 ([When narrowing or a variable cannot express the filter](#when-narrowing-or-a-variable-cannot-express-the-filter));
@@ -826,6 +847,62 @@ Rollups count bound carriers as proven, degraded (including FAILING), unproven
 and live early (including ALREADY LIVE). A step takes the live-status rollup of
 its directly selected carriers' Jira states, then the worst telemetry state
 (degraded, silent, unmeasured, unobserved, flowing), joined by the same matrix.
+
+### End-to-end metrics
+
+Page-level `tracking.endToEndMetrics: true` (#1404) makes Proof answer "does the
+whole path work, according to its metrics?" instead of combining metrics with
+Jira. The author (or agent) sets it only after the metrics and their limits are
+in place and agreed: it states that the metrics on this board cover the whole
+path. Only the boolean `true` turns it on; any other value warns and is ignored.
+Without it nothing changes.
+
+With the flag on, Jira state is not an input to Proof. Tickets keep their own
+job: Jira colours, the Tickets table, epic status and step ticket rows are
+unchanged. In Proof:
+
+- A **counted** carrier is a bound carrier with at least one signal that has a
+  `min` or `max` limit. Carriers with metrics but no limit appear in the table
+  as *not counted, no limit* and never enter the ring.
+- Each counted carrier gets one verdict from its limits and traffic:
+
+| Verdict | When |
+| --- | --- |
+| **PROVEN** | traffic observed, an authored `min` is observed and met, and every limit holds |
+| **DEGRADED** | a `max` limit (plain or `maxRatioOf`) is breached while traffic flows, or while the carrier has no rate-like signal to show traffic |
+| **ERROR** | a signal with `role: "error"` is outside its limit (#1201) |
+| **UNPROVEN** | zero across the window, a query that succeeded with no data, no traffic, below a `min`, or no observed `min` at all |
+| no verdict | nothing observed yet: a query failed or is still loading. Shown as today's unobserved / evidence incomplete state, never proven |
+
+A query that succeeds but returns no data (an empty Prometheus vector or Loki
+result, CloudWatch with no data points, SQL with no rows, Honeycomb with no
+result rows) is reported as `{empty: true}` on boards with the flag and reads as
+0 for traffic: an empty rate-like signal is zero traffic, and an empty
+`role: "error"` signal means no errors. Any other signal with a limit that comes
+back empty, such as a p95 latency, proves nothing, so its carrier is UNPROVEN
+even when its `max` would hold at 0. A signal without a limit never affects Proof. Its card value reads "no data". Without the flag such a
+signal stays unobserved, as before.
+
+- The headline reads **End to end proven** only when every counted carrier is
+  proven (none in error). Otherwise it reads **N of M proven** and the summary
+  names the degraded, error, unproven and not-measured carriers. With no counted
+  carrier nothing is claimed.
+- The Proof table drops the Jira and Since Done columns and has no ticket-state
+  wording; there is no live-early bucket, and no Done marker on charts.
+- A step's verdict is the worst of its counted carriers (error, degraded,
+  unproven), no verdict while one is pending, else proven. Step `ticketFilter`
+  narrowing does not apply to Proof.
+- Canvas seals follow the same verdicts: PROVEN check, UNPROVEN slash, DEGRADED
+  and ERROR `!`.
+
+`proofVerdicts(input, {endToEndMetrics: true})` in `src/core/proof.js` is the one
+engine for the panel, the canvas cues and the step caption.
+
+In the desktop Workbench, **Status board settings → Metrics → End-to-end metrics
+applied** sets the flag (checked writes `true`, unchecked removes the key; one
+Undo step). An invalid authored value shows its warning next to the checkbox.
+While Allow metrics is off, or no node or connection has metrics, a note by the
+box says it has no effect until metrics are on.
 
 ### Metrics and proof authoring
 

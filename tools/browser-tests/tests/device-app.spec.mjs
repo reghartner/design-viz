@@ -348,7 +348,7 @@ test('starting state uses typed fields, preserves advanced data, and leaves step
  await inspectPageElement(page,app(root).locator('.ptitle'));
  await openInspectorGroup(guide.locator('.initialedit'));
  const battery=guide.locator('.initialedit .frow').filter({has:page.locator(':scope > .flab').filter({hasText:/^Battery$/})});
- await battery.getByLabel('value',{exact:true}).fill('42');await battery.getByLabel('value',{exact:true}).press('Tab');
+ await battery.getByLabel('Value',{exact:true}).fill('42');await battery.getByLabel('Value',{exact:true}).press('Tab');
  await expect(app(root).locator('[data-da-field=battery] .da-value')).toHaveText('42%');
  let edited=diagram(JSON.parse(await page.locator('#src').inputValue()));
  expect(edited.panels[0].initial.battery).toEqual({...d.panels[0].initial.battery,value:42});
@@ -357,7 +357,7 @@ test('starting state uses typed fields, preserves advanced data, and leaves step
  await page.locator('#redo-builder').click();await expect(app(root).locator('[data-da-field=battery] .da-value')).toHaveText('42%');
  await inspectPageElement(page,root.locator('.pt-screen .ptitle'));
  await openInspectorGroup(guide.locator('.initialedit'));
- await guide.locator('.initialedit').getByLabel('mode',{exact:true}).selectOption('live');
+ await guide.locator('.initialedit').getByLabel('Mode',{exact:true}).selectOption('live');
  edited=diagram(JSON.parse(await page.locator('#src').inputValue()));
  expect(edited.panels[1].initial).toEqual({mode:'live',banner:'Ready',custom:17});expect(edited.steps).toEqual(d.steps);
  await testInfo.attach('typed-starting-state',{body:await guide.screenshot(),contentType:'image/png'});

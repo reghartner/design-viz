@@ -258,6 +258,11 @@ metadata object, or `authoring.fieldMeta[key]`, can declare `label`, `help`,
 and `step` objects override those values in one context. Dynamic fields should
 use tuple metadata so labels can come from the declaration, for example
 `[device.id, 'objf', fields, {label: device.label, group: 'Devices'}]`.
+In the setup form, `group` adds a heading before the first field of each group, and
+`advanced` fields share one collapsed **Advanced** section. A setup-context
+`ignoredWhen(panel)` function returns the reason the renderer ignores a field for that
+panel; Inspect then shows the field disabled with the reason (timeline **Shared
+cadence** while lanes exist).
 `assignment: false` leaves assignment UX to a registered custom field adapter: the
 shared selector is not added beside an object sub-field or an `editor.patchControl`
 field that sets it, so that control offers omission and any `null` choice itself

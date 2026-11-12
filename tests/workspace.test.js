@@ -15,6 +15,24 @@ test('docking is a validated browser preference alongside preserved floating geo
   assert.equal(prefs.windows.inspect.docked,true);assert.equal(prefs.windows.inspect.x,420);assert.equal(prefs.windows.inspect.w,500);
   assert.equal(prefs.windows.agent.docked,undefined);
 });
+test('#1376 a docked width is its own validated preference',()=>{
+  const prefs=context.workspacePrefs('{"windows":{"inspect":{"docked":true,"w":380,"dockW":520,"open":true},"steps":{"dockW":"wide"}}}');
+  assert.equal(prefs.windows.inspect.dockW,520);assert.equal(prefs.windows.inspect.w,380);assert.equal(prefs.windows.steps.dockW,undefined);
+});
+test('#1376 each edge and corner moves only the dragged sides; the opposite sides stay put',()=>{
+  const r={x:400,y:200,w:400,h:300},limits={left:60,top:80,right:1580,bottom:980,minW:300,minH:240};
+  const cases={n:[400,170,400,330],s:[400,200,400,330],e:[400,200,440,300],w:[360,200,440,300],
+    nw:[360,170,440,330],ne:[400,170,440,330],sw:[360,200,440,330],se:[400,200,440,330]};
+  for(const [edge,want] of Object.entries(cases)){
+    const dx=edge.includes('w')?-40:edge.includes('e')?40:0,dy=edge.includes('n')?-30:edge.includes('s')?30:0;
+    const got=context.workspaceEdgeRect(r,edge,dx,dy,limits);assert.deepEqual([got.x,got.y,got.w,got.h],want,edge);
+  }
+  // Shrinking stops at the minimum with the opposite side fixed.
+  const w=context.workspaceEdgeRect(r,'nw',500,500,limits);assert.deepEqual([w.x,w.y,w.w,w.h],[500,260,300,240]);
+  // Growing stops at the workspace limits.
+  const big=context.workspaceEdgeRect(r,'se',5000,5000,limits);assert.deepEqual([big.x,big.y,big.x+big.w,big.y+big.h],[400,200,1580,980]);
+  const left=context.workspaceEdgeRect(r,'w',-5000,0,limits);assert.deepEqual([left.x,left.x+left.w],[60,800]);
+});
 test('offscreen or oversized saved panels stay reachable after a smaller viewport',()=>{
   const r=context.workspacePanelRect({x:1600,y:1000,w:700,h:900},800,600);
   assert.ok(r.x>=12);assert.ok(r.y>=72);assert.ok(r.x+r.w<=788);assert.ok(r.y+r.h<=588);

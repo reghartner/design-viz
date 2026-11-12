@@ -116,8 +116,13 @@ test('C5 a board that does not use traces inherits nothing: header, options and 
   assert.equal(ui.traces().querySelector('summary').textContent,'Traces · 1 connection');
   const off=harness(board({enabled:false}));
   assert.equal(off.traces().querySelector('summary').textContent,'Traces · Off');
+  assert.match(off.traces().querySelector('.trace-connections-mode').textContent,/Use and Disable still save the choice\.$/,'a trace board with metrics off offers both');
   off.set('operations on this board','use');
   assert.deepEqual(off.t.traceConnections,{operations:{profile:'operations'},archive:{profile:'archive'}},'a trace board with metrics off still inherits both, so Use keeps archive');
+  const offPlain=harness({page:{title:'Board',tracking:{telemetry:{enabled:false}},sections:[{heading:'Flow',diagram:{nodes:{api:{title:'API'}},rows:[['api']]}}]}});
+  const offNote=offPlain.traces().querySelector('.trace-connections-mode').textContent;
+  assert.match(offNote,/Use still saves the choice\.$/,'metrics off on a board without traces: Disable is not offered, so the note does not name it');
+  assert.deepEqual(offPlain.field('operations on this board').children.map(o=>o.value),['inherit','use']);
   const broken=harness(board(),{operations:profile('Operations Tempo'),bad:{version:2}});
   assert.equal(broken.traces().querySelector('summary').textContent,'Traces · None','a trace board whose company profiles do not resolve says None, not "no traces"');
 });

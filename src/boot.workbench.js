@@ -284,7 +284,9 @@ var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSki
   completed:function(outcome){if(workspace)workspace.canvas.rendered(outcome);if(workbenchBuilder)workbenchBuilder.previewRendered(outcome);
     // An edit can add or remove tickets: the snapshot status line follows every render.
     if(outcome && outcome.ok && workbenchPreview && workbenchPreview.liveSnapshot())describeLiveSnapshot(workbenchPreview.liveSnapshotState());},
-  liveSnapshotChanged:function(state){describeLiveSnapshot(state);}
+  liveSnapshotChanged:function(state){describeLiveSnapshot(state);},
+  // #1241: a Tickets row dropped on a node or connection in the preview attaches its key (one Undo step).
+  ticketDrop:function(ref,key){return workbenchBuilder?workbenchBuilder.dropTicket(ref,key):false;}
 });
 
 /* one button per skin, generated from SKIN_NAMES so a new skin appears

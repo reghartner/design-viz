@@ -44,7 +44,7 @@ test('step collection controls retain earlier snapshots and append-log semantics
   expect((await diagram()).panels[1].initial.values.latency).toBe(40);
   const log=guide.locator('.patchedit[data-panel-state="step"]').filter({has:page.locator('summary').filter({hasText:/^events ·/})});
   await log.locator(':scope > summary').click();await expect(log).toContainText('append to the log');
-  await log.getByLabel('text',{exact:true}).fill('Acknowledged');await log.getByLabel('text',{exact:true}).press('Tab');
+  await log.getByLabel('Entry text',{exact:true}).fill('Acknowledged');await log.getByLabel('Entry text',{exact:true}).press('Tab');
   await expect.poll(async()=>(await diagram()).steps[1].panels.events.log[0].text).toBe('Acknowledged');
   expect((await diagram()).steps[1].panels.events.log[0].future).toBe(3);
   expect((await diagram()).panels[3].initial.log).toEqual(['Started']);

@@ -50,10 +50,13 @@ function flowMetricsDom(o){
      labels say "environment", so an environment named "shared" cannot collide with the shared rows);
      commit takes a page edit {op:'variable', action, name, to?, value?} (environment is added by the
      caller). path is the validator path of the variables object, for the warnings under each row. */
+  /* #1393: env may instead be {title, lower, legend, note} for a node, connection or import's scoped
+     variables; those rows commit the same {op:'variable', …} edits through their own commit. */
   function variableRows(parent,vars,env,commit,list,path){
-    var shared=env==null,title=shared?'Shared':env+' environment',lower=shared?'shared':env+' environment';
-    var set=group(parent,'metrics-variables',shared?'Shared variables':env+' variables');
-    note(set,shared?'Named values for ${name} in signal queries, links and scopes. An environment\'s variables override these.':'Override the shared variables while '+env+' is the environment. No row: the shared value applies.');
+    var custom=env && typeof env==='object',shared=env==null;
+    var title=custom?env.title:shared?'Shared':env+' environment',lower=custom?env.lower:shared?'shared':env+' environment';
+    var set=group(parent,'metrics-variables',custom?env.legend:shared?'Shared variables':env+' variables');
+    note(set,custom?env.note:shared?'Named values for ${name} in signal queries, links and scopes. An environment\'s variables override these.':'Override the shared variables while '+env+' is the environment. No row: the shared value applies.');
     if(vars!=null && !telemetryObject(vars)){note(set,'These variables are not an object; repair them in JSON first.');fieldWarning(set,[],warningsAt(list,path));return set;}
     var authored=telemetryObject(vars)?vars:{};
     fieldWarning(set,[],warningsAt(list,path));
@@ -264,12 +267,20 @@ function createFlowMetricsEditor(o){
   }
   // #1363: scoped variables for this carrier and, on an imported one, for its import.
   if(b){
-    var vars=s.variables || {own:{},inherited:{}};
-    d.row(box,'Variables for this '+(s.edge?'connection':'node'),c.text(Object.keys(vars.own).length?JSON.stringify(vars.own):null,function(v){return commit({op:'variables',value:v});},{textarea:true,placeholder:'{"code":"FULL_CHARGE"}'}));
-    if(Object.keys(vars.inherited).length)d.note(box,'Set by the provider: '+JSON.stringify(vars.inherited)+'.');
+    /* #1393: scoped variables as rows (the #1240 row control). Each row edit is a {op:'variableRow'} edit;
+       commands/telemetry.js checks the name and the scoped-value allowlist and refuses a value that would
+       keep one of this carrier's signals from being sent. */
+    var vars=s.variables || {own:{},inherited:{}},what=s.edge?'connection':'node',inheritedNames=Object.keys(vars.inherited);
+    var carrierSet=d.variableRows(box,vars.own,{title:what.charAt(0).toUpperCase()+what.slice(1),lower:what,legend:'Variables for this '+what,
+      note:'Named values for ${name} in this '+what+'\'s signal queries, links and scopes. They override the import\'s, the environment\'s and the shared variables. Letters, digits, _ . @ : and inner - (and spaces) only.'+
+        (inheritedNames.length?' Set by the provider: '+inheritedNames.map(function(k){return k+' = '+vars.inherited[k];}).join(', ')+'.':'')},
+      function(e){return commit(Object.assign({},e,{op:'variableRow',scope:'carrier'}));},s.warnings,'telemetry.variables');
+    carrierSet.classList.add('metrics-carrier-variables');
     if(s.importVariables){
-      d.row(box,'Variables for import '+s.importVariables.as,c.text(Object.keys(s.importVariables.value).length?JSON.stringify(s.importVariables.value):null,function(v){return commit({op:'importVariables',value:v});},{textarea:true,placeholder:'{"code":"FULL_CHARGE"}'}));
-      d.note(box,'Applies to every node and connection from import '+s.importVariables.as+'.');
+      var as=s.importVariables.as;
+      d.variableRows(box,s.importVariables.value,{title:'Import '+as,lower:'import '+as,legend:'Variables for import '+as,
+        note:'Apply to every node and connection from import '+as+', under this '+what+'\'s own. Letters, digits, _ . @ : and inner - (and spaces) only.'},
+        function(e){return commit(Object.assign({},e,{op:'variableRow',scope:'import'}));},s.importVariables.warnings || [],'variables');
     }
     if(s.merge && s.inherited){
       box.appendChild(c.action('Copy provider queries',function(){return commit({op:'copyProviderQuery'});}));

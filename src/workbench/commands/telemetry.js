@@ -657,7 +657,56 @@ function telemetryEditMerge(inherited,overlay,edit,options){
   // Nothing left that differs from the inherited binding (kind included): nothing to keep.
   return {value:Object.keys(o).length>1?o:null};
 }
+/* #1393: one scoped variable row (add, rename, value, remove) on a carrier's own variables or its
+   import's. Names follow the board's rules; a value must pass the scoped-value allowlist, and an added
+   or changed value that would keep one of this carrier's signals from being sent is refused with the
+   viewer's reason. The write itself is the existing whole-object 'variables' / 'importVariables' edit. */
+function telemetryVariableRowValue(current,edit){
+  var vars=telemetryObject(current)?telemetryClone(current):{},name=edit.name,action=edit.action;
+  function nameProblem(n){
+    if(typeof n!=='string' || !telemetryParamPattern.test(n))return 'Variable names start with a letter and use letters, digits and _.';
+    return TELEMETRY_RESERVED_VARIABLES.indexOf(n)>=0?'"'+n+'" is reserved; choose another name.':'';
+  }
+  function valueProblem(v){
+    if(!telemetryText(v))return 'A variable value is non-empty text; use Remove to delete the variable.';
+    return TELEMETRY_SCOPED_SPACED.test(v.trim())?'':TELEMETRY_SCOPED_ALLOWED.charAt(0).toUpperCase()+TELEMETRY_SCOPED_ALLOWED.slice(1)+'.';
+  }
+  var problem;
+  if(action==='add'){
+    if(!name)return {error:'Type a variable name.'};
+    if((problem=nameProblem(name)))return {error:problem};
+    if(telemetryOwn(vars,name))return {error:'Variable "'+name+'" already exists; edit its value instead.'};
+    if((problem=valueProblem(edit.value)))return {error:problem};
+    vars[name]=edit.value.trim();
+  }else{
+    if(typeof name!=='string' || !telemetryOwn(vars,name))return {error:'Variable "'+name+'" not found. Select the element again.'};
+    if(action==='remove')delete vars[name];
+    else if(action==='rename'){
+      if(edit.to==null)return {error:'A variable needs a name; use Remove to delete it.'};
+      if(edit.to===name)return {value:vars};
+      if((problem=nameProblem(edit.to)))return {error:problem};
+      if(telemetryOwn(vars,edit.to))return {error:'Variable "'+edit.to+'" already exists.'};
+      vars=telemetryRenameKey(vars,name,edit.to);
+    }else if(action==='value'){if((problem=valueProblem(edit.value)))return {error:problem};vars[name]=edit.value.trim();}
+    else return {error:'Unknown variable edit.'};
+  }
+  return {value:vars};
+}
 function planCarrierTelemetry(text,raw,target,edit,context){
+  if(edit && edit.op==='variableRow'){
+    var before;try{before=telemetryCarrierState(raw,target,context);}catch(ex){return {error:ex.message};}
+    if(before.error)return before;
+    var current=edit.scope==='import'?(before.importVariables?before.importVariables.value:null):before.variables && before.variables.own;
+    if(edit.scope==='import' && !before.importVariables)return {error:'Variables for an import are set on its imported nodes and connections.'};
+    var next=telemetryVariableRowValue(current,edit);if(next.error)return next;
+    var whole=Object.keys(next.value).length?JSON.stringify(next.value):null;
+    var plan=planCarrierTelemetry(text,raw,target,{op:edit.scope==='import'?'importVariables':'variables',value:whole},context);
+    if(plan.error || plan.text===text || (edit.action!=='add' && edit.action!=='value'))return plan;
+    var after;try{after=telemetryCarrierState(JSON.parse(plan.text),target,context);}catch(ex){after=null;}
+    var was=before.sent || {},now=after && after.sent || {},blocked=null;
+    Object.keys(now).some(function(signal){var e=now[signal].error;if(e && (!was[signal] || was[signal].error!==e))blocked='With this value, signal '+signal+' would not be sent: '+e;return !!blocked;});
+    return blocked?{error:blocked}:plan;
+  }
   var t=telemetryCarrierTarget(text,raw,target,context);if(t.error)return t;
   var inherited=telemetryInheritedBinding(text,raw,target,t,context);
   // #1363: an import's scoped variables (topologyImports[i].variables) apply to all its carriers.

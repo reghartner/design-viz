@@ -672,7 +672,12 @@ query the viewer would send; nothing is queried. **Variables for this node** (or
 connection) sets the carrier's `telemetry.variables`; on an imported carrier it is stored
 in its overlay, and **Variables for import <as>** sets `topologyImports[i].variables`,
 which applies to every node and connection from that import
-([Variable scopes](#variable-scopes)). On an imported carrier, **Copy provider queries**
+([Variable scopes](#variable-scopes)). Both are rows (#1393), like the shared and
+environment variables: **New node variable name** and **value** (or connection, or
+**import <as>**), then **Add … variable** or Enter; each row renames, changes or is
+removed in place, one Undo step each. A value must pass the scoped-value allowlist
+(letters, digits, `_ . @ : -` and spaces), and a value that would keep one of this
+carrier's signals from being sent is refused with the viewer's reason. On an imported carrier, **Copy provider queries**
 stores the provider's signals, with every narrowing and change made here, as this
 document's own binding, to edit their queries; a note beside it says so
 ([When narrowing or a variable cannot express the filter](#when-narrowing-or-a-variable-cannot-express-the-filter));

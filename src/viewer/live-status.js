@@ -1716,8 +1716,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var rect=trigger.getBoundingClientRect(),frame=popoverFrame(trigger),gap=6;
     var m=Math.min(8,(frame.right-frame.left)/20,(frame.bottom-frame.top)/20),inner={left:frame.left+m,top:frame.top+m,right:frame.right-m,bottom:frame.bottom-m};
     pop.style.maxWidth='';pop.style.maxHeight='';
-    if(pop.offsetWidth>inner.right-inner.left)pop.style.maxWidth=(inner.right-inner.left)+'px';
-    if(pop.offsetHeight>inner.bottom-inner.top)pop.style.maxHeight=(inner.bottom-inner.top)+'px';
+    // Whole pixels: a fractional cap or position lays the rows out on fractional pixels.
+    if(pop.offsetWidth>inner.right-inner.left)pop.style.maxWidth=Math.floor(inner.right-inner.left)+'px';
+    if(pop.offsetHeight>inner.bottom-inner.top)pop.style.maxHeight=Math.floor(inner.bottom-inner.top)+'px';
     var w=pop.offsetWidth,h=pop.offsetHeight,obstacles=popoverObstacles(trigger),slot=obstacles.length?exploreSlot(rect,inner,w,h,obstacles,gap):null;
     if(slot){
       if(!slot.full){
@@ -1727,7 +1728,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
         if(again){slot=again;pop.style.maxHeight=Math.floor(again.full?h:again.tall)+'px';}
         else if(wider>w)slot.left=Math.max(inner.left,Math.min(inner.right-wider,slot.left));
       }
-      pop.style.left=slot.left+'px';pop.style.top=slot.top+'px';
+      pop.style.left=Math.round(slot.left)+'px';pop.style.top=Math.round(slot.top)+'px';
     }else{
       var sides=[
         {room:inner.bottom-rect.bottom-gap,size:h,left:rect.left,top:rect.bottom+gap},
@@ -1735,8 +1736,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
         {room:inner.right-rect.right-gap,size:w,left:rect.right+gap,top:rect.top},
         {room:rect.left-gap-inner.left,size:w,left:rect.left-gap-w,top:rect.top}];
       var side=sides.find(function(s){return s.room>=s.size;}) || sides.reduce(function(best,s){return s.room/s.size>best.room/best.size?s:best;});
-      pop.style.left=Math.max(inner.left,Math.min(inner.right-w,side.left))+'px';
-      pop.style.top=Math.max(inner.top,Math.min(inner.bottom-h,side.top))+'px';
+      pop.style.left=Math.round(Math.max(inner.left,Math.min(inner.right-w,side.left)))+'px';
+      pop.style.top=Math.round(Math.max(inner.top,Math.min(inner.bottom-h,side.top)))+'px';
     }
     pop.scrollTop=scrollTop;pop.scrollLeft=scrollLeft;
   }

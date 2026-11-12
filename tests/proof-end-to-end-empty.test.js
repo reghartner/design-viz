@@ -11,7 +11,8 @@
 | E4 | CloudWatch with no data points | {empty:true}, UNPROVEN | absent |
 | E5 | failed Prometheus query | absent, no verdict (not measured) | absent |
 | E6 | Honeycomb raw answer with no result rows | {empty:true} | throws as before |
-| E7 | proofVerdicts / telemetrySample | empty reads 0 only with the flag; empty is dropped when a value or point exists | identical to absent | */
+| E7 | proofVerdicts / telemetrySample | empty reads 0 only with the flag; empty is dropped when a value or point exists | identical to absent |
+| E8 | an empty non-rate signal (p95 max 500) beside traffic | carrier UNPROVEN, not "End to end proven"; empty ratio numerator and role:error stay 0 | identical to absent | */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {entrypoint}=require('../tools/source-loader.cjs');
 const plain=x=>x===undefined?undefined:JSON.parse(JSON.stringify(x)),settle=async()=>{for(let i=0;i<30;i++)await new Promise(setImmediate);};
@@ -87,4 +88,23 @@ test('E7 proofVerdicts reads empty as 0 only with the flag; telemetrySample keep
   assert.deepEqual(plain(C.telemetrySample({signals:{rate:{empty:true,value:4}}}).signals.rate),{value:4});
   assert.deepEqual(plain(C.telemetrySample({signals:{rate:{empty:true,series:[[Date.parse(NOW),2]]}}}).signals.rate),{series:[[Date.parse(NOW),2]]});
   assert.deepEqual(plain(C.telemetrySample({signals:{rate:{empty:'yes'}}}).signals.rate),{});
+});
+
+/* #1406 review c2: an empty answer is 0 only for traffic (rate-like) and error-role signals. An empty
+   latency or other non-rate signal proves nothing: its carrier is unproven, never "End to end proven". */
+test('E8 traffic plus an empty p95 latency is unproven and the board is not "End to end proven"',()=>{
+  const C=context();
+  const signals={rate:{source:'grafana',query:'rate',unit:'req/h'},errors:{source:'grafana',query:'errors',unit:'req/h'},p95:{source:'grafana',query:'p95',unit:'ms'}};
+  const call=(id,extra={})=>({id,tickets:[],kind:'call',signals:{...signals,...extra},proof:{rate:{min:10},errors:{maxRatioOf:'rate',max:0.01},p95:{max:500}}});
+  const judge=(carrier,sample,options={endToEndMetrics:true})=>plain(C.proofVerdicts({carriers:[carrier],telemetryMap:{[carrier.id]:{signals:sample}}},options));
+  const emptyP95=judge(call('api'),{rate:{value:1300},errors:{value:0},p95:{empty:true}});
+  assert.equal(emptyP95.carriers.api.verdict,'unproven','an empty p95 (max 500) does not hold its limit by reading 0');
+  assert.equal(emptyP95.endToEnd.complete,false);assert.equal(emptyP95.endToEnd.headline,'0 of 1 proven');assert.deepEqual(emptyP95.endToEnd.unproven,['api']);
+  const onlyRate=plain(C.proofVerdicts({carriers:[{id:'api',tickets:[],kind:'call',signals:{rate:signals.rate,p95:signals.p95},proof:{rate:{min:10},p95:{max:500}}}],telemetryMap:{api:{signals:{rate:{value:1300},p95:{empty:true}}}}},{endToEndMetrics:true}));
+  assert.equal(onlyRate.carriers.api.verdict,'unproven','rate 1300 (min 10) + p95 {empty:true} (max 500)');assert.notEqual(onlyRate.endToEnd.headline,'End to end proven');
+  assert.equal(judge(call('api'),{rate:{value:1300},errors:{empty:true},p95:{value:410}}).carriers.api.verdict,'proven','an empty ratio numerator (errors) is zero errors');
+  const errorRole=call('api',{lag:{source:'grafana',query:'failures',unit:'errors',role:'error'}});errorRole.proof.lag={max:5};
+  assert.equal(judge(errorRole,{rate:{value:1300},errors:{value:0},p95:{value:410},lag:{empty:true}}).carriers.api.verdict,'proven','an empty role:error signal means no errors');
+  assert.equal(judge(call('api'),{rate:{value:1300},errors:{value:0},p95:{value:410}}).carriers.api.verdict,'proven','control: a real p95 within its limit');
+  assert.deepEqual(judge(call('api'),{rate:{value:1300},errors:{value:0},p95:{empty:true}},null),judge(call('api'),{rate:{value:1300},errors:{value:0}},null),'flag off: an empty p95 is the same as an absent one');
 });

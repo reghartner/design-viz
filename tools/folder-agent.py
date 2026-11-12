@@ -41,6 +41,10 @@ class OwnershipChangedError(ValueError):
     """session.json names a different session or connection than this command started with."""
 
 
+class EditorReleasedError(ValueError):
+    """The editor disconnected or stopped this turn. Re-establish session does both before it writes the new session.json."""
+
+
 def heartbeat_fresh(editor):
     at = editor.get('at')
     return (isinstance(at, (int, float)) and not isinstance(at, bool) and math.isfinite(at) and
@@ -51,7 +55,7 @@ def connected_editor(folder, owner, allow_stale=False):
     assert_owner(folder, owner)
     editor = read(folder, 'editor.json')
     if editor.get('connected') is not True or any(editor.get(k) != v for k, v in owner.items()):
-        raise ValueError('Editor is disconnected or its connection identity changed. Reread the session.')
+        raise EditorReleasedError('Editor is disconnected or its connection identity changed. Reread the session.')
     if not allow_stale and not heartbeat_fresh(editor):
         raise HeartbeatPausedError('The workbench heartbeat is temporarily paused. Bring the existing Workbench tab to the front and retry the same command with the same session and request IDs. Do not re-establish the session just for a stale heartbeat.')
     return editor
@@ -118,7 +122,7 @@ def current_request(folder, owner, request_id):
     if request.get('id') != request_id or any(request.get(k) != v for k, v in owner.items()):
         raise ValueError('Request is no longer current. Reread the session.')
     if cancelled(folder, owner, request_id):
-        raise ValueError('This turn was stopped in the editor. Do not send more changes or replies for it.')
+        raise EditorReleasedError('This turn was stopped in the editor. Do not send more changes or replies for it.')
     connected_editor(folder, owner)
     return request
 
@@ -198,7 +202,7 @@ def completed_reply(folder, owner, request_id):
         cancel = pending_object(folder, 'cancel.json')
         if (cancel and cancel.get('requestId') == request_id and
                 all(cancel.get(k) == v for k, v in owner.items())):
-            raise ValueError('This turn was stopped in the editor. Do not send more changes or replies for it.')
+            raise EditorReleasedError('This turn was stopped in the editor. Do not send more changes or replies for it.')
         assert_owner(folder, owner)
     return completed
 
@@ -294,8 +298,12 @@ def assert_owner(folder, owner):
         raise OwnershipChangedError('Session ownership changed. Reread the session.')
 
 
-def session_changed(folder, owner):
-    """One line for begin after Re-establish session replaced the ids it started with."""
+def session_changed(folder, owner, reason=None):
+    """One line for begin after Re-establish session replaced the ids it started with.
+
+    With a reason, the editor disconnected or stopped the turn first, which also happens
+    between Re-establish's disconnect and its new session.json.
+    """
     def ids(value):
         if all(isinstance(value.get(key), str) and re.fullmatch(r'[\w-]{1,120}', value[key], re.ASCII)
                for key in ('sessionId', 'connectionId')):
@@ -304,14 +312,17 @@ def session_changed(folder, owner):
         current = identity(folder)
     except Exception:
         current = {}
-    known = [f'{age} {text}' for age, text in (('old', ids(owner)), ('new', ids(current))) if text]
+    known = [f'{age} {text}' for age, text in (('old', ids(owner)), ('new', current != owner and ids(current))) if text]
+    known = f" ({'; '.join(known)})" if known else ''
     try:
         shown = folder.relative_to(Path.cwd())
     except (OSError, ValueError):
         shown = folder
-    return ('Session ownership changed' + (f" ({'; '.join(known)})" if known else '') +
-            '. This happens after Re-establish session in the Workbench. '
-            f'Re-read {shown / "session.json"} and {shown / "CONNECT.md"}, then run begin again.')
+    files = f'{shown / "session.json"} and {shown / "CONNECT.md"}, then run begin again'
+    if reason:
+        return (f'{reason} If this followed Re-establish session in the Workbench{known}, re-read {files}; '
+                'otherwise ask the user to reconnect the folder in the Workbench.')
+    return f'Session ownership changed{known}. This happens after Re-establish session in the Workbench. Re-read {files}.'
 
 
 def progress_history(folder, value):
@@ -758,7 +769,7 @@ def begin(folder, owner, text):
         while time.monotonic() < deadline:
             connected_editor(folder, owner, allow_stale=True)
             if cancelled(folder, owner, request_id):
-                raise ValueError('This turn was stopped in the editor. Do not send more changes or replies for it.')
+                raise EditorReleasedError('This turn was stopped in the editor. Do not send more changes or replies for it.')
             still_ours()
             if not announced and deadline - time.monotonic() <= ACKNOWLEDGEMENT_SECONDS - 1:
                 print(f'Waiting up to {ACKNOWLEDGEMENT_SECONDS} seconds for Workbench acknowledgement ({HIDDEN_TAB}).', file=sys.stderr, flush=True)
@@ -793,7 +804,10 @@ def begin(folder, owner, text):
         if isinstance(error, OwnershipChangedError):
             raise  # main() reports the replaced session on one line.
         outcome = 'This attempt was withdrawn.' if withdrawn else 'Withdrawal could not be confirmed.'
-        print(f'Workbench acknowledgement failed: {error} {outcome} Do not submit unacknowledged work.', file=sys.stderr, flush=True)
+        failure = f'Workbench acknowledgement failed: {error} {outcome} Do not submit unacknowledged work.'
+        if isinstance(error, EditorReleasedError):
+            raise EditorReleasedError(failure) from error  # main() reports it on one line.
+        print(failure, file=sys.stderr, flush=True)
         raise
     withdrawn = withdraw()
     outcome = 'This attempt was withdrawn.' if withdrawn else 'Withdrawal could not be confirmed; use Re-establish session in Agent and continue with its hand-off.'
@@ -854,6 +868,9 @@ def main():
             begin(folder, owner, args.text)
         except OwnershipChangedError:
             print(session_changed(folder, owner), file=sys.stderr)
+            raise SystemExit(1)
+        except EditorReleasedError as error:
+            print(session_changed(folder, owner, str(error)), file=sys.stderr)
             raise SystemExit(1)
         return
     if args.command == 'reply':

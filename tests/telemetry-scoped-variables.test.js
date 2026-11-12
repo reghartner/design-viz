@@ -18,6 +18,8 @@
 | V10 | (minor 2) A value in a SQL LIKE or ILIKE pattern string may hold no % or _. |
 | V11 | (minor 3) label_replace string arguments and LogQL regexp and pattern strings take the regex rule. |
 | V12 | (minor 4) TraceQL strings are "…" and `…` only: a ' does not open a string, so a placeholder after it takes the bare-token rule. |
+| V13 | (#1359 review c2 minor 1) SQL the scan cannot read safely fails closed, naming the form: a backslash before a quote, a MySQL # comment, a nested block comment, dollar quoting; standard doubled quotes still read. |
+| V14 | (minor 2) A string anywhere in a SQL LIKE, ILIKE or SIMILAR TO operand (joined by || or inside CONCAT) takes the LIKE rule; a string after ~, ~*, !~, !~*, REGEXP or RLIKE takes the regex rule. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const loader=require('../tools/source-loader.cjs');
@@ -196,4 +198,35 @@ test('V12 TraceQL: \' is not a string quote',()=>{
   assert.equal(scopedRun({tempo:'{ span.code = "${code}" }'},{code:'FULL'}).error,undefined);
   assert.equal(scopedRun({tempo:'{ span.code = `${code}` }'},{code:'a`b'}).error,unsafe('code','it would end the string it is filled into'));
   assert.equal(scopedRun({tempo:'{ span.code =~ "${code}" }'},{code:'.*'}).error,unsafe('code','it is filled into a regex and holds regex characters'));
+});
+
+test('V13 SQL the scan cannot read safely fails closed, naming the form',()=>{
+  const form=f=>unsafe('code','this SQL query uses '+f+', which Flowview cannot read safely');
+  const cases=[
+    ["SELECT count(*) FROM t WHERE path = 'C:\\' AND code = ${code}",'a backslash before a quote'],
+    ["SELECT count(*) FROM t # it's\nWHERE code = ${code}",'a # comment'],
+    ["SELECT count(*) FROM t /* a /* b */ it's */ WHERE code = ${code}",'a nested block comment'],
+    ["SELECT count(*) FROM t WHERE note = $$it's$$ AND code = ${code}",'dollar quoting'],
+    ["SELECT count(*) FROM t WHERE note = $tag$it's$tag$ AND code = '${code}'",'dollar quoting'],
+    ["SELECT count(*) FROM t /* unclosed WHERE code = ${code}",'an unclosed block comment']];
+  for(const [q,f] of cases)for(const v of ['1 OR 1=1','FULL'])assert.equal(scopedRun({sql:q},{code:v}).error,form(f),q+' / '+v);
+  const doubled={sql:"SELECT count(*) FROM t WHERE name = 'it''s' AND code = '${code}'"};
+  assert.equal(scopedRun(doubled,{code:'FULL'}).query,"SELECT count(*) FROM t WHERE name = 'it''s' AND code = 'FULL'",'standard doubled quotes still read');
+  assert.equal(scopedRun(doubled,{code:"x' OR '1'='1"}).error,unsafe('code','it would end the string it is filled into'));
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE name = 'it''s' AND code = ${code}"},{code:'1 OR 1=1'}).error,unsafe('code',BARE),'after a doubled quote the scan is still in step');
+});
+
+test('V14 SQL LIKE operands and regex operators',()=>{
+  const like=unsafe('code','it is filled into a LIKE pattern and holds % or _'),regex=unsafe('code','it is filled into a regex and holds regex characters');
+  for(const q of ["SELECT count(*) FROM t WHERE code LIKE '%' || '${code}'","SELECT count(*) FROM t WHERE code ILIKE CONCAT('%', '${code}', '%')","SELECT count(*) FROM t WHERE code SIMILAR TO '(' || '${code}' || ')'"]){
+    for(const v of ['a%','a_b'])assert.equal(scopedRun({sql:q},{code:v}).error,like,q+' / '+v);
+    assert.equal(scopedRun({sql:q},{code:'FULL'}).error,undefined,q);
+  }
+  for(const op of ['~','~*','!~','!~*','REGEXP','RLIKE','rlike']){
+    const q={sql:"SELECT count(*) FROM t WHERE code "+op+" '${code}'"};
+    for(const v of ['.*','A|B'])assert.equal(scopedRun(q,{code:v}).error,regex,op+' '+v);
+    assert.equal(scopedRun(q,{code:'FULL'}).error,undefined,op);
+  }
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE code = '${code}' AND name LIKE 'x%'"},{code:'a%'}).error,undefined,'a string before the LIKE is not its operand');
+  assert.equal(scopedRun({sql:"SELECT count(*) FROM t WHERE name LIKE 'x%' AND code = '${code}'"},{code:'a%'}).error,undefined,'nor one after AND');
 });

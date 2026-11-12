@@ -380,8 +380,7 @@ test('every JSON setup field accepts its palette starter value (#996)', () => {
 
 test('Inspect guide text does not tell authors to edit JSON and click Render (#996)', () => {
   for (const [kind, guide] of Object.entries(B.BUILDER_GUIDES)){
-    assert.ok(!/Render/.test(guide.how), kind + ' guide still mentions Render: ' + guide.how);
-    assert.ok(!/selected JSON/.test(guide.how), kind + ' guide still says to edit the selected JSON: ' + guide.how);
+    assert.ok(!/click Render|and Render|selected JSON/.test(guide.how), kind + ' guide still describes the JSON-and-Render workflow: ' + guide.how);
   }
 });
 

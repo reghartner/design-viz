@@ -4054,13 +4054,13 @@ function mapEditor(){
 }
 const runTimers=h=>{for(let i=0;i<5 && h.timers.size;i++){const due=[...h.timers];h.timers.clear();due.forEach(([,t])=>t.fn());}};
 const MAP_ID='8413cd87a9f15b6bfe8e1acf5b3346d0',MAP_SPAN='dcce084f04baa9e1',MAP_MATCH={serviceName:'currency',operation:'grpc.msdemo.CurrencyService/GetSupportedCurrencies'};
-function mapBoard({editor=mapEditor(),twoOnB=false,alternatives=false,otherSection=false}={}){
+function mapBoard({editor=mapEditor(),twoOnB=false,alternatives=false,otherSection=false,card=false}={}){
  const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),recorded=fs.readFileSync('tests/fixtures/provider-traces/honeycomb-trace.txt','utf8');
  const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
  const raw=overFixture();raw.page.tracking.telemetry={traceConnections:{company:profile}};const d=raw.page.sections[0].diagram;
  d.steps[0].text='Hop to beta';d.steps[1].text='Show beta';if(twoOnB)d.steps.push({id:'beta-again',text:'Show beta again',nodes:['b'],traceMatch:alternatives?[{serviceName:'x',operation:'y'},{serviceName:'x',operation:'z'}]:{serviceName:'x',operation:'y'}},{id:'beta-third',text:'Beta third',nodes:['b']});
  if(otherSection)raw.page.sections.push({id:'other',diagram:{nodes:{z:{title:'Zed'}},rows:[['z']],steps:[{id:'zz',text:'Zed step',nodes:['z']}]}});
- const h=harness(raw,{},{boardEditor:editor,telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async()=>({payload:recorded})}}}),api=h.ctl.liveStatus,m=mountStatus(h);
+ const h=harness(raw,{},{boardEditor:editor,telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async()=>({payload:recorded})}}}),api=h.ctl.liveStatus,m=mountStatus(h,card?h.view.appendChild(new Element('div',{class:'pwidget pt-live-status'})):h.view);
  h.ctl.sections[0].stepper={path:()=>h.C.diagramPathList(h.ctl.page.sections[0].diagram)[0].id,sourceIndex:()=>0,mode:()=>'ambient',pause(){},jumpSource(){return true;}};
  api.apply(overToday());api.setStatusMode('trace');api.setDirectTraceField({field:'environment',value:'prod'});api.setDirectTraceField({field:'input',value:MAP_ID});
  if(otherSection)api.setDirectTraceField({field:'section',value:api.snapshot().trace.direct.sections[0].id});
@@ -5144,16 +5144,20 @@ test('#1252 Cancel request during a Load keeps the shown trace and its focus; Cl
  assert.equal(api.snapshot().trace.selected,null,'idle: Clear loaded trace clears');assert.equal(calls.length,2);
  api.destroy();
 });
-/* #1280 light check for fixed-size tiles (Chuck 2026-11-10: the stretching layout is the case that matters; elsewhere the
-   panel body scrolls as a whole): the Spans list's own CSS caps nothing and scrolls nothing, and no rule fills a tile with it. */
-test('#1280 the Spans list has no height cap or scroll of its own in the panel CSS',()=>{
+/* #1280: the Spans list's own CSS caps nothing and scrolls nothing, and no rule fills a tile with it. #1411 (Chuck
+   2026-11-12, "stay ON THE PAGE") drops #1280's Edit-mode list cap: the panel body is the one scroller, on screen only. */
+test('#1280 #1411 the Spans list has no height cap or scroll of its own; the screen-only page cap scrolls the panel body',()=>{
  const h=harness(fixture()),styles=h.C.PanelRegistry.get('live-status').styles,css=typeof styles==='string'?styles:(Array.isArray(styles)?styles:[]).map(s=>typeof s==='string'?s:s.css || '').join('\n');
  assert.ok(css.includes('.dv-trace-waterfall{'),'the waterfall rule is in the panel CSS');
  const own=css.match(/\.dv-trace-waterfall\{[^}]*\}/g) || [],rules=css.match(/[^{}]*\.dv-trace-waterfall[^{]*\{[^}]*\}/g) || [];
- // The one exception is Chuck's option A: the Edit-mode span-dragging class caps and scrolls the list.
- assert.ok(own.length>=1);for(const rule of rules.filter(r=>!r.includes('dv-trace-waterfall-edit')))assert.doesNotMatch(rule.slice(rule.indexOf('{')),/max-height|overflow|contain:size|flex:1 1 0/,rule.trim());
- assert.ok(css.includes('.dv-trace-waterfall.dv-trace-waterfall-edit{max-height:max(240px,calc(100vh - var(--dv-trace-list-top,200px) - 16px));overflow:auto}'),'the Edit-mode cap runs from the list top to the window bottom');
+ assert.ok(own.length>=1);for(const rule of rules)assert.doesNotMatch(rule.slice(rule.indexOf('{')),/max-height|overflow|contain:size|flex:1 1 0/,rule.trim());
+ assert.ok(!css.includes('dv-trace-waterfall-edit') && !css.includes('--dv-trace-list-top'),'no Edit-mode list cap');
  assert.ok(!css.includes('dv-trace-fill'),'no tile fill rule');
+ const at=css.indexOf('@media screen{\n.docview .pwidget.pt-live-status.dv-live-on-page');assert.ok(at>=0,'the page cap is screen only, so print shows every span');
+ const screen=css.slice(at,css.indexOf('\n}\n',at));
+ assert.match(screen,/\.dv-live-on-page[^{]*\{[^}]*max-height:var\(--dv-live-card-max,none\)[^}]*position:sticky;top:var\(--dv-live-sticky-top,0px\)/,'the card is sticky and capped');
+ assert.match(screen,/>\.pbody\.dv-live-on-page-body\{[^}]*overflow-y:auto/,'its body scrolls');
+ assert.match(screen,/\.explore-window-body>\.pwidget\.pt-live-status\.dv-live-fill\{[^}]*height:100%/,'in a fixed Explore window the card fills the window body');
  h.ctl.liveStatus.destroy();
 });
 /* #1280 review: with no scrolling ancestor below the page, a span focus the reader asked for scrolls the page by the least
@@ -5199,30 +5203,29 @@ test('#1280 a span focus restored after an edit re-render never scrolls the page
   }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;b.api.destroy();}
  }
 });
-/* #1280 option A (Chuck 2026-11-10): only while Edit-mode span dragging is on, the list carries the cap class and a focused
-   row scrolls inside the list, never the page; the class goes the moment Edit mode ends. */
-test('#1280 Edit-mode span dragging caps the list; a focused row scrolls inside it; the cap ends with Edit mode',async()=>{
- const editor=mapEditor();let active=true;editor.state=()=>({editable:true,blocked:'',active,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
- const b=mapBoard({editor});assert.ok(await b.api.loadDirectTrace(false));b.h.flush();
- const list=()=>b.m.body.querySelector('.dv-trace-waterfall');
- assert.ok(list().classList.contains('dv-trace-waterfall-edit'),'Edit mode with span dragging: the cap class is on');
+/* #1280 option A asked that any dragged row and the diagram be on screen together. #1411 replaces its Edit-mode list cap:
+   the list never scrolls itself, the panel body (capped to the window) does, so a focused row scrolls the body, never the page. */
+test('#1280 #1411 Edit-mode span dragging adds no list cap; a focused row scrolls the panel body, not the page',async()=>{
+ const editor=mapEditor();editor.state=()=>({editable:true,blocked:'',active:true,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
+ const b=mapBoard({editor,card:true}),body=b.m.body,card=body.parentElement;
  const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect,calls=[],scroller={scrollTop:0};
  proto.getClientRects=function(){return [1];};
- proto.getBoundingClientRect=function(){if(this.classList.contains('dv-trace-waterfall'))return {top:200,bottom:900,left:0,right:100,width:100,height:700};if(this.classList.contains('dv-trace-span-item'))return {top:1500,bottom:1530,left:0,right:100,width:100,height:30};return bound.call(this);};
+ proto.getBoundingClientRect=function(){if(this===body)return {top:200,bottom:900,left:0,right:100,width:100,height:700};if(this.classList.contains('dv-trace-span-item'))return {top:1500,bottom:1530,left:0,right:100,width:100,height:30};return bound.call(this);};
  proto.scrollIntoView=function(){calls.push(this.className);};
- b.h.doc.scrollingElement=scroller;b.h.doc.defaultView={getComputedStyle:el=>({overflowY:el.classList && el.classList.contains('dv-trace-waterfall-edit')?'auto':'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''}),innerHeight:900};
- const l=list();l.scrollHeight=1600;l.clientHeight=700;l.scrollTop=0;
+ b.h.doc.scrollingElement=scroller;b.h.doc.defaultView={addEventListener(){},removeEventListener(){},requestAnimationFrame:f=>f(),innerHeight:900,
+  getComputedStyle:el=>({overflowY:el===body?'auto':'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
  try{
+  assert.ok(await b.api.loadDirectTrace(false));b.h.flush();
+  const list=body.querySelector('.dv-trace-waterfall');assert.ok(list.querySelector('.dv-trace-span[draggable="true"]'),'Edit mode with span dragging');
+  assert.ok(!list.classList.contains('dv-trace-waterfall-edit'),'no list cap class');assert.ok(card.classList.contains('dv-live-on-page') && body.classList.contains('dv-live-on-page-body'),'the page cap is on');
+  body.scrollHeight=2000;body.clientHeight=700;body.scrollTop=0;
   const s=b.api.snapshot().trace.selected;assert.equal(b.api.selectTraceSpan({context:s.context,spanId:MAP_SPAN}),true);b.h.flush();
-  assert.equal(l.scrollTop,638,'the row scrolls inside the capped list (1530 - 900 + 8)');assert.equal(scroller.scrollTop,0,'not the page');assert.equal(calls.filter(c=>/dv-trace-span-item/.test(c)).length,0);
- }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;}
- active=false;b.api.setTraceShow(false);b.api.setTraceShow(true);b.h.flush();
- assert.ok(!list().classList.contains('dv-trace-waterfall-edit'),'Edit mode ended: no cap');
- b.api.destroy();
+  assert.equal(body.scrollTop,638,'the row scrolls into the panel body (1530 - 900 + 8)');assert.equal(scroller.scrollTop,0,'not the page');assert.equal(calls.filter(c=>/dv-trace-span-item/.test(c)).length,0);
+ }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;delete proto.scrollIntoView;b.api.destroy();}
 });
-/* #1280 review c5 (probe C5): the Edit-mode cap's resize and scroll listeners exist only while the cap is on; turning it
-   off and destroying the panel remove them, so three boards built and destroyed leave none behind. */
-test('#1280 #1411 the Edit-mode cap listeners exist only while the cap is on and are gone after destroy',async()=>{
+/* #1411 (and review c1 minor 4): the page cap's resize and scroll listeners exist only while the Trace view is shown; the
+   Jira view removes them and the card's classes, and destroying the panel removes them, so three boards leave none behind. */
+test('#1411 the page cap listeners and classes exist only in the Trace view and are gone after destroy',async()=>{
  const counting=()=>({listeners:new Map(),
   addEventListener(type,fn,capture){const key=type+(capture?':capture':'');if(!this.listeners.has(key))this.listeners.set(key,new Set());this.listeners.get(key).add(fn);},
   removeEventListener(type,fn,capture){const key=type+(capture?':capture':'');if(this.listeners.has(key))this.listeners.get(key).delete(fn);},
@@ -5230,13 +5233,16 @@ test('#1280 #1411 the Edit-mode cap listeners exist only while the cap is on and
   count(){let n=0;for(const set of this.listeners.values())n+=set.size;return n;}});
  const views=[];
  for(let i=0;i<3;i++){
-  const editor=mapEditor();let active=true;editor.state=()=>({editable:true,blocked:'',active,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
-  const b=mapBoard({editor}),view=counting();b.h.doc.defaultView=view;views.push(view);
+  const b=mapBoard({card:true}),view=counting(),card=b.m.body.parentElement;b.h.doc.defaultView=view;views.push(view);
   assert.ok(await b.api.loadDirectTrace(false));b.h.flush();
-  assert.ok(b.m.body.querySelector('.dv-trace-waterfall').classList.contains('dv-trace-waterfall-edit'),'the cap is on');
-  // #1411: the Trace view's page cap (the panel ends at the window's bottom) has its own resize and scroll listener.
-  assert.deepEqual([...view.listeners.keys()].sort(),['resize','scroll:capture']);assert.equal(view.count(),4,'one resize and one scroll listener each for the Edit-mode cap and the page cap');
-  if(i===0){active=false;b.api.setTraceShow(false);b.api.setTraceShow(true);b.h.flush();assert.equal(view.count(),2,'the Edit cap turning off removes its two; the page cap keeps its two while the Trace view shows');active=true;}
+  assert.ok(card.classList.contains('dv-live-on-page'),'Trace view: the card is capped');
+  assert.deepEqual([...view.listeners.keys()].sort(),['resize','scroll:capture']);assert.equal(view.count(),2,'one resize and one scroll listener in the Trace view');
+  if(i===0){
+   b.api.setStatusMode('jira');b.h.flush();
+   assert.equal(view.count(),0,'the Jira view removes them');assert.ok(!card.classList.contains('dv-live-on-page') && !b.m.body.classList.contains('dv-live-on-page-body'),'and the classes');
+   assert.equal(card.style.getPropertyValue('--dv-live-card-max'),'','and the measured cap');
+   b.api.setStatusMode('trace');b.h.flush();assert.equal(view.count(),2,'back in the Trace view: listening again');
+  }
   b.api.destroy();assert.equal(view.count(),0,'destroy removes them');
  }
  assert.equal(views.reduce((n,v)=>n+v.count(),0),0,'none left after three boards');
@@ -5363,27 +5369,28 @@ test('#1280 follow-up: the page top edge is the bar\'s live bottom, not a stale 
   assert.equal(scroller.scrollTop,0,'the row at 100-130 is below the live bar (56): visible, so nothing moves');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;h.doc.defaultView=view;delete h.doc.scrollingElement;nav.remove();api.destroy();}
 });
-/* Follow-up to #1280 (review c9 minor 2): the capped Edit-mode list scrolled up under the bar. A row revealed inside the
-   list lands below the bar (top edge max(list top, bar bottom)), and the cap's measured top is clamped to the bar. */
-test('#1280 follow-up: in the capped Edit list a row never lands under the bar, and the cap top is clamped to it',async()=>{
+/* Follow-up to #1280 (review c9 minor 2), now for the #1411 panel body: a row revealed inside the scrolled body lands below
+   the reader's bar (top edge max(body top, bar bottom)), and the card's cap and sticky top are measured from the bar. */
+test('#1280 #1411 a row revealed in the panel body never lands under the bar; the cap and sticky top are measured from it',async()=>{
  const editor=mapEditor();editor.state=()=>({editable:true,blocked:'',active:true,pending:0,saving:false,readOnly:false,notice:null,mapped:null});
- const b=mapBoard({editor});b.h.view.classList.add('docview');const nav=new Element('nav',{class:'explore-navigation'});b.h.view.appendChild(nav);
+ const b=mapBoard({editor,card:true}),body=b.m.body,card=body.parentElement;b.h.view.classList.add('docview');const nav=new Element('nav',{class:'explore-navigation'});b.h.view.appendChild(nav);
  const proto=Element.prototype,rects=Object.getOwnPropertyDescriptor(proto,'getClientRects'),bound=proto.getBoundingClientRect;
  proto.getClientRects=function(){return [1];};
  proto.getBoundingClientRect=function(){
   if(this===nav)return {top:0,bottom:56,left:0,right:1000,width:1000,height:56};
-  if(this.classList.contains('dv-trace-waterfall'))return {top:-100,bottom:600,left:0,right:100,width:100,height:700};
+  if(this===card)return {top:-120,bottom:620,left:0,right:100,width:100,height:740};
+  if(this===body)return {top:-100,bottom:600,left:0,right:100,width:100,height:700};
   if(this.classList.contains('dv-trace-span-item') && this.querySelector('.dv-trace-span[data-span-id="'+MAP_SPAN+'"]'))return {top:-50,bottom:-20,left:0,right:100,width:100,height:30};
   return bound.call(this);};
  b.h.doc.defaultView={addEventListener(){},removeEventListener(){},requestAnimationFrame:f=>f(),innerHeight:900,
-  getComputedStyle:el=>({overflowY:el.classList && el.classList.contains('dv-trace-waterfall-edit')?'auto':'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
+  getComputedStyle:el=>({overflowY:el===body?'auto':'visible',display:'inline',visibility:'visible',backgroundColor:'',getPropertyValue:()=>''})};
  try{
   assert.ok(await b.api.loadDirectTrace(false));b.h.flush();
-  const list=b.m.body.querySelector('.dv-trace-waterfall');assert.ok(list.classList.contains('dv-trace-waterfall-edit'),'the cap is on');
-  assert.equal(list.style.getPropertyValue('--dv-trace-list-top'),'56px','the cap\'s top is clamped to the bar\'s bottom, not to 0');
-  list.scrollHeight=2000;list.clientHeight=700;list.scrollTop=0;
+  assert.equal(card.style.getPropertyValue('--dv-live-sticky-top'),'56px','the card sticks below the bar');
+  assert.equal(card.style.getPropertyValue('--dv-live-card-max'),'836px','the cap runs from the bar to the window bottom (900 - 56 - 8)');
+  body.scrollHeight=2000;body.clientHeight=700;body.scrollTop=0;
   const s=b.api.snapshot().trace.selected;assert.equal(b.api.selectTraceSpan({context:s.context,spanId:MAP_SPAN}),true);b.h.flush();
-  assert.equal(list.scrollTop,-114,'the row (top -50) is brought below the bar inside the list (-50 - 56 - 8)');
+  assert.equal(body.scrollTop,-114,'the row (top -50) is brought below the bar inside the body (-50 - 56 - 8)');
  }finally{if(rects)Object.defineProperty(proto,'getClientRects',rects);else delete proto.getClientRects;proto.getBoundingClientRect=bound;nav.remove();b.api.destroy();}
 });
 

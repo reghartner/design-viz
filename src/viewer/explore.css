@@ -58,6 +58,26 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
 .explore-window-body svg{max-width:100%;}
 .explore-window-resize{position:absolute;right:0;bottom:0;z-index:2;width:23px;height:23px;border:0;border-radius:6px 0 0;background:var(--explore-bg);color:var(--dtext);font-size:14px;cursor:nwse-resize;touch-action:none;}
 .explore-stacked .explore-window-resize{right:auto;left:0;transform:scaleX(-1);cursor:nesw-resize;}
+/* #1376: 8px edge strips and 14px corner squares on every window and on the
+   step controls. The resize button keeps its corner (bottom-right, or
+   bottom-left when stacked); the matching new corner square is not shown. */
+.explore-window-edge{position:absolute;z-index:2;touch-action:none;}
+.explore-window-edge[data-edge="n"]{top:0;left:14px;right:14px;height:8px;cursor:ns-resize;}
+.explore-window-edge[data-edge="s"]{bottom:0;left:14px;right:23px;height:8px;cursor:ns-resize;}
+.explore-window-edge[data-edge="e"]{right:0;top:14px;bottom:23px;width:8px;cursor:ew-resize;}
+.explore-window-edge[data-edge="w"]{left:0;top:14px;bottom:14px;width:8px;cursor:ew-resize;}
+.explore-stacked>.explore-window-edge[data-edge="s"]{left:23px;right:14px;}
+.explore-stacked>.explore-window-edge[data-edge="e"]{bottom:14px;}
+.explore-stacked>.explore-window-edge[data-edge="w"]{bottom:23px;}
+.explore-player>.explore-window-edge[data-edge="w"]{top:48px;}
+.explore-window-edge:is([data-edge="nw"],[data-edge="ne"],[data-edge="sw"],[data-edge="se"]){width:14px;height:14px;}
+.explore-window-edge[data-edge="nw"]{top:0;left:0;cursor:nwse-resize;}
+.explore-window-edge[data-edge="ne"]{top:0;right:0;cursor:nesw-resize;}
+.explore-window-edge[data-edge="sw"]{bottom:0;left:0;cursor:nesw-resize;}
+.explore-window-edge[data-edge="se"]{bottom:0;right:0;cursor:nwse-resize;}
+:not(.explore-stacked)>.explore-window-edge[data-edge="se"],.explore-stacked>.explore-window-edge[data-edge="sw"]{display:none;}
+[data-explore-width-locked]>.explore-window-edge:is([data-edge="n"],[data-edge="s"]){display:none;}
+.explore-window-edge:hover,.viewport-gesturing .explore-window-edge:active{background:color-mix(in srgb,var(--acc) 35%,transparent);}
 .explore-window :focus-visible,.explore-panel-menu summary:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
 .explore-player{position:absolute;z-index:20;left:var(--float-x);top:var(--float-y);width:var(--float-w);height:var(--float-h);box-sizing:border-box;overflow:hidden;overscroll-behavior:contain;border:1px solid var(--explore-border);border-radius:12px;box-shadow:0 6px 22px #14244224;background:var(--explore-bg);}
 body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;display:grid;grid-template-columns:max-content minmax(0,1fr);grid-template-rows:minmax(34px,var(--explore-tracks-height,34px)) minmax(34px,1fr);gap:6px 12px;min-height:0;max-height:none;width:calc(100% / var(--explore-overlay-scale,1));height:calc(100% / var(--explore-overlay-scale,1));transform:scale(var(--explore-overlay-scale,1));transform-origin:top left;margin:0;border:0;border-radius:0;box-shadow:none;background:var(--explore-bg);padding:12px 14px 10px 20px;align-items:start;align-content:start;}
@@ -114,7 +134,7 @@ body.dv-tour-button .explore-tour-button:focus-visible{outline:2px solid var(--a
  .explore-tools .lg{max-width:220px;}
 }
 @media print{
- .viewport-actions,.explore-tools,.explore-window-header,.explore-window-resize{display:none!important;}
+ .viewport-actions,.explore-tools,.explore-window-header,.explore-window-resize,.explore-window-edge{display:none!important;}
  .explore-stage,.explore-canvas,.docview .explore-board,.explore-window,.explore-player{position:static;height:auto;width:auto;overflow:visible;max-height:none;}
  .explore-window{break-inside:avoid;margin-top:12px;}
  .explore-window-body,body .docview .explore-player>.termbar{width:100%;height:auto;transform:none;}
@@ -220,6 +240,7 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
  .explore-canvas-objects>.explore-window>.explore-window-body{position:absolute;inset:0;width:auto;height:auto;transform:none;border-radius:10px;background:var(--explore-bg);}
  body .docview .explore-canvas-objects>.explore-window[data-explore-canvas-sizing]>.explore-window-body>.pwidget{min-height:0;}
  .explore-canvas-objects>.explore-window>.explore-window-resize{display:none;}
+ .explore-canvas-objects>.explore-window:not(.explore-canvas-selected)>.explore-window-edge{display:none;}
  .explore-canvas-objects>.explore-window[data-explore-canvas-sizing]>.explore-window-resize{cursor:ew-resize;}
  .explore-canvas-objects>.explore-window.explore-canvas-selected{border-color:var(--explore-border);outline:3px solid color-mix(in srgb,var(--acc) 72%,#fff);outline-offset:3px;box-shadow:0 7px 24px #1424422e;}
  .explore-canvas-objects>.explore-window.explore-canvas-selected>.explore-window-header{display:flex;}
@@ -244,6 +265,7 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
  .explore-canvas-objects>.explore-player{box-shadow:none;}
  .explore-canvas-objects>.explore-player>.explore-player-grip,
  .explore-canvas-objects>.explore-player>.explore-window-resize{visibility:hidden;}
+ .explore-canvas-objects>.explore-player:not(.explore-canvas-selected,.dv-sel)>.explore-window-edge{visibility:hidden;}
  .explore-canvas-objects>.explore-player:is(.explore-canvas-selected,.dv-sel){outline:3px solid color-mix(in srgb,var(--acc) 72%,#fff);outline-offset:3px;box-shadow:0 7px 24px #1424422e;}
  .explore-canvas-objects>.explore-player:is(.explore-canvas-selected,.dv-sel)>.explore-player-grip,
  .explore-canvas-objects>.explore-player:is(.explore-canvas-selected,.dv-sel)>.explore-window-resize{visibility:visible;}

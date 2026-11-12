@@ -120,9 +120,9 @@ there to save their floating defaults. View mode remains authoritative while arr
 line samples and response/ack key. It works in the editor, exported viewers and
 agent update previews. Press Escape to close it; opening it does not edit the story.
 The data-flow graph becomes the full-height workspace. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph. Each supporting panel
-starts in a stack at the right edge. Drag its header to move it, drag the corner
-to resize it, or use its **Hide** button. Tab to a header or resize handle and
-use arrow keys; hold Shift for larger changes. Escape cancels a drag. Step
+starts in a stack at the right edge. Drag its header to move it, any edge or
+corner to resize it, or use its **Hide** button. Tab to a header or resize handle and
+use arrow keys; Shift for larger changes. Escape cancels a drag. Step
 controls default to **Floating**, pinned to the viewport. Choose **Panels →
 Step controls → On canvas**, or **Placement** in their inspector, to move and
 zoom them with the graph. Each View remembers both placements separately;

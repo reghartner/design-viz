@@ -312,3 +312,19 @@ test('E15 the new span role survives a re-render; hiding a changed inherited spa
   c.set('process value','process orders v2');c.select(INODE);
   assert.match(c.control('process hidden for this document').title,/Hiding drops your changes to this span; Undo brings them back\.$/);
 });
+
+/* #1413 (local run 142af956): a second Inspect rebuild for the same connection cleared New attribute text the
+   author had typed. A rebuild for the same carrier keeps it, however the selection is re-published (the edge by
+   index, again with its key, after the Inspector is retired); another carrier clears it. */
+test('E12 a rebuild for the same carrier keeps unsaved New attribute text; another carrier clears it',()=>{
+  const source=board();source.page.sections[0].diagram.edges[0].trace={spans:{send:{serviceName:'api',operation:'POST',role:'send'}}};
+  const ui=harness(source).select(EDGE);
+  const type=(name,value)=>{const el=ui.control(name);el.value=value;el.fire('input');};
+  type('send new attribute name','deployment.environment.name');type('send new attribute value','prd');
+  const kept=label=>{assert.equal(ui.control('send new attribute name').value,'deployment.environment.name',label);assert.equal(ui.control('send new attribute value').value,'prd',label);};
+  ui.select(EDGE);kept('the same selection rebuilt');
+  ui.select({kind:'edge',section:0,index:0,id:'api->worker'});kept('the same connection published with its key');
+  ui.h.inspector.retire();ui.select(EDGE);kept('after the Inspector was retired and rebuilt');
+  ui.select(NODE);ui.select(EDGE);
+  assert.equal(ui.control('send new attribute name').value,'','another carrier in between clears it');
+});

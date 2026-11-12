@@ -36,6 +36,15 @@ function createBuilderInspector(opts){
   function hideDiff(){opts.surface.hideDiff();}
   function clipboard(){return disposed?null:opts.clipboard.current();}
   function clipboardToolbar(){return !!(opts.clipboard.toolbar && opts.clipboard.toolbar());}
+  var TRACE_SPAN_DRAFT_OWNER=null;
+  // The carrier a selection names, independent of how it was published: a connection by its from->to key.
+  function traceSpanDraftOwner(){
+    var t=session.target;if(!t)return null;
+    if(t.kind!=='edge')return JSON.stringify([t.kind,t.section,t.id,t.kind==='node'?null:t.index]);
+    var key=null;
+    try{var snap=session.snapshot(),raw=snap.error?null:session.resolve?session.resolve(snap.raw):snap.raw,rec=raw && specSectionPaths(raw)[t.section],d=rec && specValueAt(raw,rec.diagram),e=d && Array.isArray(d.edges)?d.edges[t.index]:null;if(e)key=e.from+'->'+e.to;}catch(ex){key=null;}
+    return JSON.stringify(['edge',t.section,key || t.index]);
+  }
   function targetIdentity(){
     var t=session.target;
     return t?JSON.stringify([session.snapshot().project,t.kind,t.section,t.id,t.index,t.bulletPath,t.card,t.block,t.tab,t.pathId,t.layoutId]):null;
@@ -52,11 +61,16 @@ function createBuilderInspector(opts){
     // rendering anything else first drops it, so a later ordinary click opens nothing.
     if(REVEAL_TRACE_SPANS && REVEAL_TRACE_SPANS!==revealKey(session.target))REVEAL_TRACE_SPANS=null;
     if(!same){
-      OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_SPAN_DRAFTS.clear();TRACE_SCOPE_VIEW.clear();TRACE_MATCH_REVEALED.clear();
+      OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_SCOPE_VIEW.clear();TRACE_MATCH_REVEALED.clear();
       OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;FORM_NOTICE=null;
       LOG_SEARCH_DRAFTS.clear();TRACE_CONNECTION_DRAFTS.clear();JIRA_DRAFTS.clear();
     }
     if(!same)METRICS_DRAFTS.clear();
+    /* #1413 (local run 142af956): a rebuild for the same node or connection keeps unsaved Trace spans text
+       (New span, New attribute), also when the selection is re-published in another form (an edge by index,
+       then with its key) or after the Inspector was retired and rebuilt. Only another carrier clears it. */
+    var spanOwner=traceSpanDraftOwner();
+    if(spanOwner!==TRACE_SPAN_DRAFT_OWNER){TRACE_SPAN_DRAFTS.clear();TRACE_SPAN_DRAFT_OWNER=spanOwner;}
     retireForm();
     inspectorScrollKey=identity;invalidateEffectiveState=null;
     revealInspector();guide.hidden=false;guide.innerHTML='';

@@ -496,8 +496,9 @@ identity no longer matches. When an old `begin` reads the new `session.json`, it
 with one line naming the old IDs and, when readable, the new ones, and asking to reread
 `session.json` and `CONNECT.md`, then run `begin` again. A `begin` that polls between
 the disconnect and the new `session.json` exits with one line instead: the disconnect
-or stopped-turn error, the old IDs (and the new ones once readable), and the same
-reread-then-`begin` step.
+or stopped-turn error, the old IDs (and the new ones once readable), the same
+reread-then-`begin` step if this followed Re-establish session, and otherwise a request
+to ask the user to reconnect the folder in the Workbench.
 Interrupt computation in the agent app itself.
 
 In the Beta conversation, use `progress --request ID --text TEXT` to report meaningful work phases, errors,

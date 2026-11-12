@@ -682,7 +682,8 @@ class FolderAgentTests(unittest.TestCase):
 
     def gap_line(self, reason, shown, ids='old session session, connection connection'):
         return (f'{reason} If this followed Re-establish session in the Workbench ({ids}), re-read '
-                f'{shown}/session.json and {shown}/CONNECT.md, then run begin again.')
+                f'{shown}/session.json and {shown}/CONNECT.md, then run begin again; otherwise ask the user '
+                'to reconnect the folder in the Workbench.')
 
     def acknowledgement_line(self, reason, shown):
         return self.gap_line(f'Workbench acknowledgement failed: {reason} This attempt was withdrawn. '

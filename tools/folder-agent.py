@@ -318,10 +318,11 @@ def session_changed(folder, owner, reason=None):
         shown = folder.relative_to(Path.cwd())
     except (OSError, ValueError):
         shown = folder
-    files = f'{shown / "session.json"} and {shown / "CONNECT.md"}, then run begin again.'
+    files = f'{shown / "session.json"} and {shown / "CONNECT.md"}, then run begin again'
     if reason:
-        return f'{reason} If this followed Re-establish session in the Workbench{known}, re-read {files}'
-    return f'Session ownership changed{known}. This happens after Re-establish session in the Workbench. Re-read {files}'
+        return (f'{reason} If this followed Re-establish session in the Workbench{known}, re-read {files}; '
+                'otherwise ask the user to reconnect the folder in the Workbench.')
+    return f'Session ownership changed{known}. This happens after Re-establish session in the Workbench. Re-read {files}.'
 
 
 def progress_history(folder, value):

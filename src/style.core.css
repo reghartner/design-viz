@@ -4109,6 +4109,8 @@ g.node.dv-edit-target,path.edge.dv-edit-target{cursor:copy;}
 .docview g.coin.dv-edit-over[data-dv-step] circle{stroke:var(--dink,currentColor)!important;stroke-width:3px!important;}
 .dv-live-popover{inset:auto;margin:0;flex-direction:column;align-items:stretch;padding:12px;font-size:11px;font-weight:400;max-width:min(420px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;}
 .dv-live-popover .node-link-title{padding-right:28px;}
+/* #1165: the popover is capped to the diagram frame and its body scrolls; Close stays in its top right corner. */
+.dv-live-popover>.node-link-close{position:sticky;top:5px;z-index:1;order:-1;align-self:flex-end;flex:none;margin:-7px -7px -28px 0;background:inherit;}
 /* #1198 one line per ticket: key, title, staleness, PR count and PR links, with the status chip pinned at the top right
    (its width is reserved through --dv-live-chip-ch, the chip text length). Only the title shrinks (ellipsis, at least 56px);
    staleness, the count and the links are never clipped: when they do not fit, they wrap onto a second line in the row,

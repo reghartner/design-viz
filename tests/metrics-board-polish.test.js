@@ -46,11 +46,15 @@ test('V1 Add shared variable writes tracking.telemetry.variables; an environment
   assert.deepEqual(ui.t.variables,{team:'core'});
   assert.equal(ui.field('Shared variable 1 name').value,'team');assert.equal(ui.field('Shared variable 1 value').value,'core');
   oneUndo(ui,before);
-  ui.render().draft('New stg variable name','team').draft('New stg variable value','edge');
-  ui.field('New stg variable value').fire('keydown',{key:'Enter'});ui.h.flush();
+  ui.render().draft('New stg environment variable name','team').draft('New stg environment variable value','edge');
+  ui.field('New stg environment variable value').fire('keydown',{key:'Enter'});ui.h.flush();
   assert.deepEqual(ui.t.environments,{qa:{},stg:{variables:{team:'edge'}}},'Enter adds; the row writes under stg only');
   assert.equal(Object.hasOwn(ui.t,'variables'),false,'no shared variables written');
   oneUndo(ui,before);
+  const named=harness(board({environments:{shared:{}}}),BOARD);
+  named.draft('New shared environment variable name','team').draft('New shared environment variable value','x').click('Add shared environment variable');
+  assert.deepEqual(named.t,{environments:{shared:{variables:{team:'x'}}}},'an environment named "shared" has its own labels and writes under it');
+  assert.equal(named.field('New shared variable name').value,'','the shared rows keep their own draft');
 });
 
 test('V2 variable rows rename in place, edit, remove; refused names and values write nothing; an authored bad entry is warned at its row',()=>{
@@ -99,6 +103,7 @@ test('V4 signal role and window on carriers and templates',()=>{
   const kept=ui.text;ui.render().set('rate window','forever');assert.equal(ui.text,kept,'a value that is not a duration is refused');
   ui.render().set('rate window','');assert.equal(Object.hasOwn(edge().rate,'window'),false,'empty uses the page window');
   assert.equal(ui.field('cw window').disabled,true,'CloudWatch signals always cover the page window');
+  assert.ok(ui.h.guide.querySelectorAll('.metrics-window-note').some(p=>p.textContent==='Window: CloudWatch signals always cover the page window.'),'a visible note says why');
   const badWindow=ui.field('bad window');assert.equal(badWindow.getAttribute('aria-invalid'),'true');
   assert.match(ui.described(badWindow),/Use a duration such as "1h", "7d" or "now-7d" — ignored/,'the validator warning sits at the field');
   ui.select(BOARD).set('queue lag window','1h');

@@ -46,12 +46,14 @@ function flowMetricsDom(o){
     return p;
   }
   function warningsAt(list,path){return (list || []).filter(function(text){return text.indexOf(path+': ')===0;});}
-  /* #1240: named variables as rows. scope is 'shared' or an environment id; commit takes a page edit
-     {op:'variable', action, name, to?, value?} (environment is added by the caller). path is the
-     validator path of the variables object, for the warnings under each row. */
-  function variableRows(parent,vars,scope,commit,list,path){
-    var title=scope==='shared'?'Shared':scope,set=group(parent,'metrics-variables',scope==='shared'?'Shared variables':scope+' variables');
-    note(set,scope==='shared'?'Named values for ${name} in signal queries, links and scopes. An environment\'s variables override these.':'Override the shared variables while '+scope+' is the environment. Blank: use the shared value.');
+  /* #1240: named variables as rows. env is null for the shared variables, else an environment id (its
+     labels say "environment", so an environment named "shared" cannot collide with the shared rows);
+     commit takes a page edit {op:'variable', action, name, to?, value?} (environment is added by the
+     caller). path is the validator path of the variables object, for the warnings under each row. */
+  function variableRows(parent,vars,env,commit,list,path){
+    var shared=env==null,title=shared?'Shared':env+' environment',lower=shared?'shared':env+' environment';
+    var set=group(parent,'metrics-variables',shared?'Shared variables':env+' variables');
+    note(set,shared?'Named values for ${name} in signal queries, links and scopes. An environment\'s variables override these.':'Override the shared variables while '+env+' is the environment. No row: the shared value applies.');
     if(vars!=null && !telemetryObject(vars)){note(set,'These variables are not an object; repair them in JSON first.');fieldWarning(set,[],warningsAt(list,path));return set;}
     var authored=telemetryObject(vars)?vars:{};
     fieldWarning(set,[],warningsAt(list,path));
@@ -61,10 +63,10 @@ function flowMetricsDom(o){
       var valueControl=row(item,title+' variable '+n+' value',c.text(typeof value==='string'?value:JSON.stringify(value),function(v){return commit({op:'variable',action:'value',name:name,value:v});},{required:'A variable value is non-empty text; use Remove to delete it.',placeholder:'core'}));
       nameControl.title='Write ${'+name+'} in a query, link or scope to use this value.';
       fieldWarning(item,[nameControl,valueControl],warningsAt(list,path+'.'+name));
-      var remove=c.action('Remove '+(scope==='shared'?'shared':scope)+' variable '+name,function(){return commit({op:'variable',action:'remove',name:name});},'bdanger');
+      var remove=c.action('Remove '+lower+' variable '+name,function(){return commit({op:'variable',action:'remove',name:name});},'bdanger');
       remove.title='Remove this variable. Undo brings it back.';item.appendChild(remove);
     });
-    var lower=scope==='shared'?'shared':scope,newName=keptDraft(set,'New '+lower+' variable name','text',null,''),newValue=keptDraft(set,'New '+lower+' variable value','text',null,'');
+    var newName=keptDraft(set,'New '+lower+' variable name','text',null,''),newValue=keptDraft(set,'New '+lower+' variable value','text',null,'');
     newName.placeholder='team';newValue.placeholder='core';
     function add(){
       var ok=commit({op:'variable',action:'add',name:newName.value.trim(),value:newValue.value});
@@ -114,7 +116,7 @@ function flowMetricsDom(o){
       var hasWindow=telemetryObject(entry) && telemetryOwn(entry,'window');
       var windowControl=row(box,prefix+name+' window',c.text(hasWindow?(typeof entry.window==='string'?entry.window:JSON.stringify(entry.window)):null,function(v){return commit({op:'signal',name:name,field:'window',value:v});},{placeholder:'Page window (e.g. 1h, 7d)'}));
       windowControl.title=source==='cloudwatch'?'CloudWatch signals always cover the page window.':'Time range for this signal only, such as 1h, 7d or now-7d. Empty uses the page Metrics window.';
-      if(source==='cloudwatch' && !hasWindow)windowControl.disabled=true;
+      if(source==='cloudwatch' && !hasWindow){windowControl.disabled=true;note(box,'Window: CloudWatch signals always cover the page window.','metrics-window-note');}
       if(warnAt){fieldWarning(box,[role],warnAt(name,'role'));fieldWarning(box,[windowControl],warnAt(name,'window'));}
       row(box,prefix+name+' show on card',c.checkbox(!entry || entry.showOnCard!==false,function(v){return commit({op:'signal',name:name,field:'showOnCard',value:v});}));
       if(source==='loki' || source==='grafana')row(box,prefix+name+' empty result reads 0',c.checkbox(entry.missingMeansZero!==false,function(v){return commit({op:'signal',name:name,field:'missingMeansZero',value:v});})).setAttribute('title','On: an empty Prometheus result reads 0 in Live; an empty Loki count/rate reads 0 in Live and Over time. Off: empty stays unobserved (missingMeansZero: false).');
@@ -302,7 +304,7 @@ function createFlowMetricsSettings(o){
     var group=telemetryObject(t[field[0]])?t[field[0]]:{};
     d.row(box,field[2],c.text(group[field[1]],function(v){return commit({op:field[0],key:field[1],value:v});},{placeholder:field[3]}));
   });
-  d.variableRows(box,t.variables,'shared',commit,s.warnings,'tracking.telemetry.variables');
+  d.variableRows(box,t.variables,null,commit,s.warnings,'tracking.telemetry.variables');
   var environmentWarnings=o.environmentWarnings || s.warnings || [];
   var profiles=telemetryObject(t.environments)?t.environments:{},environmentIds=Object.keys(profiles);
   // #1236: Status board settings passes its Environments section as o.environments.

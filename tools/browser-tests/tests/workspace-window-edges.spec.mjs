@@ -69,3 +69,25 @@ test('docked Inspect resizes from its left edge by pointer and keyboard; the can
   await inspect.getByRole('button',{name:'Float Inspect panel',exact:true}).click();
   await expect.poll(async()=>(await box(inspect)).slice(2)).toEqual(floating.slice(2));
 });
+
+test('resize strips leave the pane scrollbar, the grip and the close button usable',async({page,server})=>{
+  await open(page,server);await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();
+  const win=page.locator('#workspace-window-inspect'),pane=win.locator('.editor-pane');
+  await win.locator('.workspace-window-resize').focus();for(let i=0;i<12;i++)await page.keyboard.press('Shift+ArrowUp');
+  // The right strip sits beside the pane, so it covers none of its scrollbar.
+  const strip=await box(win.locator('.workspace-window-edge[data-edge="e"]')),paneBox=await box(pane);
+  expect(strip[0]).toBeGreaterThanOrEqual(paneBox[0]+paneBox[2]);
+  // Corner squares leave every pixel of the grip and the close button reachable.
+  for(const control of ['.workspace-window-grip','.workspace-window-close'])expect(await win.locator(control).evaluate(el=>{
+    const r=el.getBoundingClientRect(),points=[[r.left+1,r.top+1],[r.right-1,r.top+1],[r.left+1,r.bottom-1],[r.right-1,r.bottom-1]];
+    return points.every(([x,y])=>{const hit=document.elementFromPoint(x,y);return hit===el || el.contains(hit);});
+  }),control).toBe(true);
+  // With a classic scrollbar, dragging its thumb scrolls the pane and never resizes the window.
+  const bar=await pane.evaluate(el=>({width:el.offsetWidth-el.clientWidth,overflow:el.scrollHeight-el.clientHeight}));
+  expect(bar.overflow).toBeGreaterThan(40);
+  if(bar.width>0){
+    const before=await box(win),x=paneBox[0]+paneBox[2]-bar.width/2,y=paneBox[1]+bar.width+6;
+    await pointerDrag(page,[x,y],0,40);
+    expect(await pane.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);expect(await box(win)).toEqual(before);
+  }
+});

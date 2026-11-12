@@ -35,6 +35,8 @@ function pointFor(r,edge){
   const inset=-2;
   return [edge.includes('w')?r.x+inset:edge.includes('e')?r.x+r.width-inset:r.x+r.width/2,edge.includes('n')?r.y+inset:edge.includes('s')?r.y+r.height-inset:r.y+r.height/2];
 }
+// The element under a press point: '<edge>|<tile key>' for a strip, else what it is.
+function stripAt(page,[x,y]){return page.evaluate(([x,y])=>{const hit=document.elementFromPoint(x,y),tile=hit && hit.closest('[data-layout-key]');return hit && (hit.getAttribute('data-edge') || (hit.classList.contains('section-tile-resize')?'se':''))?(hit.getAttribute('data-edge') || 'se')+'|'+(tile && tile.getAttribute('data-layout-key')):'other '+(hit && String(hit.className || hit.tagName));},[x,y]);}
 async function pointerDrag(page,[x,y],dx,dy){await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:8});await page.mouse.up();}
 
 test('a Standard tile resizes from every corner and edge in whole cells, one Undo each, and the saved grid renders',async({page,server,context})=>{
@@ -45,6 +47,7 @@ test('a Standard tile resizes from every corner and edge in whole cells, one Und
   for(const edge of ['nw','n','ne','e','se','s','sw','w']){
     const dx=edge.includes('w')?-1:edge.includes('e')?1:0,dy=edge.includes('n')?-1:edge.includes('s')?1:0,before=await src.inputValue();
     await tile.scrollIntoViewIfNeeded();const r=await tile.boundingBox();
+    expect(await stripAt(page,pointFor(r,edge)),`${edge} press reaches the strip`).toBe(edge+'|panel:home');
     await pointerDrag(page,pointFor(r,edge),dx*cell,dy*row);
     const want={x:item.x+(edge.includes('w')?dx:0),y:item.y+(edge.includes('n')?dy:0),w:item.w+(edge.includes('w')?-dx:edge.includes('e')?dx:0),h:item.h+(edge.includes('n')?-dy:edge.includes('s')?dy:0)};
     await expect.poll(async()=>homeItem(await src.inputValue()),{message:edge}).toEqual(cells(want));
@@ -88,7 +91,7 @@ test('the first tile-strip resize after an uncommitted Inspector edit saves the 
   await title.fill('Pending before the strip');
   await tile.scrollIntoViewIfNeeded();const {cell,row}=await grid(tile),r=await tile.boundingBox(),point=pointFor(r,'nw');
   // The press must reach the strip itself, not a tool window over it.
-  expect(await page.evaluate(([x,y])=>document.elementFromPoint(x,y)?.getAttribute('data-edge'),point)).toBe('nw');
+  expect(await stripAt(page,point)).toBe('nw|panel:home');
   await pointerDrag(page,point,-cell,-row);
   await expect(src).toHaveValue(/Pending before the strip/);
   await expect.poll(async()=>homeItem(await src.inputValue())).toEqual([7,23,7,9]);
@@ -96,4 +99,31 @@ test('the first tile-strip resize after an uncommitted Inspector edit saves the 
   expect(homeItem(await src.inputValue())).toEqual([8,24,6,8]);
   await page.locator('#undo-builder').click();await expect(src).not.toHaveValue(/Pending before the strip/);
   expect(homeItem(await src.inputValue())).toEqual(homeItem(before));
+});
+
+test('boundary tiles resize from their outer edges and adjacent tiles each own their half of the gap',async({page,server})=>{
+  const raw=fixture(),d=raw.page.blocks[0].diagram;
+  d.panels.push({id:'below',type:'state',title:'Below panel',states:['Ready'],initial:{state:'Ready'}});
+  d.layouts[0].sectionLayout.default.push({panel:'below',x:14,y:24,w:4,h:8});
+  await open(page,server,raw);const src=page.locator('#src');
+  // Adjacent tiles: 2px either side of the shared gap's middle reaches each tile's own strip.
+  const home=page.locator('[data-layout-key="panel:home"]'),below=page.locator('[data-layout-key="panel:below"]');
+  await home.scrollIntoViewIfNeeded();const h=await home.boundingBox(),b=await below.boundingBox(),mid=(h.x+h.width+b.x)/2,y=h.y+h.height/2;
+  expect(b.x-(h.x+h.width)).toBeGreaterThan(5);
+  expect(await stripAt(page,[mid-2,y])).toBe('e|panel:home');expect(await stripAt(page,[mid+2,y])).toBe('w|panel:below');
+  // The diagram tile sits on the grid's left and top boundary: its w, n and nw
+  // strips take its own outer 4px. Drag them inward by one cell or row.
+  const diagram=page.locator('[data-layout-key="diagram"]');await diagram.scrollIntoViewIfNeeded();
+  const {cell,row}=await grid(diagram);
+  const cellsOf=async()=>{const it=items(await src.inputValue()).find(it=>!it.panel && !it.controls);return [it.x,it.y,it.w,it.h];};
+  let r=await diagram.boundingBox(),point=[r.x+2,r.y+r.height/2];
+  expect(await stripAt(page,point)).toBe('w|diagram');await pointerDrag(page,point,cell,0);
+  await expect.poll(cellsOf).toEqual([1,0,15,16]);
+  r=await diagram.boundingBox();point=[r.x+r.width/2,r.y+2];
+  expect(await stripAt(page,point)).toBe('n|diagram');await pointerDrag(page,point,0,row);
+  await expect.poll(cellsOf).toEqual([1,1,15,15]);
+  r=await diagram.boundingBox();point=[r.x+2,r.y+2];
+  // Off the boundary now, so the nw corner is pressed outside the tile again.
+  expect(await stripAt(page,[r.x-2,r.y-2])).toBe('nw|diagram');await pointerDrag(page,[r.x-2,r.y-2],-cell,-row);
+  await expect.poll(cellsOf).toEqual([0,0,16,16]);
 });

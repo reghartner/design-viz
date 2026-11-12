@@ -1171,7 +1171,8 @@ body.sk-aurora.sk-blueprint{
 .section-arranging .section-tile-resize{display:block;right:1px;bottom:1px;width:32px;height:32px;cursor:nwse-resize;border-radius:6px 0 0 0;}
 /* #1376: tile edge strips straddle the 8px grid gap (4px out, 4px in); corner
    squares are 14px. The bottom-right is the resize button. The attached
-   controls' line sits inside the top 8px of the controls bar, which clips. */
+   controls' line sits inside the top 6px of the controls bar (which clips),
+   above its first row of buttons in every skin. */
 .section-tile-edge,.section-controls-edge{display:none;position:absolute;z-index:3;touch-action:none;}
 .section-arranging .section-tile-edge,.section-arranging .section-controls-edge{display:block;}
 .section-tile-edge[data-edge="n"]{top:-4px;left:10px;right:10px;height:8px;cursor:ns-resize;}
@@ -1181,7 +1182,9 @@ body.sk-aurora.sk-blueprint{
 .section-tile-edge[data-edge="nw"]{top:-4px;left:-4px;width:14px;height:14px;cursor:nwse-resize;}
 .section-tile-edge[data-edge="ne"]{top:-4px;right:-4px;width:14px;height:14px;cursor:nesw-resize;}
 .section-tile-edge[data-edge="sw"]{bottom:-4px;left:-4px;width:14px;height:14px;cursor:nesw-resize;}
-.section-controls-edge{top:0;left:10px;right:10px;height:8px;cursor:ns-resize;}
+.section-controls-edge{top:0;left:10px;right:10px;height:6px;cursor:ns-resize;}
+.section-arranging .section-layout-tile[data-grid-left]>.section-tile-edge:is([data-edge="w"],[data-edge="nw"],[data-edge="sw"]),
+.section-arranging .section-layout-tile[data-grid-top]>.section-tile-edge:is([data-edge="n"],[data-edge="nw"],[data-edge="ne"]){z-index:5;}
 /* Tile content sits above the strips, so a strip's inner half never takes a
    press from a panel, the diagram or their scrollbars; the half in the grid
    gap takes the drag. The grab bar and resize button stay on top. */

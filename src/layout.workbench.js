@@ -159,11 +159,18 @@ function initSectionLayoutEditor(opts){
     cancel();var n=Number(width.value);if(!Number.isFinite(n))n=760;
     widths[target.value]=Math.max(320,Math.min(1920,Math.round(n)));
   });
+  // #1376: a tile on the grid's left or top boundary has no gap outside that
+  // side to grab (an expanded grid clips it), so its strips there take the
+  // tile's own outer 4px instead.
+  function markGridBoundary(tile){
+    tile.toggleAttribute('data-grid-left',Number(tile.style.getPropertyValue('--tile-x'))===1);
+    tile.toggleAttribute('data-grid-top',Number(tile.style.getPropertyValue('--tile-y'))===1);
+  }
   function paint(grid,items){
     var d=rawDiagram(Number(grid.closest('.doc-sec').getAttribute('data-dv-section')));
     grid.querySelectorAll('.section-layout-tile').forEach(function(tile){
       var item=items.find(function(it){return sectionLayoutKey(it)===tile.getAttribute('data-layout-key');});if(!item)return;
-      tile.style.setProperty('--tile-x',item.x+1);tile.style.setProperty('--tile-y',item.y+1);tile.style.setProperty('--tile-w',item.w);tile.style.setProperty('--tile-h',item.h);
+      tile.style.setProperty('--tile-x',item.x+1);tile.style.setProperty('--tile-y',item.y+1);tile.style.setProperty('--tile-w',item.w);tile.style.setProperty('--tile-h',item.h);markGridBoundary(tile);
       if(d && tile.classList.contains('layout-has-attached-controls'))tile.style.setProperty('--attached-controls-height',(sectionLayoutControlsRows(d,items)*40-8)+'px');
     });
   }
@@ -369,6 +376,7 @@ function initSectionLayoutEditor(opts){
       if(editing===index){
         fields(section,d);
         if(effectivePresentation(index,definition)!=='explore')section.querySelectorAll('.section-layout-tile').forEach(function(tile){
+          markGridBoundary(tile);
           if(!tile.querySelector('.section-tile-move')){
             var name=tile.getAttribute('data-layout-label');
             var move=el('button','section-tile-move','⠿ '+name);move.type='button';move.setAttribute('aria-label','Move '+name);move.title='Drag to move. Arrow keys move; Shift + arrows resize.';tile.appendChild(move);

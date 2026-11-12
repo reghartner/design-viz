@@ -4,6 +4,7 @@
 | T1 | Choosing Disable for company profile operations writes a map without it; the Workbench resolved list and the saved spec's Trace view connection choices no longer list it. | build with company profiles operations, archive, audit; live-status board with a telemetry block | source map; resolved list items; viewer `Trace connection` options | a disabled profile still offered to readers |
 | T2 | Use operations, uncheck its stage environment and type a board label: the entry is written and the resolved list shows the label and only prod. | same | entry; resolved item text | overrides the resolver ignores |
 | T3 | Typing an allowed attribute on an inline profile and pressing Enter writes allowedAttributes; one Undo removes it. | board with one inline profile | source list; source after Undo | attributes written elsewhere; two Undo steps |
+| T4 | (Chuck 2026-11-12) With operations set to Use, typing an allowed attribute and clicking Add allowed attribute writes the board's addition on the operations entry; one Undo removes it. | the T1 board | entry; source after Undo | additions written to the company list or an inline profile |
 Company profiles are put into the page the way a company build does: the TELEMETRY_COMPANY_TRACE_CONNECTIONS value in the served HTML. Desktop only.
 */
 import {readFile,writeFile} from 'node:fs/promises';
@@ -63,5 +64,18 @@ test('T3 desktop add an allowed attribute to an inline profile; one Undo removes
   await expect.poll(async()=>(await map(src)).inline.allowedAttributes).toEqual(['device.model']);
   await expect(traces.getByRole('button',{name:'Remove inline allowed attribute device.model',exact:true})).toBeVisible();
   await page.screenshot({path:info.outputPath('trace-connections-attribute.png')});
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);
+});
+
+test('T4 desktop a board adds an allowed attribute to a company profile it uses; one Undo removes it',async({page,server},info)=>{
+  const traces=await open(page,server,board()),src=page.locator('#src');
+  await traces.getByLabel('operations on this board',{exact:true}).selectOption('use');
+  await expect.poll(async()=>(await map(src)).operations).toEqual({profile:'operations'});
+  const before=await src.inputValue(),add=traces.getByLabel('operations new allowed attribute',{exact:true});
+  await add.click();await add.pressSequentially('device.model');
+  await traces.getByRole('button',{name:'Add allowed attribute to operations',exact:true}).click();
+  await expect.poll(async()=>(await map(src)).operations).toEqual({profile:'operations',allowedAttributes:['device.model']});
+  await expect(traces.getByRole('button',{name:'Remove operations allowed attribute device.model',exact:true})).toBeVisible();
+  await page.screenshot({path:info.outputPath('trace-connections-company-attribute.png')});
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);
 });

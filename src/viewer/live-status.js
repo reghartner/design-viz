@@ -1513,7 +1513,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(active && pop.querySelector('.dv-live-production') && view.contains(ev.target) && ev.target.closest('.dv-live-over-time-slider,.dv-live-step'))return;
     if(active && !active.contains(ev.target) && !pop.contains(ev.target) && carrierFrom(ev.target)!==active)close(true);
   }
-  function resized(){if(active && pop && !pop.hidden && active.isConnected)place(active);}
+  // After the frame: Explore refits its camera on the same resize.
+  function resized(){requestAnimationFrame(function(){if(!retired && active && pop && !pop.hidden && active.isConnected)place(active);});}
   function escape(ev){if(ev.key==='Escape' && active){ev.preventDefault();ev.stopPropagation();close(true);}}
   function productionRow(trigger){
     if(authoring || !trigger || !trigger._liveCarrier)return null;
@@ -1711,8 +1712,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
       return s;
     });
     function fits(s){return s.room>=s.size;}
-    var side=sides.find(function(s){return fits(s) && s.clear;}) || sides.find(function(s){return s.clear;}) || sides.find(fits) ||
-      sides.reduce(function(best,s){return s.room/s.size>best.room/best.size?s:best;});
+    function roomiest(list){return list.reduce(function(best,s){return s.room/s.size>best.room/best.size?s:best;});}
+    var clear=sides.filter(function(s){return s.clear;});
+    var side=sides.find(function(s){return fits(s) && s.clear;}) || (clear.length?roomiest(clear):sides.find(fits) || roomiest(sides));
     pop.style.left=side.left+'px';pop.style.top=side.top+'px';
     pop.scrollTop=scrollTop;pop.scrollLeft=scrollLeft;
   }

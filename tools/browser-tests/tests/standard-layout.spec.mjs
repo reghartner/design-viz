@@ -104,6 +104,8 @@ for(const stacked of [false,true])test(`bottom panel ${stacked?'overlapping anot
 async function tileGrid(tile){return tile.evaluate(el=>{const g=el.closest('.section-layout-grid'),r=g.getBoundingClientRect(),scale=g.offsetWidth?r.width/g.offsetWidth:1;return {cell:(g.clientWidth+8)*scale/24,row:40*scale};});}
 async function tileDrag(page,handle,dx,dy){
   await handle.scrollIntoViewIfNeeded();const box=await handle.boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+  // The press must reach the handle itself, not a tool window over it.
+  expect(await handle.evaluate((el,[x,y])=>{const hit=document.elementFromPoint(x,y);return el===hit || el.contains(hit);},[x,y])).toBe(true);
   await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:8});await page.mouse.up();
 }
 const homeItem=text=>JSON.parse(text).page.blocks[0].diagram.layouts[0].sectionLayout.default.find(it=>it.panel==='home');
@@ -115,28 +117,18 @@ test('Arrange tile move and resize land on the first try with an Inspector edit 
   const outline=page.locator('#workspace-window-outline .workspace-window-close');if(await outline.isVisible())await outline.press('Enter');
   const title=page.locator('#guide').getByLabel('Name',{exact:true}),tile=page.locator('[data-layout-key="panel:home"]');
   await expect(title).toHaveValue('Doorbell');
+  // Inspect floats over the right side of the grid; keep it clear of the tiles.
+  const grip=page.locator('#workspace-window-inspect .workspace-window-grip');await grip.focus();
+  for(let i=0;i<20;i++)await grip.press('Shift+ArrowLeft');
   const {cell,row}=await tileGrid(tile);
   await title.fill('Pending before move');
-  // TEMPORARY #1375 diagnostics: event order and handle state around the press.
-  await page.evaluate(()=>{
-    const out=window.__dv1375=[],desc=el=>el?String(el.className && el.className.baseVal!==undefined?el.tagName:el.className || el.tagName).slice(0,60)+(el.isConnected?'':'(detached)'):'null';
-    const state=()=>'active='+desc(document.activeElement)+' arranging='+document.querySelectorAll('.section-arranging').length+' handles='+document.querySelectorAll('.section-tile-move').length+' dragging='+document.querySelectorAll('.layout-dragging').length+' note='+JSON.stringify(document.querySelector('.layout-preview-tools .fnote')?.textContent||'')+' popovers='+Array.from(document.querySelectorAll(':popover-open')).map(desc).join('|');
-    let moves=0;
-    window.addEventListener('pointerdown',ev=>{out.push('down target='+desc(ev.target)+' hit='+desc(document.elementFromPoint(ev.clientX,ev.clientY))+' at '+ev.clientX+','+ev.clientY+' '+state());setTimeout(()=>out.push('after-down target='+desc(ev.target)+' hit='+desc(document.elementFromPoint(ev.clientX,ev.clientY))+' '+state()),0);},true);
-    window.addEventListener('pointermove',ev=>{if(moves++<2 && ev.buttons)out.push('move target='+desc(ev.target)+' '+state());},true);
-    for(const t of ['focusout','focusin','pointerup','gotpointercapture','lostpointercapture','pointercancel','click'])window.addEventListener(t,ev=>out.push(t+' target='+desc(ev.target)+' '+state()),true);
-    document.getElementById('src').addEventListener('input',()=>out.push('src input'));
-  });
   await tileDrag(page,tile.locator('.section-tile-move'),4*cell,-8*row);
-  console.log('#1375 tile move feedback:',JSON.stringify(await page.locator('.fnote').allTextContents()));
-  console.log('#1375 tile move events:\n'+(await page.evaluate(()=>window.__dv1375)).join('\n'));
   await expect(page.locator('#src')).toHaveValue(/Pending before move/);
   expect(homeItem(await page.locator('#src').inputValue())).toMatchObject({x:12,y:16,w:4,h:8});
   await expect.poll(()=>tile.evaluate(el=>['--tile-x','--tile-y','--tile-w','--tile-h'].map(k=>Number(el.style.getPropertyValue(k))))).toEqual([13,17,4,8]);
   const moved=await page.locator('#src').inputValue();
   await expect(title).toBeVisible();await title.fill('Pending before resize');
   await tileDrag(page,tile.locator('.section-tile-resize'),2*cell,2*row);
-  console.log('#1375 tile resize feedback:',JSON.stringify(await page.locator('.fnote').allTextContents()));
   await expect(page.locator('#src')).toHaveValue(/Pending before resize/);
   expect(homeItem(await page.locator('#src').inputValue())).toMatchObject({x:12,y:16,w:6,h:10});
   await expect.poll(()=>tile.evaluate(el=>['--tile-x','--tile-y','--tile-w','--tile-h'].map(k=>Number(el.style.getPropertyValue(k))))).toEqual([13,17,6,10]);

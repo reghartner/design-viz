@@ -115,8 +115,9 @@ test('#1411 follower: a panel after the Status card in its column can be scrolle
 });
 // Review c2: the cap follows a page scroll. Content above the section puts the card low on the page, so its cap is short; a
 // real wheel over that content scrolls the page, the card's top rises and the re-measured cap grows, still ending on screen.
+// The card starts more than the documented 160 px floor (plus 8) above the window's bottom, so the floor does not apply.
 test('#1411 plain: after a page scroll the re-measured cap grows and the panel still ends inside the window',async({page,server})=>{
- const panel=await open(page,server,'plain',async page=>page.evaluate(()=>{const spacer=document.createElement('div');spacer.className='trace-on-page-spacer';spacer.style.height='420px';document.querySelector('#docview .doc-sec').before(spacer);window.scrollTo(0,0);}));
+ const panel=await open(page,server,'plain',async page=>page.evaluate(()=>{const spacer=document.createElement('div');spacer.className='trace-on-page-spacer';spacer.style.height='300px';document.querySelector('#docview .doc-sec').before(spacer);window.scrollTo(0,0);}));
  const settle=async()=>{await expect.poll(async()=>{const a=JSON.stringify((await geometry(panel)).panel);await frames(page);return a===JSON.stringify((await geometry(panel)).panel);},{message:'the panel box has settled'}).toBe(true);return geometry(panel);};
  // The Load reveals the loaded trace's request line (#1280), which can scroll the page: start this check from the top.
  await page.evaluate(()=>window.scrollTo(0,0));

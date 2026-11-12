@@ -3398,16 +3398,19 @@ literal, never expanded, and the same in every environment.
     duration (`200`, `0.25`, `1.5e3`, `5m`, `1h30m`, `250ms`), in every language and every
     position: comparisons (including PromQL `> bool …` and Logs Insights `in [ … ]`),
     arithmetic, function arguments, `IN ( … )`, `BETWEEN`, `LIMIT`, `OFFSET`. A field name
-    there would compare or count a field instead of a literal. A plain token is allowed only
-    in these positions:
-    - a PromQL or LogQL label list in `by`, `without`, `on`, `ignoring`, `group_left` or
-      `group_right ( … )`;
-    - a SQL table name right after `JOIN`, or after the `FROM` of a `SELECT` (not
-      `IS DISTINCT FROM` or a `FROM` inside a call such as `EXTRACT`);
-    - a TraceQL `status` comparison, which takes `error`, `ok` or `unset`, and a `kind`
-      comparison, which takes `unspecified`, `internal`, `server`, `client`, `producer` or
-      `consumer`.
-    A SQL `IS` (or `IS NOT`) also takes `NULL`, `TRUE` or `FALSE`.
+    there would compare or count a field instead of a literal. A name is filled in only:
+    - inside a PromQL or LogQL `by ( … )` or `without ( … )` label list (any case), which
+      only changes grouping; the name holds only letters, digits and `_` and does not start
+      with a digit;
+    - as a TraceQL `status` value (`error`, `ok` or `unset`) or `kind` value
+      (`unspecified`, `internal`, `server`, `client`, `producer` or `consumer`).
+
+    A SQL `IS` (or `IS NOT`) also takes `NULL`, `TRUE` or `FALSE`. A SQL table name (after
+    `FROM` or `JOIN`) and a PromQL vector-matching label list (`on`, `ignoring`,
+    `group_left`, `group_right`) never take a name, because a broader table or a label
+    neither side carries would count more than the provider meant: "a table name cannot
+    come from a telemetry variable", "a vector-matching label cannot come from a telemetry
+    variable".
   - **Ranges.** Inside a PromQL or LogQL `[range]` a value may not hold `:` (it would make
     a subquery).
   - **Comments and strings.** The scan skips the provider's comments (SQL `--` and block

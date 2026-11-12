@@ -304,7 +304,7 @@ var TELEMETRY_SCOPED_QUOTES={loki:'"`',grafana:'"\'`',tempo:'"`',sql:'\'"`',clou
 var TELEMETRY_SCOPED_TOKEN='[A-Za-z0-9_.@:]+(?:-[A-Za-z0-9_.@:]+)*';
 var TELEMETRY_SCOPED_BARE=new RegExp('^'+TELEMETRY_SCOPED_TOKEN+'$'),TELEMETRY_SCOPED_SPACED=new RegExp('^'+TELEMETRY_SCOPED_TOKEN+'(?: +'+TELEMETRY_SCOPED_TOKEN+')*$');
 var TELEMETRY_SCOPED_ALLOWED='a telemetry variable may hold only letters, digits and _ . @ : - (and spaces inside a string)';
-var TELEMETRY_SCOPED_NUMERIC='outside a string only a number or a duration may be filled in here';
+var TELEMETRY_SCOPED_NUMERIC='outside a string only a number or a duration may be filled in here; a name may be filled in only inside by (…) / without (…) or as a TraceQL status/kind value';
 var TELEMETRY_SCOPED_SQL_PATTERN='in a SQL query that uses patterns or regexes, a variable may not hold _ or .';
 var TELEMETRY_TRACE_ENUMS={status:['error','ok','unset'],kind:['unspecified','internal','server','client','producer','consumer']};
 /* SQL readability gate (VARTEST-1359): dialect forms the scan cannot follow in step. Any of them
@@ -330,18 +330,20 @@ function telemetrySqlUnreadable(text){
 }
 // Patterns and regexes anywhere in a SQL query: a scoped value there may not hold _ or . (VARTEST-1359).
 var TELEMETRY_SQL_PATTERNS=/\b(?:i?like|similar|regexp|rlike|patindex)\b|\bregexp_\w+|~|\bsubstring\b[\s\S]*\bfrom\b/i;
-/* #1359 c5: a bare placeholder (outside any string) takes only a number or a duration, in every
-   language, except in a short named list of positions where it takes a plain token: a PromQL or
-   LogQL label list in by / without / on / ignoring / group_left / group_right ( … ), a SQL table
-   name right after FROM or JOIN, and a TraceQL status or kind comparison, which takes its enum
-   keywords. A SQL IS also takes NULL, TRUE or FALSE. */
+/* #1359 c5/c6: a bare placeholder (outside any string) takes only a number or a duration, in every
+   language. A name is filled in only in a PromQL or LogQL by ( … ) or without ( … ) label list,
+   which only changes grouping, and as a TraceQL status or kind value (its own enum keywords). A
+   SQL IS also takes NULL, TRUE or FALSE. A SQL table name (after FROM or JOIN) and a vector-matching
+   label list (on, ignoring, group_left, group_right) are recognised only to name them when they
+   refuse: either can widen the query by design. */
 function telemetryScopedBarePosition(source,text,index,end){
   // Strings and comments are masked first, so a slot keyword inside one never counts.
   var mask=source==='sql'?/'[^']*'|"[^"]*"|`[^`]*`|--[^\n]*|\/\*[\s\S]*?\*\//g:/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`|#[^\n]*/g;
   var before=text.slice(0,index).replace(mask,'\u0001').replace(/\s+$/,''),after=text.slice(end).replace(mask,'\u0001').replace(/^\s+/,'');
-  if((source==='grafana' || source==='loki') && /\b(?:by|without|on|ignoring|group_left|group_right)\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*$/.test(before) && /^(?:,\s*[A-Za-z_][A-Za-z0-9_]*\s*)*\)/.test(after))return 'label';
+  var list=(source==='grafana' || source==='loki') && /^(?:,\s*[A-Za-z_][A-Za-z0-9_]*\s*)*\)/.test(after) && /\b(by|without|on|ignoring|group_left|group_right)\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*$/i.exec(before);
+  if(list)return /^(?:by|without)$/i.test(list[1])?'label':'vector';
   // A table name: after JOIN, or after the FROM of a SELECT at the same parenthesis depth (not
-  // IS DISTINCT FROM, substring(… FROM …), EXTRACT(… FROM …) or TRIM(… FROM …)).
+  // IS DISTINCT FROM, substring(… FROM …), EXTRACT(… FROM …) or TRIM(… FROM …)). Only named.
   if(source==='sql' && /\bjoin$/i.test(before))return 'table';
   if(source==='sql' && /\bfrom$/i.test(before) && !/\bdistinct\s+from$/i.test(before)){
     var bare=before,depth=0,open=-1;
@@ -408,7 +410,8 @@ function telemetryScopedValueProblem(source,query,scoped,fragments){
       else if(at.string && at.regex && value.indexOf('.')>=0)why='it is filled into a regex and holds regex characters';
       else if(source==='sql' && TELEMETRY_SQL_PATTERNS.test(texts[t]) && /[_.]/.test(value))why=TELEMETRY_SCOPED_SQL_PATTERN;
       else if(!at.string && at.range && value.indexOf(':')>=0)why='inside a range it may not hold :, which turns the range into a subquery';
-      else if(!at.string && !telemetryScopedNumber(value) && !(at.position==='label' || at.position==='table' || (at.position==='status' || at.position==='kind') && TELEMETRY_TRACE_ENUMS[at.position].indexOf(value)>=0 || at.position==='is' && /^(?:null|true|false)$/i.test(value)))why=TELEMETRY_SCOPED_NUMERIC;
+      else if(!at.string && !telemetryScopedNumber(value) && !(at.position==='label' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) || (at.position==='status' || at.position==='kind') && TELEMETRY_TRACE_ENUMS[at.position].indexOf(value)>=0 || at.position==='is' && /^(?:null|true|false)$/i.test(value)))
+        why=at.position==='label'?'a label name may hold only letters, digits and _, and may not start with a digit':at.position==='table'?'a table name cannot come from a telemetry variable':at.position==='vector'?'a vector-matching label cannot come from a telemetry variable':TELEMETRY_SCOPED_NUMERIC;
       if(why)return 'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';
     }
   }

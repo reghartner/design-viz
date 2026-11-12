@@ -2734,24 +2734,29 @@ function panelEditorForCard(card){
     return section ? panelEditorForTarget({kind:'panel',section:Number(section.getAttribute('data-dv-section')),index:Number(card.getAttribute('data-dv-panel'))}) : {};
   }
 
+var ignoredNoteSerial=0;
 function panelSetupRows(val){
     var fields = PANEL_SETUP_FIELDS[val.type] || [['initial', 'json']];
     var entries=fields.map(function(f,index){return {field:f,index:index,meta:panelFieldPresentation(val,f,'setup')};})
       .filter(function(entry){return !entry.meta.hidden;})
-      .sort(function(a,b){return Number(a.meta.advanced)-Number(b.meta.advanced) || a.index-b.index;});
+      .sort(function(a,b){return setupRank(a)-setupRank(b) || a.index-b.index;});
+    /* Grouped fields, then the Advanced section, then Starting state last. */
+    function setupRank(entry){return entry.field[0]==='initial'?2:entry.meta.advanced?1:0;}
     var out=[],lastGroup=null,advancedFold=null;
     function annotated(row,meta){
       var reason=typeof meta.ignoredWhen==='function'?meta.ignoredWhen(val):null;
-      if(reason){
-        /* The renderer ignores this field in the current setup: show it read-only with the reason. */
-        Array.prototype.forEach.call(row.querySelectorAll('input,select,textarea,button'),function(control){control.disabled=true;});
-        row.classList.add('panel-setup-ignored');
-      }
       if(!meta.help && !reason)return row;
       var wrap=document.createElement('div');wrap.className='panel-setup-field';wrap.appendChild(row);
       [reason,meta.help].forEach(function(text){
         if(!text)return;
         var note=document.createElement('p');note.className='fnote panel-setup-note';note.textContent=text;wrap.appendChild(note);
+        if(text!==reason)return;
+        /* The renderer ignores this field in the current setup: show it read-only, described by the reason. */
+        note.id='panel-setup-ignored-'+(++ignoredNoteSerial);note.classList.add('panel-setup-reason');
+        Array.prototype.forEach.call(row.querySelectorAll('input,select,textarea,button'),function(control){
+          control.disabled=true;control.setAttribute('aria-describedby',note.id);
+        });
+        row.classList.add('panel-setup-ignored');
       });
       return wrap;
     }
@@ -2767,7 +2772,7 @@ function panelSetupRows(val){
         }
         rows={push:function(row){advancedFold.appendChild(row);}};
       }else{
-        var groupName=meta.group || (key==='initial' && lastGroup && !panelAuthoring(val.type).initialFields?'Starting state':'');
+        var groupName=key==='initial'?(lastGroup || advancedFold?'Starting state':''):meta.group;
         if(groupName && groupName!==lastGroup){var heading=document.createElement('h4');heading.className='panel-state-group panel-setup-group';heading.textContent=groupName;rows.push(heading);}
         lastGroup=groupName || lastGroup;
       }

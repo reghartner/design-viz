@@ -19,16 +19,16 @@ const CASES={
   radar:{groups:['Sensor','Alert','Starting state'],advanced:['Rings','Scale','Zones'],fields:[
     ['Sensor X','sensor','150',{x:150,y:150}],['Facing','facing','45',45],['Spread','spread','60',60],['Range','range','180',180],
     ['Threshold','threshold','90',90],['Rings','rings','4',4,true],['Pixels per unit','scale','2',{pxPerUnit:2},true],['Zones','zones','[]',[],true]]},
-  cost:{groups:['Units','Notes','Cost model'],advanced:['Display density'],fields:[
+  cost:{groups:['Units','Notes','Cost model','Starting state'],advanced:['Display density'],fields:[
     ['Currency','currency','EUR','EUR'],['Workload unit','unit','requests','requests'],['Cost period','period','per day','per day'],
     ['Basis & exclusions','assumptions','Example rates','Example rates'],
     [rowsField('Operations / routes','Name','Primary'),'routes',null,v=>v[0].label==='Primary'],
     [rowsField('Components & cost lines','Component','Broker'),'items',null,v=>v[0].label==='Broker'],
     [{kind:'select',label:'Display density',option:'compact'},'density',null,'compact',true]]},
-  thermo:{groups:['Scale','Thresholds'],advanced:[],fields:[
+  thermo:{groups:['Scale','Thresholds','Starting state'],advanced:[],fields:[
     ['Unit','unit','°F','°F'],['Minimum','min','-10',-10],['Maximum','max','120',120],['High warning','warn','75',75],
     ['High critical','crit','95',95],['Low warning','lowWarn','12',12],['Low critical','lowCrit','2',2]]},
-  app:{groups:['App','Data sources','Cards'],advanced:[],fields:[
+  app:{groups:['App','Data sources','Cards','Starting state'],advanced:[],fields:[
     ['App Name','appName','Porch','Porch'],['Device','device','Side door','Side door'],['Subtitle','subtitle','Status','Status'],
     [{kind:'select',label:'Show data sources',option:'Show'},'showSources',null,true],
     [rowsField('Sources','Name','Hub'),'sources',null,v=>v[0].label==='Hub'],
@@ -54,6 +54,9 @@ for(const [index,decl] of panels.entries()){
       await advanced.locator(':scope > summary').click();
       await expect(advanced).toHaveAttribute('open','');
       for(const label of c.advanced)await expect(advanced.locator('.flab',{hasText:label}).first()).toBeVisible();
+      // The Advanced section sits before Starting state, which stays last.
+      expect(await guide.evaluate(el=>{const fold=el.querySelector('details.panel-setup-advanced'),heads=[...el.querySelectorAll('h4.panel-setup-group')];
+        const start=heads.find(h=>h.textContent==='Starting state');return !!start && !!(fold.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING);})).toBe(true);
     }else await expect(advanced).toHaveCount(0);
 
     for(const [control,key,typed,expected,isAdvanced] of c.fields){
@@ -73,6 +76,7 @@ for(const [index,decl] of panels.entries()){
       }
       if(typeof expected==='function')await expect.poll(async()=>expected((await panel())[key]),key+' commits').toBe(true);
       else await expect.poll(async()=>(await panel())[key],key+' commits').toEqual(expected);
+      if(isAdvanced)await expect(fold,'Advanced stays open after a commit').toHaveAttribute('open','');
       await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);
     }
     await expect(source).toHaveValue(original);
@@ -89,12 +93,14 @@ test('timeline Shared cadence is disabled with a reason while lanes exist, and e
   await inspectPageElement(page,root.locator('.pt-timeline .ptitle'));
   await expect(cadence().getByLabel('Every',{exact:true})).toBeDisabled();
   await expect(cadence().getByLabel('Name',{exact:true})).toBeDisabled();
-  await expect(guide).toContainText('Lanes set their own cadence');
+  const reason=guide.locator('.panel-setup-field').filter({has:cadence()}).locator('.panel-setup-reason');
+  await expect(reason).toBeVisible();await expect(reason).toContainText('Lanes set their own cadence');
+  await expect(cadence().getByLabel('Every',{exact:true})).toHaveAttribute('aria-describedby',await reason.getAttribute('id'));
 
   await page.goto(server.origin+'/workbench.html');const original=make(false);await pastePage(page,original);
   await inspectPageElement(page,root.locator('.pt-timeline .ptitle'));
   const every=cadence().getByLabel('Every',{exact:true});
-  await expect(every).toBeEnabled();await expect(guide).not.toContainText('Lanes set their own cadence');
+  await expect(every).toBeEnabled();await expect(guide.locator('.panel-setup-reason')).toHaveCount(0);
   await every.click();await page.keyboard.press('ControlOrMeta+A');await page.keyboard.type('20m');await page.keyboard.press('Tab');
   await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.panels[0].cadence).toEqual({every:'20m',label:'heartbeat'});
   await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);

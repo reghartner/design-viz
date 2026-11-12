@@ -70,11 +70,16 @@ test('resize strips of a floating Explore window leave the body scrollbar, the g
   // Make the body scroll: shrink the window from its bottom-right button.
   await panel.locator('.explore-window-resize').focus();for(let i=0;i<10;i++)await page.keyboard.press('Shift+ArrowUp');
   await closeTools(page);
-  // Corner squares leave every pixel of the grip and Hide reachable.
-  for(const control of ['.explore-window-grip','.explore-window-hide'])expect(await panel.locator(control).evaluate(el=>{
-    const r=el.getBoundingClientRect(),points=[[r.left+1,r.top+1],[r.right-1,r.top+1],[r.left+1,r.bottom-1],[r.right-1,r.bottom-1]];
-    return points.every(([x,y])=>{const hit=document.elementFromPoint(x,y);return hit===el || el.contains(hit);});
-  }),control).toBe(true);
+  // Corner squares leave the grip and Hide reachable up to their edges: edge
+  // midpoints 1px in and corners 3px in (inside Hide's 6px radius).
+  for(const control of ['.explore-window-grip','.explore-window-hide']){
+    const missed=await panel.locator(control).evaluate(el=>{
+      const r=el.getBoundingClientRect(),cx=(r.left+r.right)/2,cy=(r.top+r.bottom)/2;
+      const points=[[r.left+3,r.top+3],[r.right-3,r.top+3],[r.left+3,r.bottom-3],[r.right-3,r.bottom-3],[cx,r.top+1],[cx,r.bottom-1],[r.left+1,cy],[r.right-1,cy]];
+      return points.map(([x,y])=>{const hit=document.elementFromPoint(x,y);return hit===el || el.contains(hit)?null:[Math.round(x-r.left),Math.round(y-r.top),hit && (hit.className || hit.tagName)];}).filter(Boolean);
+    });
+    expect(missed,control).toEqual([]);
+  }
   const strip=await box(panel.locator('.explore-window-edge[data-edge="e"]')),bodyBox=await box(body);
   expect(strip[0]).toBeGreaterThanOrEqual(bodyBox[0]+bodyBox[2]-1);
   const bar=await body.evaluate(el=>({width:el.offsetWidth-el.clientWidth,overflow:el.scrollHeight-el.clientHeight}));

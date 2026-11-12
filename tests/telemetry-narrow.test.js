@@ -16,6 +16,14 @@
 | N8 | Viewer: a carrier whose signal is not shown reads "Not shown: <reason>" instead of "Evidence is missing or incomplete." in Proof and the metrics popup; a narrowed signal lists its fragments in the Proof predicate ("Narrowed: …"). |
 | N9 | (review c1 minor 2) needsNarrow counts only a filter that pins values: Honeycomb = or in with a value, a CloudWatch dimension with a value. exists, !=, not-in, does-not-exist (and an empty =) do not; true needs one pinning filter too. The reason names the field. |
 | N10 | (minor 1) No link opens an unnarrowed query: a signal that fails closed loses its own and the carrier's query link; a narrowed signal's card never falls back to the carrier's query link. |
+| N12 | (#1354) LogQL placement: each stage goes at the end of every log pipeline, after the selector's stages and before an inherited unwrap, a [range], a closing ) or the end; every leg of a ratio; $__range and offset untouched; a line filter meeting an inherited line_format, or a query without a stream selector, fails closed. |
+| N13 | (#1354) LogQL fragment safety: one line filter (with or chains), label filter expression or parser per entry; anything else fails closed: a second "|", [ ] { }, #, a newline, unbalanced quotes or parentheses, a refused stage (line_format, label_format, unwrap, drop, keep, decolorize, distinct); a variable value that breaks the stage says so. |
+| N14 | (#1354) PromQL placement: the matcher text goes into every vector selector, inside its braces or as braces after a bare metric name; by/without/on/ignoring/group_left/group_right lists are skipped; ranges with $__rate_interval stay; a $var outside strings and ranges, an unknown token, or no selector fails closed. |
+| N15 | (#1354) PromQL fragment safety: matcher text only (label op "value" joined by commas); a }, or, unless, a trailing comma, an unquoted value or a newline fails closed. |
+| N16 | (#1354) Logs Insights placement: "| filter …" before the first stats, or at the end; breakdown and trend queries are narrowed too, and a failure there sets only their own error; a limit or dedup before the insertion point fails closed. |
+| N17 | (#1354) Logs Insights fragment safety: one filter command; a "|", "#", a newline, unbalanced quotes or a non-filter command fails closed; /regex/ is masked. |
+| N18 | (#1354) needsNarrow pins with text: a PromQL or LogQL label "=" with a value; a Logs Insights field = value or field in [...]; a fragment with or (or not) pins nothing; true is met by a LogQL |= line filter too. |
+| N19 | (#1353 review c1 minor 5) A narrowed Honeycomb trace search (query_spec) is not shown, with a narrowing reason. |
 | N11 | (minor 6) The text view prints "Not shown: <reason>" for a fail-closed signal instead of its provider query; a narrowed signal prints the narrowed query. |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
@@ -62,7 +70,7 @@ test('N4 every fail-closed reason',()=>{
   assert.deepEqual(narrow('honeycomb',HC(),{loki:'| a="1"'}),{kind:'language',written:true,error:'This signal reads from Honeycomb, so a LogQL narrowing cannot apply; it is not shown.'});
   assert.deepEqual(narrow('sql','SELECT 1',{sql:'WHERE a=1'}),{kind:'unsupported',written:true,error:'Grafana SQL signals cannot be narrowed, so this one is not shown. Ask the provider to write a ${name} placeholder in its query, then set that variable.'});
   assert.deepEqual(narrow('tempo','{}',null,['x']),{kind:'unsupported',written:false,error:'Tempo signals cannot be narrowed, so this one is not shown. Ask the provider to write a ${name} placeholder in its query, then set that variable.'});
-  assert.deepEqual(narrow('loki','sum(count_over_time({app="a"}[5m]))',{loki:'| a="1"'}),{kind:'unsupported',written:true,error:'Flowview cannot narrow LogQL signals yet, so this one is not shown.'});
+  assert.deepEqual(narrow('loki','sum(count_over_time({app="a"}[5m]))',{loki:'| a="1"'}),{query:'sum(count_over_time({app="a"} | a="1" [5m]))',fragments:['| a="1"']},'#1354: LogQL fragments now apply');
   assert.equal(narrow('loki','q',null).error,undefined,'a text signal without narrowing is untouched');
   assert.deepEqual(narrow('honeycomb',HC(),{honeycomb:{filters:[{column:'a',op:'like',value:'1'}]}}),{kind:'shape',written:true,error:'A Honeycomb narrowing of this signal is not valid (use a Honeycomb filter operator such as "=" or "in"), so it is not shown.'});
   assert.equal(narrow('honeycomb',HC(),{honeycomb:{filters:[{column:'a',op:'exists',value:1}]}}).error,'A Honeycomb narrowing of this signal is not valid (exists takes no value), so it is not shown.');
@@ -167,4 +175,128 @@ test('N11 the text view says why a signal is not shown, and prints a narrowed qu
   assert.ok(flat.includes('node b metric.received.query.filters[1].column event_code'),flat.filter(l=>/node b metric/.test(l)).join('\n'));
   const elements=String(C.textViewElements(C.textViewModel(page)));
   assert.match(elements,/Not shown: The provider asks each board to narrow this signal by event_code/,'the elements view says so too');
+});
+
+const lq=(q,frag)=>narrow('loki',q,{loki:frag});
+test('N12 LogQL: each stage goes at the end of every log pipeline',()=>{
+  const ok=(q,frag,want)=>{const r=lq(q,frag);assert.equal(r.error,undefined,q+' | '+JSON.stringify(frag)+': '+r.error);assert.equal(r.query,want);};
+  ok('{app="dcf"}','| event_code="X"','{app="dcf"} | event_code="X"');
+  ok('{app="dcf"} | json','| event_code="X"','{app="dcf"} | json | event_code="X"');
+  ok('sum(count_over_time({app="dcf"} |= "err" [5m]))',['| json','| code="E1"'],'sum(count_over_time({app="dcf"} |= "err" | json | code="E1" [5m]))');
+  ok('sum(count_over_time({app="a"}[$__range]))','| code="E1"','sum(count_over_time({app="a"} | code="E1" [$__range]))');
+  ok('sum(count_over_time({app="a"}[5m] offset 1h))','| code="E1"','sum(count_over_time({app="a"} | code="E1" [5m] offset 1h))');
+  ok('sum(sum_over_time({app="a"} | json | unwrap bytes [5m]))','| code="E1"','sum(sum_over_time({app="a"} | json | code="E1" | unwrap bytes [5m]))');
+  ok('sum(rate({app="a"} |= "x" [5m])) / sum(rate({app="a"}[5m]))','|= "FULL"','sum(rate({app="a"} |= "x" |= "FULL" [5m])) / sum(rate({app="a"} |= "FULL" [5m]))');
+  ok('sum by (code) (count_over_time({app="a", env=~"p.*"} | logfmt [1h]))','| code!="200"','sum by (code) (count_over_time({app="a", env=~"p.*"} | logfmt | code!="200" [1h]))');
+  ok('{app="a"} | line_format "{{.msg}}"','| code="E1"','{app="a"} | line_format "{{.msg}}" | code="E1"');
+  assert.deepEqual(lq('{app="a"} | line_format "{{.msg}}"','|= "FULL"'),{kind:'placement',error:'This LogQL query reformats its lines with line_format, so a line filter cannot be added safely; it is not shown.'});
+  assert.deepEqual(lq('vector(1)','| a="1"'),{kind:'placement',error:'This LogQL query has no stream selector Flowview can find, so the narrowing cannot be added; it is not shown.'});
+  assert.deepEqual(lq('{app="a" | json','| a="1"'),{kind:'placement',error:'This LogQL query has unbalanced braces, brackets or parentheses, so the narrowing cannot be added; it is not shown.'});
+  assert.deepEqual(lq('{app="a} | json','| a="1"'),{kind:'placement',error:'This LogQL query has an unclosed string, so the narrowing cannot be added; it is not shown.'});
+  assert.deepEqual(lq('{app="a"} # note','| a="1"'),{kind:'placement',error:'This LogQL query has a # comment, so the narrowing cannot be added; it is not shown.'});
+  // The validator: a fragment fault as written warns anywhere; a query it cannot be placed in, only where signals are shown.
+  const page=(signal,panel)=>({page:{title:'t',sections:[{id:'main',diagram:{nodes:{a:{title:'A',telemetry:{kind:'service',signals:{logs:signal}}}},rows:[['a']],...(panel?{panels:[{id:'s',type:'live-status'}]}:{})}}]}});
+  const warn=doc=>plain(C.validate(C.normalize(doc)).warnings).filter(w=>/telemetry/.test(w));
+  assert.deepEqual(warn(page({loki:'{app="a"}',narrow:{loki:['| json','| a="x" | drop b']}},false)),['sections[0].diagram.nodes.a.telemetry.signals.logs.narrow.loki[1]: one stage per entry: this one has a second "|" — signal not shown']);
+  const unplaceable={loki:'vector(1)',narrow:{loki:'| a="x"'}};
+  assert.deepEqual(warn(page(unplaceable,false)),[],'a canon page still builds');
+  assert.deepEqual(warn(page(unplaceable,true)),['sections[0].diagram.nodes.a.telemetry.signals.logs: This LogQL query has no stream selector Flowview can find, so the narrowing cannot be added; it is not shown.']);
+});
+
+test('N13 LogQL: only one safe stage per entry; every escape attempt fails closed',()=>{
+  for(const frag of ['|= "a"','!= "a"','|~ "a.*b"','!~ "x"','|= "a" or "b"','| json','| logfmt','| unpack','| regexp "(?P<code>\\\\w+)"','| pattern "<_> code=<code>"','| a="x"','| a=~"x|y" and b!="z"','| status >= 500','| duration > 1.5s, size < 10KB','| (a="1" or b="2") and c="3"','| json code="event.code"'])
+    assert.equal(lq('{app="a"}',frag).error,undefined,frag);
+  const bad=(frag,why)=>assert.deepEqual(lq('sum(count_over_time({app="a"}[5m]))',frag),{kind:'shape',written:true,error:'A LogQL narrowing of this signal is not valid ('+why+'), so it is not shown.'},JSON.stringify(frag));
+  const stage='a LogQL narrowing is one line filter (|= "x"), label filter (| a="x") or parser (| json)';
+  bad('| a="x" [5m])) or vector(1)','a LogQL narrowing cannot hold { } [ ]');
+  bad('| a="x" | line_format "x"','one stage per entry: this one has a second "|"');
+  bad('|= "x" |= "y"','one stage per entry: this one has a second "|"');
+  bad('| a="x" # rest','"#" would comment out the rest of the query');
+  bad('| a="x"\n| b="y"','a narrowing is one line');
+  bad('} |= "x"','a LogQL narrowing cannot hold { } [ ]');
+  bad('|= "x','its quotes are unbalanced');
+  bad('| (a="x"','its parentheses are unbalanced');
+  bad('| line_format {{.a}}','a LogQL narrowing cannot hold { } [ ]');
+  bad('| line_format "x"','line_format changes what is counted and cannot narrow');
+  for(const word of ['label_format a="b"','unwrap bytes','drop a','keep a','decolorize','distinct a'])bad('| '+word,word.split(' ')[0]+' changes what is counted and cannot narrow');
+  bad('| a',stage);bad('a="x"',stage);bad('| a="x" b="y"',stage);bad('|= x',stage);bad('',stage);
+  // A variable value that adds a quote breaks the stage after it is filled in.
+  const s=plain(C.carrierTelemetry({telemetry:{kind:'service',signals:{logs:{loki:'sum(count_over_time({app="a"}[5m]))',narrow:{loki:'| code="${code}"'}}}}},{},undefined,{variables:{code:'x" | line_format "y'}}).signals.logs);
+  assert.equal(s.error,'After its variables were filled in, a LogQL narrowing of this signal is not valid (one stage per entry: this one has a second "|"), so it is not shown.');
+  assert.equal(s.query,'sum(count_over_time({app="a"}[5m]))','nothing is spliced');
+});
+
+const pq=(q,frag)=>narrow('grafana',q,{grafana:frag});
+test('N14 PromQL: the matcher text goes into every vector selector',()=>{
+  const ok=(q,frag,want)=>{const r=pq(q,frag);assert.equal(r.error,undefined,q+': '+r.error);assert.equal(r.query,want);};
+  ok('sum(rate(http_requests_total{job="api"}[5m]))','code="500"','sum(rate(http_requests_total{job="api",code="500"}[5m]))');
+  ok('up','code="500"','up{code="500"}');
+  ok('x{a="b",}','code="500"','x{a="b",code="500"}');
+  ok('sum by (job) (rate(x[5m]))','type="full"','sum by (job) (rate(x{type="full"}[5m]))');
+  ok('sum(rate(a_total[5m])) / on(job) group_left(team) sum(rate(b_total[$__rate_interval]))','type="full"','sum(rate(a_total{type="full"}[5m])) / on(job) group_left(team) sum(rate(b_total{type="full"}[$__rate_interval]))');
+  ok('histogram_quantile(0.9, sum without (pod) (rate(h_bucket{le!=""}[5m])))','type="full"','histogram_quantile(0.9, sum without (pod) (rate(h_bucket{le!="",type="full"}[5m])))');
+  ok('{__name__="x"} * 3600','type="full"','{__name__="x",type="full"} * 3600');
+  ok('rate(x[5m] offset 1h) > bool 0','type="full"','rate(x{type="full"}[5m] offset 1h) > bool 0');
+  ok('label_replace(up{job="a"}, "dst", "$1", "src", "(.*)")','type="full"','label_replace(up{job="a",type="full"}, "dst", "$1", "src", "(.*)")');
+  ok('count{job="a"}','type="full"','count{job="a",type="full"}');
+  ok('sum(rate(x[5m]))',['type="full"','region="eu"'],'sum(rate(x{type="full",region="eu"}[5m]))');
+  assert.deepEqual(pq('sum(rate(x{job="$job"}[5m])) / $total','type="full"'),{kind:'placement',error:'This PromQL query has a $ variable outside a string or range, so the narrowing cannot be added; it is not shown.'});
+  assert.deepEqual(pq('vector(1)','type="full"'),{kind:'placement',error:'This PromQL query has no vector selector Flowview can find, so the narrowing cannot be added; it is not shown.'});
+  assert.deepEqual(pq('sum(rate(x[5m]) ; drop','type="full"'),{kind:'placement',error:'This PromQL query has a token Flowview does not recognise (;), so the narrowing cannot be added; it is not shown.'});
+  assert.deepEqual(pq('sum(rate(x[5m])','type="full"'),{kind:'placement',error:'This PromQL query has unbalanced braces, brackets or parentheses, so the narrowing cannot be added; it is not shown.'});
+});
+
+test('N15 PromQL: matcher text only; every escape attempt fails closed',()=>{
+  for(const frag of ['type="full"','type=~"a|b",region!="test"','a!~\'x\'','a=`raw`','a="say \\"hi\\""'])assert.equal(pq('up',frag).error,undefined,frag);
+  const bad=frag=>assert.deepEqual(pq('up',frag),{kind:'shape',written:true,error:'A Prometheus narrowing of this signal is not valid (use PromQL matcher text such as type="full_charge"), so it is not shown.'},JSON.stringify(frag));
+  for(const frag of ['type="1"} or vector(1)','type="1" or up','type="1" unless up','type="1",','type=1','type="1"\n','}','type="1"}[5m]','{type="1"}','type="1" #','type','"a"="b"',''])bad(frag);
+});
+
+const logs=(query,frag,extra={})=>narrow('cloudwatchLogs',{logGroups:['g'],query,region:'us-east-1',...extra},{cloudwatchLogs:frag});
+test('N16 Logs Insights: "| filter …" before the first stats, or at the end; breakdown and trend too',()=>{
+  const ok=(q,frag,want)=>{const r=logs(q,frag);assert.equal(r.error,undefined,q+': '+r.error);assert.equal(r.query.query,want);};
+  ok('fields @message | filter level="error" | stats count() as n','filter code = "E1"','fields @message | filter level="error" | filter code = "E1" | stats count() as n');
+  ok('filter a = 1 | stats count() as n | stats sum(n) as m','filter code = "E1"','filter a = 1 | filter code = "E1" | stats count() as n | stats sum(n) as m');
+  ok('fields @timestamp, @message','filter code = "E1"','fields @timestamp, @message | filter code = "E1"');
+  ok('fields @message | stats count() as n',['filter a = 1','filter b like /x|y/'],'fields @message | filter a = 1 | filter b like /x|y/ | stats count() as n');
+  const r=logs('filter a = 1 | stats count() as n','filter code = "E1"',{breakdown:{query:'filter a = 1 | stats count() as n by clientId | sort n desc | limit 20',labelField:'clientId',valueField:'n',limit:20},trend:{query:'filter a = 1 | stats count() as n by bin(1h)',timeField:'bin(1h)',valueField:'n'}});
+  assert.equal(r.query.breakdown.query,'filter a = 1 | filter code = "E1" | stats count() as n by clientId | sort n desc | limit 20','a limit after stats is fine');
+  assert.equal(r.query.trend.query,'filter a = 1 | filter code = "E1" | stats count() as n by bin(1h)');
+  assert.deepEqual(logs('fields a | limit 10 | stats count() as n','filter code = "E1"'),{kind:'placement',error:'This Logs Insights query has limit or dedup before its stats, so a filter cannot be added safely; it is not shown.'});
+  const side=logs('stats count() as n','filter code = "E1"',{breakdown:{query:'dedup clientId | stats count() as n by clientId',labelField:'clientId',valueField:'n',limit:20}});
+  assert.equal(side.error,undefined,'the total is still narrowed and shown');
+  assert.equal(side.breakdownError,'This Logs Insights query has limit or dedup before its stats, so a filter cannot be added safely; it is not shown.');
+  const s=plain(C.carrierTelemetry({telemetry:{kind:'service',signals:{fail:{cloudwatchLogs:{logGroups:['g'],query:'stats count() as n',region:'us-east-1',valueField:'n',breakdown:{query:'dedup c | stats count() as n by c',labelField:'c',valueField:'n',limit:20}},narrow:{cloudwatchLogs:'filter code = "E1"'}}}}},{}).signals.fail);
+  assert.equal(s.error,undefined);assert.equal(s.query.query,'filter code = "E1" | stats count() as n');
+  assert.match(s.breakdownError,/limit or dedup before its stats/,'only the details query fails');
+});
+
+test('N17 Logs Insights: one filter command; every escape attempt fails closed',()=>{
+  for(const frag of ['filter a = "x"','FILTER a in ["x","y"]','filter @message like /a|b#c/','filter a = \'x\' and b != 2'])assert.equal(logs('stats count() as n',frag).error,undefined,frag);
+  const bad=(frag,why)=>assert.deepEqual(logs('stats count() as n',frag),{kind:'shape',written:true,error:'A Logs Insights narrowing of this signal is not valid ('+why+'), so it is not shown.'},JSON.stringify(frag));
+  bad('filter a = "x" | stats count() as n','one filter command: this one has a "|"');
+  bad('filter a = "x" # c','"#" would comment out the rest of the query');
+  bad('filter a = "x"\n| fields b','a narrowing is one line');
+  bad('filter a = "x','its quotes are unbalanced');
+  bad('fields a','a Logs Insights narrowing is one filter command');
+  bad('stats count()','a Logs Insights narrowing is one filter command');
+});
+
+test('N18 needsNarrow pins with text fragments',()=>{
+  const met=(source,query,frag,needs)=>narrow(source,query,{[source]:frag},needs).error===undefined;
+  assert.ok(met('grafana','up','code="500"',['code']));
+  for(const f of ['code=~"5.."','code!="1"','code=""'])assert.ok(!met('grafana','up',f,['code']),f);
+  assert.ok(met('loki','{a="b"}','| code="E1"',['code']));assert.ok(met('loki','{a="b"}','| code=="E1"',['code']));
+  for(const f of ['| code!="E1"','| code="E1" or code="E2"','| code=~"E.*"','|= "code"'])assert.ok(!met('loki','{a="b"}',f,['code']),f);
+  assert.ok(met('loki','{a="b"}','|= "FULL"',true),'true is met by a |= line filter');
+  assert.ok(!met('loki','{a="b"}','!= "FULL"',true));
+  const q={logGroups:['g'],query:'stats count() as n',region:'us-east-1'};
+  assert.ok(met('cloudwatchLogs',q,'filter code = "E1"',['code']));assert.ok(met('cloudwatchLogs',q,'filter code in ["a","b"]',['code']));
+  for(const f of ['filter code = "E1" or x = 1','filter not code = "E1"','filter code != "E1"','filter code like /E/'])assert.ok(!met('cloudwatchLogs',q,f,['code']),f);
+  assert.equal(narrow('loki','{a="b"}',{loki:'| code!="E1"'},['code']).error,'The provider asks each board to narrow this signal by code; a filter on code counts only with = and a value, so it is not shown.');
+});
+
+test('N19 a narrowed Honeycomb trace search is not shown, with a narrowing reason',()=>{
+  const trace={query_spec:{calculations:[{op:'COUNT'}],filters:[{column:'service.name',op:'=',value:'dcf'}]},raw_row_columns:['trace.trace_id'],results_limit:5};
+  assert.deepEqual(narrow('honeycomb',trace,{honeycomb:{filters:[{column:'event_code',op:'=',value:'X'}]}}),{kind:'unsupported',written:true,error:'This Honeycomb trace search cannot be narrowed, so it is not shown.'});
 });

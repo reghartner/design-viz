@@ -455,7 +455,7 @@ PanelRegistry.extend('trace', {
       initial: { selected: 'request' },
     },
     setupFields: [
-      ['spans', 'json'],
+      ['spans', 'jsonArr'],
       ['initial', 'json'],
     ],
     patchFields: [['selected', 'text']],

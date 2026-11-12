@@ -62,7 +62,9 @@ test('S1 canon validate checks each declaration on nodes and connections',()=>{
   assert.deepEqual(node({serviceName:'w',operation:'a'}),['nodes.worker.trace.spans.x: role must be one of process, database, cache, call, work'],'role is required');
   assert.deepEqual(node({serviceName:'w',operation:'a',role:'process',maxDurationMs:5}),['nodes.worker.trace.spans.x: unknown field maxDurationMs'],'budgets belong to steps');
   assert.deepEqual(node({serviceName:'w',attributes:{'not.listed':'x'},role:'cache'}),['nodes.worker.trace.spans.x: attributes: use supported operational attributes only']);
-  assert.deepEqual(node({serviceName:'w',attributes:{'db.system':{}},role:'cache'}),['nodes.worker.trace.spans.x: attributes: use supported operational attributes only']);
+  // #1413: an object value is an operator; a malformed one ({}) is a validator warning and matches no span, not an error.
+  assert.deepEqual(node({serviceName:'w',attributes:{'db.system':{}},role:'cache'}),[]);
+  assert.deepEqual(node({serviceName:'w',attributes:{'db.system':[]},role:'cache'}),['nodes.worker.trace.spans.x: attributes: use supported operational attributes only'],'an array is still an error');
   assert.deepEqual(node('process'),['nodes.worker.trace.spans.x: expected a span declaration object']);
   assert.deepEqual(bad({spans:{'1st':{serviceName:'w',operation:'a',role:'process'}}}),['nodes.worker.trace.spans.1st: span names start with a letter and use letters, digits, - and _']);
   for(const trace of [[],{spans:[]},{spans:{},extra:1},'x'])assert.deepEqual(bad(trace),['nodes.worker.trace: expected {"spans": {<name>: <span declaration>}}'],JSON.stringify(trace));

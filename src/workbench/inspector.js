@@ -10,6 +10,8 @@ function createBuilderInspector(opts){
   var proseDraft={key:null,fields:Object.create(null)};
   // #1233: uncommitted New log search text in Status board settings; cleared when the selection changes.
   var LOG_SEARCH_DRAFTS=new Map();
+  // #1239: uncommitted new allowed attribute text in Status board settings → Traces; cleared when the selection changes.
+  var TRACE_CONNECTION_DRAFTS=new Map();
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
   function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;invalidateTopologyExport=null;invalidateAlignment=null;invalidateEdgeEndpoints=null;}
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
@@ -50,7 +52,7 @@ function createBuilderInspector(opts){
     if(!same){
       OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_SPAN_DRAFTS.clear();TRACE_SCOPE_VIEW.clear();TRACE_MATCH_REVEALED.clear();
       OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;FORM_NOTICE=null;
-      LOG_SEARCH_DRAFTS.clear();
+      LOG_SEARCH_DRAFTS.clear();TRACE_CONNECTION_DRAFTS.clear();
     }
     if(!same)METRICS_DRAFTS.clear();
     retireForm();
@@ -940,7 +942,8 @@ function traceConnectionsControls(warnings){
     var snapshot=parseEditor();if(snapshot.error)return null;
     var company=companyTraceProfiles(),state=telemetryTraceConnectionState(snapshot.raw,company),doc=builderDocumentPage(snapshot.raw);state.warnings=warnings || [];
     var t=doc && specObject(doc.page.tracking) && specObject(doc.page.tracking.telemetry)?doc.page.tracking.telemetry:{};
-    return createFlowTraceConnections({document:document,state:state,company:company,authored:t.traceConnections,controls:metricsControlKit(),listen:listen,drafts:METRICS_DRAFTS,idPrefix:prefix+'-trace-connections',commit:function(edit){
+    state.company=company;
+    return createFlowTraceConnections({document:document,state:state,company:company,authored:t.traceConnections,controls:metricsControlKit(),listen:listen,drafts:TRACE_CONNECTION_DRAFTS,idPrefix:prefix+'-trace-connections',commit:function(edit){
       return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }
@@ -3088,8 +3091,11 @@ function boardForm(){
     var metrics=section('metrics','Metrics',count(warnings.metrics) || (!hasTelemetry?(statusBoardHasBindings(raw)?'No page settings':'Not set'):telemetry.enabled===false?'Off':''),hasTelemetry || warnings.metrics.length>0);
     // #1239: the header names how many connections readers can choose, or that the board inherits them.
     var traceState=telemetryTraceConnectionState(raw,companyTraceProfiles()),traceCount=Object.keys(traceState.resolved).length;
-    var traceStatus=traceState.present?(traceCount?traceCount+(traceCount===1?' connection':' connections'):'None'):
-      traceState.companyIds.length?'Inherits '+traceState.companyIds.length+(traceState.companyIds.length===1?' company profile':' company profiles'):'Not set';
+    // It names what readers get: the resolver's answer, never the number of company profiles.
+    var traceStatus=!traceState.enabled && (traceState.present || traceState.companyIds.length)?'Off':
+      traceState.present?(traceCount?traceCount+(traceCount===1?' connection':' connections'):'None'):
+      traceCount?'Inherits '+traceCount+(traceCount===1?' company profile':' company profiles'):
+      traceState.companyIds.length?'Not used (no traces)':'Not set';
     var traces=section('traces','Traces',count(warnings.traces) || traceStatus,warnings.traces.length>0);
     var environments=section('environments','Environments',count(warnings.environments) || environmentIds.join(', '),warnings.environments.length>0);
     var lookupSet=specObject(telemetry.lookups)?Object.keys(telemetry.lookups).length:0;

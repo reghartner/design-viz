@@ -89,11 +89,17 @@ var FlowTraceConnections=(function(){
     Object.keys(raw).forEach(function(id){try{
       if(!name(id))fail('configuration','Invalid connection id.');var entry=raw[id],p;
       if(entry && own(entry,'profile')){
-        fields(entry,['profile','label','literals','environments'],'board connection');
+        fields(entry,['profile','label','literals','environments','allowedAttributes'],'board connection');
         if(!name(entry.profile) || !own(company || {},entry.profile))fail('configuration','Unknown company trace profile.');p=profile(company[entry.profile]);
         if(own(entry,'label'))p.label=entry.label;
         if(own(entry,'literals')){var overrides=literals(entry.literals,'board literals');if(Object.keys(overrides).some(function(k){return !own(p.literals,k);}))fail('configuration','Board literals may override only declared profile literals.');Object.assign(p.literals,overrides);}
         if(own(entry,'environments')){if(!object(entry.environments) || !Object.keys(entry.environments).length)fail('configuration','Board environments must select configured environments.');var envs={};Object.keys(entry.environments).forEach(function(k){if(!own(p.environments,k))fail('configuration','Unknown profile environment.');var over=entry.environments[k];fields(over,['label','value','context','literals'],'board environment');var base=copy(p.environments[k]);['label','value'].forEach(function(f){if(own(over,f))base[f]=over[f];});['context','literals'].forEach(function(f){if(own(over,f)){var v=literals(over[f],'board environment '+f);if(Object.keys(v).some(function(n){return !own(base[f],n);}))fail('configuration','Overrides may only replace declared environment fields.');Object.assign(base[f],v);}});envs[k]=base;});p.environments=envs;}
+        // #1239 (Chuck 2026-11-12): a board may add allowed attributes to a company profile; the
+        // connection allows the company list plus these (de-duplicated). profile() checks the result.
+        if(own(entry,'allowedAttributes')){
+          if(!Array.isArray(entry.allowedAttributes))fail('configuration','Board allowedAttributes must be an array of span attribute names.');
+          p.allowedAttributes=(p.allowedAttributes || []).concat(entry.allowedAttributes).filter(function(k,i,all){return all.indexOf(k)===i;});
+        }
         p=profile(p);
       }else p=profile(entry);
       out[id]=p;

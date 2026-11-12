@@ -457,16 +457,19 @@ dependency link names and no-activity days are edited in JSON for now.
 **Traces** (#1239) edits `tracking.telemetry.traceConnections`
 ([trace connections](trace-connections.md)): each company profile of the build is
 **Inherited** (no board map), **Use** or **Disable**; the first Use or Disable lists every
-company profile, so only that one changes, and **Inherit all company profiles** removes
+profile the board inherits (none on a board without traces, where Disable is not offered and
+the profile reads **Not used**), so only that one changes, and **Inherit all company profiles** removes
 the key. A used profile takes a **board label** and an environment subset (checkboxes;
 all checked writes no `environments`) with per-environment **label**, **value** and
-**context** overrides. Company `allowedAttributes` are shown read only; an inline
-profile's are rows with **Remove** and an **Add allowed attribute** field (Enter adds).
+**context** overrides. A used profile shows the company `allowedAttributes` read only and
+the board's additions as rows (Chuck 2026-11-12: the connection allows both lists); an
+inline profile's list is rows too. Each row has **Remove**, and an **Add allowed
+attribute** field adds one (Enter adds); a company name or a secret-like name is refused.
 Inline profiles otherwise live in **Advanced JSON** (the whole map; empty removes the
 key). **Readers can choose** lists the resolved connections. An edit the resolver would
 reject is refused with its message; each edit is one Undo step, and a warning sits in
-the group of the connection it names. The header reads "Not set", "Inherits N company
-profiles", "N connections" or "None".
+the group of the connection it names. The header names what readers get: "Not set", "Inherits N company
+profiles", "Not used (no traces)", "N connections", "None" or "Off" (Allow metrics off).
 **Log searches** (#1233) edits `tracking.telemetry.lookups`: **Offer log searches
 in the Trace view** adds or removes the block (`{}` offers only the typed LogQL
 box), each search is a fold titled by its id with its label, query, suggested

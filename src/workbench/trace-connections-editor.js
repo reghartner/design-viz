@@ -11,6 +11,8 @@
 function createFlowTraceConnections(o){
   var d=flowMetricsDom(o),c=o.controls,s=o.state,commit=o.commit,warnings=s.warnings || [];
   var box=d.el('div','trace-connections');
+  // What the board inherits while it sets no map: the resolver's answer (none without traces or with metrics off).
+  var inherited=s.present?[]:Object.keys(s.resolved);
   function edit(fields){return commit(Object.assign({op:'traceConnections'},fields));}
   function named(control,name,title){control.setAttribute('aria-label',name);if(title)control.title=title;return control;}
   var serial=0,prefix=o.idPrefix || 'dv-trace-connections';
@@ -21,14 +23,30 @@ function createFlowTraceConnections(o){
     p.id=prefix+'-warning-'+(serial++);p.setAttribute('role','note');
     controls.forEach(function(control){control.setAttribute('aria-invalid','true');control.setAttribute('aria-describedby',((control.getAttribute('aria-describedby') || '')+' '+p.id).trim());});
   }
+  /* Allowed attribute rows (Remove each) and an Add field. target names the inline profile ({id}) or the
+     company profile the board adds to ({profile, inherited}). Returns the Add field. */
+  function attributeRows(set,id,list,target,text){
+    d.note(set,text);
+    list.forEach(function(name){
+      var row=d.el('div','trace-connection-attribute');row.appendChild(d.el('span',null,String(name)));
+      var remove=named(c.action('Remove',function(){return edit(Object.assign({action:'attribute',name:name,remove:true,company:o.company},target));},'bdanger'),'Remove '+id+' allowed attribute '+name,'Stop allowing this attribute. Undo brings it back.');
+      row.appendChild(remove);set.appendChild(row);
+    });
+    var add=d.keptDraft(set,id+' new allowed attribute','text',null,'');add.placeholder='device.model';
+    function submit(){var ok=edit(Object.assign({action:'attribute',name:add.value,company:o.company},target));if(ok){d.forget([id+' new allowed attribute']);add.value='';}return ok;}
+    o.listen(add,'keydown',function(ev){if(ev.key==='Enter' && !ev.isComposing){ev.preventDefault();submit();}});
+    var button=c.action('Add allowed attribute',submit);named(button,'Add allowed attribute to '+id,'Save this attribute name as one Undo step. Enter in the field does the same.');set.appendChild(button);
+    return add;
+  }
   function warningsFor(id){return warnings.filter(function(text){return text.indexOf('tracking.telemetry.traceConnections.'+id+':')===0;});}
   d.note(box,'Trace connections let readers load one trace by ID or link in the Trace view, through a connector they already have. Company profiles come with this build; each board can use, narrow or disable them. Nothing is called until a reader presses Load.');
   if(!s.valid){
     d.note(box,'tracking.telemetry.traceConnections is not an object, so readers get no trace connections. Fix it in Advanced JSON below.');
   }else if(!s.present){
     d.note(box,!s.companyIds.length?'This build has no company trace profiles. Add an inline profile in Advanced JSON.':
-      s.usesTraces?'This board inherits every company profile, including ones added later. Choose Use or Disable on a profile to pick them for this board.':
-      'This board inherits every company profile once it uses traces (a step trace match, span declarations, or Metrics on a Live status board). Choose Use or Disable on a profile to pick them now.','trace-connections-mode');
+      !s.enabled?'Allow metrics is off for this page, so readers get no trace connections. Choosing Use still saves the choice.':
+      inherited.length?'This board inherits every company profile, including ones added later. Choose Use or Disable on a profile to pick them for this board.':
+      'This board does not use traces yet (a step trace match, span declarations, or Metrics on a Live status board), so it inherits no company profile. Choose Use to add one now.','trace-connections-mode');
   }else{
     d.note(box,'This board uses only the connections set to Use below and its inline profiles.','trace-connections-mode');
     var inherit=c.action('Inherit all company profiles',function(){return edit({action:'inherit',company:o.company});});
@@ -39,21 +57,22 @@ function createFlowTraceConnections(o){
     var parsed=s.profiles[id],p=parsed.profile,held=s.entries[id],entry=held && telemetryObject(held.entry)?held.entry:null;
     var set=d.group(box,'trace-connection','Company profile '+id+(p?' · '+p.label:''));set.setAttribute('data-trace-profile',id);
     if(!p){d.note(set,'This company profile is not valid in this build: '+parsed.error);return;}
-    var mode=!s.present?'inherit':held?'use':'disable';
-    var options=s.present?['use','disable']:['inherit','use','disable'];
+    var mode=!s.present?'inherit':held?'use':'disable',inheritsThis=inherited.indexOf(id)>=0;
+    // Without a map a profile the board does not inherit cannot be disabled: there is nothing to turn off.
+    var options=s.present?['use','disable']:inheritsThis?['inherit','use','disable']:['inherit','use'];
     var select=d.relabel(c.select(options,mode,function(v){
       if(v===mode)return true;
-      return v==='inherit'?edit({action:'inherit',company:o.company}):edit({action:'mode',profile:id,value:v,company:o.company});
-    }),{inherit:'Inherited',use:'Use',disable:'Disable'});
+      return v==='inherit'?edit({action:'inherit',company:o.company}):edit({action:'mode',profile:id,value:v,company:o.company,inherited:inherited});
+    }),{inherit:inheritsThis?'Inherited':'Not used',use:'Use',disable:'Disable'});
     d.row(set,id+' on this board',select);
     select.title='Inherited: the company settings, while this board sets no trace connections. Use: listed for this board, with the changes below. Disable: readers of this board cannot choose it.';
     var envIds=Object.keys(p.environments);
-    var attrs=Array.isArray(p.allowedAttributes) && p.allowedAttributes.length?p.allowedAttributes.join(', '):'none';
-    d.note(set,p.provider+' · '+envIds.length+(envIds.length===1?' environment':' environments')+' · allowed attributes from the company profile: '+attrs+'.');
+    var companyAttrs=Array.isArray(s.company && s.company[id] && s.company[id].allowedAttributes)?s.company[id].allowedAttributes:[];
+    d.note(set,p.provider+' · '+envIds.length+(envIds.length===1?' environment':' environments')+' · allowed attributes from the company profile: '+(companyAttrs.length?companyAttrs.join(', '):'none')+'.');
     if(held && held.more.length)d.note(set,'Also listed as '+held.more.join(', ')+'; edit '+(held.more.length===1?'that entry':'those entries')+' in Advanced JSON.');
     var own=warningsFor(held?held.id:id);
     if(entry){
-      var label=d.row(set,id+' board label',c.text(typeof entry.label==='string'?entry.label:null,function(v){return edit({action:'label',profile:id,value:v,company:o.company});},{placeholder:p.label}));
+      var label=d.row(set,id+' board label',c.text(typeof entry.label==='string'?entry.label:null,function(v){return edit({action:'label',profile:id,value:v,company:o.company,inherited:inherited});},{placeholder:p.label}));
       label.title='The name readers see in the Trace view. Empty uses the company label.';
       var envs=d.group(set,'trace-connection-environments','Environments');
       d.note(envs,'Readers choose one of the checked environments. All checked: every environment of the profile, also ones the company adds later.');
@@ -76,6 +95,8 @@ function createFlowTraceConnections(o){
           field('context '+key,'context',Object.prototype.hasOwnProperty.call(context,key)?String(context[key]):null,base.context[key]==null?'':String(base.context[key]),{key:key});
         });
       });
+      attributeRows(set,id,Array.isArray(entry.allowedAttributes)?entry.allowedAttributes:[],{profile:id,inherited:inherited},
+        'Allowed attributes this board adds to the company list above: span attribute names kept from loaded traces and allowed in a step trace match. Names that look like secrets are refused.');
     }
     fieldWarning(set,[select],own);
   });
@@ -83,17 +104,8 @@ function createFlowTraceConnections(o){
     var entry=s.map[id],set=d.group(box,'trace-connection trace-connection-inline','Inline profile '+id+(typeof entry.label==='string'?' · '+entry.label:''));
     set.setAttribute('data-trace-inline',id);
     d.note(set,'Defined in this board. Edit its other fields in Advanced JSON.');
-    var list=Array.isArray(entry.allowedAttributes)?entry.allowedAttributes:[];
-    d.note(set,'Allowed attributes: span attribute names this profile keeps from loaded traces and allows in a step trace match, besides the built-in list. Names that look like secrets are refused.');
-    list.forEach(function(name){
-      var row=d.el('div','trace-connection-attribute');row.appendChild(d.el('span',null,String(name)));
-      var remove=named(c.action('Remove',function(){return edit({action:'attribute',id:id,name:name,remove:true,company:o.company});},'bdanger'),'Remove '+id+' allowed attribute '+name,'Stop allowing this attribute. Undo brings it back.');
-      row.appendChild(remove);set.appendChild(row);
-    });
-    var add=d.keptDraft(set,id+' new allowed attribute','text',null,'');add.placeholder='device.model';
-    function submit(){var ok=edit({action:'attribute',id:id,name:add.value,company:o.company,remove:false});if(ok){d.forget([id+' new allowed attribute']);add.value='';}return ok;}
-    o.listen(add,'keydown',function(ev){if(ev.key==='Enter' && !ev.isComposing){ev.preventDefault();submit();}});
-    var button=c.action('Add allowed attribute',submit);named(button,'Add allowed attribute to '+id,'Save this attribute name as one Undo step. Enter in the field does the same.');set.appendChild(button);
+    var add=attributeRows(set,id,Array.isArray(entry.allowedAttributes)?entry.allowedAttributes:[],{id:id},
+      'Allowed attributes: span attribute names this profile keeps from loaded traces and allows in a step trace match, besides the built-in list. Names that look like secrets are refused.');
     fieldWarning(set,[add],warningsFor(id));
   });
   /* Read-only: what readers of this board can choose. */

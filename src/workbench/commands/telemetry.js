@@ -332,12 +332,14 @@ function telemetryEditBinding(binding,edit,options){
    (docs/trace-connections.md). edit: {op:'traceConnections', action, company, ...}; company is the
    build's company profile map (TELEMETRY_COMPANY_TRACE_CONNECTIONS).
    - inherit: remove the key, so the board inherits every company profile again.
-   - mode {profile, value:'use'|'disable'}: list or unlist a company profile. Leaving inheritance
-     first lists every company profile, so only the chosen one changes.
+   - mode {profile, value:'use'|'disable', inherited}: list or unlist a company profile. Leaving
+     inheritance first lists the profiles the board inherits now (edit.inherited: every company profile
+     on a board that uses traces, none otherwise), so only the chosen one changes.
    - label {profile, value}: the board label of that profile's connection.
    - environment {profile, env, on}: the environment subset (all environments: no key).
    - envField {profile, env, field:'label'|'value'|'context', key?, value}: one environment override.
-   - attribute {id, name, remove?}: add (or with remove, drop) one allowedAttributes name of an inline profile.
+   - attribute {id | profile, name, remove?}: add (or with remove, drop) one allowedAttributes name of an
+     inline profile, or one board addition to a company profile's list (Chuck 2026-11-12).
    - json {value}: the whole map as JSON text (Advanced); null removes the key.
    Every edit but json is checked with FlowTraceConnections.resolve first: an edit that would make
    its connection fail to resolve is refused with the resolver's message. */
@@ -356,9 +358,14 @@ function telemetryEditTraceConnections(t,edit,done){
   if(present && !telemetryObject(t.traceConnections))return {error:'Trace connections are not an object; fix them in Advanced JSON first.'};
   var map=present?t.traceConnections:null,touched=null,profile=edit.profile;
   function companyProfile(){return typeof profile==='string' && telemetryOwn(company,profile) && telemetryObject(company[profile])?company[profile]:null;}
-  if(action==='mode' || action==='label' || action==='environment' || action==='envField'){
+  if(action==='mode' || action==='label' || action==='environment' || action==='envField' || action==='attribute' && edit.profile!=null){
     if(!companyProfile())return {error:'Unknown company trace profile "'+profile+'".'};
-    if(!map){map={};Object.keys(company).forEach(function(id){map[id]={profile:id};});}
+    if(!map){
+      var inherited=(Array.isArray(edit.inherited)?edit.inherited:[]).filter(function(id){return telemetryOwn(company,id);});
+      // A board that inherits nothing (no traces, or metrics off) has nothing to disable.
+      if(action==='mode' && edit.value==='disable' && inherited.indexOf(profile)<0)return {error:'This board does not inherit '+profile+', so there is nothing to disable.'};
+      map={};inherited.forEach(function(id){map[id]={profile:id};});
+    }
     var at=telemetryTraceEntryId(map,profile);
     if(action==='mode'){
       if(edit.value==='use'){
@@ -369,7 +376,17 @@ function telemetryEditTraceConnections(t,edit,done){
     }else{
       if(!at)return {error:'Set '+profile+' to Use first.'};
       touched=at;var entry=map[at],envIds=telemetryObject(company[profile].environments)?Object.keys(company[profile].environments):[];
-      if(action==='label'){
+      if(action==='attribute'){
+        // #1239 (Chuck 2026-11-12): the board's additions to the company list; the company's own stay read only.
+        var own=Array.isArray(company[profile].allowedAttributes)?company[profile].allowedAttributes:[],added=Array.isArray(entry.allowedAttributes)?entry.allowedAttributes.slice():[],attr=typeof edit.name==='string'?edit.name.trim():'';
+        if(!edit.remove){
+          if(!attr)return {error:'Type a span attribute name, such as device.model.'};
+          if(own.indexOf(attr)>=0)return {error:'"'+attr+'" is already allowed by the company profile.'};
+          if(added.indexOf(attr)>=0)return {error:'"'+attr+'" is already allowed.'};
+          added.push(attr);
+        }else{if(added.indexOf(attr)<0)return {error:'"'+attr+'" is not one of this board\'s additions.'};added=added.filter(function(x){return x!==attr;});}
+        if(added.length)entry.allowedAttributes=added;else delete entry.allowedAttributes;
+      }else if(action==='label'){
         if(edit.value==null)delete entry.label;
         else if(!telemetryText(edit.value) || edit.value.length>200 || /[\x00-\x1f<>]/.test(edit.value))return {error:'A label is 1–200 characters without < or >.'};
         else entry.label=edit.value.trim();

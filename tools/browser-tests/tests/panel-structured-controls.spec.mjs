@@ -97,7 +97,7 @@ test('zone frame step subject uses fixed fields',async({page,server})=>{
 });
 
 test('trace spans use a row editor with plain column labels',async({page,server})=>{
-  const spans=[{id:'request',service:'api',name:'handle request',startMs:0,ms:100},{id:'parse',parentId:'request',service:'api',name:'parse input',startMs:5,ms:20}];
+  const spans=[{id:'request',service:'api',name:'handle request',startMs:0,ms:100},{id:'parse',parentId:'request',service:'api',name:'parse input',startMs:5,ms:20,error:true}]; // error survives the edit
   const original=page1({id:'t',type:'trace',title:'Trace',spans,initial:{selected:'request'}});
   await page.goto(server.origin+'/workbench.html');await pastePage(page,original);await selectPanel(page);
   await noRawBox(page.locator('#guide'),'Spans');

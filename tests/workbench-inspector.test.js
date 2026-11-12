@@ -788,12 +788,12 @@ test('#1000 step objf conversions edit one sub-field and keep the rest of the ob
     ['radar',{id:'p',type:'radar'},{subject:{x:10,y:20,r:30,deg:40,future:1}},'X',['x',11]],
     ['zoneframe',{id:'p',type:'zoneframe',zones:[]},{subject:{x:10,y:20,future:1}},'Y',['y',21]],
     ['replicas',{id:'p',type:'replicas',replicas:[{id:'a'}]},{reference:{series:'log',position:5,future:1}},'Position',['position',6]],
-    ['grid',{id:'p',type:'grid',rows:[{id:'r1'}],cols:[{id:'c1'}]},{highlight:{row:'r1',col:'c1',cell:'r1.c1',future:1}},'Row',['row','']]
+    ['grid',{id:'p',type:'grid',rows:[{id:'r1'},{id:'r2'}],cols:[{id:'c1'}]},{highlight:{row:'r1',col:'c1',cell:'r1.c1',future:1}},'Row',['row','r2']]
   ];
   for(const [type,decl,patch,label,[key,value]] of cases){
     const e=environment(),spec={nodes:{},rows:[[]],panels:[decl],steps:[{panels:{p:patch}}]},h=e.mount(spec);
     h.session.target={kind:'step',section:0,index:0};h.inspector.render();const before=h.text;
-    const field=Object.keys(patch)[0],input=h.guide.querySelector('.patchedit [aria-label="'+label+'"]');
+    const field=Object.keys(patch)[0],input=aria(h.guide,label);
     assert.ok(input,type+' '+label+' control');
     input.value=String(value);input.fire('change');h.flush();
     const expected={...patch[field]};if(value==='')delete expected[key];else expected[key]=value;
@@ -828,4 +828,30 @@ test('#1000 security setup scene is a dropdown of camera scenes',()=>{
   const other=Array.from(scene.options).map(o=>o.value).find(v=>v && v!=='person-at-door-night');
   scene.value=other;scene.fire('change');h.flush();
   assert.equal(JSON.parse(h.text).panels[0].scene,other);h.session.undo();assert.equal(h.text,before);
+});
+
+test('#1000 counts and positions accept whole numbers only, with a visible reason',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[
+    {id:'f',type:'funnel',stages:[{id:'intake',label:'Received'},{id:'review',label:'Reviewed'}]},
+    {id:'r',type:'replicas',replicas:[{id:'primary',label:'Primary'}]}
+  ],steps:[{panels:{f:{counts:{intake:90}},r:{reference:{series:'log',position:5},replicas:{primary:{series:'log',position:4}}}}}]};
+  const h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();const before=h.text;
+  for(const [label,pattern] of [['Reviewed value',/whole number/],['Primary Position',/whole number/],['Position',/whole number/]]){
+    h.inspector.render();const input=aria(h.guide,label);assert.ok(input,label);
+    input.value='12.5';input.fire('change');h.flush();
+    assert.equal(h.text,before,label+' rejects a decimal');
+    assert.match(h.guide.querySelector('.ierr').textContent,pattern,label+' shows the reason');
+  }
+});
+
+test('#1000 trace span rows keep error flags and require service and name',()=>{
+  const spans=[{id:'request',service:'api',name:'handle',startMs:0,ms:100},{id:'db',parentId:'request',service:'db',name:'query',startMs:5,ms:20,error:true}];
+  const e=environment(),h=e.mount({nodes:{},rows:[[]],panels:[{id:'t',type:'trace',spans,initial:{selected:'request'}}]});
+  h.inspector.render();const before=h.text;
+  const names=h.guide.querySelectorAll('[aria-label="Name"]');assert.equal(names.length,2);
+  names[1].value='slow query';names[1].fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].spans[1],{...spans[1],name:'slow query'});
+  h.session.undo();assert.equal(h.text,before);h.inspector.render();
+  const service=h.guide.querySelectorAll('[aria-label="Service"]')[1];service.value='';service.fire('change');h.flush();
+  assert.equal(h.text,before,'a blank service is refused');assert.match(h.guide.querySelector('.ierr').textContent,/service is required/);
 });

@@ -362,6 +362,29 @@ test('every key the palette starter templates carry has a setup control', () => 
   }
 });
 
+test('trace spans is a list field in Inspect (#996)', () => {
+  const spans = B.PANEL_SETUP_FIELDS.trace.find(f => f[0] === 'spans');
+  assert.strictEqual(spans && spans[1], 'jsonArr');
+});
+
+test('every JSON setup field accepts its palette starter value (#996)', () => {
+  for (const [type, fields] of Object.entries(B.PANEL_SETUP_FIELDS)){
+    const tpl = B.PANEL_TEMPLATES[type] || {};
+    for (const field of fields){
+      if (!['json', 'jsonArr', 'jsonAny'].includes(field[1]) || !(field[0] in tpl)) continue;
+      const result = B.panelFieldAssignment(field, JSON.stringify(tpl[field[0]]));
+      assert.strictEqual(result.error, undefined, type + '.' + field[0] + ': ' + result.error);
+    }
+  }
+});
+
+test('Inspect guide text does not tell authors to edit JSON and click Render (#996)', () => {
+  for (const [kind, guide] of Object.entries(B.BUILDER_GUIDES)){
+    assert.ok(!/Render/.test(guide.how), kind + ' guide still mentions Render: ' + guide.how);
+    assert.ok(!/selected JSON/.test(guide.how), kind + ' guide still says to edit the selected JSON: ' + guide.how);
+  }
+});
+
 test('the timeline palette starter renders a validator-clean heartbeat setup', () => {
   const plan = B.planAddPanel(TEXT, SPEC, 0, 'timeline');
   const d = JSON.parse(plan.text).page.blocks[0].diagram;

@@ -30,7 +30,9 @@ async function openPopup(page,server,map,tickets){
 }
 // Row geometry: the chip on the key's line inside the row, and every stale/count/link part fully inside the row and the
 // popover, not cut by any clipping ancestor up to the popover, and the topmost element at its centre (nothing covers it).
+// #1165: the popover is capped to the diagram frame and its body scrolls; the row is first scrolled into view in it, as a reader would.
 const geometry=row=>row.evaluate(el=>{
+ el.scrollIntoView({block:'nearest',inline:'nearest'});
  const box=n=>n.getBoundingClientRect(),r=box(el),pop=box(el.closest('.dv-live-popover')),key=box(el.querySelector('.nbacklink')),chip=box(el.querySelector('.dv-live-ticket-state')),title=el.querySelector('.dv-live-ticket-title');
  const parts=Array.from(el.querySelectorAll('.dv-live-stale-detail,.dv-live-ticket-prs,.dv-live-ticket-links a'));
  const inside=b=>b.width>0 && b.left>=r.left-1 && b.right<=r.right+1 && b.left>=pop.left && b.right<=pop.right && b.top>=r.top-1 && b.bottom<=r.bottom+1;

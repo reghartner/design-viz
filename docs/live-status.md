@@ -1592,7 +1592,7 @@ ask your agent for a snapshot, for example "take a live snapshot of examples/liv
 The agent runs one command:
 
 ```
-node tools/live-snapshot.js <board.spec.json> [--out <file>] [--timeout <seconds>]
+node tools/live-snapshot.js <board.spec.json> [--out <file>] [--timeout <seconds>] [--resolve-imports <folder-or-registry>]
 ```
 
 The script runs the viewer's own Jira and Grafana adapters on a headless copy of the board, so
@@ -1633,8 +1633,13 @@ the same query)", and a CloudWatch failure is recorded only on signals of
 its statistic (an Average signal's SampleCount weight query belongs to Average); a provider's
 own error text, which can hold data, is never printed or written. Pull request states are not read either
 (no GitHub transport yet): each authored PR is one recorded error. A board that imports shared
-topology (`topologyImports`) is refused, because the script does not resolve imported carriers
-yet. It takes today's state only (no Over time history). Every request ends after 30 s or at
+topology (`topologyImports`) needs `--resolve-imports <repository folder or registry>`, which
+loads its providers the way `validate.js --resolve-imports` does (#1367); without it the board
+is refused and the reason names the flag, and a failed resolution writes nothing and calls no
+provider. The resolved board is what the viewer shows: inherited signals with their
+[narrowing](#narrowing-inherited-signals), `needsNarrow` and [scoped variables](#variable-scopes).
+A signal the viewer would not show is never queried and is one recorded error with the viewer's
+reason (carrier id and signal name), such as an unmet `needsNarrow`. It takes today's state only (no Over time history). Every request ends after 30 s or at
 `--timeout` (default 60 s), and the process exits once its line is printed.
 
 Credentials come from the environment and are never written to the snapshot:
@@ -1672,7 +1677,9 @@ provider is called. Its format is one day of
 the [demo story](#demo-mode) plus `snapshotAt` and the recorded `errors`:
 `{"version": 1, "kind": "flowview-live-snapshot", "snapshotAt", "board", "epics", "days": [{"label":
 "Snapshot from …", "issues": {…}, "telemetry": {"start", "stepSeconds", "carriers"}}], "errors": [{"source",
-"tool", "message"}]}`. A ticket Jira did not return is left out of `issues`, so the board shows
+"tool", "message"}], "narrowed": {"<carrier>": {"<signal>": [<fragment>, …]}}}`; `narrowed`, present only
+when a shown signal was narrowed, lists the fragments each one applied, as written (never a provider
+answer). A ticket Jira did not return is left out of `issues`, so the board shows
 it as missing; a ticket no answered search covered has state `unknown`.
 
 REST credentials and this script are the zero-token route: no provider response reaches the

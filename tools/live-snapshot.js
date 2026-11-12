@@ -3,7 +3,11 @@
 /* live-snapshot.js — write a snapshot of a board's real Jira status and metrics (#1265).
 
    Usage:
-     node tools/live-snapshot.js <board.spec.json> [--out <file>] [--timeout <seconds>]
+     node tools/live-snapshot.js <board.spec.json> [--out <file>] [--timeout <seconds>] [--resolve-imports <folder-or-registry>]
+
+   A board that imports canon diagrams (topologyImports) needs --resolve-imports: its providers are loaded
+   from that repository folder or registry (tools/canon/local-imports.mjs, as validate.js does), so the
+   snapshot sees the viewer's inherited signals, narrowing, needsNarrow and scoped variables (#1367).
 
    The Workbench never calls Jira or a metrics provider. An agent runs this script instead; the
    Workbench then shows the snapshot as it shows Demo live status. The script runs the viewer's
@@ -386,7 +390,7 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
   const C=loadRuntime(win,doc),page=C.normalize(JSON.parse(specText)),view=new Node('div');view.ownerDocument=doc;
   // Imported carriers carry tickets and signals the script cannot resolve yet: refuse rather than miss them.
   const imports=C.sectionRecords(page).filter(record=>{const d=record.section && record.section.diagram;return d && Array.isArray(d.topologyImports) && d.topologyImports.length;});
-  if(imports.length)return {refused:'the board imports shared topology (topologyImports in section '+imports.map(r=>r.number).join(', ')+'), which the snapshot script does not resolve yet'};
+  if(imports.length)return {refused:'the board imports shared topology (topologyImports in section '+imports.map(r=>r.number).join(', ')+'); pass --resolve-imports <repository folder or registry> to load its providers'};
   const sections=C.sectionRecords(page).map(record=>({sectionEl:view.appendChild(new Node('section')),reference:record.reference,number:record.number}));
   const ctl={view,page,sections},providers=typeof C.createTelemetryProviders==='function'?C.createTelemetryProviders(page,win):null;
   const api=ctl.liveStatus=C.createLiveStatus(ctl,page,{},providers?{telemetry:providers.options}:{});
@@ -450,10 +454,18 @@ async function snapshotRun({specText,board,transport,now,timeoutMs,errors,doc,na
   // PR states come from GitHub, which the script does not read yet: one error per authored PR.
   refs.prs.forEach(url=>errors.push({source:'github',tool:url,message:'pull request state is not read by the snapshot script yet'}));
   api.destroy();if(providers && providers.destroy)providers.destroy();
+  /* #1367: the narrowing each shown signal applied, verbatim (board and provider fragments, never a provider
+     answer), scrubbed like every recorded string. A signal the viewer does not show was recorded above. */
+  const narrowed={};
+  bindings.forEach(b=>Object.keys(b.signals).forEach(name=>{
+    const s=b.signals[name];if(s.error || !Array.isArray(s.narrow) || !s.narrow.length)return;
+    (narrowed[b.id] || (narrowed[b.id]={}))[name]=Array.from(s.narrow,f=>typeof f==='string'?scrub(f,transport.secrets):JSON.parse(scrub(JSON.stringify(f),transport.secrets)));
+  }));
   const at=new Date(now()).toISOString(),day=snapshotDay(hasJira?live.states:{},evidence.map || {},bindings,at);
   // intervalSeconds keeps the file a valid demo timeline (tools/inject.py --timeline); one day never advances.
   const snapshot={version:1,kind:SNAPSHOT_KIND,snapshotAt:at,board,intervalSeconds:6,epics:day.epics,days:[{label:'Snapshot from '+at,issues:day.issues,telemetry:day.telemetry}],
     errors:dedupe(errors.map(e=>({source:e.source,tool:e.tool==null?null:scrub(e.tool,transport.secrets),message:scrub(e.message,transport.secrets)})))};
+  if(Object.keys(narrowed).length)snapshot.narrowed=narrowed;
   const signals=hasMetrics?bindings.reduce((n,b)=>n+Object.keys(b.signals).length,0):0,observed=Object.keys(day.telemetry.carriers).reduce((n,id)=>n+Object.keys(day.telemetry.carriers[id]).length,0);
   /* The viewer names a ticket only when a search covering it answered: a key search (10 keys a search) naming it,
      or an epic-children search returning it. Then a ticket Jira did not return is missing. On a board with epics
@@ -536,13 +548,19 @@ function defaultOut(specPath){
 }
 
 async function main(argv,env,{fetchImpl,stdout=process.stdout,transport}={}){
-  const args=argv.slice();let out=null,timeout=60;const files=[];
-  while(args.length){const a=args.shift();if(a==='--out')out=args.shift();else if(a==='--timeout')timeout=Number(args.shift());else files.push(a);}
-  if(files.length!==1 || !(timeout>0)){stdout.write('usage: node tools/live-snapshot.js <board.spec.json> [--out <file>] [--timeout <seconds>]\n');return 2;}
+  const args=argv.slice();let out=null,timeout=60,resolveImports=null,bad=false;const files=[];
+  while(args.length){const a=args.shift();if(a==='--out')out=args.shift();else if(a==='--timeout')timeout=Number(args.shift());
+    else if(a==='--resolve-imports'){resolveImports=args.shift();if(!resolveImports || resolveImports.startsWith('--'))bad=true;}else files.push(a);}
+  if(bad || files.length!==1 || !(timeout>0)){stdout.write('usage: node tools/live-snapshot.js <board.spec.json> [--out <file>] [--timeout <seconds>] [--resolve-imports <folder-or-registry>]\n');return 2;}
   const specPath=files[0],file=out || defaultOut(specPath);
   let specText;try{specText=fs.readFileSync(specPath,'utf8');JSON.parse(specText);}catch(ex){stdout.write('snapshot not written: cannot read '+specPath+' as JSON\n');return 2;}
   // Checked before any provider call.
   const unsafe=unsafeOut(file);if(unsafe){stdout.write('snapshot not written: '+unsafe+'\n');return 1;}
+  // #1367: the board's imports, resolved from the named repository before any provider is called.
+  if(resolveImports){
+    try{specText=JSON.stringify((await (await import('./canon/local-imports.mjs')).resolveLocalImports(specPath,resolveImports)).resolved);}
+    catch(ex){stdout.write('snapshot not written: cannot resolve imports: '+String(ex && ex.message || ex).split('\n')[0]+'\n');return 1;}
+  }
   const tracking=JSON.parse(specText),jiraSite=tracking && tracking.page && tracking.page.tracking && tracking.page.tracking.jira && tracking.page.tracking.jira.site || tracking && tracking.tracking && tracking.tracking.jira && tracking.tracking.jira.site;
   const now=()=>Date.now(),source=transport || restTransport(env,fetchImpl,now,typeof jiraSite==='string' && /^https?:\/\//.test(jiraSite)?jiraSite:null,{});
   const result=await takeSnapshot({specText,board:path.basename(specPath),transport:source,timeoutMs:timeout*1000,now});

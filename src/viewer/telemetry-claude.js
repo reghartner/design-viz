@@ -36,7 +36,9 @@
    Map: per carrier, each signal's series is the result's points added by time
    ([epoch ms, number], ascending), value its last point, 0 with no points
    when the query matched nothing (unobserved when the signal sets
-   missingMeansZero: false); sql signals carry a value only. observedAt
+   missingMeansZero: false); sql signals carry a value only. A query that
+   succeeded with no data and no value is {empty: true} (#1404), on pages
+   with tracking.endToEndMetrics only. observedAt
    is the newest point of the refresh (the server clock); markers are that
    window's annotations; links are the authored ones plus the Explore link.
 
@@ -281,6 +283,11 @@ function telemetryGrafanaMarkers(payload,from,to){
 }
 /* query_sql (shape unverified): the first numeric column of the first row of
    [row], {rows: [row]} or {data: [row]}, a row being an array or an object. */
+// #1404: a SQL answer with a rows list and no rows (a successful query with no data).
+function telemetryGrafanaSqlEmpty(payload){
+  var rows=Array.isArray(payload)?payload:payload && typeof payload==='object'?(Array.isArray(payload.rows)?payload.rows:Array.isArray(payload.data)?payload.data:null):null;
+  return !!rows && !rows.length && !(payload && payload.error);
+}
 function telemetryGrafanaSql(payload){
   var rows=Array.isArray(payload)?payload:payload && typeof payload==='object'?(Array.isArray(payload.rows)?payload.rows:Array.isArray(payload.data)?payload.data:null):null;
   var row=rows && rows[0],values=Array.isArray(row)?row:row && typeof row==='object'?Object.keys(row).map(function(key){return row[key];}):[];
@@ -492,6 +499,7 @@ function createTelemetryGrafana(page,win,now,bound){
       else if(entry.points && entry.points.length)sample={value:entry.points[entry.points.length-1][1],series:entry.points,observedAt:new Date(entry.points[entry.points.length-1][0]).toISOString()};
       if(sample && entry.points)sample.series=entry.points;
       else if(!sample && entry.points)sample={value:0,series:[],observedAt:new Date(clock()).toISOString()};
+      else if(!sample && entry.empty && trackingEndToEndMetrics(current))sample={empty:true};
       if(sample){if(['cloudwatch','cloudwatchLogs'].indexOf(entry.source)>=0 || windowRange)sample.window=anchoredRange;var queryUrl=telemetryQueryUrl(entry.links.query) || telemetryGrafanaUrl(entry.exploreUrl);if(queryUrl)sample.links={query:queryUrl};if(entry.unit)sample.unit=entry.unit;if(entry.breakdown)sample.breakdown=entry.breakdown;if(entry.intervalMs)sample.intervalMs=entry.intervalMs;}
       report.settled(job.id,entry.name,sample);
     }
@@ -530,7 +538,7 @@ function createTelemetryGrafana(page,win,now,bound){
               var payload=telemetryGrafanaPayload(result);
               if(telemetryGrafanaCloudwatchEmpty(payload) || telemetryCloudwatchAfterWindow(payload,anchoredRange)){
                 if(query.missingMeansZero===true){entry.value=0;entry.observedAt=anchoredRange.to;}
-                else{notices.push(label+': no data points yet');if(report && report.pending)progressNote();}
+                else{entry.empty=true;notices.push(label+': no data points yet');if(report && report.pending)progressNote();}
                 return;
               }
               // A failed weight query leaves no series-only sample that could be
@@ -573,10 +581,12 @@ function createTelemetryGrafana(page,win,now,bound){
             if(offered.indexOf('query_sql')<0){entry.failed=true;failed(rank,label,'the Grafana connector does not offer query_sql');return;}
             if(windowRange && !telemetrySqlHistoryQuery(entry.query)){failed(rank,label,'Historical SQL requires an authored $__timeFilter or both $__from and $__to time constraints');return;}
             var key=(config.environment || '')+'\n'+uid+'\n'+entry.query+(windowRange?JSON.stringify(range):''),cached=windowRange?null:sql[key];
-            if(cached && clock()-cached.at<TELEMETRY_GRAFANA_SQL_MS){if(cached.value!==null)entry.value=cached.value;else entry.failed=true;return;}
+            if(cached && clock()-cached.at<TELEMETRY_GRAFANA_SQL_MS){if(cached.value!==null)entry.value=cached.value;else if(cached.empty)entry.empty=true;else entry.failed=true;return;}
             var input=Object.assign({datasourceUid:uid,query:entry.query},windowRange?{start:range.from,end:range.to}:{}),attempt={at:clock(),value:cached?cached.value:null};
             started(job,entry);tasks.push(function(){if(!windowRange)sql[key]=attempt;return call('query_sql',input).then(function(result){
               var value=telemetryGrafanaSql(result && result.payload);
+              // #1404: with tracking.endToEndMetrics, zero rows is a successful query with no data, not a failure.
+              if(value===null && trackingEndToEndMetrics(current) && telemetryGrafanaSqlEmpty(result && result.payload)){attempt.empty=entry.empty=true;notices.push(label+': no rows');return;}
               if(value===null){entry.failed=true;failed(rank,label,'query_sql returned no number');return;}
               attempt.value=entry.value=value;
             },caught(rank,label,{tool:'query_sql',input:input},entry)).finally(function(){settled(job,entry);});});
@@ -595,8 +605,8 @@ function createTelemetryGrafana(page,win,now,bound){
               if(points.length && total){entry.value=points[points.length-1][1];entry.observedAt=new Date(points[points.length-1][0]).toISOString();}
               else if(points.length)entry.points=points;
               else if(telemetryLokiEmpty(payload) && entry.missingMeansZero!==false && telemetryLokiCountingQuery(entry.query))entry.value=0;
-              else notices.push(label+': no numeric observation');
-            }else {if(payload && payload.status && payload.status!=='success' || payload && payload.error)throw {code:'tool_error',message:'Prometheus query failed'};var promPoints=telemetryGrafanaPrometheus(payload);if(promPoints.length || !windowRange && entry.missingMeansZero!==false)entry.points=promPoints;else notices.push(label+': no numeric observation'+(windowRange?' in this window':''));}
+              else{if(telemetryLokiEmpty(payload))entry.empty=true;notices.push(label+': no numeric observation');}
+            }else {if(payload && payload.status && payload.status!=='success' || payload && payload.error)throw {code:'tool_error',message:'Prometheus query failed'};var promPoints=telemetryGrafanaPrometheus(payload);if(promPoints.length || !windowRange && entry.missingMeansZero!==false)entry.points=promPoints;else{if(telemetryLokiEmpty(payload))entry.empty=true;notices.push(label+': no numeric observation'+(windowRange?' in this window':''));}}
             var url=telemetryGrafanaUrl(result && result.payload && result.payload.exploreUrl);if(url)entry.exploreUrl=url;
           }).catch(caught(rank,label,{tool:tool,input:query},entry)).finally(function(){settled(job,entry);});});
         });});
@@ -630,6 +640,7 @@ function createTelemetryGrafana(page,win,now,bound){
           var sample=null,previous=last[job.id] && last[job.id].signals[entry.name];
           if(typeof entry.value==='number'){sample={value:entry.value,observedAt:entry.observedAt || null};if(entry.points)sample.series=entry.points;}
           else if(entry.points)sample={value:entry.points.length?entry.points[entry.points.length-1][1]:0,series:entry.points};
+          else if(entry.empty && trackingEndToEndMetrics(current))sample={empty:true};
           else if(!windowRange && entry.failed && previous && entry.source!=='cloudwatch' && entry.source!=='cloudwatchLogs' && entry.source!=='loki' && !entry.error)sample=JSON.parse(JSON.stringify(previous));
           if(!sample)return;
           if(['cloudwatch','cloudwatchLogs'].indexOf(entry.source)>=0 || windowRange)sample.window=anchoredRange;

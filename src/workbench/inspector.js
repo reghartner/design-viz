@@ -1119,6 +1119,29 @@ function traceConnectionsControls(warnings){
       return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }
+/* #1404: Status board settings → Metrics → End-to-end metrics applied (page tracking.endToEndMetrics).
+   Checked writes true; unchecked removes the key. One Undo step either way. */
+function endToEndControl(box,tracking,warnings,inactive){
+    var control=checkboxControl(tracking.endToEndMetrics===true,function(on){
+      return commitPageTracking(function(jira,page,next){if(on)next.endToEndMetrics=true;else delete next.endToEndMetrics;});
+    }),input=control.querySelector('input'),id=prefix+'-e2e-metrics-note';
+    input.setAttribute('aria-label','End-to-end metrics applied');
+    input.title='Proof rolls up from metric limits and traffic only, not Jira. Check this once the metrics and their limits cover the whole path.';
+    box.appendChild(frow('End-to-end metrics applied',control));
+    var note=document.createElement('p');note.className='fnote';note.id=id;
+    note.textContent='When checked, Proof reads "End to end proven" only when every carrier with a limit is proven; Jira state is not used. Check it after the metrics and limits on this board cover the whole path and were agreed.';
+    box.appendChild(note);
+    var describedBy=[id];
+    // An inactive setting says so beside the box: Allow metrics is off, or the board has no metrics at all.
+    if(inactive){var idle=document.createElement('p');idle.className='fnote board-e2e-inactive';idle.id=id+'-inactive';idle.textContent=inactive;box.appendChild(idle);describedBy.push(idle.id);}
+    var own=(warnings || []).filter(function(text){return /^tracking\.endToEndMetrics:/.test(text);});
+    if(own.length){
+      var warn=document.createElement('p');warn.className='fnote board-field-warning';warn.id=id+'-warning';
+      warn.textContent=own.map(function(text){var m=text.slice(text.indexOf(': ')+2);return m.charAt(0).toUpperCase()+m.slice(1)+'.';}).join(' ');
+      box.appendChild(warn);input.setAttribute('aria-invalid','true');describedBy.push(warn.id);
+    }
+    input.setAttribute('aria-describedby',describedBy.join(' '));
+  }
 function metricsSettingsControls(environments,warnings,environmentWarnings){
     var snapshot=parseEditor();if(snapshot.error)return null;
     var state=telemetryPageState(snapshot.raw);if(warnings)state.warnings=warnings;
@@ -3315,7 +3338,10 @@ function boardForm(){
     pageTrackingControls(doc.page,jira);
     jiraDependencyControls(doc.page,jira,warnings.jira);
     warningList(jira,warnings.jira,'Jira warnings');
-    var metricsForm=metricsSettingsControls(environments,warnings.metrics,warnings.environments);if(metricsForm)metrics.appendChild(metricsForm);
+    endToEndControl(metrics,tracking,warnings.metrics,telemetry.enabled===false?'No effect until metrics are on: Allow metrics is off.':
+      !hasTelemetry && !statusBoardHasBindings(raw)?'No effect until metrics are on: no node or connection on this board has metrics yet.':'');
+    // The end-to-end warning sits next to its checkbox, not again in the section list.
+    var metricsForm=metricsSettingsControls(environments,warnings.metrics.filter(function(text){return !/^tracking\.endToEndMetrics:/.test(text);}),warnings.environments);if(metricsForm)metrics.appendChild(metricsForm);
     warningList(environments,warnings.environments,'Environments warnings');
     var tracesForm=traceConnectionsControls(warnings.traces);if(tracesForm)traces.appendChild(tracesForm);
     warningList(traces,warnings.traces,'Traces warnings');

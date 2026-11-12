@@ -163,14 +163,16 @@ function telemetryHoneycombFormatted(meta,query,unit){
   if(!isFinite(value) || Math.abs(value)>Number.MAX_SAFE_INTEGER)throw telemetryHoneycombError('Honeycomb formatted Results first row has no finite scalar.');
   var sample={value:value,series:[],observedAt:null,provenance:'formatted-text'};if(unit)sample.unit=unit;return sample;
 }
-async function telemetryHoneycombMeasurement(win,result,meta,signal,query,unit){
-  try{return telemetryHoneycombSample(await telemetryHoneycombResult(win,result,meta,signal),query,unit);}
+async function telemetryHoneycombMeasurement(win,result,meta,signal,query,unit,allowEmpty){
+  try{return telemetryHoneycombSample(await telemetryHoneycombResult(win,result,meta,signal),query,unit,allowEmpty);}
   catch(error){
     if(signal && signal.aborted || !error || error.code!=='transport_unavailable')throw error;
     return telemetryHoneycombFormatted(meta,query,unit);
   }
 }
-function telemetryHoneycombSample(raw,query,unit){
+function telemetryHoneycombSample(raw,query,unit,allowEmpty){
+  // #1404: with tracking.endToEndMetrics, a successful answer with no result rows and no series is "no data".
+  if(allowEmpty && telemetryObject(raw) && Array.isArray(raw.results) && !raw.results.length && !(Array.isArray(raw.series) && raw.series.length)){var none={empty:true,series:[],observedAt:null};if(unit)none.unit=unit;return none;}
   if(!telemetryObject(raw) || !Array.isArray(raw.results) || raw.results.length!==1 || !telemetryObject(raw.results[0]) || !telemetryObject(raw.results[0].data))throw telemetryHoneycombError('Honeycomb result is missing or ambiguous; expected one aggregate row.');
   var key=query.key,header=Array.isArray(raw.header)?raw.header:[];
   if(header.some(function(h){return !telemetryObject(h) || !telemetryText(h.alias) || !telemetryText(h.key_name);}))throw telemetryHoneycombError('Honeycomb raw result has an invalid header.');
@@ -246,7 +248,7 @@ function createTelemetryHoneycomb(page,win,now,bound){
         stage='Honeycomb run_query';var work=function(){return mcp.callTool(contract.server,'run_query',query.input,{signal:signal});};var result=await (windowRange?liveStatusHistoryCall(work,signal):work());
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
         if(result && result.isError)throw {code:'tool_error',message:telemetryProviderErrorText(result)};
-        stage='Honeycomb run_query result';var meta=telemetryHoneycombMetadata(result),sample=await telemetryHoneycombMeasurement(win,result,meta,signal,query,job.unit);
+        stage='Honeycomb run_query result';var meta=telemetryHoneycombMetadata(result),sample=await telemetryHoneycombMeasurement(win,result,meta,signal,query,job.unit,trackingEndToEndMetrics(current));
         if(signal.aborted || retired || epoch!==generation)throw telemetryHoneycombError('Honeycomb refresh cancelled.');
         sample.retrievedAt=new Date(clock()).toISOString();
         var out=map[job.id] || (map[job.id]={signals:{},observedAt:null,links:{},markers:[]});out.signals[job.name]=sample;

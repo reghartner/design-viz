@@ -848,6 +848,62 @@ and live early (including ALREADY LIVE). A step takes the live-status rollup of
 its directly selected carriers' Jira states, then the worst telemetry state
 (degraded, silent, unmeasured, unobserved, flowing), joined by the same matrix.
 
+### End-to-end metrics
+
+Page-level `tracking.endToEndMetrics: true` (#1404) makes Proof answer "does the
+whole path work, according to its metrics?" instead of combining metrics with
+Jira. The author (or agent) sets it only after the metrics and their limits are
+in place and agreed: it states that the metrics on this board cover the whole
+path. Only the boolean `true` turns it on; any other value warns and is ignored.
+Without it nothing changes.
+
+With the flag on, Jira state is not an input to Proof. Tickets keep their own
+job: Jira colours, the Tickets table, epic status and step ticket rows are
+unchanged. In Proof:
+
+- A **counted** carrier is a bound carrier with at least one signal that has a
+  `min` or `max` limit. Carriers with metrics but no limit appear in the table
+  as *not counted, no limit* and never enter the ring.
+- Each counted carrier gets one verdict from its limits and traffic:
+
+| Verdict | When |
+| --- | --- |
+| **PROVEN** | traffic observed, an authored `min` is observed and met, and every limit holds |
+| **DEGRADED** | a `max` limit (plain or `maxRatioOf`) is breached while traffic flows, or while the carrier has no rate-like signal to show traffic |
+| **ERROR** | a signal with `role: "error"` is outside its limit (#1201) |
+| **UNPROVEN** | zero across the window, a query that succeeded with no data, no traffic, below a `min`, or no observed `min` at all |
+| no verdict | nothing observed yet: a query failed or is still loading. Shown as today's unobserved / evidence incomplete state, never proven |
+
+A query that succeeds but returns no data (an empty Prometheus vector or Loki
+result, CloudWatch with no data points, SQL with no rows, Honeycomb with no
+result rows) is reported as `{empty: true}` on boards with the flag and reads as
+0 for traffic: an empty rate-like signal is zero traffic, and an empty
+`role: "error"` signal means no errors. Any other signal with a limit that comes
+back empty, such as a p95 latency, proves nothing, so its carrier is UNPROVEN
+even when its `max` would hold at 0. A signal without a limit never affects Proof. Its card value reads "no data". Without the flag such a
+signal stays unobserved, as before.
+
+- The headline reads **End to end proven** only when every counted carrier is
+  proven (none in error). Otherwise it reads **N of M proven** and the summary
+  names the degraded, error, unproven and not-measured carriers. With no counted
+  carrier nothing is claimed.
+- The Proof table drops the Jira and Since Done columns and has no ticket-state
+  wording; there is no live-early bucket, and no Done marker on charts.
+- A step's verdict is the worst of its counted carriers (error, degraded,
+  unproven), no verdict while one is pending, else proven. Step `ticketFilter`
+  narrowing does not apply to Proof.
+- Canvas seals follow the same verdicts: PROVEN check, UNPROVEN slash, DEGRADED
+  and ERROR `!`.
+
+`proofVerdicts(input, {endToEndMetrics: true})` in `src/core/proof.js` is the one
+engine for the panel, the canvas cues and the step caption.
+
+In the desktop Workbench, **Status board settings → Metrics → End-to-end metrics
+applied** sets the flag (checked writes `true`, unchecked removes the key; one
+Undo step). An invalid authored value shows its warning next to the checkbox.
+While Allow metrics is off, or no node or connection has metrics, a note by the
+box says it has no effect until metrics are on.
+
 ### Metrics and proof authoring
 
 Agent authors load the live-status board skill's conditional

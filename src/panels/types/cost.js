@@ -309,7 +309,7 @@ PanelRegistry.define('cost', {
       initial: {messages:1}
     },
     setupFields: [['density','text'],['currency','text'],['unit','text'],['period','text'],['assumptions','text'],
-      ['routes','rows',{wide:true,max:6,cols:[{k:'id',label:'Entry ID',req:true},{k:'label',label:'Name'},{k:'tradeoff',label:'Trade-off'}]}],
+      ['routes','rows',{wide:true,max:6,cols:[{k:'id',label:'Route ID',req:true},{k:'label',label:'Name'},{k:'tradeoff',label:'Trade-off'}]}],
       ['items','rows',{wide:true,max:24,cols:[{k:'route',label:'Route ID',req:true},{k:'node',label:'Diagram node'},{k:'label',label:'Component'},
         {k:'perMillion',label:'Cost per 1M units',kind:'num',req:true},{k:'fixed',label:'Fixed cost per period',kind:'num'}]}],['initial','json']],
     patchFields: [['messages','num'],['activeRoute','text'],['note','text']],

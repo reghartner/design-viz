@@ -615,11 +615,11 @@ test('App screens Starting state exposes explicit default, null and set modes',(
   ],initial:{screen:null,date:'',futureTop:9}}],steps:[]};
   const h=e.mount(spec);h.inspector.render();const before=h.text;
   const mode=aria(h.guide,'Starting screen assignment');assert.equal(mode.value,'null');
-  mode.value='set';mode.fire('change');const screen=aria(h.guide,'screen');assert.equal(screen.disabled,false);
+  mode.value='set';mode.fire('change');const screen=aria(h.guide,'Starting screen');assert.equal(screen.disabled,false);
   screen.value='live';screen.fire('change');h.flush();
   assert.deepEqual(JSON.parse(h.text).panels[0].initial,{screen:'live',date:'',futureTop:9});
   const changed=h.text;h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(h.text,changed);
-  h.inspector.render();const blank=aria(h.guide,'screen');blank.value='';blank.fire('change');
+  h.inspector.render();const blank=aria(h.guide,'Starting screen');blank.value='';blank.fire('change');
   assert.equal(blank.value,'live');assert.equal(h.text,changed);assert.equal(h.session.canUndo(),true);
   const omit=aria(h.guide,'Starting screen assignment');omit.value='omit';omit.fire('change');h.flush();
   assert.deepEqual(JSON.parse(h.text).panels[0].initial,{date:'',futureTop:9});

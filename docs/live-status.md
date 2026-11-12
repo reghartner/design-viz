@@ -3353,6 +3353,48 @@ fails closed:
   opens the provider's own dashboard, which is not narrowed.
 - Pages need `flow.telemetry-narrow`.
 
+### Variable scopes
+
+A `${name}` in a signal is filled from the nearest scope that sets it (#1344, #1357):
+
+1. the carrier: `telemetry.variables` on a node or connection, local, provider, or in an
+   import's `nodeTracking` / `edgeTracking` overlay (with or without `extends`);
+2. the import: `topologyImports[i].variables`, for every node and connection of that import;
+3. the environment profile: `tracking.telemetry.environments.<id>.variables`;
+4. the board: `tracking.telemetry.variables`;
+5. company AWS account defaults.
+
+```json
+"topologyImports": [
+  {"spec": "dcf-canon", "export": "core", "as": "fc", "variables": {"code": "FULL_CHARGE"}},
+  {"spec": "dcf-canon", "export": "core", "as": "et", "variables": {"code": "EARLY"}}]
+```
+
+The same canon imported twice reads one value per import. Names follow the board's
+rules (`env` and `account` are reserved; values are non-empty strings). Scoped values are
+literal, never expanded, and the same in every environment.
+
+- **Set once.** Across nesting levels the value nearest the provider is kept: a provider
+  carrier's own value, then each importing level's. A different value set further out is
+  ignored with a warning where it is written ("${code} is already set to "MIDDLE" nearer
+  the provider; this value is ignored"). A provider page's board-level variables do not
+  travel with an import.
+- **Never escaping or widening.** A scoped value is filled into the provider's query only
+  where it cannot change its meaning: inside a string it holds no quote of that kind, no
+  `\` and no control character; inside a regex (`=~`, `!~`, `|~`, a Logs `/regex/`) no
+  regex character; outside a string only letters, digits and `. _ : - @`. Otherwise the
+  signal is not shown: "Variable ${code} from this import or carrier cannot be filled in
+  safely here (…)". A narrowing fragment that uses a scoped value is checked again after
+  it is filled in. Board-wide and profile variables keep their meaning.
+- **SQL and Tempo.** A provider that wants boards to choose a value writes a `${name}`
+  placeholder in its query (in a string for SQL: `WHERE code = '${code}'`); the import
+  sets it. This is the route for sources that cannot be narrowed.
+- **Unset.** An unset variable keeps the signal from being sent: "Set telemetry variable
+  ${code} for this import, this node or connection, or the active environment." On a page
+  with a live-status panel the validator checks every environment profile and warns at
+  the signal, naming the environments without a value and where to set it.
+- Pages need `flow.telemetry-scoped-variables`.
+
 ### Named environment variables and counting scope
 
 Put shared string defaults in `tracking.telemetry.variables`, with per-profile

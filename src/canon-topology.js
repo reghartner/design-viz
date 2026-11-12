@@ -198,6 +198,22 @@ var FlowTopology = (function(){
     Object.keys(signals).forEach(function(name){if(object(signals[name]))needs=telemetryNeedsMerge(needs,signals[name].needsNarrow);});
     return needs;
   }
+  /* #1357: an imported carrier's scoped variables. inherited is what the provider's binding (and
+     every inner import) already set; this level adds its carrier overlay's, then its import's (D6:
+     the carrier first). A name set nearer the provider keeps that value (D7): a different value
+     here is ignored, with a warning where it is written. */
+  function telemetryScopeVariables(value,inherited,overlayVars,importVars,overlayNote,importNote){
+    if(!object(value.telemetry))return;
+    var out=Object.assign({},inherited);
+    [[overlayVars,overlayNote,'.variables.'],[importVars,importNote,'.']].forEach(function(level){
+      var vars=telemetryScopedVariables(level[0],null,'');
+      Object.keys(vars).forEach(function(name){
+        if(own(inherited,name)){if(inherited[name]!==vars[name] && level[1])level[1]('warning',level[2]+name,'${'+name+'} is already set to "'+inherited[name]+'" nearer the provider; this value is ignored');return;}
+        if(!own(out,name))out[name]=vars[name];
+      });
+    });
+    if(Object.keys(out).length)value.telemetry.variables=out;else delete value.telemetry.variables;
+  }
   // #1290: trace spans always merge. A span names spans one way, so a patch that sets
   // operation removes an inherited operationPrefix and the reverse.
   var TRACE_OVERLAY_RULES={hide:'spans',fields:{spans:'entries'},
@@ -393,7 +409,8 @@ var FlowTopology = (function(){
   var telemetryNotes=new WeakMap();
   function telemetryFindings(d,DP){
     var out={warnings:[],notes:[]};
-    (telemetryNotes.get(d) || []).forEach(function(f){out[f.type==='warning'?'warnings':'notes'].push(DP+'.'+f.at+': '+f.message);});
+    var seen=Object.create(null);
+    (telemetryNotes.get(d) || []).forEach(function(f){var line=DP+'.'+f.at+': '+f.message;if(seen[line])return;seen[line]=true;out[f.type==='warning'?'warnings':'notes'].push(line);});
     return out;
   }
   function inheritTelemetry(value,templates,overlay,record){
@@ -452,7 +469,7 @@ var FlowTopology = (function(){
         if(own(d,'topologyImports') && !Array.isArray(d.topologyImports))fail(at,'topologyImports must be an array');
         var namespaces=new Set();
         (d.topologyImports || []).forEach(function(imp,i){
-          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions','nodeCodeRefs','nodeOverrides','nodeDetails','edgeOverrides','nodeTracking','edgeTracking','presentation'],where);
+          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions','nodeCodeRefs','nodeOverrides','nodeDetails','edgeOverrides','nodeTracking','edgeTracking','presentation','variables'],where);
           if(!validExports(imp.export))fail(where,'export must be a name or a nonempty array of unique export names');
           if(typeof imp.spec!=='string' || !imp.spec || !token(imp.as))fail(where,'requires spec, export, and a namespace as (letters, digits, dot, dash, underscore)');
           var reference=at+' import '+imp.as+' ('+imp.spec+' export '+imp.export+')';
@@ -532,6 +549,8 @@ var FlowTopology = (function(){
           var providerAt=(providerRecord?providerRecord.path:'section')+'.diagram';
           function dropped(kind,id,path){return function(problem){drops.push({kind:kind,id:id,spec:imp.spec,path:path+'.telemetry'+problem.path,message:problem.message});};}
           function traceDropped(kind,id,path){return function(key,message){spanDrops.push({type:'drop',kind:kind,id:id,key:key,spec:imp.spec,path:path+'.trace'+(key==null?'':'.spans.'+key),message:message});};}
+          function importNoted(type,sub,message){metricNotes.push({type:type,at:'topologyImports['+importIndex+'].variables'+sub,message:message});}
+          function trackingVariables(entry){return object(entry) && object(entry.telemetry)?entry.telemetry.variables:null;}
           function telemetryNoted(field,key){return function(type,sub,message){metricNotes.push({type:type,at:'topologyImports['+importIndex+'].'+field+'.'+key+'.telemetry'+sub,message:message});};}
           function traceNoted(field,key){return function(type,sub,message){spanDrops.push({type:type,at:'topologyImports['+importIndex+'].'+field+'.'+key+'.trace'+sub,message:message});};}
           function importedEdge(key){var parts=key.split('->');return prefix+parts[0]+'->'+prefix+parts[1];}
@@ -570,7 +589,7 @@ var FlowTopology = (function(){
               else {if(value.handoff!=null)fail(where,'nodeDetails '+key+' conflicts with its inherited handoff');value.detail=clone(imp.nodeDetails[key]);}
             }
             if(own(imp.nodeCodeRefs || {},key))value.codeRefs=(value.codeRefs || []).concat(clone(imp.nodeCodeRefs[key]));
-            inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));applyTracking(value,(imp.nodeTracking || {})[key],telemetryNoted('nodeTracking',key),'node '+key,consumerTemplates);
+            inheritTelemetry(value,providerTemplates,(imp.nodeTracking || {})[key],dropped('nodes',prefix+key,providerAt+'.nodes.'+key));var varsBefore=object(value.telemetry) && object(value.telemetry.variables)?clone(value.telemetry.variables):{};applyTracking(value,(imp.nodeTracking || {})[key],telemetryNoted('nodeTracking',key),'node '+key,consumerTemplates);telemetryScopeVariables(value,varsBefore,trackingVariables((imp.nodeTracking || {})[key]),imp.variables,telemetryNoted('nodeTracking',key),importNoted);
             inheritTrace(value,(imp.nodeTracking || {})[key],'node',spec,byId.get(imp.spec),traceDropped('nodes',prefix+key,providerAt+'.nodes.'+key),traceNoted('nodeTracking',key),referenceLit.nodes.indexOf(prefix+key)>=0?referenceSpans:null);
             if(imp.presentation)value.presentation=imp.presentation;
             Object.keys((imp.nodeOverrides || {})[key] || {}).forEach(function(field){var override=imp.nodeOverrides[key][field];if(override===null)delete value[field];else value[field]=clone(override);});
@@ -599,7 +618,7 @@ var FlowTopology = (function(){
           exp.edges.forEach(function(key){
             var matches=(provider.edges || []).filter(function(e){return e && edgeKey(e)===key;});
             if(matches.length!==1)fail(where,'missing or ambiguous exported edge '+key);
-            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));applyTracking(edge,(imp.edgeTracking || {})[key],telemetryNoted('edgeTracking',key),'connection '+key,consumerTemplates);
+            var edge=clone(matches[0]);inheritTelemetry(edge,providerTemplates,(imp.edgeTracking || {})[key],dropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'));var edgeVarsBefore=object(edge.telemetry) && object(edge.telemetry.variables)?clone(edge.telemetry.variables):{};applyTracking(edge,(imp.edgeTracking || {})[key],telemetryNoted('edgeTracking',key),'connection '+key,consumerTemplates);telemetryScopeVariables(edge,edgeVarsBefore,trackingVariables((imp.edgeTracking || {})[key]),imp.variables,telemetryNoted('edgeTracking',key),importNoted);
             inheritTrace(edge,(imp.edgeTracking || {})[key],'edge',spec,byId.get(imp.spec),traceDropped('edges',importedEdge(key),providerAt+'.edges['+provider.edges.indexOf(matches[0])+']'),traceNoted('edgeTracking',key),referenceLit.edges.indexOf(importedEdge(key))>=0?referenceSpans:null);
             if(imp.presentation)edge.presentation=imp.presentation;
             if(!selected.has(edge.from) || !selected.has(edge.to))fail(where,'exported edge '+key+' must include both endpoints in exported nodes');

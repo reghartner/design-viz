@@ -158,13 +158,13 @@ successful empty results into zero. Malformed/error results never become zero.
 
 ### Named environment variables and counting scope
 
-Shared string defaults go in `tracking.telemetry.variables`, per-profile overrides in
-`environments.<id>.variables`. Any signal string may use `${name}` (`env` and `account`
-are reserved); an unset one blocks that signal with a reason. Never interpolate user
-secrets; profiles and queries are shipped in the artifact. A signal may author
-`scope`; without it, CloudWatch `RuleName`, `QueueName` and account-wide AuthError
-metrics name their own scope. Full rules:
-[details](../../../docs/live-status.md#named-environment-variables-and-counting-scope).
+Defaults go in `tracking.telemetry.variables`, profile overrides in
+`environments.<id>.variables`, one import's in `topologyImports[i].variables`, one
+carrier's in `telemetry.variables` (carrier wins, then import, profile, board). Any
+signal string may use `${name}` (`env`, `account` reserved); unset blocks the signal.
+Never interpolate user secrets; profiles and queries ship in the artifact. Without
+`scope`, CloudWatch `RuleName`, `QueueName` and account-wide AuthError name their own
+([details](../../../docs/live-status.md#named-environment-variables-and-counting-scope)).
 
 ### Narrowing an imported signal
 
@@ -175,8 +175,8 @@ source, in the import's `extends` overlay; never restate the provider's query:
 - `"loki": "| code=\"X\""` (one stage per entry), `"grafana": "code=\"X\""` (matchers)
 - `"cloudwatchLogs": "filter code = \"X\""`
 
-Flowview appends it, never translates it, and anything unsafe (another language, SQL,
-Tempo, an OR query, a conflict) is not shown, with a reason. A provider signal with
+Flowview appends it, never translates it; anything unsafe is not shown, with a
+reason. A provider signal with
 `needsNarrow: ["code"]` (or `true`) stays hidden until a board pins it (`=`/`in`)
 ([details](../../../docs/live-status.md#narrowing-inherited-signals)).
 

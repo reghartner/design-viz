@@ -495,22 +495,22 @@ The delivery board imports that structure without copying nodes or edges:
 
 Open the authored consumer with its approved providers. In the desktop Inspector,
 select an imported node or connection and use **Add ticket** or **Add PR**.
-Inherited references are displayed read-only. Removal applies only to consumer
-additions; each edit is one Undo/Redo. Duplicate additions do nothing.
+Inherited references are read-only. Removal applies only to consumer
+additions; each edit is one Undo/Redo. Duplicates do nothing.
 
 `nodeTracking` and `edgeTracking` values accept `tickets` and `prs` arrays,
 optional `existsWhen: "tickets-done"`, and `trace` (change, add or hide one provider
-[span declaration](provider-traces.md#trace-spans-declared-on-nodes-and-connections-1290)). Existence requires all resolved tickets to
-be Done, including inherited and local tickets. Provider-authored rules survive
-imports and remain read-only in the consumer. A consumer may add or remove its
-own rule using desktop Inspect → Tracking; reference edits and layout resets
-preserve it. No valid resolved tickets warns and ignores the rule. See
+[span declaration](provider-traces.md#trace-spans-declared-on-nodes-and-connections-1290)). An import's
+`variables` fill its metrics' `${name}`. Existence needs every resolved
+ticket Done, inherited and local. Provider rules survive imports, read-only in the
+consumer, which adds or removes its own in desktop Inspect → Tracking; reference
+edits and layout resets keep it. No valid resolved tickets warns and ignores the rule. See
 [planned availability](live-status.md#planned-nodes-and-connections).
 Jira keys or browse URLs, and PR URLs, follow the [tracking parser](live-status.md#fields); invalid
 entries, unknown fields, and missing/deselected identities fail validation.
 Nested imports use complete provider-relative keys such as `inner::api` and
 `inner::api->inner::store`. Local references follow inherited ones, deduplicated
-by Jira key (the first wins). Provider refreshes keep local
+by Jira key (first wins). Provider refreshes keep local
 additions; removing a local copy of an inherited reference keeps the provider's.
 
 Tracking is independent of `nodeOverrides`, `nodePositions`, `nodeCodeRefs` and

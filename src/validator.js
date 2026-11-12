@@ -893,6 +893,26 @@ function validate(page){
       if(bindingOut)Object.keys(bindingOut.signals).forEach(function(name){
         var sig=bindingOut.signals[name];
         if(sig.narrowFailure && !sig.narrowWritten)narrowWarnings.push(at+'.telemetry.signals.'+name+': '+sig.error);
+      });      // #1357: a ${name} no scope sets, per environment profile, is a signal not shown there.
+      if(bindingOut)telemetryUnsetVariableWarnings(carrier,at,bindingOut);
+    }
+    function telemetryUnsetVariableWarnings(carrier,at,bindingOut){
+      var expanded=telemetryExpand(carrier.telemetry,telemetry.templates,null);if(!specObject(expanded) || !specObject(expanded.signals))return;
+      var scoped=telemetryScopedVariables(expanded.variables,null,''),profiles=specObject(telemetry.environments)?Object.keys(telemetry.environments):[];
+      var ids=profiles.length?profiles:[null],configs=ids.map(function(id){return telemetryEnvironmentConfig(page,id);});
+      var imported=/::/.test(at),kind=/\.edges\[/.test(at)?'connection':'node',namespace=imported?(at.split('.nodes.')[1] || '').split('::')[0]:'';
+      if(kind==='connection' && imported){var e=(Array.isArray(d.edges)?d.edges:[])[Number((/\.edges\[(\d+)\]/.exec(at) || [])[1])];namespace=e && typeof e.from==='string'?e.from.split('::')[0]:'';}
+      Object.keys(bindingOut.signals).forEach(function(name){
+        var raw=expanded.signals[name];if(!specObject(raw))return;
+        var shown={};Object.keys(raw).forEach(function(k){if(['label','links','window'].indexOf(k)<0)shown[k]=raw[k];});
+        var names=[],re=/\$\{([A-Za-z][A-Za-z0-9_]*)\}/g,hit,text=JSON.stringify(shown);
+        while((hit=re.exec(text)))if(['env','account'].indexOf(hit[1])<0 && names.indexOf(hit[1])<0 && !Object.prototype.hasOwnProperty.call(scoped,hit[1]))names.push(hit[1]);
+        names.forEach(function(v){
+          var missing=ids.filter(function(id,i){var vars=configs[i].variables || {};return !Object.prototype.hasOwnProperty.call(vars,v);});
+          if(!missing.length)return;
+          var where=profiles.length?' in environments '+missing.join(', '):'',there=profiles.length?' there':'';
+          narrowWarnings.push(at+'.telemetry.signals.'+name+': ${'+v+'} is not set '+(imported?'for import '+namespace+', this '+kind+', or':'on this '+kind+' or in')+' the board\'s variables'+where+', so the signal is not shown'+there+'. Set it '+(imported?'in the variables of import '+namespace+', on the '+kind+', or':'on the '+kind+' or')+' in tracking.telemetry.variables.');
+        });
       });
     }
     if(specObject(d.nodes))Object.keys(d.nodes).forEach(function(id){bound(d.nodes[id],DP+'.nodes.'+id);});
@@ -913,6 +933,7 @@ function validate(page){
     // A resolved snapshot already carries overlay bindings on its imported carriers.
     if(!d.topologyProvenance)(Array.isArray(d.topologyImports)?d.topologyImports:[]).forEach(function(imp,i){
       if(!specObject(imp))return;
+      if(Object.prototype.hasOwnProperty.call(imp,'variables'))telemetryScopedVariables(imp.variables,function(path,message){warnings.push(path+': '+message);},DP+'.topologyImports['+i+'].variables');
       ['nodeTracking','edgeTracking'].forEach(function(field){
         if(specObject(imp[field]))Object.keys(imp[field]).forEach(function(key){
           var entry=imp[field][key],at=DP+'.topologyImports['+i+'].'+field+'.'+key;

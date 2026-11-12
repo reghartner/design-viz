@@ -237,7 +237,7 @@ var TELEMETRY_SOURCES=['grafana','loki','tempo','sql','honeycomb','cloudwatch','
 var TELEMETRY_CARD_SIDES=['right','left','above','below'];
 var TELEMETRY_LINKS=['dashboard','query'];
 // #1353: a binding-level needsNarrow applies to every signal of the binding, also ones a template writes.
-var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card','needsNarrow'];
+var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card','needsNarrow','variables'];
 var TELEMETRY_RESERVED=TELEMETRY_BINDING_FIELDS.concat(['use','params']);
 var TELEMETRY_DEFAULT_WINDOW='24h',TELEMETRY_MIN_REFRESH_MS=300000,TELEMETRY_CARD_OFFSET_MAX=1000,TELEMETRY_CARD_WIDTH_MIN=140,TELEMETRY_CARD_WIDTH_MAX=480;
 var telemetryNamePattern=/^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -281,6 +281,53 @@ function telemetryCloudwatchLogsQuery(query){
 function telemetryQueryUrl(value){
   if(!telemetryConfigUrl(value))return null;
   var url=new URL(value);return /(?:^|\.)honeycomb\.io$/.test(url.hostname) && /(?:query_results|trace_results)(?:\/|$)/.test(url.pathname)?null:value;
+}
+/* #1357: scoped variables, on a binding (carrier) or a topology import, follow the board's name
+   rules: a non-reserved name and a non-empty string. Returns the valid ones; warns on the rest. */
+function telemetryScopedVariables(value,warn,at){
+  var out={};if(value==null)return out;
+  warn=warn || function(){};
+  if(!telemetryObject(value)){warn(at,'must be an object of named strings — ignored');return out;}
+  Object.keys(value).forEach(function(name){
+    if(!telemetryParamPattern.test(name) || ['env','account','constructor','prototype','__proto__'].indexOf(name)>=0 || !telemetryText(value[name]))warn(at+'.'+name,'use a non-reserved name and non-empty string — ignored');
+    else out[name]=value[name];
+  });
+  return out;
+}
+/* #1357: why a scoped value cannot be filled into a provider's text query safely, or null. Inside
+   a string it may not end that string (its quote, a \ or a control character); in a regex it may
+   hold no regex character, so it cannot widen the match; outside a string it is a plain token. */
+var TELEMETRY_SCOPED_QUOTES={loki:'"`',grafana:'"\'`',tempo:'"\'`',sql:'\'"`',cloudwatchLogs:'"\'`'};
+function telemetryScopedPlacement(source,text,index){
+  var quotes=TELEMETRY_SCOPED_QUOTES[source] || '"\'`',quote=null,opened=-1;
+  for(var i=0;i<index;i++){
+    var c=text[i];
+    if(quote){if(quote!=='`' && c==='\\'){i++;continue;}if(c===quote)quote=null;continue;}
+    if(quotes.indexOf(c)>=0 || source==='cloudwatchLogs' && c==='/' && typeof telemetryLogsRegexOpens==='function' && telemetryLogsRegexOpens(text.slice(0,i))){quote=c;opened=i;}
+  }
+  if(!quote)return {string:false};
+  var before=text.slice(0,opened).replace(/\s+$/,'');
+  return {string:true,quote:quote,regex:quote==='/' || source!=='cloudwatchLogs' && source!=='sql' && /(?:=~|!~|\|~)$/.test(before)};
+}
+function telemetryScopedValueProblem(source,query,scoped){
+  var texts=[];
+  if(typeof query==='string')texts.push(query);
+  else if(source==='cloudwatchLogs' && telemetryObject(query)){
+    if(typeof query.query==='string')texts.push(query.query);
+    ['breakdown','trend'].forEach(function(k){if(telemetryObject(query[k]) && typeof query[k].query==='string')texts.push(query[k].query);});
+  }
+  for(var t=0;t<texts.length;t++){
+    var re=/\$\{([A-Za-z][A-Za-z0-9_]*)\}/g,hit;
+    while((hit=re.exec(texts[t]))){
+      var name=hit[1];if(!telemetryOwn(scoped,name))continue;
+      var value=String(scoped[name]),at=telemetryScopedPlacement(source,texts[t],hit.index),why=null;
+      if(at.string && at.regex && /[.*+?()\[\]{}|^$\\\/]/.test(value))why='it is filled into a regex and holds regex characters';
+      else if(at.string && (value.indexOf(at.quote)>=0 || value.indexOf('\\')>=0 || /[\x00-\x1f\x7f]/.test(value)))why='it would end the string it is filled into';
+      else if(!at.string && !/^[A-Za-z0-9_.:@-]+$/.test(value))why='outside a string it may hold only letters, digits and . _ : - @';
+      if(why)return 'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';
+    }
+  }
+  return null;
 }
 /* #1348: shape warnings for a signal's narrow (keyed by source) as written. source is the
    signal's own source, or null for a field patch whose inherited source is not known here. */
@@ -391,6 +438,7 @@ function telemetryClean(raw,warn,template){
     if(!Object.keys(signals).length){warn('.signals','needs at least one valid signal — '+(template?'template':'binding')+' ignored');ok=false;}
   }
   out.signals=signals;
+  if(!template && telemetryOwn(raw,'variables')){var scopedVars=telemetryScopedVariables(raw.variables,warn,'.variables');if(Object.keys(scopedVars).length)out.variables=scopedVars;}
   if(!template && telemetryOwn(raw,'needsNarrow') && raw.needsNarrow!==null){
     if(telemetryNeedsNarrowValid(raw.needsNarrow))out.needsNarrow=telemetryClone(raw.needsNarrow);
     else warn('.needsNarrow','must be true or a list of the field names a board must narrow by — ignored');
@@ -467,7 +515,7 @@ function telemetryExpand(raw,templates,invalid){
   if(missing)return null;
   var base={};Object.keys(template).forEach(function(key){if(key!=='params' && key!=='card')base[key]=telemetryClone(template[key]);});
   var out=telemetrySubstitute(base,values);
-  ['kind','card','needsNarrow'].forEach(function(key){if(telemetryOwn(raw,key))out[key]=telemetryClone(raw[key]);});
+  ['kind','card','needsNarrow','variables'].forEach(function(key){if(telemetryOwn(raw,key))out[key]=telemetryClone(raw[key]);});
   ['signals','proof','links'].forEach(function(key){
     if(!telemetryOwn(raw,key))return;
     if(!telemetryObject(raw[key])){warn('.'+key,'must be an object — carrier '+key+' ignored');return;}
@@ -480,7 +528,7 @@ function telemetryExpand(raw,templates,invalid){
 /* #1266: a consumer overlay on an imported carrier. `{extends:true, ...}` merges with the
    inherited (provider) binding through FlowTopology.mergeTelemetry (canon-topology.js); an
    overlay without `extends` replaces the inherited binding (the original rule). */
-var TELEMETRY_MERGE_FIELDS=['extends','kind','signals','hide','proof','links','card'];
+var TELEMETRY_MERGE_FIELDS=['extends','kind','signals','hide','proof','links','card','variables'];
 function telemetryMergeOverlay(overlay){return telemetryObject(overlay) && overlay.extends===true;}
 // Metrics rule for a removed or hidden signal: its limit goes, and so does any ratio limit based on it.
 function telemetryDropSignal(binding,name){
@@ -499,6 +547,7 @@ function telemetryMergeOverlayWarnings(overlay,invalid,inheritedNames){
   var warn=telemetryWarn(invalid);
   telemetryUnknown(overlay,TELEMETRY_MERGE_FIELDS,warn);
   if(telemetryOwn(overlay,'kind') && TELEMETRY_KINDS.indexOf(overlay.kind)<0)warn('.kind','must be one of '+TELEMETRY_KINDS.join(', ')+' — ignored');
+  if(telemetryOwn(overlay,'variables'))telemetryScopedVariables(overlay.variables,warn,'.variables');
   if(telemetryOwn(overlay,'hide') && !(Array.isArray(overlay.hide) && overlay.hide.every(function(name){return typeof name==='string' && telemetryNamePattern.test(name);})))warn('.hide','must be an array of inherited signal names — ignored');
   ['signals','proof','links','card'].forEach(function(field){
     if(!telemetryOwn(overlay,field))return;
@@ -547,6 +596,10 @@ function carrierTelemetry(obj,templates,invalid,environment){
     var values=Object.assign(Object.create(null),config.variables || {});
     if(config.environment)values.env=config.environment;
     if(config.grafana && config.grafana.accountId)values.account=config.grafana.accountId;
+    // #1357: the carrier's and its import's values come before the environment and the board's (D6),
+    // literal and the same in every environment.
+    var scoped=telemetryScopedVariables(expanded.variables,null,'');
+    Object.keys(scoped).forEach(function(name){values[name]=scoped[name];});
     Object.keys(expanded).forEach(function(key){
       if(key==='signals' && telemetryObject(expanded[key]))Object.keys(expanded[key]).forEach(function(name){
         // #1354: the narrowing as written, to tell a fragment broken by a filled-in variable from one written broken.
@@ -558,7 +611,14 @@ function carrierTelemetry(obj,templates,invalid,environment){
         // The optional grouped query owns its configuration errors. Resolve it
         // separately, once, so it cannot suppress an otherwise readable total.
         if(hasBreakdown)delete logs.breakdown;if(hasTrend)delete logs.trend;
-        function missingReason(missing){return 'Set telemetry variable ${'+missing+'} in the active environment'+(missing==='account'?' or tracking.telemetry.grafana.accountId':'')+'.';}
+        function missingReason(missing){return 'Set telemetry variable ${'+missing+'} for this import, this node or connection, or the active environment'+(missing==='account'?', or tracking.telemetry.grafana.accountId':'')+'.';}
+        // #1357: a scoped value that would escape or widen the provider's query keeps the signal from being sent.
+        if(telemetryObject(authored)){
+          var sourceKey=TELEMETRY_SOURCES.filter(function(k){return telemetryOwn(authored,k);})[0];
+          var checked=sourceKey==='cloudwatchLogs'?Object.assign({},authored.cloudwatchLogs,hasBreakdown?{breakdown:breakdown}:{},hasTrend?{trend:trend}:{}):sourceKey?authored[sourceKey]:null;
+          var unsafe=sourceKey?telemetryScopedValueProblem(sourceKey,checked,scoped):null;
+          if(unsafe)errors[name]=unsafe;
+        }
         expanded[key][name]=telemetrySubstitute(expanded[key][name],values,function(missing){
           errors[name]=missingReason(missing);
         },true);
@@ -569,7 +629,7 @@ function carrierTelemetry(obj,templates,invalid,environment){
         if(hasTrend)expanded[key][name].cloudwatchLogs.trend=telemetrySubstitute(trend,values,function(missing){trendErrors[name]=missingReason(missing);},true);
         if(hasBreakdown)expanded[key][name].cloudwatchLogs.breakdown=telemetrySubstitute(breakdown,values,function(missing){breakdownErrors[name]=missingReason(missing);},true);
       });
-      else expanded[key]=telemetrySubstitute(expanded[key],values,null,true);
+      else if(key!=='variables')expanded[key]=telemetrySubstitute(expanded[key],values,null,true);
     });
   }
   var clean=telemetryClean(expanded,warn,false);

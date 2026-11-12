@@ -609,8 +609,8 @@ class FolderAgentTests(unittest.TestCase):
     #   and the reread hint; no Traceback |
     # | 2 new id unreadable | session.json names non-id values; an empty placeholder session.json |
     #   the same line without the new ids |
-    # | 3 another error path unchanged | begin outside the external workflow; cancellation during
-    #   acknowledgement | raw ValueError traceback; acknowledgement failure line and withdrawal kept |
+    # | 3 another error path unchanged | begin outside the external workflow | raw ValueError traceback |
+    #   (#1120 moved cancellation during acknowledgement to the one-line report below.)
     def begin_interrupted(self, announcement, change):
         """Run CLI begin; once stderr shows announcement, call change; return (exit code, stderr)."""
         command = [sys.executable, str(HELPER), '--folder', str(self.folder), 'begin', '--text', 'Next']
@@ -668,16 +668,63 @@ class FolderAgentTests(unittest.TestCase):
         self.assertEqual(run.returncode, 1)
         self.assertIn('Traceback', run.stderr)
         self.assertTrue(run.stderr.rstrip().endswith('ValueError: Native requests require the Work in your agent workflow.'), run.stderr)
+
+    # #1120 test plan (coverage = this list): Re-establish session writes cancel.json, then
+    # editor.json with connected:false under the OLD ids, and only then the new session.json.
+    # | 1 disconnect in that gap | begin waits for a paused heartbeat (registration) or for
+    #   acknowledgement | exit 1; one stderr line with the disconnect text and the reread hint; no Traceback |
+    # | 2 stopped pending turn | cancel.json names the request during acknowledgement | the same, with the
+    #   "This turn was stopped" text; the attempt is withdrawn |
+    # | 3 new ids readable | session.json already renewed when the line is built | the line names them |
+    DISCONNECTED = 'Editor is disconnected or its connection identity changed. Reread the session.'
+    STOPPED = 'This turn was stopped in the editor. Do not send more changes or replies for it.'
+    PROGRESS = ('Workbench heartbeat paused;', 'Waiting up to 120 seconds for Workbench acknowledgement')
+
+    def gap_line(self, reason, shown, ids='old session session, connection connection'):
+        return (f'{reason} If this followed Re-establish session in the Workbench ({ids}), re-read '
+                f'{shown}/session.json and {shown}/CONNECT.md, then run begin again.')
+
+    def acknowledgement_line(self, reason, shown):
+        return self.gap_line(f'Workbench acknowledgement failed: {reason} This attempt was withdrawn. '
+                             'Do not submit unacknowledged work.', shown)
+
+    def assert_one_line(self, code, errors, expected):
+        self.assertEqual(code, 1, errors)
+        self.assertNotIn('Traceback', errors)
+        self.assertEqual([line for line in errors.splitlines() if not line.startswith(self.PROGRESS)], [expected])
+
+    def test_begin_reports_reestablish_disconnect_on_one_line_without_traceback(self):
+        def disconnect():
+            self.replace('editor.json', {**self.owner, 'connected': False, 'at': time.time()*1000})
+        for phase, announcement, editor_age in (('registration', 'heartbeat paused', 60),
+                                                ('acknowledgement', 'Waiting up to 120 seconds for Workbench acknowledgement', 0)):
+            with self.subTest(phase=phase):
+                self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+                self.put('editor.json', {**self.owner, 'connected': True, 'at': (time.time()-editor_age)*1000})
+                (self.folder/'agent-request.json').unlink(missing_ok=True)
+                code, errors = self.begin_interrupted(announcement, disconnect)
+                expected = (self.gap_line(self.DISCONNECTED, self.folder.name) if phase == 'registration'
+                            else self.acknowledgement_line(self.DISCONNECTED, self.folder.name))
+                self.assert_one_line(code, errors, expected)
+                if phase == 'acknowledgement':
+                    self.assertTrue(helper.read(self.folder, 'agent-request.json')['withdrawn'])
+
+    def test_begin_reports_stopped_turn_on_one_line_without_traceback(self):
         self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
         def cancel():
             incoming = helper.read(self.folder, 'agent-request.json')
             self.put('cancel.json', {**self.owner, 'id': 'cancel-1', 'requestId': incoming['id']})
         code, errors = self.begin_interrupted('Waiting up to 120 seconds for Workbench acknowledgement', cancel)
-        self.assertEqual(code, 1, errors)
-        self.assertIn('Workbench acknowledgement failed: This turn was stopped in the editor. Do not send more '
-                      'changes or replies for it. This attempt was withdrawn.', errors)
-        self.assertIn('Traceback', errors)
+        self.assert_one_line(code, errors, self.acknowledgement_line(self.STOPPED, self.folder.name))
         self.assertTrue(helper.read(self.folder, 'agent-request.json')['withdrawn'])
+
+    def test_reestablish_gap_line_names_new_ids_once_readable(self):
+        self.replace('session.json', {'protocol': 'flowview-folder-v1', 'sessionId': 'renewed',
+                                      'connectionId': 'renewed-connection', 'workflow': 'external'})
+        with patch.object(helper.Path, 'cwd', return_value=self.folder.resolve().parent):
+            self.assertEqual(helper.session_changed(self.folder.resolve(), self.owner, self.DISCONNECTED), self.gap_line(
+                self.DISCONNECTED, self.folder.name,
+                'old session session, connection connection; new session renewed, connection renewed-connection'))
 
     def test_acceptance_history_is_connection_bound_and_ignores_late_proposal_replacement(self):
         self.active_native_turn('applied')

@@ -102,7 +102,7 @@ test('N6 validator: fragment faults warn anywhere; needsNarrow, OR and conflicts
   assert.deepEqual(warnings(spec(needs,false)),[],'a canon page that asks boards to narrow builds');
   assert.deepEqual(warnings(spec(needs,true)),['sections[0].diagram.nodes.dcf.telemetry.signals.received: The provider asks each board to narrow this signal by event_code, and nothing narrows it here, so it is not shown.']);
   const or={dcf:{title:'DCF',...bind({received:{honeycomb:{...HC(),filter_combination:'OR'},narrow:{honeycomb:{filters:[{column:'a',op:'=',value:'1'}]}}}})}};
-  assert.deepEqual(warnings(spec(or,true)),['sections[0].diagram.nodes.dcf.telemetry.signals.received: This Honeycomb query combines its filters with OR, so a filter cannot be added safely; it is not shown.']);
+  assert.deepEqual(warnings(spec(or,true)),['sections[0].diagram.nodes.dcf.telemetry.signals.received: This Honeycomb query combines its filters with OR, so a filter cannot be added safely; it is not shown. Copy the provider\'s query and edit it.']);
   const bad={dcf:{title:'DCF',...bind({received:{honeycomb:HC(),narrow:{honeycomb:{filters:[{column:'a',op:'like',value:'1'}]},loki:'| x'},needsNarrow:'event_code'}})}};
   assert.deepEqual(warnings(spec(bad,false)),[
     'sections[0].diagram.nodes.dcf.telemetry.signals.received.narrow.honeycomb.filters[0].op: use a Honeycomb filter operator such as "=" or "in" — signal not shown',
@@ -204,7 +204,7 @@ test('N12 LogQL: each stage goes at the end of every log pipeline',()=>{
   assert.deepEqual(warn(page({loki:'{app="a"}',narrow:{loki:['| json','| a="x" | drop b']}},false)),['sections[0].diagram.nodes.a.telemetry.signals.logs.narrow.loki[1]: one stage per entry: this one has a second "|" — signal not shown']);
   const unplaceable={loki:'vector(1)',narrow:{loki:'| a="x"'}};
   assert.deepEqual(warn(page(unplaceable,false)),[],'a canon page still builds');
-  assert.deepEqual(warn(page(unplaceable,true)),['sections[0].diagram.nodes.a.telemetry.signals.logs: This LogQL query has no stream selector Flowview can find, so the narrowing cannot be added; it is not shown.']);
+  assert.deepEqual(warn(page(unplaceable,true)),['sections[0].diagram.nodes.a.telemetry.signals.logs: This LogQL query has no stream selector Flowview can find, so the narrowing cannot be added; it is not shown. Copy the provider\'s query and edit it.']);
 });
 
 test('N13 LogQL: only one safe stage per entry; every escape attempt fails closed',()=>{
@@ -226,7 +226,7 @@ test('N13 LogQL: only one safe stage per entry; every escape attempt fails close
   bad('| a',stage);bad('a="x"',stage);bad('| a="x" b="y"',stage);bad('|= x',stage);bad('',stage);
   // A variable value that adds a quote breaks the stage after it is filled in.
   const s=plain(C.carrierTelemetry({telemetry:{kind:'service',signals:{logs:{loki:'sum(count_over_time({app="a"}[5m]))',narrow:{loki:'| code="${code}"'}}}}},{},undefined,{variables:{code:'x" | line_format "y'}}).signals.logs);
-  assert.equal(s.error,'After its variables were filled in, a LogQL narrowing of this signal is not valid (one stage per entry: this one has a second "|"), so it is not shown.');
+  assert.equal(s.error,'After its variables were filled in, a LogQL narrowing of this signal is not valid (one stage per entry: this one has a second "|"), so it is not shown. Change the narrowing, or copy the provider\'s query and edit it.');
   assert.equal(s.query,'sum(count_over_time({app="a"}[5m]))','nothing is spliced');
 });
 

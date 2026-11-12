@@ -146,15 +146,12 @@ longer windows choose bounded coarser periods. Optional positive integer `period
 uses regular CloudWatch multiples of 60 seconds, at least 300 seconds for data
 15–63 days old and 3600 seconds beyond 63 days. Invalid periods, more than 1440
 points, or starts beyond 455-day retention are diagnosed before querying.
-Returned timestamps are sorted and must lie within the requested window, allowing
-the first rounded boundary bucket. Boundary buckets can cover a partial window;
-the headline and graph use the same returned buckets, without prorating.
+Returned buckets must lie in the window (the first may start at a rounded
+boundary); the headline and graph use the same buckets, without prorating.
 `Sum` and `SampleCount` sum bucket values; `Maximum`/`Minimum` take their extrema.
-`Average` weights each bucket by its underlying SampleCount from a paired query
-with exactly the same range/period. Missing, invalid or mismatched weights leave
-Average unobserved, never the last bucket or an unweighted mean.
-Empty arrays mean no data points yet; `missingMeansZero: true` opts only
-successful empty results into zero. Malformed/error results never become zero.
+`Average` weights buckets by a paired SampleCount query over the same range and
+period; bad weights leave it unobserved, never an unweighted mean. An empty result
+is no data yet unless `missingMeansZero: true`; errors never become zero.
 
 ### Named environment variables and counting scope
 
@@ -168,17 +165,19 @@ Never interpolate user secrets; profiles and queries ship in the artifact. Witho
 
 ### Narrowing an imported signal
 
-Narrow an inherited signal in its provider's own language under `narrow`, keyed by
-source, in the import's `extends` overlay; never restate the provider's query:
+Narrow an inherited signal in the provider's language under `narrow`, keyed by
+source, in the import's `extends` overlay, without restating its query:
 - `"honeycomb": {"filters": [{"column": "code", "op": "=", "value": "X"}]}`
 - `"cloudwatch": {"dimensions": {"Type": "X"}}`
 - `"loki": "| code=\"X\""` (one stage per entry), `"grafana": "code=\"X\""` (matchers)
 - `"cloudwatchLogs": "filter code = \"X\""`
 
-Flowview appends it, never translates it; anything unsafe is not shown, with a
-reason. A provider signal with
-`needsNarrow: ["code"]` (or `true`) stays hidden until a board pins it (`=`/`in`)
-([details](../../../docs/live-status.md#narrowing-inherited-signals)).
+Flowview appends it verbatim; anything unsafe is not shown, with a reason. A
+provider signal with `needsNarrow: ["code"]` (or `true`) stays hidden until a board
+pins it (`=`/`in`). If a narrowing or scoped variable is refused or cannot express the
+filter, copy the provider's query into a replacing binding (no `extends`) and edit it:
+the copy stops following the provider, and its `narrow` must still pin `needsNarrow`
+fields ([details](../../../docs/live-status.md#narrowing-inherited-signals)).
 
 ### CloudWatch Logs Insights
 

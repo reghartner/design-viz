@@ -3381,7 +3381,8 @@ literal, never expanded, and the same in every environment.
   travel with an import.
 - **Never escaping or widening.** A scoped value is filled into the provider's query only
   where it cannot change its meaning. Otherwise the signal is not shown: "Variable
-  ${code} from this import or carrier cannot be filled in safely here (…)".
+  ${code} from this import or carrier cannot be filled in safely here (…), so the signal
+  is not shown. Use another value, or copy the provider's query and edit it."
   - **One allowlist, everywhere.** A value may hold only letters, digits and `_ . @ :`,
     with `-` only between two of those (never first or last, never `--`). A space is
     allowed only inside a string of a query the scan can read. So no value holds a quote,
@@ -3432,6 +3433,36 @@ literal, never expanded, and the same in every environment.
   with a live-status panel the validator checks every environment profile and warns at
   the signal, naming the environments without a value and where to set it.
 - Pages need `flow.telemetry-scoped-variables`.
+
+### When narrowing or a variable cannot express the filter
+
+If a narrowing fragment or a scoped variable is refused (the signal shows "Not shown: …")
+or cannot express the filter the board needs, copy the provider's query into a replacing
+binding for that carrier (a `telemetry` overlay without `extends`) and edit the copy there
+(#1360). Two things follow:
+- The copy no longer follows the provider: later changes to the provider's query, signals
+  or limits do not reach this board.
+- A provider `needsNarrow` still applies to every signal the copy writes, so the copy is
+  shown only when its own `narrow` pins those fields (see
+  [Narrowing inherited signals](#narrowing-inherited-signals)). Editing the copied query
+  text does not meet it.
+- The copy still receives the import's and the provider's scoped variables, so replace a
+  refused `${name}` placeholder with the literal value in the copy rather than keeping it.
+
+The reasons name this way out where copying helps:
+- the provider's query cannot take the narrowing (a LogQL `drop`, `keep`, `label_format`
+  or `line_format`, a Logs Insights command before `stats`, no stream selector, and the
+  like) or a Honeycomb query combines its filters with OR: "… Copy the provider's query
+  and edit it.", or, with `needsNarrow`, "… Copy the provider's query and edit it, keeping
+  a narrowing that pins what the provider requires.";
+- a malformed narrowing on a signal without `needsNarrow`: "… Change the narrowing, or
+  copy the provider's query and edit it.";
+- a refused scoped variable: "… Use another value, or copy the provider's query and edit
+  it."
+
+A malformed narrowing under `needsNarrow` and an unmet `needsNarrow` do not, because a
+copy must still carry a valid narrowing that pins. The SQL and Tempo "cannot be narrowed"
+reason keeps its own route: a provider `${name}` placeholder that the import sets.
 
 ### Named environment variables and counting scope
 

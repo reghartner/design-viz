@@ -113,7 +113,7 @@ function flowMetricsDom(o){
     n.own.forEach(function(f,i){
       var index=n.inherited.length+i;
       note(box,name+' narrowing: '+telemetryNarrowText(f),'metrics-narrow');
-      box.appendChild(c.action('Remove '+name+' narrowing '+(index+1),function(){return commit({op:'narrow',name:name,action:'remove',index:index});}));
+      box.appendChild(c.action('Remove '+name+' narrowing '+(i+1),function(){return commit({op:'narrow',name:name,action:'remove',index:index});}));
     });
     if(source!=='sql' && source!=='tempo'){
       var json=telemetryOwn(TELEMETRY_NARROW_JSON,source),label=name+' add narrowing',input=keptDraft(box,label,json?'textarea':'text',null,'');
@@ -122,7 +122,13 @@ function flowMetricsDom(o){
       if(!json)o.listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();add();}});
       box.appendChild(c.action('Add '+name+' narrowing',add));
     }
-    row(box,name+' boards must narrow by',c.text(telemetryNeedsText(n.needs.inherited===true || n.needs.own===true?true:[].concat(n.needs.inherited,n.needs.own)) || null,function(v){return commit({op:'needsNarrow',name:name,value:v});},{placeholder:'event_code, type (or any)'}));
+    // #1363 c1: what the provider requires is read-only; the field holds only this board's own fields.
+    var required=n.needs.inherited,has=required===true || required.length>0;
+    if(has){var fixed=el('input','fctl');fixed.type='text';fixed.readOnly=true;fixed.value=telemetryNeedsText(required);row(box,name+' required by the provider',fixed);}
+    if(required!==true)row(box,name+' boards must narrow by',c.text(telemetryNeedsText(n.needs.own) || null,function(v){
+      var mine=telemetryNeedsValue(v);if(mine.error)return commit({op:'needsNarrow',name:name,value:v});
+      return commit({op:'needsNarrow',name:name,value:telemetryNeedsText(telemetryNeedsMerge(has?required:null,mine.value)) || null});
+    },{placeholder:has?'More fields, separated by commas (or any)':'event_code, type (or any)'}));
     if(sent && !sent.error && (n.inherited.length || n.own.length)){
       var query=el('textarea','fctl');query.readOnly=true;query.value=sent.query;row(box,name+' query sent',query);
     }
@@ -216,7 +222,10 @@ function createFlowMetricsEditor(o){
       d.row(box,'Variables for import '+s.importVariables.as,c.text(Object.keys(s.importVariables.value).length?JSON.stringify(s.importVariables.value):null,function(v){return commit({op:'importVariables',value:v});},{textarea:true,placeholder:'{"code":"FULL_CHARGE"}'}));
       d.note(box,'Applies to every node and connection from import '+s.importVariables.as+'.');
     }
-    if(s.merge && s.inherited)box.appendChild(c.action('Copy provider queries',function(){return commit({op:'copyProviderQuery'});})).setAttribute('title','Copy the provider\'s signals into this document as its own binding, to edit their queries. The copy no longer follows later provider changes, and a provider needsNarrow still applies.');
+    if(s.merge && s.inherited){
+      box.appendChild(c.action('Copy provider queries',function(){return commit({op:'copyProviderQuery'});}));
+      d.note(box,'Saves the provider\'s queries in this document; later provider changes no longer reach it. Required narrowing still applies.','metrics-copy-note');
+    }
   }
   if(b){
     d.note(box,'Proof limits: min is a floor and max a ceiling; with ratio of, max is the highest allowed ratio to that signal.');

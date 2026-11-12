@@ -108,6 +108,23 @@ function telemetryNeedsValue(text){
   if(fields.some(function(f){return /[\s"'`]/.test(f);}))return {error:'List the field names a board must narrow by, separated by commas (or any).'};
   return {value:fields};
 }
+/* #1363 c1: what the provider requires of a signal on an imported carrier, which this board can
+   only add to: an inherited signal keeps its own needsNarrow and the binding-level one; a signal
+   this board adds, and every signal of a replacing (copied) binding, gets the carrier's union
+   (canon-topology, #1353). null when nothing is required. */
+function telemetryRequiredNeeds(inherited,name,merging){
+  if(!telemetryObject(inherited))return null;
+  var signals=telemetryObject(inherited.signals)?inherited.signals:{},own=telemetryOwn(signals,name) && telemetryObject(signals[name])?signals[name]:null;
+  if(merging && own)return telemetryNeedsMerge(own.needsNarrow,inherited.needsNarrow);
+  var all=telemetryNeedsMerge(null,inherited.needsNarrow);
+  Object.keys(signals).forEach(function(key){if(telemetryObject(signals[key]))all=telemetryNeedsMerge(all,signals[key].needsNarrow);});
+  return all;
+}
+function telemetryNeedsKept(required,next){
+  if(required==null)return true;
+  if(required===true)return next===true;
+  return next===true || Array.isArray(next) && required.every(function(f){return next.indexOf(f)>=0;});
+}
 function telemetryNeedsText(needs){return needs===true?'any':Array.isArray(needs)?needs.join(', '):'';}
 function telemetryVariablesValue(text){
   if(text==null || !String(text).trim())return {value:null};
@@ -550,10 +567,9 @@ function telemetryEditMerge(inherited,overlay,edit,options){
     var source=telemetrySignalSource(was),count=source && telemetryObject(was.narrow)?telemetryNarrowList(was.narrow[source]).length:0;
     if(typeof edit.index==='number' && edit.index<count)return {error:'This narrowing comes from the provider, so it cannot be removed here. To change it, use Copy provider queries.'};
   }
-  if(op==='needsNarrow' && was.needsNarrow!=null){
-    var asked=telemetryNeedsValue(edit.value);if(asked.error)return asked;
-    var kept=was.needsNarrow===true?asked.value===true:asked.value===true || Array.isArray(asked.value) && was.needsNarrow.every(function(f){return asked.value.indexOf(f)>=0;});
-    if(!kept)return {error:'The provider asks each board to narrow this signal by '+telemetryNeedsText(was.needsNarrow)+'; a board can add fields, never remove them.'};
+  if(op==='needsNarrow'){
+    var asked=telemetryNeedsValue(edit.value),required=telemetryRequiredNeeds(inherited,edit.name,true);if(asked.error)return asked;
+    if(!telemetryNeedsKept(required,asked.value))return {error:'The provider asks each board to narrow this signal by '+telemetryNeedsText(required)+'; a board can add fields, never remove them.'};
   }
   var staleHide=op==='hide' && !edit.value && Array.isArray(o.hide) && o.hide.indexOf(edit.name)>=0;
   if(op==='hide' || op==='revert'){
@@ -610,6 +626,11 @@ function planCarrierTelemetry(text,raw,target,edit,context){
     var merged=telemetryEditMerge(inherited,t.binding,edit,{templates:telemetryPageTemplates(raw)});if(merged.error)return merged;
     if(JSON.stringify(merged.value)===JSON.stringify(t.hasField?t.binding:null))return {text:text};
     return planTopologyTracking(text,raw,target.section,target.kind,t.id,'telemetry',merged.value,merged.value==null,context,target.index);
+  }
+  // #1363 c1: a copied (replacing) binding still carries the provider carrier's needsNarrow.
+  if(edit && edit.op==='needsNarrow' && t.owner && inherited){
+    var asked=telemetryNeedsValue(edit.value),required=telemetryRequiredNeeds(inherited,edit.name,false);if(asked.error)return asked;
+    if(!telemetryNeedsKept(required,asked.value))return {error:'The provider asks each board to narrow this signal by '+telemetryNeedsText(required)+'; a board can add fields, never remove them.'};
   }
   // A placement edit of inherited telemetry creates a consumer override from
   // the resolver's expanded binding, never a reference to a provider template.
@@ -778,10 +799,11 @@ function telemetryCarrierState(raw,target,context){
       var entry=telemetryObject(signals[name])?signals[name]:{},source=telemetrySignalSource(entry);if(!source)return;
       var from=merge && inherited && telemetryObject(inherited.signals) && telemetryObject(inherited.signals[name])?inherited.signals[name]:{};
       var all=telemetryObject(entry.narrow)?telemetryNarrowList(entry.narrow[source]):[],before=telemetryObject(from.narrow)?telemetryNarrowList(from.narrow[source]):[];
-      var keys=before.map(telemetryNarrowCanonical),needs=telemetryNarrowOwn(from,{needsNarrow:entry.needsNarrow}).needs;
+      var required=t.owner?telemetryRequiredNeeds(inherited,name,!!merge && telemetryObject(inherited) && telemetryObject(inherited.signals) && telemetryOwn(inherited.signals,name)):null;
+      var keys=before.map(telemetryNarrowCanonical),needs=telemetryNarrowOwn({needsNarrow:required},{needsNarrow:entry.needsNarrow}).needs;
       narrow[name]={source:source,inherited:telemetryClone(all.filter(function(f){return keys.indexOf(telemetryNarrowCanonical(f))>=0;})),
         own:telemetryClone(all.filter(function(f){return keys.indexOf(telemetryNarrowCanonical(f))<0;})),
-        needs:{inherited:from.needsNarrow===true?true:Array.isArray(from.needsNarrow)?telemetryClone(from.needsNarrow):[],own:needs===true?true:needs || []}};
+        needs:{inherited:required===true?true:Array.isArray(required)?telemetryClone(required):[],own:needs===true?true:needs || []}};
     });
   }
   if(telemetryOwn(t.resolved,'telemetry')){

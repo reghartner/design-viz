@@ -112,7 +112,9 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
 .explore-canvas-objects>*>.explore-window-edge[data-edge="sw"]{bottom:var(--out);left:var(--out);}
 .explore-canvas-objects>*>.explore-window-edge[data-edge="se"]{bottom:var(--out);right:var(--out);}
 .explore-canvas-objects>.explore-window>.explore-window-body{z-index:3;}
-.explore-canvas-objects>.explore-window>.explore-window-edge:is([data-edge="n"],[data-edge="nw"],[data-edge="ne"]){top:calc(var(--out) - 32px);z-index:4;}
+.explore-canvas-objects>.explore-window>.explore-window-edge:is([data-edge="n"],[data-edge="nw"],[data-edge="ne"]){top:calc(var(--out) - 32px);}
+/* Window controls stay above the body: the resize button sits over it. */
+.explore-stage>.explore-window>.explore-window-resize,.explore-canvas-objects>.explore-window>.explore-window-resize{z-index:4;}
 /* Canvas step controls stop clipping so their strips reach outside the border
    (their tracks scroll inside the termbar). The player grip (top 10-44px, 18px
    wide) stays clear: the w strip starts below it and the nw corner ends above it. */

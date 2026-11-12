@@ -152,6 +152,6 @@ test('stacked windows 8px apart: a press in the gap drags the nearer border only
   await expect(bottom).toHaveClass(/explore-stacked/);
   // 2px above the lower window's top border: the lower window's top edge.
   await page.locator('#undo-builder').click();await expect.poll(async()=>near(await box(top),a)).toBe(true);
-  await expect(top).toHaveClass(/explore-stacked/);await expect.poll(async()=>near(await box(bottom),b)).toBe(true);
+  await closeTools(page);await expect(top).toHaveClass(/explore-stacked/);await expect.poll(async()=>near(await box(bottom),b)).toBe(true);
   const c=await box(bottom);expect(await edgeAt([c[0]+c[2]/2,c[1]-2])).toBe('n|'+await bottom.getAttribute('data-explore-panel'));
 });

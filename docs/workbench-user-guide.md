@@ -28,7 +28,8 @@ Epics and descendant stories, with separate Epic counts and story coverage.
 The desktop **Demo live status** preview uses sample states without querying
 Jira, so it cannot infer parent type from a key. **File → Load snapshot…** shows an agent's
 snapshot of real Jira and metrics data instead, labelled **Snapshot from <time>**; it is preview
-only and never saved or exported. See [live status](live-status.md).
+only and never saved or exported. While the demo or a snapshot shows, drag a row of the Epic
+status Tickets list onto a node or connection to attach that ticket (one Undo step). See [live status](live-status.md).
 
 **Status board settings** (the **Board settings** button at the top of Inspect and in Find objects)
 holds the board-level settings in five sections: Jira, Metrics, Traces,

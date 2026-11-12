@@ -1189,6 +1189,21 @@ function initWorkbenchBuilder(opts){
     refreshOutline();
   }
 
+  /* #1241: a Tickets row of the preview's Live status panel (demo or snapshot) dropped on a node or
+     connection. ref is the viewer's drop target {section, kind:'node', id} or {section, kind:'edge', index};
+     the write is the Links window's (planLinksTicket), so imported carriers get a consumer overlay and the
+     edit is one Undo step. The carrier is selected afterwards, so Inspect → Tracking shows the new ticket. */
+  function dropTicket(ref,key){
+    var snap=session.snapshot();if(snap.error){formError(snap.error);return false;}
+    if(!ref || (ref.kind!=='node' && ref.kind!=='edge'))return false;
+    var link=ref.kind==='node'?{kind:'node',section:ref.section,id:ref.id}:{kind:'edge',section:ref.section,index:ref.index};
+    var plan=planLinksTicket(snap.text,snap.raw,link,key,key,false,session.topologyContext());
+    var target=ref.kind==='node'?{kind:'node',section:ref.section,id:ref.id}:{kind:'edge',section:ref.section,index:ref.index};
+    function show(){selectTarget(Object.assign({},target,{el:findTargetEl(target)}),true);}
+    // Already there: select it, so Inspect → Tracking shows the ticket; no history entry.
+    if(plan && !plan.error && plan.text===snap.text){show();return true;}
+    return applyPlan(plan,{after:show},snap);
+  }
   /* #1243: the Links window reads the same session and writes through applyPlan (one Undo step per edit). */
   var linksView=typeof initWorkbenchLinksView==='function'?initWorkbenchLinksView({document:document,window:window,view:view,session:session,apply:applyPlan,
     inspectStep:function(t){selectTarget(Object.assign({},t,{el:findTargetEl(t)}),true);},
@@ -1876,6 +1891,7 @@ function initWorkbenchBuilder(opts){
     loadText:loadText,beginFileOpen:beginFileOpen, restoreDraft:life.guard(restoreDraft), prepareWelcome:life.guard(prepareWelcome),
     arrangementSection:function(request,next,previous){return sectionLayoutEditor?sectionLayoutEditor.arrangementSection(request,next,previous):null;},
     beforePreviewReplace:life.guard(beforePreviewReplace),previewRendered:life.guard(previewRendered),
+    dropTicket:life.guard(dropTicket),
     isProjectOpen:session.isProjectOpen,
     draft:session.draft,
     draftInfo:function(){

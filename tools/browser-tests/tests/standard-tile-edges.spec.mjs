@@ -73,3 +73,26 @@ test('attached step controls move their top line in whole rows; the tile outline
   expect(cells(saved.find(it=>it.panel==='home'))).toEqual(cells(items(before).find(it=>it.panel==='home')));
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);
 });
+
+// #1375 + #1376: a strip press with an uncommitted Inspector edit saves the
+// edit and lands the resize in the same gesture; Undo removes the resize, then the edit.
+test('the first tile-strip resize after an uncommitted Inspector edit saves the edit and lands the resize',async({page,server})=>{
+  await open(page,server,fixture());const src=page.locator('#src'),before=await src.inputValue();
+  await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
+  await page.locator('.outline-item').filter({hasText:'Doorbell'}).click();await page.locator('#outline-inspect').click();
+  const outline=page.locator('#workspace-window-outline .workspace-window-close');if(await outline.isVisible())await outline.press('Enter');
+  const title=page.locator('#guide').getByLabel('Name',{exact:true}),tile=page.locator('[data-layout-key="panel:home"]');
+  await expect(title).toHaveValue('Doorbell');
+  const grip=page.locator('#workspace-window-inspect .workspace-window-grip');await grip.focus();for(let i=0;i<20;i++)await grip.press('Shift+ArrowLeft');
+  await title.fill('Pending before the strip');
+  await tile.scrollIntoViewIfNeeded();const {cell,row}=await grid(tile),r=await tile.boundingBox(),point=pointFor(r,'nw');
+  // The press must reach the strip itself, not a tool window over it.
+  expect(await page.evaluate(([x,y])=>document.elementFromPoint(x,y)?.getAttribute('data-edge'),point)).toBe('nw');
+  await pointerDrag(page,point,-cell,-row);
+  await expect(src).toHaveValue(/Pending before the strip/);
+  await expect.poll(async()=>homeItem(await src.inputValue())).toEqual([7,23,7,9]);
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(/Pending before the strip/);
+  expect(homeItem(await src.inputValue())).toEqual([8,24,6,8]);
+  await page.locator('#undo-builder').click();await expect(src).not.toHaveValue(/Pending before the strip/);
+  expect(homeItem(await src.inputValue())).toEqual(homeItem(before));
+});

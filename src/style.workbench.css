@@ -1170,7 +1170,8 @@ body.sk-aurora.sk-blueprint{
 .section-arranging .section-tile-move{display:block;top:0;left:0;right:0;height:28px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .section-arranging .section-tile-resize{display:block;right:1px;bottom:1px;width:32px;height:32px;cursor:nwse-resize;border-radius:6px 0 0 0;}
 /* #1376: tile edge strips straddle the 8px grid gap (4px out, 4px in); corner
-   squares are 14px. The bottom-right is the resize button. */
+   squares are 14px. The bottom-right is the resize button. The attached
+   controls' line sits inside the top 8px of the controls bar, which clips. */
 .section-tile-edge,.section-controls-edge{display:none;position:absolute;z-index:5;touch-action:none;}
 .section-arranging .section-tile-edge,.section-arranging .section-controls-edge{display:block;}
 .section-tile-edge[data-edge="n"]{top:-4px;left:10px;right:10px;height:8px;cursor:ns-resize;}
@@ -1180,7 +1181,10 @@ body.sk-aurora.sk-blueprint{
 .section-tile-edge[data-edge="nw"]{top:-4px;left:-4px;width:14px;height:14px;cursor:nwse-resize;}
 .section-tile-edge[data-edge="ne"]{top:-4px;right:-4px;width:14px;height:14px;cursor:nesw-resize;}
 .section-tile-edge[data-edge="sw"]{bottom:-4px;left:-4px;width:14px;height:14px;cursor:nesw-resize;}
-.section-controls-edge{top:-4px;left:10px;right:10px;height:8px;cursor:ns-resize;}
+.section-controls-edge{top:0;left:10px;right:10px;height:8px;cursor:ns-resize;}
+/* In Arrange the tile keeps a 4px right gutter, so the inner half of the e
+   strip lies beside a scrolling panel or diagram column, not over its scrollbar. */
+.section-arranging .section-layout-tile{box-sizing:border-box;padding-right:4px;}
 .section-tile-edge:hover,.section-controls-edge:hover,.layout-dragging .section-tile-edge:active,.layout-dragging .section-controls-edge:active{background:color-mix(in srgb,var(--acc) 35%,transparent);}
 .section-controls-resize{display:none;}
 .section-arranging .section-controls-resize{display:block;position:absolute;bottom:2px;right:38px;width:32px;height:24px;z-index:4;touch-action:none;user-select:none;cursor:ns-resize;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:5px;}

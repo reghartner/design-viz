@@ -724,9 +724,9 @@ function jiraDependencyControls(page,box,warnings){
           var list=currentDeps();if(!list)return false;var to=index+offset;
           if(index>=list.length || to<0 || to>=list.length)return false;
           var moved=list.splice(index,1)[0];list.splice(to,0,moved);
-          var ok=writeDeps(list);if(ok)JIRA_DRAFTS.set('focus','Move dependency '+(to+1)+(offset<0?' up':' down'));return ok;
+          var ok=writeDeps(list);if(ok)JIRA_DRAFTS.set('focus',(offset<0?'Move up':'Move down')+' dependency '+(to+1));return ok;
         }
-        var up=named(actionButton('Move up',function(){return move(-1);}),'Move dependency '+n+' up'),down=named(actionButton('Move down',function(){return move(1);}),'Move dependency '+n+' down');
+        var up=named(actionButton('Move up',function(){return move(-1);}),'Move up dependency '+n),down=named(actionButton('Move down',function(){return move(1);}),'Move down dependency '+n);
         up.disabled=index===0;down.disabled=index===rows.length-1;
         up.title=up.disabled?'Already the first dependency':'Move this dependency one place up';down.title=down.disabled?'Already the last dependency':'Move this dependency one place down';
         actions.appendChild(up);actions.appendChild(down);
@@ -802,10 +802,10 @@ function jiraDependencyControls(page,box,warnings){
     var stale=group('board-stale-days','No activity');
     var days=named(numberControl(Object.prototype.hasOwnProperty.call(tracking,'staleDays')?tracking.staleDays:null,function(v){
       return commitPageTracking(function(jira,page,tracking){if(v==null)delete tracking.staleDays;else tracking.staleDays=v;});
-    }),'No activity after (days)','Days without a Jira update before a ticket is marked “no activity”. Empty uses 7.');
+    }),'No activity after (days)','Days without a Jira update before an in-progress ticket is marked “no activity”. Empty uses 7.');
     days.placeholder='7';days.inputMode='decimal';
     stale.appendChild(frow('No activity after (days)',days));
-    note(stale,'A ticket with no Jira update for this many days is marked “no activity” on the board. Empty uses 7.');
+    note(stale,'An in-progress ticket with no Jira update for this many days is marked “no activity” on the board. Empty uses 7.');
     warn(stale,[days],matching(/^tracking\.staleDays:/));
 
     if(intent && intent!=='')opts.schedule(function(){

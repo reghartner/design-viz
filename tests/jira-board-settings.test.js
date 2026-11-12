@@ -7,6 +7,7 @@
 | J3 | No activity after (days) writes `tracking.staleDays`; empty removes it; an invalid value is written and its validator warning sits next to the field. | board without staleDays | placeholder 7; staleDays 3; staleDays 0 + aria-invalid + note text; key removed on empty | no control; a warning only in the section list |
 | J4 | Existing dependency rows edit, reorder and remove in place, each one Undo step; bad keys, self-dependencies and duplicate pairs are refused; an authored invalid entry is kept and warned at its row. | board with three authored dependencies, the last invalid | source after each edit; refused edits leave the text; row warning text + aria-invalid | edits that rewrite or drop authored entries; silent junk writes |
 | J5 | The Jira header counts dependencies; the old "edit in JSON for now" note is gone. | board with two dependencies | summary text | stale pointer to JSON |
+| J6 | A non-object `tracking.jira` stays as written when a No activity or dependency edit is saved. | tracking.jira "acme" | source keeps the string | an edit that deletes authored junk |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -117,9 +118,9 @@ test('J4 existing dependency rows edit, move and remove in place; bad edits are 
   ui.render();before=ui.text;
   ui.type('Dependency 2 reason','');
   assert.deepEqual(ui.raw.page.tracking.dependencies[1],{ticket:'DOOR-102',on:'DOOR-103'},'an empty reason removes it');
-  ui.render().click('Move dependency 2 up');
+  ui.render().click('Move up dependency 2');
   assert.deepEqual(ui.raw.page.tracking.dependencies.map(d=>d.ticket),['DOOR-102','DOOR-101','door-9']);
-  assert.equal(ui.button('Move dependency 1 up').disabled,true,'the first row cannot move up');
+  assert.equal(ui.button('Move up dependency 1').disabled,true,'the first row cannot move up');
   ui.click('Remove dependency 3');
   assert.deepEqual(ui.raw.page.tracking.dependencies.map(d=>d.ticket),['DOOR-102','DOOR-101']);
   ui.render().click('Remove dependency 1');ui.render().click('Remove dependency 1');
@@ -131,4 +132,12 @@ test('J5 the Jira header counts dependencies; no "edit in JSON for now" note',()
   const ui=harness(board({jira:{site:'https://acme.atlassian.net'},dependencies:[{ticket:'DOOR-101',on:'DOOR-102'},{ticket:'DOOR-102',on:'DOOR-103'}]}));
   assert.equal(ui.jira().querySelector('summary').textContent,'Jira · acme.atlassian.net · 2 dependencies');
   assert.doesNotMatch(ui.text_(ui.jira()),/edit in JSON for now/);
+});
+
+test('J6 a tracking.jira the form cannot read stays as written when a dependency or No activity edit is saved',()=>{
+  const ui=harness(board({jira:'acme',staleDays:5}));
+  ui.type('No activity after (days)','3');
+  assert.equal(ui.raw.page.tracking.staleDays,3);assert.equal(ui.raw.page.tracking.jira,'acme','tracking.jira is kept');
+  ui.render().draft('New dependency ticket','DOOR-101').draft('New dependency waits on','DOOR-102');ui.click('Add dependency');
+  assert.deepEqual(ui.raw.page.tracking.dependencies,[{ticket:'DOOR-101',on:'DOOR-102'}]);assert.equal(ui.raw.page.tracking.jira,'acme','tracking.jira is still kept');
 });

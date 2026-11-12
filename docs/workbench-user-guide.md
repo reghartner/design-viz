@@ -35,7 +35,8 @@ holds the board-level settings in five sections: Jira, Metrics, Traces,
 Environments and Log searches. Each section lists its own validator warnings.
 Jira also holds **Dependencies** (ticket waits on ticket, with an optional reason),
 the **"Waits on" link names** read from Jira, and **No activity after (days)**
-(default 7); each edit is one Undo step.
+(an in-progress ticket with no Jira update for that long is marked; default 7);
+each edit is one Undo step.
 On a diagram that is not a status board yet, **Make this a status board** adds a
 page wrapper if needed, an empty `tracking` block and a Live status panel as one
 Undo step. Document settings and the Live status panel link to it.

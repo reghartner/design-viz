@@ -89,8 +89,9 @@ function planPageTracking(text,raw,edit){
   var before=specObject(authored)?authored:{},tracking=builderClone(before);
   var hadJira=specObject(tracking.jira),jira=hadJira?tracking.jira:{},jiraBefore=JSON.stringify(jira);
   edit(jira,doc.page,tracking);
+  // A tracking.jira the form cannot read stays as written unless this edit sets Jira fields.
   if(Object.keys(jira).length)tracking.jira=jira;
-  else if(!hadJira || JSON.stringify(jira)!==jiraBefore)delete tracking.jira;
+  else if(hadJira && JSON.stringify(jira)!==jiraBefore)delete tracking.jira;
   var pairs=[];
   ['jira','github','dependencies','staleDays'].forEach(function(key){
     if(JSON.stringify(before[key])===JSON.stringify(tracking[key]))return;

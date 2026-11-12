@@ -459,7 +459,7 @@ dependency** or Enter adds one; keys are upper-cased, and a self-dependency or a
 repeated pair is refused), `tracking.jira.dependencyLinks` (**"Waits on" link
 names**: the defaults are listed while unset; **Add link name** keeps them and adds
 the name; **Use default link names** removes the key) and `tracking.staleDays`
-(**No activity after (days)**, empty uses 7). Each edit is one Undo step, entries the
+(**No activity after (days)**: in-progress tickets only; empty uses 7). Each edit is one Undo step, entries the
 form cannot read stay as written, and a validator warning sits under the field it
 names. The Jira header counts the dependencies. Traces shows **No
 settings yet**; edit `tracking.telemetry.traceConnections` in JSON for now.

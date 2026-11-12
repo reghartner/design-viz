@@ -136,6 +136,13 @@ test('R7 an import variable is checked in every carrier of the import; warnings 
   assert.match(ui.lastError,/On node fc::q, signal top would not be sent: Variable \$\{n\}/,'the refusal names the other carrier and its signal');
   ui.select(Q);ui.add('node','n','7');ui.select(P);
   ui.add('import fc','n','abc');assert.deepEqual(diagramOf(ui.raw).topologyImports[0].variables,{n:'abc'},'accepted once fc::q sets its own n');
+  // review c2: changing an existing import value, and renaming into a used name, are checked the same way.
+  ui=inspector(twoCarriers({n:'5',m:'abc'}));ui.select(P);let kept=ui.text;
+  ui.set('Import fc variable 1 value','abc');assert.equal(ui.text,kept,'changing n to abc is refused: fc::q uses ${n} outside a string');
+  ui=inspector(twoCarriers({m:'abc'}));ui.select(P);kept=ui.text;
+  ui.set('Import fc variable 1 name','n');assert.equal(ui.text,kept,'renaming m (abc) to n is refused for the same reason');
+  ui=inspector(twoCarriers());ui.select(LOCAL);ui.add('node','b','B');ui.add('node','c','abc');kept=ui.text;
+  ui.set('Node variable 2 name','a');assert.equal(ui.text,kept,'a carrier rename into a used name is checked too');
   ui=inspector(twoCarriers({'9x':'1'}));ui.select(P);
   const bad=ui.field('Import fc variable 1 name');assert.equal(bad.getAttribute('aria-invalid'),'true');
   assert.match(ui.described(bad),/Use a non-reserved name and non-empty string/,'the validator warning sits under the import row');

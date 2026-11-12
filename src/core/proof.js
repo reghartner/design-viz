@@ -70,7 +70,8 @@
      flowing     an observed finite minimum exists and every limit holds
 
    End-to-end metrics (options.endToEndMetrics === true, #1404): Jira is not an
-   input. A signal sample {empty: true} without a value reads as 0. jira is null, since.doneAt is null and step ticket narrowing is not
+   input. A signal sample {empty: true} without a value reads as 0; when that
+   signal is neither rate-like nor role "error", the carrier is unproven. jira is null, since.doneAt is null and step ticket narrowing is not
    used. A bound carrier is counted when at least one signal has a finite min or
    max limit; it then gets one verdict, first match wins:
      null       nothing observed yet, or a limit or rate-like signal is pending
@@ -81,7 +82,8 @@
                 signal exists to say otherwise)
      proven     an observed minimum is met and every limit holds
    Order: null (nothing observed), error, unproven (silent), null (a rate-like
-   signal pending), degraded, unproven (min not met), null (a limit pending),
+   signal pending), degraded, unproven (min not met, or an empty non-rate
+   signal), null (a limit pending),
    unproven (no observed minimum), proven. Uncounted carriers have no verdict.
    Each carrier gains counted: true|false; the output gains
      endToEnd {counted, proven, complete, headline, degraded, error, unproven,
@@ -194,10 +196,11 @@ var proofVerdicts = (function(){
     });
     var value = proofNumber(entry.value);
     if (value === null && points.length) value = points[points.length - 1][1];
-    if (value === null && emptyIsZero && entry.empty === true) value = 0;
+    var empty = value === null && emptyIsZero === true && entry.empty === true;
+    if (empty) value = 0;
     if (value === null) return null;
     return {value: value, points: points, unit: unit || (typeof entry.unit === 'string' ? entry.unit : ''),
-      zero: value === 0 && points.every(function(point){ return point[1] === 0; })};
+      zero: value === 0 && points.every(function(point){ return point[1] === 0; }), empty: empty};
   }
   function proofRateLike(name, proof, unit){
     var limit = proofOwn(proof, name);
@@ -240,8 +243,13 @@ var proofVerdicts = (function(){
     var minimumObserved = rateLike.some(function(name){ return readings[name] && proofObject(proof[name]) && proofNumber(proof[name].min) !== null; });
     var state = !observed ? 'unobserved' : silent ? 'silent' : rateLike.length && !traffic ? 'unobserved' :
       failing.length ? 'degraded' : pending ? 'unobserved' : !minimumObserved ? 'unmeasured' : 'flowing';
+    // #1404: an empty answer is a measured 0 only for traffic (rate-like) and error-role signals; any
+    // other signal that came back empty (a latency, a gauge) proves nothing, so the carrier is unproven.
+    var emptyEvidence = names.some(function(name){
+      return readings[name] && readings[name].empty && rateLike.indexOf(name) < 0 && carrier.signals[name].role !== 'error';
+    });
     return {state: state, minimumObserved: minimumObserved, failing: failing, readings: readings, rateLike: rateLike,
-      proof: proof, observed: observed, pending: pending, traffic: traffic};
+      proof: proof, observed: observed, pending: pending, traffic: traffic, emptyEvidence: emptyEvidence};
   }
   /* #1404: a max limit (plain or ratio) that does not hold; min failures are not breaches. */
   function proofMaxBreached(limit, reading, readings){
@@ -263,7 +271,7 @@ var proofVerdicts = (function(){
     if (judged.state === 'silent') return 'unproven';
     if (judged.rateLike.length && !judged.traffic) return null;
     if (judged.failing.some(function(name){ return proofMaxBreached(judged.proof[name], judged.readings[name], judged.readings); })) return 'degraded';
-    if (judged.failing.length) return 'unproven';
+    if (judged.failing.length || judged.emptyEvidence) return 'unproven';
     if (judged.pending) return null;
     return judged.minimumObserved ? 'proven' : 'unproven';
   }

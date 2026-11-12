@@ -369,7 +369,12 @@ configuration and do not substitute `$env` or automatically query production.
 In desktop **Status board settings → Environments**, add
 `qa`, `stg`, and `prd` (or other ids), choose **Default environment**, and set
 per-environment Grafana UIDs/base URL and Honeycomb environment/dataset values. Each
-control is one Undo step; export preserves the authored profiles. Removing the
+control is one Undo step; export preserves the authored profiles. Each profile's
+**environment id** renames it in place (#1240); a default that named it follows. Shared and
+per-environment variables are rows (**New … variable name** and **value**, then **Add … variable**
+or Enter; rename, edit or **Remove** each row). Names the validator refuses (`env`, `account`,
+a leading digit) and empty values are refused; an authored bad entry keeps its warning
+under its row. Removing the
 default selects the first remaining profile; removing the last restores shared
 settings. Blank profile fields inherit the shared value.
 
@@ -1339,7 +1344,8 @@ available. CloudWatch, Logs and SQL may use authored links. Link generation
 failure never invalidates numeric evidence. Preview invents no provider URLs.
 Workbench Metrics exposes each signal's **label**, **show on card**, **query link**, **scope** and
 **hide scope** controls (**hide scope** writes `scope: ""`; unchecking it removes the key);
-source edits and Undo/Redo preserve them, including `scope: ""`, and signal edits keep an authored `window`. `loki` and `grafana` signals also show
+source edits and Undo/Redo preserve them, including `scope: ""`. **role** (Normal or Error, #1240) writes or removes `role: "error"`, and **window** writes
+the signal's own duration (empty uses the page window; disabled for CloudWatch); other signal edits keep both. `loki` and `grafana` signals also show
 **empty result reads 0** (`missingMeansZero`; its tooltip gives the Live and Over time rule); unchecking writes `false`, checking removes the key, and a change to another source drops it.
 
 #### Signal span

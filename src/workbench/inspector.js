@@ -1106,10 +1106,10 @@ function logSearchesControls(warnings){
       return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }
-function metricsSettingsControls(environments,warnings){
+function metricsSettingsControls(environments,warnings,environmentWarnings){
     var snapshot=parseEditor();if(snapshot.error)return null;
     var state=telemetryPageState(snapshot.raw);if(warnings)state.warnings=warnings;
-    return createFlowMetricsSettings({document:document,state:state,controls:metricsControlKit(),listen:listen,environments:environments,drafts:METRICS_DRAFTS,commit:function(edit){
+    return createFlowMetricsSettings({document:document,state:state,controls:metricsControlKit(),listen:listen,environments:environments,environmentWarnings:environmentWarnings,idPrefix:prefix+'-metrics',drafts:METRICS_DRAFTS,commit:function(edit){
       return commitTelemetry(function(text,raw){return planPageTelemetry(text,raw,edit);});
     }});
   }
@@ -3257,7 +3257,7 @@ function boardForm(){
     pageTrackingControls(doc.page,jira);
     jiraDependencyControls(doc.page,jira,warnings.jira);
     warningList(jira,warnings.jira,'Jira warnings');
-    var metricsForm=metricsSettingsControls(environments,warnings.metrics);if(metricsForm)metrics.appendChild(metricsForm);
+    var metricsForm=metricsSettingsControls(environments,warnings.metrics,warnings.environments);if(metricsForm)metrics.appendChild(metricsForm);
     warningList(environments,warnings.environments,'Environments warnings');
     note(traces,'No settings yet. Trace connections choose which company trace profiles this board uses; for now, edit tracking.telemetry.traceConnections in JSON.'+
       (Object.prototype.hasOwnProperty.call(telemetry,'traceConnections')?' This board sets it.':''));

@@ -758,3 +758,74 @@ test('excluded stories add remove validate and deduplicate with one Undo Redo pr
  const removed=h.text;h.session.undo();assert.equal(h.text,both);h.session.redo();assert.equal(h.text,removed);
  h.session.target={kind:'board'};h.inspector.render();h.guide.querySelectorAll('button').find(button=>button.textContent==='Remove excluded story 1').fire('click');h.flush();assert.deepEqual(JSON.parse(h.text),raw,'last removal drops only exclude');
 });
+
+/* #1000: structured controls replace raw JSON boxes for seven panel types. */
+test('#1000 converted panel fields declare structured kinds',()=>{
+  const e=environment(),C=e.C;
+  const setupKind=(type,key)=>(C.PANEL_SETUP_FIELDS[type].find(f=>f[0]===key) || [])[1];
+  const patchKind=(type,key)=>(C.PANEL_PATCH_FIELDS[type].find(f=>f[0]===key) || [])[1];
+  assert.equal(setupKind('grid','scale'),'objf');assert.equal(patchKind('grid','highlight'),'objf');
+  assert.equal(setupKind('radar','sensor'),'objf');assert.equal(setupKind('radar','scale'),'objf');assert.equal(patchKind('radar','subject'),'objf');
+  assert.equal(patchKind('zoneframe','subject'),'objf');assert.equal(patchKind('replicas','reference'),'objf');
+  assert.equal(setupKind('trace','spans'),'rows');
+  // Keyed composers keep the declared json kind, as checks and budget do.
+  assert.equal(patchKind('funnel','counts'),'json');assert.equal(patchKind('replicas','replicas'),'json');
+});
+
+test('#1000 setup objf conversions round-trip a fully set object unchanged',()=>{
+  const e=environment(),C=e.C;
+  const cases=[['grid','scale',{min:-2,max:2,kind:'diverging',mid:0,future:'keep'}],['radar','sensor',{x:160,y:150,future:1}],['radar','scale',{pxPerUnit:2,unit:'m',future:true}]];
+  for(const [type,key,obj] of cases){
+    const shape=C.PANEL_SETUP_FIELDS[type].find(f=>f[0]===key)[2];
+    const values=Object.fromEntries(shape.cols.map(col=>[col.k,obj[col.k]==null?'':String(obj[col.k])]));
+    assert.deepEqual(JSON.parse(JSON.stringify(C.objFieldsCollect(shape,obj,values).obj)),obj,type+'.'+key);
+    for(const col of shape.cols)assert.ok(col.k in obj,type+'.'+key+' models '+col.k);
+  }
+});
+
+test('#1000 step objf conversions edit one sub-field and keep the rest of the object',()=>{
+  const cases=[
+    ['radar',{id:'p',type:'radar'},{subject:{x:10,y:20,r:30,deg:40,future:1}},'X',['x',11]],
+    ['zoneframe',{id:'p',type:'zoneframe',zones:[]},{subject:{x:10,y:20,future:1}},'Y',['y',21]],
+    ['replicas',{id:'p',type:'replicas',replicas:[{id:'a'}]},{reference:{series:'log',position:5,future:1}},'Position',['position',6]],
+    ['grid',{id:'p',type:'grid',rows:[{id:'r1'}],cols:[{id:'c1'}]},{highlight:{row:'r1',col:'c1',cell:'r1.c1',future:1}},'Row',['row','']]
+  ];
+  for(const [type,decl,patch,label,[key,value]] of cases){
+    const e=environment(),spec={nodes:{},rows:[[]],panels:[decl],steps:[{panels:{p:patch}}]},h=e.mount(spec);
+    h.session.target={kind:'step',section:0,index:0};h.inspector.render();const before=h.text;
+    const field=Object.keys(patch)[0],input=h.guide.querySelector('.patchedit [aria-label="'+label+'"]');
+    assert.ok(input,type+' '+label+' control');
+    input.value=String(value);input.fire('change');h.flush();
+    const expected={...patch[field]};if(value==='')delete expected[key];else expected[key]=value;
+    assert.deepEqual(JSON.parse(h.text).steps[0].panels.p[field],expected,type);
+    h.session.undo();assert.equal(h.text,before,type+' undo');
+  }
+});
+
+test('#1000 funnel counts and replica snapshots use keyed composers with numeric fields',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[
+    {id:'f',type:'funnel',stages:[{id:'intake',label:'Received'},{id:'review',label:'Reviewed'}],initial:{counts:{intake:100}}},
+    {id:'r',type:'replicas',replicas:[{id:'primary',label:'Primary'}]}
+  ],steps:[{panels:{f:{counts:{intake:90,unknown:3}},r:{replicas:{primary:{series:'log',position:4,future:1}}}}}]};
+  const h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();const before=h.text;
+  const reviewed=aria(h.guide,'Reviewed value');assert.ok(reviewed,'funnel counts composer');
+  reviewed.value='80';reviewed.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.f.counts,{intake:90,unknown:3,review:80});
+  h.session.undo();assert.equal(h.text,before);h.inspector.render();
+  const position=aria(h.guide,'Primary Position');assert.ok(position,'replica composer');
+  position.value='7';position.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.r.replicas,{primary:{series:'log',position:7,future:1}});
+  h.inspector.render();const lag=aria(h.guide,'Primary Lag (ms)');lag.value='12.5';lag.fire('change');h.flush();
+  assert.strictEqual(JSON.parse(h.text).steps[0].panels.r.replicas.primary.lagMs,12.5);
+  h.session.undo();h.session.undo();assert.equal(h.text,before);
+});
+
+test('#1000 security setup scene is a dropdown of camera scenes',()=>{
+  const e=environment(),h=e.mount({nodes:{},rows:[[]],panels:[{id:'s',type:'security',scene:'person-at-door-night'}]});
+  h.inspector.render();const before=h.text;
+  const scene=aria(h.guide,'Default camera scene');assert.ok(scene,'scene control');assert.equal(scene.tagName,'SELECT');
+  assert.equal(scene.value,'person-at-door-night');
+  const other=Array.from(scene.options).map(o=>o.value).find(v=>v && v!=='person-at-door-night');
+  scene.value=other;scene.fire('change');h.flush();
+  assert.equal(JSON.parse(h.text).panels[0].scene,other);h.session.undo();assert.equal(h.text,before);
+});

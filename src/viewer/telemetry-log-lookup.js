@@ -2,8 +2,9 @@
    only: one query_loki_logs log query per Find, through the Grafana connector
    that offers that tool (the one loki signals use). A lookup comes from
    tracking.telemetry.lookups and fills its $value slot; the reader may instead
-   type a LogQL log query. #1233: each lookup is its own search box with its own
-   value; Find runs one box, and its results belong to that box (result.lookup). Both expand $env, ${variables} and $account like
+   type a LogQL log query. #1233: each lookup is its own search with its own value.
+   #1349: the reader shows one search at a time (form.lookup); each search keeps its
+   own value and its own last results, and switching away cancels a running Find. Both expand $env, ${variables} and $account like
    signals, cover the Load trace lookback and return at most 10 lines, newest
    first. Choosing a line hands its trace id and span id to the direct trace
    loader (viewer/live-status.js). Nothing is written to the board.
@@ -57,7 +58,8 @@ function createTelemetryLogLookup(page,transport,hooks){
   var holding=false,dead=false,wantedBefore=false,retired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),off=null,serial=0,abort=null,timer=null,busy=false,connector=null,lastIdentity=null,result=null;
   // traced: "Only lines with a trace ID" (#1158), reader state like the rest of the form.
   // form.lookup is the box that ran last (or is about to); form.value is its value; boxValues holds every box's value (#1233).
-  var form={lookup:'',value:'',logql:'',traced:true},boxValues=Object.create(null);
+  // #1349: result is form.lookup's; results holds the other searches' last results.
+  var form={lookup:'',value:'',logql:'',traced:true},boxValues=Object.create(null),results=Object.create(null);
   function lookups(){return trackingTelemetry(page).lookups || null;}
   function supported(){return !!transport && typeof transport.logsConnector==='function' && typeof transport.queryLogs==='function';}
   // '' when enabled, else the cause: a TELEMETRY_LOG_DISABLED key, or true for an unnamed one.
@@ -65,10 +67,20 @@ function createTelemetryLogLookup(page,transport,hooks){
   function note(s){return s==='disabled'?TELEMETRY_LOG_DISABLED[disabled()] || TELEMETRY_LOG_NOTES.disabled:TELEMETRY_LOG_NOTES[s] || '';}
   function changed(){if(!dead && typeof hooks.changed==='function')hooks.changed();}
   function cancel(){serial++;if(timer)clearTimeout(timer);timer=null;if(abort)abort.abort();abort=null;busy=false;}
+  function forget(){result=null;results=Object.create(null);}
+  // Show another search: a running Find is dropped, also one still waiting for the connector check (its
+  // results so far go with it); a result is kept under the search that ran it.
+  function select(id){
+    if(form.lookup===id)return;
+    if(busy || abort){var running=busy;cancel();if(running)result=null;}
+    if(result)results[result.lookup]=result;
+    form.lookup=id;form.value=boxValues[id] || '';result=results[id] || null;delete results[id];
+  }
   function sync(){
     var key=JSON.stringify(typeof hooks.identity==='function'?hooks.identity():null),ls=lookups() || {},ids=Object.keys(ls);
-    if(key!==lastIdentity){if(lastIdentity!==null && !holding){cancel();result=null;}lastIdentity=key;}
-    if(form.lookup!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,form.lookup)){form.lookup=ids.length?ids[0]:TELEMETRY_LOG_TYPED;form.value=boxValues[form.lookup] || '';}
+    if(key!==lastIdentity){if(lastIdentity!==null && !holding){cancel();forget();}lastIdentity=key;}
+    Object.keys(results).forEach(function(id){if(id!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,id))delete results[id];});
+    if(form.lookup!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,form.lookup)){if(busy)cancel();result=null;select(ids.length?ids[0]:TELEMETRY_LOG_TYPED);}
     return ls;
   }
   // A closed view and host telemetry off name themselves; without a logs connector the
@@ -85,7 +97,7 @@ function createTelemetryLogLookup(page,transport,hooks){
     return mine.pending;
   }
   function recheck(){if(dead || !connector || connector.state!=='absent')return;connector.at=-Infinity;discover();changed();}
-  function retire(){if(dead || retired)return;retired=true;cancel();result=null;changed();}
+  function retire(){if(dead || retired)return;retired=true;cancel();forget();changed();}
   /* #1141: the selected Over time day {key, today, from, to, label, short} or null in Live. A Trace
      start or end typed under Lookback wins over the day; otherwise Find searches the whole day. */
   function day(){var d=typeof hooks.day==='function'?hooks.day():null;return d && typeof d.from==='string' && typeof d.to==='string'?d:null;}
@@ -102,8 +114,8 @@ function createTelemetryLogLookup(page,transport,hooks){
       lookups:Object.keys(ls).map(function(id){var l=ls[id];return {id:id,label:l.label,slot:telemetryLookupSlot(l.query),values:(l.values || []).slice()};}),
       result:result?Object.assign(JSON.parse(JSON.stringify(result)),{next:next()}):null};
   }
-  // `lookup` names the box a 'value' belongs to (default: form.lookup). A box's own edit clears only its results;
-  // the shared checkbox clears any.
+  // `lookup` names the search a 'value' belongs to (default: form.lookup); 'lookup' shows another search.
+  // A search's own edit clears only its results; the shared checkbox clears every search's.
   function set(field,value,lookup){
     if(dead || !telemetryOwn(form,field) || typeof value!==typeof form[field] || typeof value==='string' && value.length>2000)return;
     var ls=sync(),at=field==='value'?typeof lookup==='string'?lookup:form.lookup:field==='logql'?TELEMETRY_LOG_TYPED:null;
@@ -112,9 +124,10 @@ function createTelemetryLogLookup(page,transport,hooks){
       boxValues[at]=value;if(at===form.lookup)form.value=value;
     }else if(field==='lookup'){
       if(form.lookup===value || value!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,value))return;
-      form.lookup=value;form.value=boxValues[value] || '';
+      select(value);
     }else{if(form[field]===value)return;form[field]=value;}
-    if(field!=='lookup' && result && (at===null || result.lookup===at)){cancel();result=null;}
+    if(at===null && field!=='lookup'){if(result)cancel();forget();}
+    else if(at!==null){delete results[at];if(result && result.lookup===at){cancel();result=null;}}
     changed();
   }
   function errorText(e){
@@ -125,11 +138,11 @@ function createTelemetryLogLookup(page,transport,hooks){
     var text=e && typeof e.message==='string'?e.message.replace(/[\x00-\x1f\x7f]+/g,' ').trim():'';
     return text?(text.length>200?text.slice(0,199)+'…':text):'Grafana did not answer the log query.';
   }
-  // `lookup` is the box whose Find ran (default: form.lookup); an unknown one runs nothing.
+  // `lookup` is the search whose Find ran (default: form.lookup), shown from then on; an unknown one runs nothing.
   async function find(lookup){
     if(dead || !lookups())return null;
     var ls=sync();
-    if(typeof lookup==='string'){if(lookup!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,lookup))return null;form.lookup=lookup;form.value=boxValues[lookup] || '';}
+    if(typeof lookup==='string'){if(lookup!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,lookup))return null;select(lookup);}
     cancel();var mine=serial,controller=new AbortController(),signal=controller.signal;abort=controller;
     var request=Object.assign({},form),typed=request.lookup===TELEMETRY_LOG_TYPED,lookup=typed?null:ls[request.lookup];
     function fail(message){throw {code:'input',message:message};}
@@ -176,13 +189,17 @@ function createTelemetryLogLookup(page,transport,hooks){
       result={lookup:request.lookup,rows:[],error:errorText(e)};changed();return null;
     }finally{if(mine===serial && timer){clearTimeout(timer);timer=null;}}
   }
-  // The row a reader chose, and what happened when its trace loaded.
+  // The row a reader chose, and what happened when its trace loaded. #1349: marker(index) is tied to the shown
+  // results; a later note lands there, shown or kept, and is dropped once a new Find or a clear replaced them.
   function row(index){var r=result && result.rows[index];return r?JSON.parse(JSON.stringify(r)):null;}
-  function chosen(index,note){if(!result || !result.rows[index])return;result.chosen=index;result.chosenNote=note || '';changed();}
+  function marker(index){
+    var r=result;
+    return function(note){if(dead || !r || !r.rows[index] || r!==result && results[r.lookup]!==r)return;r.chosen=index;r.chosenNote=note || '';if(r===result)changed();};
+  }
   // The next row with a trace id after `from` (default: the chosen row), or -1 (#1124).
   function next(from){if(!result)return -1;if(from===undefined)from=result.chosen;if(typeof from!=='number')return -1;for(var i=from+1;i<result.rows.length;i++)if(result.rows[i].traceId)return i;return -1;}
   if(transport && typeof transport.onAccountChanged==='function')off=transport.onAccountChanged(retire);
   // #1145: while a loaded trace moves the view to its own day, the results stay; the reader's own day change still clears them.
   function hold(on){holding=!!on;if(!holding && !dead)sync();}
-  return {snapshot:snapshot,set:set,find:find,recheck:recheck,row:row,chosen:chosen,next:next,hold:hold,clear:function(){cancel();result=null;changed();},destroy:function(){cancel();dead=true;if(off)off();}};
+  return {snapshot:snapshot,set:set,find:find,recheck:recheck,row:row,marker:marker,next:next,hold:hold,clear:function(){cancel();forget();changed();},destroy:function(){cancel();dead=true;if(off)off();}};
 }

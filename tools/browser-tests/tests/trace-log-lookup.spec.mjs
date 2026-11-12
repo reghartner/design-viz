@@ -49,8 +49,9 @@ const formControls=root=>root.locator('.dv-trace-config').evaluate(config=>Array
 
 test('desktop authored log lookup lists the newest matching lines and loads the chosen trace focused on its span',async({page,server},info)=>{
  const h=await open(page,server);
- // #1173, #1233: one authored lookup is its own box, not a select; the typed query is a separate collapsed box.
- await expect(h.logs.getByRole('combobox',{name:'Log lookup',exact:true})).toHaveCount(0);await expect(h.logs.locator('details.dv-trace-log-typed > summary')).toHaveText('Type a LogQL query');await expect(h.logs.locator('details.dv-trace-log-typed')).toHaveJSProperty('open',false);await expect(h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true})).toBeEnabled();
+ // #1349: one authored search still gets the Log search dropdown, so Type a LogQL query stays one choice away.
+ const pick=h.logs.getByRole('combobox',{name:'Log search',exact:true});await expect(pick).toHaveValue('camera');await expect(pick.locator('option')).toHaveText(['Camera model','Type a LogQL query']);
+ await expect(h.logs.getByRole('textbox',{name:'LogQL log query',exact:true})).toHaveCount(0);await expect(h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true})).toBeEnabled();
  await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');expect(h.calls).toHaveLength(0);
  // #1158: unchecked, Find sends the query as before and lists every line.
  await h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true}).uncheck();
@@ -78,7 +79,10 @@ test('desktop without a Grafana connector the log lookup is disabled with a mess
  const plain=await open(await page.context().newPage(),server,{lookups:false});await expect(plain.logs).toHaveCount(0);const expected=await formControls(plain.root);
  const h=await open(page,server,{grafana:false});
  await expect(h.logs.getByRole('status')).toContainText('Log lookups need a Grafana connector with query_loki_logs');
- await h.logs.locator('details.dv-trace-log-typed > summary').click();await expect(h.logs.getByLabel('LogQL log query',{exact:true})).toBeDisabled();await expect(h.logs.getByRole('button',{name:'Find log lines for LogQL query',exact:true})).toBeDisabled();await expect(h.logs.getByLabel('Camera model',{exact:true})).toBeDisabled();await expect(h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true})).toBeDisabled();
+ await expect(h.logs.getByLabel('Camera model',{exact:true})).toBeDisabled();await expect(h.logs.getByRole('button',{name:'Find log lines for Camera model',exact:true})).toBeDisabled();
+ // #1349: choosing a search makes no call, so the dropdown stays usable; the LogQL box it shows is disabled too.
+ const pick=h.logs.getByRole('combobox',{name:'Log search',exact:true});await expect(pick).toBeEnabled();await pick.selectOption(':logql');
+ await expect(h.logs.getByLabel('LogQL log query',{exact:true})).toBeDisabled();await expect(h.logs.getByRole('button',{name:'Find log lines for LogQL query',exact:true})).toBeDisabled();
  expect(await formControls(h.root)).toEqual(expected);
  await info.attach('log-lookup-no-grafana',{body:await h.root.screenshot(),contentType:'image/png'});
  await h.root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await h.root.getByRole('button',{name:'Load trace',exact:true}).click();
@@ -108,34 +112,74 @@ test('desktop a log-line trace the provider did not keep says so and loads the n
  expect(h.calls.filter(c=>c.tool==='get_trace').map(c=>c.args.trace_id)).toEqual([MISSING,ID]);
 });
 
-/* #1233 (test plan 1): any number of authored log searches, each its own labeled box with its own Find in authored order.
-   Find on the second sends one query_loki_logs call with that lookup's query and its typed value, and the results sit
-   directly under that box only. Enter in a box runs its Find. The typed LogQL query is its own collapsed box. */
-test('desktop three authored log searches are three labeled boxes; Find on the second runs only its query and lists under it',async({page,server},info)=>{
- const DEVICE='{env="$env"} |= "Handling camera stats message" | deviceId="$value"',ERRORS='{env="$env"} |= "Handling camera stats message" |= "error"';
- const h=await open(page,server,{lookups:{camera:{label:'Camera model',query:QUERY,values:['arch','wren']},device:{label:'Search for my device ID',query:DEVICE},errors:{label:'Recent errors',query:ERRORS}}});
- const seen=()=>h.root.evaluate(host=>{const r=host.shadowRoot || host;return Array.from(r.querySelectorAll('.dv-trace-logs [data-log-search]')).map(b=>{const input=b.querySelector(':scope input:not([type=checkbox]), :scope textarea'),box=b.getBoundingClientRect();
-  return {id:b.getAttribute('data-log-search'),label:(b.querySelector('.dv-trace-log-label, .dv-trace-log-name, summary') || {}).textContent || '',input:input && input.getAttribute('aria-label'),list:!!(input && input.list),
-   finds:Array.from(b.querySelectorAll('button.dv-trace-log-find')).map(f=>f.getAttribute('aria-label')),rows:b.querySelectorAll('.dv-trace-log-row').length,rowTops:Array.from(b.querySelectorAll('.dv-trace-log-row')).map(n=>n.getBoundingClientRect().top),top:box.top,bottom:box.bottom};});});
- let at=await seen();
- expect(at.map(b=>[b.id,b.label,b.input,b.list,b.finds]),'three labeled boxes in authored order, then the typed box').toEqual([
-  ['camera','Camera model','Camera model',true,['Find log lines for Camera model']],['device','Search for my device ID','Search for my device ID',false,['Find log lines for Search for my device ID']],
-  ['errors','Recent errors',null,false,['Find log lines for Recent errors']],[':logql','Type a LogQL query','LogQL log query',false,['Find log lines for LogQL query']]]);
- expect(at.slice(0,3).every((b,i,all)=>!i || b.top>=all[i-1].bottom-1),'stacked top to bottom').toBe(true);
- for(const name of ['Camera model','Search for my device ID','Recent errors'])await expect(h.logs.getByRole('button',{name:'Find log lines for '+name,exact:true})).toBeVisible();
- await expect(h.logs.locator('details.dv-trace-log-typed')).toHaveJSProperty('open',false);
+/* #1349 (replaces #1233's stacked boxes; ticket test plan): one Log search dropdown lists the authored searches in order,
+   then Type a LogQL query. Only the selected search shows: a $value search its field and Find, a search without a slot
+   only its Find. Each search keeps its value and its last results across switches; one query_loki_logs call per Find.
+   Keyboard: Tab reaches the dropdown, arrows change it, Enter in the value field runs Find. */
+const DEVICE='{env="$env"} |= "Handling camera stats message" | deviceId="$value"',ERRORS='{env="$env"} |= "Handling camera stats message" |= "error"';
+const THREE={camera:{label:'Camera model',query:QUERY,values:['arch','wren']},device:{label:'Search for my device ID',query:DEVICE},errors:{label:'Recent errors',query:ERRORS}};
+const TRACED='\n| trace_id =~ "[0-9a-fA-F]{16,32}"';
+// What the logs section shows: the dropdown's options and value, and each shown search with its text box, Finds and rows.
+const shown=h=>h.root.evaluate(host=>{const r=host.shadowRoot || host,logs=r.querySelector('.dv-trace-logs'),pick=Array.from(logs.querySelectorAll('select')).find(s=>s.getAttribute('aria-label')==='Log search');
+ return {options:pick?Array.from(pick.options).map(o=>[o.value,o.textContent]):null,value:pick?pick.value:null,
+  searches:Array.from(logs.querySelectorAll('[data-log-search]')).map(b=>{const input=b.querySelector(':scope input:not([type=checkbox]), :scope textarea');
+   return {id:b.getAttribute('data-log-search'),input:input && [input.tagName.toLowerCase(),input.getAttribute('aria-label'),!!input.list],finds:Array.from(b.querySelectorAll('button.dv-trace-log-find')).map(f=>f.getAttribute('aria-label')),rows:b.querySelectorAll('.dv-trace-log-row').length};})};});
+test('desktop three authored log searches are one dropdown; only the selected search shows, and each keeps its value and results',async({page,server},info)=>{
+ const h=await open(page,server,{lookups:THREE}),pick=h.logs.getByRole('combobox',{name:'Log search',exact:true});
+ let at=await shown(h);
+ expect(at.options,'authored order, then Type a LogQL query').toEqual([['camera','Camera model'],['device','Search for my device ID'],['errors','Recent errors'],[':logql','Type a LogQL query']]);
+ expect([at.value,at.searches],'the first search: its value field (a pick list) and its Find').toEqual(['camera',[{id:'camera',input:['input','Camera model',true],finds:['Find log lines for Camera model'],rows:0}]]);
+ await expect(h.logs.getByRole('textbox',{name:'Search for my device ID',exact:true})).toHaveCount(0);await expect(h.logs.getByRole('textbox',{name:'LogQL log query',exact:true})).toHaveCount(0);
+ await info.attach('log-search-dropdown',{body:await h.root.screenshot(),contentType:'image/png'});
+ await pick.selectOption('device');at=await shown(h);
+ expect(at.searches,'only the second search').toEqual([{id:'device',input:['input','Search for my device ID',false],finds:['Find log lines for Search for my device ID'],rows:0}]);
  await h.logs.getByLabel('Search for my device ID',{exact:true}).fill('cam-7');await h.logs.getByRole('button',{name:'Find log lines for Search for my device ID',exact:true}).click();
  await expect(h.logs.locator('[data-log-search="device"] .dv-trace-log-row')).toHaveCount(1);
- expect(h.calls.map(c=>[c.tool,c.args.logql])).toEqual([['query_loki_logs','{env="stg"} |= "Handling camera stats message" | deviceId="cam-7"\n| trace_id =~ "[0-9a-fA-F]{16,32}"']]);
- at=await seen();expect(at.map(b=>b.rows),'results under the box that ran only').toEqual([0,1,0,0]);
- expect(await h.root.evaluate(host=>{const a=host.shadowRoot && host.shadowRoot.activeElement || document.activeElement;return a && a.matches('button.dv-trace-log-find') && a.closest('[data-log-search]').getAttribute('data-log-search');}),'focus stays on the Find that ran').toBe('device');
- const device=at[1];expect(device.rowTops[0],'directly under its controls, inside the box').toBeGreaterThan(device.top);expect(device.bottom,'above the next box').toBeLessThanOrEqual(at[2].top+1);
- await info.attach('log-search-boxes',{body:await h.root.screenshot(),contentType:'image/png'});
- // Enter in the first box runs its Find; the list moves under it.
- await h.logs.getByLabel('Camera model',{exact:true}).fill('arch');await h.logs.getByLabel('Camera model',{exact:true}).press('Enter');
- await expect(h.logs.locator('[data-log-search="camera"] .dv-trace-log-row')).toHaveCount(1);expect(h.calls).toHaveLength(2);expect(h.calls[1].args.logql).toContain('cameraModel="arch"');
- at=await seen();expect(at.map(b=>b.rows)).toEqual([1,0,0,0]);
- await expect(h.logs.getByLabel('Search for my device ID',{exact:true}),'each box keeps its value').toHaveValue('cam-7');
+ expect(h.calls.map(c=>[c.tool,c.args.logql]),'one call with that search\'s query and value').toEqual([['query_loki_logs','{env="stg"} |= "Handling camera stats message" | deviceId="cam-7"'+TRACED]]);
+ await pick.selectOption('errors');at=await shown(h);
+ expect(at.searches,'no $value slot: no text box, only its Find').toEqual([{id:'errors',input:null,finds:['Find log lines for Recent errors'],rows:0}]);
+ await h.logs.getByRole('button',{name:'Find log lines for Recent errors',exact:true}).click();await expect(h.logs.locator('[data-log-search="errors"] .dv-trace-log-row')).toHaveCount(1);
+ expect(h.calls.map(c=>c.args.logql).slice(1)).toEqual(['{env="stg"} |= "Handling camera stats message" |= "error"'+TRACED]);
+ // Back to the device search: its value and its own results return, with no call.
+ await pick.selectOption('device');await expect(h.logs.getByLabel('Search for my device ID',{exact:true}),'its value is kept').toHaveValue('cam-7');
+ await expect(h.logs.locator('[data-log-search="device"] .dv-trace-log-row'),'its results are kept').toHaveCount(1);expect(h.calls).toHaveLength(2);
+ await pick.selectOption('errors');await expect(h.logs.locator('[data-log-search="errors"] .dv-trace-log-row')).toHaveCount(1);expect(h.calls).toHaveLength(2);
+ await info.attach('log-search-dropdown-switched',{body:await h.root.screenshot(),contentType:'image/png'});
+ // Type a LogQL query: only the query box and its Find; Ctrl+Enter runs it.
+ await pick.selectOption(':logql');at=await shown(h);
+ expect(at.searches).toEqual([{id:':logql',input:['textarea','LogQL log query',false],finds:['Find log lines for LogQL query'],rows:0}]);
+ await h.logs.getByLabel('LogQL log query',{exact:true}).fill('{env="stg"}');await h.logs.getByLabel('LogQL log query',{exact:true}).press('Control+Enter');
+ await expect(h.logs.locator('[data-log-search=":logql"] .dv-trace-log-row')).toHaveCount(1);expect(h.calls.map(c=>c.args.logql).slice(2)).toEqual(['{env="stg"}'+TRACED]);
+});
+
+test('desktop keyboard: Tab reaches the Log search dropdown, arrows change it, Enter in the value field runs Find',async({page,server})=>{
+ const h=await open(page,server,{lookups:THREE}),pick=h.logs.getByRole('combobox',{name:'Log search',exact:true});
+ await h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true}).focus();await page.keyboard.press('Tab');await expect(pick,'Tab from the checkbox reaches the dropdown').toBeFocused();
+ // A closed select changes with the arrow keys on Linux and Windows; macOS opens its menu instead, so the arrow step runs off macOS (CI).
+ if(process.platform!=='darwin'){
+  await page.keyboard.press('ArrowDown');await expect(pick).toHaveValue('device');await expect(h.logs.getByLabel('Search for my device ID',{exact:true})).toBeVisible();
+  await page.keyboard.press('ArrowUp');await expect(pick).toHaveValue('camera');
+ }
+ await page.keyboard.press('Tab');await expect(h.logs.getByLabel('Camera model',{exact:true}),'Tab moves on to the value field').toBeFocused();
+ await page.keyboard.type('arch');await page.keyboard.press('Enter');
+ await expect(h.logs.locator('[data-log-search="camera"] .dv-trace-log-row')).toHaveCount(1);
+ expect(h.calls.map(c=>c.args.logql)).toEqual(['{env="stg"} |= "Handling camera stats message" | cameraModel="arch"'+TRACED]);
+});
+
+test('desktop lookups: {} shows only the LogQL box, with no dropdown',async({page,server})=>{
+ const h=await open(page,server,{lookups:{}});
+ await expect(h.logs.getByRole('combobox',{name:'Log search',exact:true})).toHaveCount(0);
+ expect((await shown(h)).searches).toEqual([{id:':logql',input:['textarea','LogQL log query',false],finds:['Find log lines for LogQL query'],rows:0}]);
+});
+
+/* #1349: the reader view at phone width (read-only use): the dropdown and the selected search fit the logs section, with no sideways scroll in it. */
+test('phone-width reader: the Log search dropdown and the selected search fit without sideways scrolling',async({page,server},info)=>{
+ const h=await open(page,server,{lookups:THREE});await page.setViewportSize({width:390,height:844});
+ const pick=h.logs.getByRole('combobox',{name:'Log search',exact:true});await pick.selectOption('device');
+ const fit=()=>h.root.evaluate(host=>{const r=host.shadowRoot || host,logs=r.querySelector('.dv-trace-logs'),b=logs.getBoundingClientRect();
+  return {logs:logs.scrollWidth<=logs.clientWidth+1,inside:Array.from(logs.querySelectorAll('select,input,button')).filter(n=>n.getClientRects().length).every(n=>{const c=n.getBoundingClientRect();return c.left>=b.left-1 && c.right<=b.right+1;})};});
+ expect(await fit()).toEqual({logs:true,inside:true});await expect(h.logs.getByLabel('Search for my device ID',{exact:true})).toBeVisible();
+ await info.attach('log-search-dropdown-phone',{body:await page.screenshot(),contentType:'image/png'});
 });
 
 /* #1230 (test plan 2 and 3): a reserved space above the search holds the loaded trace. Before a load it is a short

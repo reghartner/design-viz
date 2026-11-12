@@ -4418,43 +4418,86 @@ test('#1173 #1230 a picked example trace keeps the search open and collapses the
  assert.ok(m.body.querySelector('.dv-trace-slot > .dv-trace-selected'),'the picked trace is in the reserved space');
  api.destroy();
 });
-/* #1233 (replaces #1173's text switch): each authored lookup is its own box with its own Find, in authored order; a lookup
-   without a $value slot shows only its button; the typed LogQL query is its own collapsible box. Enter runs a value box's
-   Find, Ctrl/Cmd+Enter the typed box's; results sit under the box that ran. */
-test('#1173 #1233 each authored lookup is its own box with its own Find; the typed LogQL query is a separate collapsed box',async()=>{
+/* #1349 (replaces #1233's stacked boxes): one Log search dropdown lists the authored searches in order, then Type a LogQL
+   query; only the selected search's value (or the LogQL box) and Find show. Each search keeps its own value and its own
+   last results across switches; switching away drops a running Find. Enter runs a value search's Find, Ctrl/Cmd+Enter the
+   typed one's. lookups: {} shows only the LogQL box. */
+test('#1173 #1233 #1349 one Log search dropdown shows only the selected search; each search keeps its value and its results',async()=>{
  const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),calls=[];let hold=null;
  const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"',values:['arch']},errors:{label:'Recent errors',query:'{app="cams"} |= "error"'},constructor:{label:'Constructor ID',query:'{app="cams"} | id="$value"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
- const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async args=>{calls.push(plain(args));if(hold)await hold.promise;return {data:[]};}}}}),api=h.ctl.liveStatus;
+ const line=id=>({timestamp:'1700000000000000000',line:id+' line',labels:{trace_id:'0123456789abcdef0123456789abcdef'}});
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async args=>{calls.push(plain(args));const h2=hold;if(h2)await h2.promise;return {data:[line(args.logql.split('\n')[0])]};}}}}),api=h.ctl.liveStatus;
  api.setStatusMode('trace');for(let i=0;i<6;i++)await settle();const m=mountStatus(h);h.flush();
- const typedId=api.snapshot().trace.direct.logs.typed,box=id=>m.body.querySelector('.dv-trace-log-search[data-log-search="'+id+'"]'),find=id=>box(id).querySelector('button.dv-trace-log-find'),first=()=>calls.map(c=>c.logql.split('\n')[0]);
- assert.deepEqual(m.body.querySelectorAll('.dv-trace-logs [data-log-search]').map(n=>n.getAttribute('data-log-search')),['camera','errors','constructor',typedId],'authored order, then the typed box');
- assert.equal(box('constructor').querySelector('input').value,'','an id that is an Object.prototype key starts empty');
- assert.equal(find('camera').getAttribute('aria-label'),'Find log lines for Camera model');assert.equal(find('errors').getAttribute('aria-label'),'Find log lines for Recent errors');assert.equal(find('camera').textContent,'Find log lines');
+ const run=async()=>{for(let i=0;i<6;i++)await settle();h.flush();};
+ const typedId=api.snapshot().trace.direct.logs.typed,logs=()=>api.snapshot().trace.direct.logs,box=id=>m.body.querySelector('.dv-trace-log-search[data-log-search="'+id+'"]'),find=id=>box(id).querySelector('button.dv-trace-log-find'),first=()=>calls.map(c=>c.logql.split('\n')[0]);
+ const pick=()=>m.body.querySelectorAll('.dv-trace-logs select').find(el=>el.getAttribute('aria-label')==='Log search'),choose=async id=>{const p=pick();p.value=id;p.dispatchEvent({type:'change'});await run();};
+ const shown=()=>m.body.querySelectorAll('.dv-trace-logs [data-log-search]').map(n=>n.getAttribute('data-log-search')),rows=id=>box(id).querySelectorAll('.dv-trace-log-value').map(n=>n.textContent);
+ assert.ok(pick(),'the Log search dropdown');assert.equal(pick().disabled,false);
+ assert.deepEqual(pick().querySelectorAll('option').map(o=>[o.value,o.textContent]),[['camera','Camera model'],['errors','Recent errors'],['constructor','Constructor ID'],[typedId,'Type a LogQL query']],'authored order, then Type a LogQL query');
+ assert.equal(pick().value,'camera','the first search is selected');assert.deepEqual(shown(),['camera'],'only the selected search shows');
+ assert.equal(m.body.querySelector('textarea'),null,'no LogQL box until it is chosen');assert.equal(m.body.querySelector('details.dv-trace-log-typed'),null,'no collapsible typed box');
+ assert.equal(find('camera').getAttribute('aria-label'),'Find log lines for Camera model');assert.equal(find('camera').textContent,'Find log lines');
  const value=box('camera').querySelector('input');assert.equal(value.getAttribute('aria-label'),'Camera model');assert.ok(value.getAttribute('list'),'suggested values stay a pick list');
- assert.equal(box('errors').querySelector('input'),null,'no $value slot: only its button');assert.equal(box('errors').querySelector('.dv-trace-log-name').textContent,'Recent errors');
- const typed=m.body.querySelector('details.dv-trace-log-typed');assert.ok(typed,'the typed box');assert.equal(typed.open,false,'with authored lookups it starts collapsed');assert.equal(typed.querySelector('summary').textContent,'Type a LogQL query');
- assert.equal(m.body.querySelector('button.dv-trace-log-mode'),null,'no mode switch');assert.ok(!m.body.querySelectorAll('select').some(el=>el.getAttribute('aria-label')==='Log lookup'),'no lookup select');
- value.value='arch';value.dispatchEvent({type:'input'});value.dispatchEvent({type:'keydown',key:'Enter',preventDefault(){}});for(let i=0;i<6;i++)await settle();h.flush();
- assert.deepEqual(first(),['{app="cams"} | cameraModel="arch"'],'Enter in a value box runs its Find');
+ value.value='arch';value.dispatchEvent({type:'input'});value.dispatchEvent({type:'keydown',key:'Enter',preventDefault(){}});await run();
+ assert.deepEqual(first(),['{app="cams"} | cameraModel="arch"'],'Enter in the value field runs its Find, once');assert.deepEqual(rows('camera'),['arch']);
+ await choose('errors');assert.deepEqual(shown(),['errors'],'the other search replaces it');assert.equal(box('errors').querySelector('input'),null,'no $value slot: no text box');
+ assert.equal(box('errors').querySelector('.dv-trace-log-name'),null,'the dropdown names it');assert.equal(find('errors').getAttribute('aria-label'),'Find log lines for Recent errors');assert.equal(calls.length,1,'switching makes no call');
  // While it runs, the pressed Find keeps focus (aria-disabled, not disabled), names what it does, and ignores a repeat press.
- const running=find('errors');hold={};hold.promise=new Promise(resolve=>{hold.release=resolve;});running.dispatchEvent({type:'click'});for(let i=0;i<6;i++)await settle();h.flush();
+ const running=find('errors');hold={};hold.promise=new Promise(resolve=>{hold.release=resolve;});running.dispatchEvent({type:'click'});await run();
  assert.equal(find('errors'),running,'the same button');assert.deepEqual([running.disabled,running.getAttribute('aria-disabled'),running.getAttribute('aria-busy'),running.textContent,running.getAttribute('aria-label')],[false,'true','true','Finding…','Finding log lines for Recent errors']);
- assert.equal(find('camera').disabled,true,'the other Finds wait');running.dispatchEvent({type:'click'});await settle();assert.equal(calls.length,2,'a repeat press is ignored');
- const release=hold.release;hold=null;release();for(let i=0;i<6;i++)await settle();h.flush();
+ running.dispatchEvent({type:'click'});await settle();assert.equal(calls.length,2,'a repeat press is ignored');
+ let release=hold.release;hold=null;release();await run();
  assert.equal(find('errors'),running);assert.deepEqual([running.disabled,running.getAttribute('aria-disabled'),running.textContent,running.getAttribute('aria-label')],[false,null,'Find log lines','Find log lines for Recent errors'],'done: back to Find');
- assert.deepEqual(first(),['{app="cams"} | cameraModel="arch"','{app="cams"} |= "error"'],'the second box runs its own query');
- assert.ok(box('errors').querySelector('.dv-trace-logs-status'),'its result note is under the box that ran');assert.equal(box('camera').querySelector('.dv-trace-logs-status'),null,'and nowhere else');
+ assert.deepEqual(first(),['{app="cams"} | cameraModel="arch"','{app="cams"} |= "error"'],'the selected search runs its own query');assert.deepEqual(rows('errors'),['{app="cams"} |= "error" line']);
+ // Back to the first search: its value and its own results return, with no call.
+ await choose('camera');assert.equal(box('camera').querySelector('input').value,'arch','its value is kept');assert.deepEqual(rows('camera'),['arch'],'its own last results are kept');
+ assert.equal(logs().result.lookup,'camera');assert.equal(logs().form.values.camera,'arch');await choose('errors');assert.deepEqual(rows('errors'),['{app="cams"} |= "error" line'],'and so are the other search\'s');assert.equal(calls.length,2);
+ // Switching away while a Find runs drops that Find; the search it ran for has no results.
+ await choose('camera');hold={};hold.promise=new Promise(resolve=>{hold.release=resolve;});find('camera').dispatchEvent({type:'click'});await run();assert.equal(logs().busy,true);
+ await choose('errors');assert.equal(logs().busy,false,'the running Find is dropped');assert.deepEqual(rows('errors'),['{app="cams"} |= "error" line']);
+ release=hold.release;hold=null;release();await run();await choose('camera');assert.equal(logs().result,null,'the dropped Find left nothing');assert.equal(box('camera').querySelector('.dv-trace-log-results'),null);
+ // A value edit clears only that search's results; the shared checkbox clears every search's.
+ box('camera').querySelector('input').dispatchEvent({type:'keydown',key:'Enter',preventDefault(){}});await run();assert.deepEqual(rows('camera'),['arch']);
+ const field=box('camera').querySelector('input');field.value='arc';field.dispatchEvent({type:'input'});await run();assert.equal(box('camera').querySelector('.dv-trace-log-results'),null,'its own edit clears its results');
+ await choose('errors');assert.deepEqual(rows('errors'),['{app="cams"} |= "error" line'],'the other search keeps its results');
+ const traced=m.body.querySelector('input.dv-trace-log-traced');traced.checked=false;traced.dispatchEvent({type:'change'});await run();assert.equal(box('errors').querySelector('.dv-trace-log-results'),null,'the checkbox clears every search');
+ // Type a LogQL query: only the LogQL box and its Find.
+ await choose(typedId);assert.deepEqual(shown(),[typedId]);const typed=box(typedId);assert.equal(typed.querySelector('input'),null);
  const area=typed.querySelector('textarea');assert.equal(area.getAttribute('aria-label'),'LogQL log query');area.value='{app="cams"}';area.dispatchEvent({type:'input'});
- area.dispatchEvent({type:'keydown',key:'Enter',preventDefault(){}});for(let i=0;i<6;i++)await settle();assert.equal(calls.length,2,'plain Enter in the query box is a new line');
- area.dispatchEvent({type:'keydown',key:'Enter',ctrlKey:true,preventDefault(){}});for(let i=0;i<6;i++)await settle();h.flush();assert.deepEqual(first().slice(2),['{app="cams"}'],'Ctrl+Enter runs the typed box');
- assert.equal(typed.querySelector('button.dv-trace-log-find').getAttribute('aria-label'),'Find log lines for LogQL query');
- assert.equal(api.snapshot().trace.direct.logs.form.values.camera,'arch','each box keeps its value');
+ const before=calls.length;area.dispatchEvent({type:'keydown',key:'Enter',preventDefault(){}});await run();assert.equal(calls.length,before,'plain Enter in the query box is a new line');
+ area.dispatchEvent({type:'keydown',key:'Enter',ctrlKey:true,preventDefault(){}});await run();assert.deepEqual(first().slice(before),['{app="cams"}'],'Ctrl+Enter runs the typed query');
+ assert.equal(find(typedId).getAttribute('aria-label'),'Find log lines for LogQL query');assert.ok(typed.querySelector('.dv-trace-log-results'),'its results sit under it');
  api.destroy();
- // lookups: {} shows only the typed box, open.
+ // lookups: {} shows only the LogQL box, with no dropdown.
  const none=harness({...raw,tracking:{telemetry:{...raw.tracking.telemetry,lookups:{}}}},{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe(){},call(){},logsConnector:async()=>'Grafana',queryLogs:async()=>({data:[]})}}});
  none.ctl.liveStatus.setStatusMode('trace');for(let i=0;i<6;i++)await settle();const nm=mountStatus(none);none.flush();
- assert.equal(nm.body.querySelectorAll('.dv-trace-log-search').length,0,'no authored boxes');const only=nm.body.querySelector('details.dv-trace-log-typed');assert.ok(only,'the typed box');assert.equal(only.open,true,'open');
+ assert.ok(!nm.body.querySelectorAll('.dv-trace-logs select').some(el=>el.getAttribute('aria-label')==='Log search'),'no dropdown');assert.deepEqual(nm.body.querySelectorAll('.dv-trace-logs [data-log-search]').map(n=>n.getAttribute('data-log-search')),[typedId],'only the LogQL box');
+ assert.ok(nm.body.querySelector('.dv-trace-logs textarea'),'its query field');
  none.ctl.liveStatus.destroy();
+});
+/* #1349 review c1: the "Span … is not in this trace." note from a log-row Load belongs to the results that row came from.
+   Start a load, switch searches, the load finishes: the note lands on the first search's row, not the shown search's.
+   The selected search also survives leaving and re-entering the Trace view. */
+test('#1349 a log-row Load that finishes after a switch notes only its own search; the selected search survives leaving Trace',async()=>{
+ const profile=JSON.parse(JSON.stringify(require('./fixtures/trace-connection-profile.json'))),settle=async()=>{for(let i=0;i<12;i++)await new Promise(setImmediate);};
+ const fs=require('node:fs'),path=require('node:path'),RECORDED=fs.readFileSync(path.join(__dirname,'fixtures/provider-traces/honeycomb-trace.txt'),'utf8'),ID='8413cd87a9f15b6bfe8e1acf5b3346d0',GONE='ffffffffffffffff';
+ const tool={name:'get_trace',annotations:{readOnlyHint:true},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},required:['trace_id','from','environment_slug','team_slug','view_mode']}};
+ const data=[{timestamp:(BigInt(Date.now()-600000)*1000000n).toString(),line:'Handling camera stats message',labels:{env:'stg'},structuredMetadata:{cameraModel:'arch',trace_id:ID,span_id:GONE}}];
+ const raw={tracking:{telemetry:{grafana:{loki:'logs'},lookups:{camera:{label:'Camera model',query:'{app="cams"} | cameraModel="$value"'},errors:{label:'Recent errors',query:'{app="cams"} |= "error"'}},traceConnections:{company:profile}}},sections:[{id:'main',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+ let hold=null;
+ const h=harness(raw,{},{telemetry:{provider:()=>Promise.resolve({}),directTrace:{describe:async()=>tool,call:async()=>{const wait=hold;if(wait)await wait.promise;return {payload:RECORDED};},logsConnector:async()=>'Grafana',queryLogs:async()=>({data})}}}),api=h.ctl.liveStatus;
+ const logs=()=>api.snapshot().trace.direct.logs,note='Span '+GONE+' from the log line is not in this trace.';
+ api.setStatusMode('trace');await settle();api.setDirectTraceField({field:'environment',value:'prod'});
+ api.setLogLookupField({field:'lookup',value:'errors'});await api.findLogLines('errors');api.setLogLookupField({field:'lookup',value:'camera'});
+ api.setLogLookupField({field:'value',value:'arch',lookup:'camera'});await api.findLogLines('camera');assert.equal(logs().result.lookup,'camera');assert.equal(logs().result.rows.length,1);
+ hold={};hold.promise=new Promise(resolve=>{hold.release=resolve;});const loading=api.loadLogTrace(0);await settle();
+ api.setLogLookupField({field:'lookup',value:'errors'});const release=hold.release;hold=null;release();assert.ok(await loading,'the trace loads');await settle();
+ let r=logs().result;assert.equal(r.lookup,'errors');assert.deepEqual([r.chosen,r.chosenNote],[undefined,undefined],'the shown search\'s row gets no note');
+ api.setLogLookupField({field:'lookup',value:'camera'});r=logs().result;assert.deepEqual([r.lookup,r.chosen,r.chosenNote],['camera',0,note],'the note is on the row it came from');
+ // Leaving the Trace view and coming back keeps the selected search, its value and its results.
+ api.setLogLookupField({field:'lookup',value:'errors'});api.setStatusMode('jira');await settle();api.setStatusMode('trace');await settle();
+ assert.equal(logs().form.lookup,'errors','the selected search survives leaving Trace');assert.equal(logs().result && logs().result.lookup,'errors');assert.equal(logs().form.values.camera,'arch');
+ api.destroy();
 });
 // #1182 c2: one open-state slot. Another trace resets it (pick A, open, pick B, back to A: collapsed); a re-poll with the
 // same entry key keeps it; focus inside a card removed by a Load moves to the new card's line once.

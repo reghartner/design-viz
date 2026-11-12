@@ -3556,16 +3556,16 @@ names lookups in `tracking.telemetry.lookups`:
 | `fields` | optional `{traceId, spanId}` field names; default `trace_id` and `span_id` |
 
 The reader opens Status → Trace → **Load trace**, chooses a connection and
-environment, then uses **Find a trace from a log line** (#1233). Each lookup is its
-own search box, in authored order, with any number of them: its label, a value
-field (with the suggested `values` to pick from) when the query has a `$value`
-slot, and its own **Find log lines** button (accessible name "Find log lines for
-<label>"). Enter in the value field runs that box's Find. Each box keeps its own
-value. Below them, **Type a LogQL query** is a collapsible box for a reader-typed
-log query (Ctrl+Enter or Cmd+Enter runs it); it starts collapsed when lookups are
-authored, and `lookups: {}` offers only that box, open. The results and a load
-error sit directly under the box that ran (#1230); typing in that box clears its
-results, typing in another box does not. Each Find makes one `query_loki_logs` call to the Grafana connector that offers that
+environment, then uses **Find a trace from a log line** (#1349). One **Log search**
+dropdown lists the lookups by label in authored order, then **Type a LogQL query**.
+Only the selected search shows: a value field (with the suggested `values` to pick
+from) when the query has a `$value` slot, and its **Find log lines** button
+(accessible name "Find log lines for <label>"); Enter in the value field runs Find.
+Type a LogQL query shows a query box instead (Ctrl+Enter or Cmd+Enter runs it), and
+`lookups: {}` offers only that box, with no dropdown. Each search keeps its own value
+and its own last results while the page is open; switching away drops a running
+Find. The results and a load error sit directly under the search (#1230); typing in
+a search clears its results only. Each Find makes one `query_loki_logs` call to the Grafana connector that offers that
 tool (the one `loki` signals use, preferring a connector named Grafana):
 
 ```json

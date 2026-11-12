@@ -255,3 +255,21 @@ test('#1252 connector discovery retries after absent or a listing error',async()
  // A thrown listing is retryable too.
  const x=setup({failList:1});x.api.snapshot();await settle();assert.equal(x.api.snapshot().state,'absent');x.api.recheck();await settle();assert.equal(x.api.snapshot().state,'ready');
 });
+
+/* #1349 review c1: switching searches drops a Find that is still waiting for the connector check, and each result is
+   kept under the search that ran it. */
+test('#1349 a switch while Find waits for the connector check drops that Find; results stay with the search that ran them',async()=>{
+ const C=context(),p=board({camera:{label:'Camera model',query:QUERY},errors:{label:'Recent errors',query:'{env="$env"} |= "error"'}}),calls=[];let found=null;
+ const transport={logsConnector:()=>new Promise(resolve=>{found=resolve;}),queryLogs:async args=>{calls.push(args.logql.split('\n')[0]);return {data:[entry()]};}};
+ const api=C.createTelemetryLogLookup(p,transport,{config:()=>C.telemetryEnvironmentConfig(p,'stg'),lookback:()=>({start:'',end:'',lookback:'2h'})});
+ assert.equal(api.snapshot().state,'checking');api.set('value','arch','camera');
+ const waiting=api.find('camera');await settle();assert.equal(calls.length,0,'the Find waits for the connector check');
+ api.set('lookup','errors');found('Grafana');assert.equal(await waiting,null,'the dropped Find returns nothing');await settle();
+ assert.deepEqual(calls,[],'the dropped Find never queries Loki');let s=api.snapshot();assert.equal(s.form.lookup,'errors');assert.equal(s.result,null,'nothing lands under the shown search');
+ await api.find('errors');assert.deepEqual(calls,['{env="stg"} |= "error"']);assert.equal(api.snapshot().result.lookup,'errors');
+ api.set('lookup','camera');s=api.snapshot();assert.equal(s.result,null,'the dropped Find left the first search nothing');
+ await api.find('camera');assert.equal(api.snapshot().result.lookup,'camera');
+ api.set('lookup','errors');assert.equal(api.snapshot().result.lookup,'errors','each search gets back its own results');
+ api.set('lookup','camera');assert.equal(api.snapshot().result.lookup,'camera');assert.equal(api.snapshot().result.rows.length,1);
+ api.destroy();
+});

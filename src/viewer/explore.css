@@ -29,7 +29,7 @@
 .sk-terminal .section-viewport,.sk-terminal .explore-navigation{--explore-bg:var(--tm-surface);--explore-border:var(--tm-line);}
 .sk-blueprint .section-viewport,.sk-blueprint .explore-navigation{--explore-bg:#0A345D;--explore-border:#537FA1;}
 .explore-window{position:absolute;z-index:2;left:var(--float-x);top:var(--float-y);width:var(--float-w);height:var(--float-h);min-width:0;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;border:1px solid var(--explore-border);border-radius:12px;background:var(--explore-bg);box-shadow:0 6px 22px #1424421c;}
-.explore-window-header{height:32px;min-height:32px;display:flex;align-items:center;border-bottom:1px solid var(--explore-border);padding:0 14px;gap:3px;}
+.explore-window-header{height:32px;min-height:32px;display:flex;align-items:center;border-bottom:1px solid var(--explore-border);padding:0 5px 0 8px;gap:3px;}
 .explore-window-grip{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;padding:6px 0;border:0;background:none;color:var(--dtext);font:600 10px 'IBM Plex Mono',monospace;cursor:grab;touch-action:none;}
 .explore-window-grip::before{content:'⠿';padding-right:6px;opacity:.6;}
 .explore-window-hide{flex:none;width:24px;height:24px;border:0;background:none;color:var(--dtext);border-radius:6px;font-size:18px;cursor:pointer;}
@@ -77,9 +77,11 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
 .explore-window-edge[data-edge="se"]{bottom:0;right:0;cursor:nwse-resize;}
 :not(.explore-stacked)>.explore-window-edge[data-edge="se"],.explore-stacked>.explore-window-edge[data-edge="sw"]{display:none;}
 [data-explore-width-locked]>.explore-window-edge:is([data-edge="n"],[data-edge="s"]){display:none;}
-/* The right strip sits beside a floating window's body, clear of its scrollbar;
-   the header's 14px side padding keeps its grip and Hide clear of the corners. */
-.explore-stage>.explore-window>.explore-window-body{width:calc((100% - 8px) / var(--explore-overlay-scale,1));}
+/* Floating windows keep an 8px frame inside their border, so the edge strips
+   never cover content or a scrollbar. The header pads 8px on the right so Hide
+   clears the corner square. Step controls already pad their content. */
+.explore-stage>.explore-window{padding:8px;}
+.explore-stage>.explore-window>.explore-window-header{padding-right:8px;}
 .explore-window-edge:hover,.viewport-gesturing .explore-window-edge:active{background:color-mix(in srgb,var(--acc) 35%,transparent);}
 .explore-window :focus-visible,.explore-panel-menu summary:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
 .explore-player{position:absolute;z-index:20;left:var(--float-x);top:var(--float-y);width:var(--float-w);height:var(--float-h);box-sizing:border-box;overflow:hidden;overscroll-behavior:contain;border:1px solid var(--explore-border);border-radius:12px;box-shadow:0 6px 22px #14244224;background:var(--explore-bg);}

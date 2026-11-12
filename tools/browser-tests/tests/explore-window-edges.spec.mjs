@@ -87,27 +87,28 @@ test('resize strips of a floating Explore window leave the body scrollbar, the g
 
 const starter=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 function canvasSpec(){
-  const raw=structuredClone(starter),s=raw.page.sections[0],d=s.diagram;s.id='canvas-story';d.autoplay=false;d.defaultLayout='service-flow';
+  const raw=structuredClone(starter),s=raw.page.sections[0],d=s.diagram;s.id='canvas-story';s.text='Section notes stay with the diagram.';d.autoplay=false;d.defaultLayout='service-flow';
   d.layouts[1].sectionLayout.default.forEach(t=>{if(t.panel)t.hidden=false;});
-  d.layouts[1].exploreLayout={panelPlacement:'canvas',canvas:{panels:[{panel:'home',x:-380,y:20,w:340,h:300},{panel:'clip',x:500,y:450,w:340,h:280},{panel:'outcome',x:900,y:20,w:300,h:240}]}};
+  d.layouts[1].exploreLayout={panelPlacement:'canvas',canvas:{panels:[{panel:'home',x:-380,y:20,w:340,h:300},{panel:'clip',x:500,y:450,w:340,h:280},{panel:'outcome',x:900,y:20,w:300,h:240}],prose:{x:900,y:310,w:300,h:180}}};
   return JSON.stringify(raw);
 }
-const savedCanvas=(text,id)=>JSON.parse(text).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel===id);
+const savedCanvas=(text,id)=>{const canvas=JSON.parse(text).page.sections[0].diagram.layouts[1].exploreLayout.canvas;return id==='prose'?canvas.prose:canvas.panels.find(p=>p.panel===id);};
 
 test('canvas windows show edge handles only while selected; width-locked windows follow width from the side edge',async({page,server})=>{
   await page.setViewportSize({width:1600,height:1000});
   await page.goto(server.origin+'/standalone.html');await page.evaluate(()=>localStorage.clear());
   await page.goto(server.origin+'/workbench.html');await paste(page,canvasSpec());await closeTools(page);
-  const home=page.locator('.explore-canvas-objects [data-explore-panel=home]'),clip=page.locator('.explore-canvas-objects [data-explore-panel=clip]');
-  await expect(home).toBeVisible();
-  for(const edge of SIDES.filter(e=>e!=='se'))expect(await shown(home,edge),`unselected ${edge}`).toBe(false);
-  await home.focus();await expect(home).toHaveAttribute('aria-current','true');await closeTools(page);
-  for(const edge of SIDES.filter(e=>e!=='se'))expect(await shown(home,edge),`selected ${edge}`).toBe(true);
+  // Section notes are an ordinary (not width-locked) canvas window.
+  const notes=page.locator('.explore-canvas-objects [data-explore-content=prose]'),clip=page.locator('.explore-canvas-objects [data-explore-panel=clip]');
+  await expect(notes).toBeVisible();
+  for(const edge of SIDES.filter(e=>e!=='se'))expect(await shown(notes,edge),`unselected ${edge}`).toBe(false);
+  await notes.focus();await expect(notes).toHaveAttribute('aria-current','true');await closeTools(page);
+  for(const edge of SIDES.filter(e=>e!=='se'))expect(await shown(notes,edge),`selected ${edge}`).toBe(true);
   // An ordinary canvas window: the north-west corner moves only the top and left sides.
-  const before=await page.locator('#src').inputValue(),old=savedCanvas(before,'home'),start=await box(home),scale=start[2]/old.w;
+  const before=await page.locator('#src').inputValue(),old=savedCanvas(before,'prose'),start=await box(notes),scale=start[2]/old.w;
   await pointerDrag(page,pointFor(start,'nw'),-40,-30);
-  const moved=await page.locator('#src').inputValue(),now=savedCanvas(moved,'home');
-  expect(near([now.x,now.y,now.w,now.h],[old.x-40/scale,old.y-30/scale,old.w+40/scale,old.h+30/scale]),`home: ${JSON.stringify(old)} -> ${JSON.stringify(now)} at scale ${scale}`).toBe(true);
+  const moved=await page.locator('#src').inputValue(),now=savedCanvas(moved,'prose');
+  expect(near([now.x,now.y,now.w,now.h],[old.x-40/scale,old.y-30/scale,old.w+40/scale,old.h+30/scale]),`notes: ${JSON.stringify(old)} -> ${JSON.stringify(now)} at scale ${scale}`).toBe(true);
   expect(near([now.x+now.w,now.y+now.h],[old.x+old.w,old.y+old.h])).toBe(true);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
   // A width-locked window: no top or bottom edge; the west edge widens it, the right side stays put, the height follows.

@@ -3353,6 +3353,86 @@ fails closed:
   opens the provider's own dashboard, which is not narrowed.
 - Pages need `flow.telemetry-narrow`.
 
+### Variable scopes
+
+A `${name}` in a signal is filled from the nearest scope that sets it (#1344, #1357):
+
+1. the carrier: `telemetry.variables` on a node or connection, local, provider, or in an
+   import's `nodeTracking` / `edgeTracking` overlay (with or without `extends`);
+2. the import: `topologyImports[i].variables`, for every node and connection of that import;
+3. the environment profile: `tracking.telemetry.environments.<id>.variables`;
+4. the board: `tracking.telemetry.variables`;
+5. company AWS account defaults.
+
+```json
+"topologyImports": [
+  {"spec": "dcf-canon", "export": "core", "as": "fc", "variables": {"code": "FULL_CHARGE"}},
+  {"spec": "dcf-canon", "export": "core", "as": "et", "variables": {"code": "EARLY"}}]
+```
+
+The same canon imported twice reads one value per import. Names follow the board's
+rules (`env` and `account` are reserved; values are non-empty strings). Scoped values are
+literal, never expanded, and the same in every environment.
+
+- **Set once.** Across nesting levels the value nearest the provider is kept: a provider
+  carrier's own value, then each importing level's. A different value set further out is
+  ignored with a warning where it is written ("${code} is already set to "MIDDLE" nearer
+  the provider; this value is ignored"). A provider page's board-level variables do not
+  travel with an import.
+- **Never escaping or widening.** A scoped value is filled into the provider's query only
+  where it cannot change its meaning. Otherwise the signal is not shown: "Variable
+  ${code} from this import or carrier cannot be filled in safely here (…)".
+  - **One allowlist, everywhere.** A value may hold only letters, digits and `_ . @ :`,
+    with `-` only between two of those (never first or last, never `--`). A space is
+    allowed only inside a string of a query the scan can read. So no value holds a quote,
+    `\`, a bracket, a brace, `<`, `>`, `%`, `*`, `|`, `#`, `/` or `$`, and none can end a
+    string, a template or a comment in any of the five languages.
+  - **Regexes.** Inside a regex (`=~`, `!~`, `|~`, a Logs `/regex/`, a `label_replace`
+    string argument in PromQL or LogQL other than a matcher in its selector, a LogQL
+    `regexp` or `pattern` string) a value may not hold `.`.
+  - **SQL patterns.** If a SQL query uses `LIKE`, `ILIKE`, `SIMILAR`, `~`, `REGEXP`,
+    `RLIKE`, `PATINDEX`, a `regexp_…` function or `substring … from` anywhere, no value in
+    it may hold `_` or `.`, wherever it sits. A value such as `full_charge` needs a query
+    compared with `=` only.
+  - **Bare values are numbers.** Outside a string a value takes only a number or a
+    duration (`200`, `0.25`, `1.5e3`, `5m`, `1h30m`, `250ms`), in every language and every
+    position: comparisons (including PromQL `> bool …` and Logs Insights `in [ … ]`),
+    arithmetic, function arguments, `IN ( … )`, `BETWEEN`, `LIMIT`, `OFFSET`. A field name
+    there would compare or count a field instead of a literal. A name is filled in only:
+    - inside a PromQL or LogQL `by ( … )` or `without ( … )` label list (any case), which
+      only changes grouping; the name holds only letters, digits and `_` and does not start
+      with a digit;
+    - as a TraceQL `status` value (`error`, `ok` or `unset`) or `kind` value
+      (`unspecified`, `internal`, `server`, `client`, `producer` or `consumer`).
+
+    A SQL `IS` (or `IS NOT`) also takes `NULL`, `TRUE` or `FALSE`. A SQL table name (after
+    `FROM` or `JOIN`) and a PromQL vector-matching label list (`on`, `ignoring`,
+    `group_left`, `group_right`) never take a name, because a broader table or a label
+    neither side carries would count more than the provider meant: "a table name cannot
+    come from a telemetry variable", "a vector-matching label cannot come from a telemetry
+    variable".
+  - **Ranges.** Inside a PromQL or LogQL `[range]` a value may not hold `:` (it would make
+    a subquery).
+  - **Comments and strings.** The scan skips the provider's comments (SQL `--` and block
+    comments; `#` in PromQL, LogQL and Logs Insights). A placeholder inside one is refused.
+    A placeholder in a string that never closes is refused in every language. TraceQL
+    strings are `"…"` and `` `…` `` only.
+  - **SQL the scan cannot read.** A SQL query with any of these refuses every scoped
+    value, naming the form: a string that never closes, a `[bracket]` identifier,
+    `q'…'` quoting, triple quotes, a `--` not followed by a space or line end, a `#`,
+    `$$` or `$tag$` quoting, a nested or unclosed block comment, a backslash before a
+    quote, `UESCAPE`.
+  - A narrowing fragment that uses a scoped value takes the same rules and is checked
+    again after it is filled in. Board-wide and profile variables keep their meaning.
+- **SQL and Tempo.** A provider that wants boards to choose a value writes a `${name}`
+  placeholder in its query (in a string for SQL: `WHERE code = '${code}'`); the import
+  sets it. This is the route for sources that cannot be narrowed.
+- **Unset.** An unset variable keeps the signal from being sent: "Set telemetry variable
+  ${code} for this import, this node or connection, or the active environment." On a page
+  with a live-status panel the validator checks every environment profile and warns at
+  the signal, naming the environments without a value and where to set it.
+- Pages need `flow.telemetry-scoped-variables`.
+
 ### Named environment variables and counting scope
 
 Put shared string defaults in `tracking.telemetry.variables`, with per-profile

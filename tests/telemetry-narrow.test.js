@@ -290,6 +290,8 @@ test('N16 Logs Insights: "| filter …" before the first stats, or at the end; b
   ok('filter parse / 2 > 1 | stats count() as n','filter code = "E1"','filter parse / 2 > 1 | filter code = "E1" | stats count() as n');
   ok('filter like / 2 > 1 | stats count() as n','filter code = "E1"','filter like / 2 > 1 | filter code = "E1" | stats count() as n');
   // #1356 review c3 minor 2: a regex after a keyword is not read as one; the reason says so.
+  // #1356 review c4: the regex reason is about the refused command's own text, not a regex elsewhere.
+  assert.deepEqual(logs('filter x like /a/ | limit 5 | stats count() as n','filter code = "E1"'),{kind:'placement',error:'This Logs Insights query has a limit command before its stats, so a filter cannot be added safely; it is not shown.'});
   assert.deepEqual(logs('filter by like /a|b/ | stats count() as n','filter code = "E1"'),{kind:'placement',error:'This Logs Insights query has a regex after like or =~ that Flowview cannot read, so a filter cannot be added safely; it is not shown.'});
   const side=logs('stats count() as n','filter code = "E1"',{breakdown:{query:'dedup clientId | stats count() as n by clientId',labelField:'clientId',valueField:'n',limit:20}});
   assert.equal(side.error,undefined,'the total is still narrowed and shown');

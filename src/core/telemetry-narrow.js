@@ -204,7 +204,9 @@ function telemetryLogsPlace(query,commands){
   var before=at<0?parts:parts.slice(0,at);
   // Only commands known to keep every row's fields may come before the filter (#1356 review c2).
   var unknown=before.filter(function(p){var w=(/^[A-Za-z]+/.exec(p.masked) || [''])[0].toLowerCase();return TELEMETRY_LOGS_BEFORE_FILTER.indexOf(w)<0;})[0];
-  if(unknown && /(?:\blike|=~)\s*\//i.test(m))return {kind:'placement',error:'This Logs Insights query has a regex after like or =~ that Flowview cannot read, so a filter cannot be added safely; it is not shown.'};
+  // The regex reason is about the refused command's own text (#1356 review c4): it holds a / left
+  // from a regex the scanner did not read as one.
+  if(unknown && unknown.masked.indexOf('/')>=0 && /(?:\blike|=~)\s*\//i.test(m))return {kind:'placement',error:'This Logs Insights query has a regex after like or =~ that Flowview cannot read, so a filter cannot be added safely; it is not shown.'};
   if(unknown){var word=(/^[A-Za-z]+/.exec(unknown.masked) || [''])[0];return {kind:'placement',error:'This Logs Insights query has '+(word?'a '+word+' command':'an empty command')+' before its stats, so a filter cannot be added safely; it is not shown.'};}
   var added=commands.map(function(c){return c.trim();}).join(' | ');
   if(at<0)return {query:query.replace(/\s+$/,'')+' | '+added};

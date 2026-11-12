@@ -237,7 +237,7 @@ var TELEMETRY_SOURCES=['grafana','loki','tempo','sql','honeycomb','cloudwatch','
 var TELEMETRY_CARD_SIDES=['right','left','above','below'];
 var TELEMETRY_LINKS=['dashboard','query'];
 // #1353: a binding-level needsNarrow applies to every signal of the binding, also ones a template writes.
-var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card','needsNarrow'];
+var TELEMETRY_BINDING_FIELDS=['kind','signals','proof','links','card','needsNarrow','variables'];
 var TELEMETRY_RESERVED=TELEMETRY_BINDING_FIELDS.concat(['use','params']);
 var TELEMETRY_DEFAULT_WINDOW='24h',TELEMETRY_MIN_REFRESH_MS=300000,TELEMETRY_CARD_OFFSET_MAX=1000,TELEMETRY_CARD_WIDTH_MIN=140,TELEMETRY_CARD_WIDTH_MAX=480;
 var telemetryNamePattern=/^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -281,6 +281,141 @@ function telemetryCloudwatchLogsQuery(query){
 function telemetryQueryUrl(value){
   if(!telemetryConfigUrl(value))return null;
   var url=new URL(value);return /(?:^|\.)honeycomb\.io$/.test(url.hostname) && /(?:query_results|trace_results)(?:\/|$)/.test(url.pathname)?null:value;
+}
+/* #1357: scoped variables, on a binding (carrier) or a topology import, follow the board's name
+   rules: a non-reserved name and a non-empty string. Returns the valid ones; warns on the rest. */
+function telemetryScopedVariables(value,warn,at){
+  var out={};if(value==null)return out;
+  warn=warn || function(){};
+  if(!telemetryObject(value)){warn(at,'must be an object of named strings — ignored');return out;}
+  Object.keys(value).forEach(function(name){
+    if(!telemetryParamPattern.test(name) || ['env','account','constructor','prototype','__proto__'].indexOf(name)>=0 || !telemetryText(value[name]))warn(at+'.'+name,'use a non-reserved name and non-empty string — ignored');
+    else out[name]=value[name];
+  });
+  return out;
+}
+/* #1357 / #1359: a scoped value is filled into a provider's text query only when it cannot change
+   the query's meaning. One character allowlist covers every language and position (no quote, \,
+   brace, bracket, angle bracket, %, *, |, #, / or $ can be filled in, so no value can end a string,
+   template or comment in any dialect), plus a few coarse gates: SQL the scan cannot read, a SQL
+   query that uses patterns or regexes, a regex position, a [range], a bare value. */
+// String quotes per language. TraceQL strings are "…" and `…` only (Tempo's lexer); a ' is not one.
+var TELEMETRY_SCOPED_QUOTES={loki:'"`',grafana:'"\'`',tempo:'"`',sql:'\'"`',cloudwatchLogs:'"\'`'};
+var TELEMETRY_SCOPED_TOKEN='[A-Za-z0-9_.@:]+(?:-[A-Za-z0-9_.@:]+)*';
+var TELEMETRY_SCOPED_BARE=new RegExp('^'+TELEMETRY_SCOPED_TOKEN+'$'),TELEMETRY_SCOPED_SPACED=new RegExp('^'+TELEMETRY_SCOPED_TOKEN+'(?: +'+TELEMETRY_SCOPED_TOKEN+')*$');
+var TELEMETRY_SCOPED_ALLOWED='a telemetry variable may hold only letters, digits and _ . @ : - (and spaces inside a string)';
+var TELEMETRY_SCOPED_NUMERIC='outside a string only a number or a duration may be filled in here; a name may be filled in only inside by (…) / without (…) or as a TraceQL status/kind value';
+var TELEMETRY_SCOPED_SQL_PATTERN='in a SQL query that uses patterns or regexes, a variable may not hold _ or .';
+var TELEMETRY_TRACE_ENUMS={status:['error','ok','unset'],kind:['unspecified','internal','server','client','producer','consumer']};
+/* SQL readability gate (VARTEST-1359): dialect forms the scan cannot follow in step. Any of them
+   makes every scoped value in the query refused, naming the form. */
+function telemetrySqlUnreadable(text){
+  if(/\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.test(text))return 'dollar quoting';
+  if(/\\['"]/.test(text))return 'a backslash before a quote';
+  if(/\buescape\b/i.test(text))return 'UESCAPE';
+  if(text.indexOf("'''")>=0 || text.indexOf('"""')>=0)return 'triple quotes';
+  var quote=null;
+  for(var i=0;i<text.length;i++){
+    var c=text[i];
+    if(quote){if(c===quote)quote=null;continue;}
+    if(c==="'" || c==='"' || c==='`'){quote=c;continue;}
+    if((c==='q' || c==='Q') && text[i+1]==="'" && !/[A-Za-z0-9_$]/.test(text[i-1] || ''))return "q'…' quoting";
+    if(c==='#')return 'a # (MySQL comment, or a Postgres #> / # operator)';
+    if(c==='[')return 'a [bracket] identifier';
+    if(text.slice(i,i+2)==='--'){if(!/^--(?:[ \t]|\r?\n|$)/.test(text.slice(i)))return 'a -- with no space after it';var nl=text.indexOf('\n',i);if(nl<0)break;i=nl;continue;}
+    if(text.slice(i,i+2)==='/*'){var close=text.indexOf('*/',i+2);if(close<0)return 'an unclosed block comment';if(text.slice(i+2,close).indexOf('/*')>=0)return 'a nested block comment';i=close+1;}
+  }
+  if(quote)return 'an unclosed string';
+  return null;
+}
+// Patterns and regexes anywhere in a SQL query: a scoped value there may not hold _ or . (VARTEST-1359).
+var TELEMETRY_SQL_PATTERNS=/\b(?:i?like|similar|regexp|rlike|patindex)\b|\bregexp_\w+|~|\bsubstring\b[\s\S]*\bfrom\b/i;
+/* #1359 c5/c6: a bare placeholder (outside any string) takes only a number or a duration, in every
+   language. A name is filled in only in a PromQL or LogQL by ( … ) or without ( … ) label list,
+   which only changes grouping, and as a TraceQL status or kind value (its own enum keywords). A
+   SQL IS also takes NULL, TRUE or FALSE. A SQL table name (after FROM or JOIN) and a vector-matching
+   label list (on, ignoring, group_left, group_right) are recognised only to name them when they
+   refuse: either can widen the query by design. */
+function telemetryScopedBarePosition(source,text,index,end){
+  // Strings and comments are masked first, so a slot keyword inside one never counts.
+  var mask=source==='sql'?/'[^']*'|"[^"]*"|`[^`]*`|--[^\n]*|\/\*[\s\S]*?\*\//g:/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`|#[^\n]*/g;
+  var before=text.slice(0,index).replace(mask,'\u0001').replace(/\s+$/,''),after=text.slice(end).replace(mask,'\u0001').replace(/^\s+/,'');
+  var list=(source==='grafana' || source==='loki') && /^(?:,\s*[A-Za-z_][A-Za-z0-9_]*\s*)*\)/.test(after) && /\b(by|without|on|ignoring|group_left|group_right)\s*\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*$/i.exec(before);
+  if(list)return /^(?:by|without)$/i.test(list[1])?'label':'vector';
+  // A table name: after JOIN, or after the FROM of a SELECT at the same parenthesis depth (not
+  // IS DISTINCT FROM, substring(… FROM …), EXTRACT(… FROM …) or TRIM(… FROM …)). Only named.
+  if(source==='sql' && /\bjoin$/i.test(before))return 'table';
+  if(source==='sql' && /\bfrom$/i.test(before) && !/\bdistinct\s+from$/i.test(before)){
+    var bare=before,depth=0,open=-1;
+    for(var i=bare.length-1;i>=0;i--){if(bare[i]===')')depth++;else if(bare[i]==='('){if(depth===0){open=i;break;}depth--;}}
+    if(/\bselect\b/i.test(bare.slice(open+1)))return 'table';
+  }
+  var enumOf=source==='tempo' && /(?:^|[\s{(.:])(status|kind)\s*!?=$/.exec(before);
+  if(enumOf)return enumOf[1];
+  if(source==='sql' && /\bis(?:\s+not)?$/i.test(before))return 'is';
+  return null;
+}
+/* Where a placeholder sits: a forward scan that skips strings (with their escapes) and comments
+   (SQL -- and block comments; # in PromQL, LogQL and Logs Insights) and keeps the call each (
+   opens, the selector braces and the [range] brackets it is in. */
+function telemetryScopedPlacement(source,text,index,end){
+  if(source==='sql'){var unreadable=telemetrySqlUnreadable(text);if(unreadable)return {unreadable:unreadable};}
+  var quotes=TELEMETRY_SCOPED_QUOTES[source] || '"\'`',quote=null,opened=-1,calls=[],openedIn=null,braces=0,openedInBraces=false,brackets=0;
+  for(var i=0;i<index;i++){
+    var c=text[i];
+    if(quote){if(source!=='sql' && quote!=='`' && c==='\\'){i++;continue;}if(c===quote)quote=null;continue;}
+    var comment=source==='sql'?(text.slice(i,i+2)==='--'?'\n':text.slice(i,i+2)==='/*'?'*/':null):(source==='grafana' || source==='loki' || source==='cloudwatchLogs') && c==='#'?'\n':null;
+    if(comment){var stop=text.indexOf(comment,i+(comment==='*/'?2:1));if(stop<0 || stop>=index)return {comment:true};i=stop+comment.length-1;continue;}
+    if(c==='('){var callee=/([A-Za-z_][A-Za-z0-9_]*)\s*$/.exec(text.slice(0,i));calls.push(callee?callee[1].toLowerCase():'');continue;}
+    if(c===')'){calls.pop();continue;}
+    if(c==='{'){braces++;continue;}if(c==='}'){braces=Math.max(0,braces-1);continue;}
+    if(c==='['){brackets++;continue;}if(c===']'){brackets=Math.max(0,brackets-1);continue;}
+    if(quotes.indexOf(c)>=0 || source==='cloudwatchLogs' && c==='/' && typeof telemetryLogsRegexOpens==='function' && telemetryLogsRegexOpens(text.slice(0,i))){quote=c;opened=i;openedIn=calls[calls.length-1] || '';openedInBraces=braces>0;}
+  }
+  if(!quote){
+    var range=(source==='grafana' || source==='loki') && brackets>0;
+    return {string:false,range:range,position:telemetryScopedBarePosition(source,text,index,end)};
+  }
+  // A string that never closes after the placeholder is not one the scan can read.
+  var k=end;
+  for(;k<text.length;k++){var d=text[k];if(source!=='sql' && quote!=='`' && d==='\\'){k++;continue;}if(d===quote)break;}
+  if(k>=text.length)return {unreadable:'an unclosed string'};
+  var before=text.slice(0,opened).replace(/\s+$/,'');
+  // Regex positions: =~ !~ |~, a Logs /regex/, label_replace string arguments (not a matcher in its
+  // selector), a LogQL regexp or pattern stage.
+  var regex=source!=='sql' && (quote==='/' || source!=='cloudwatchLogs' && /(?:=~|!~|\|~)$/.test(before) ||
+    (source==='grafana' || source==='loki') && openedIn==='label_replace' && !openedInBraces || source==='loki' && /\|\s*(?:regexp|pattern)$/.test(before));
+  return {string:true,regex:regex};
+}
+// A numeric literal (signed, decimal, exponent) or a duration (5m, 1h30m, 250ms).
+function telemetryScopedNumber(value){return /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(value) || /^(?:\d+(?:\.\d+)?(?:ns|us|µs|ms|s|m|h|d|w|y))+$/.test(value);}
+function telemetryScopedValueProblem(source,query,scoped,fragments){
+  var texts=[];
+  if(typeof query==='string')texts.push(query);
+  else if(source==='cloudwatchLogs' && telemetryObject(query)){
+    if(typeof query.query==='string')texts.push(query.query);
+    ['breakdown','trend'].forEach(function(k){if(telemetryObject(query[k]) && typeof query[k].query==='string')texts.push(query[k].query);});
+  }
+  // Text narrowing fragments that use a scoped value take the same rules, read as text of the same language.
+  (fragments || []).forEach(function(f){if(typeof f==='string')texts.push(f);});
+  for(var t=0;t<texts.length;t++){
+    var re=/\$\{([A-Za-z][A-Za-z0-9_]*)\}/g,hit;
+    while((hit=re.exec(texts[t]))){
+      var name=hit[1];if(!telemetryOwn(scoped,name))continue;
+      var value=String(scoped[name]),why=null;
+      var at=telemetryScopedPlacement(source,texts[t],hit.index,hit.index+hit[0].length);
+      if(at.comment)why='it sits in a comment of the provider\'s query';
+      else if(at.unreadable)why=(source==='sql' && at.unreadable!=='an unclosed string'?'this SQL query uses ':'this query has ')+at.unreadable+', which Flowview cannot read safely';
+      else if(!(at.string?TELEMETRY_SCOPED_SPACED:TELEMETRY_SCOPED_BARE).test(value))why=TELEMETRY_SCOPED_ALLOWED;
+      else if(at.string && at.regex && value.indexOf('.')>=0)why='it is filled into a regex and holds regex characters';
+      else if(source==='sql' && TELEMETRY_SQL_PATTERNS.test(texts[t]) && /[_.]/.test(value))why=TELEMETRY_SCOPED_SQL_PATTERN;
+      else if(!at.string && at.range && value.indexOf(':')>=0)why='inside a range it may not hold :, which turns the range into a subquery';
+      else if(!at.string && !telemetryScopedNumber(value) && !(at.position==='label' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) || (at.position==='status' || at.position==='kind') && TELEMETRY_TRACE_ENUMS[at.position].indexOf(value)>=0 || at.position==='is' && /^(?:null|true|false)$/i.test(value)))
+        why=at.position==='label'?'a label name may hold only letters, digits and _, and may not start with a digit':at.position==='table'?'a table name cannot come from a telemetry variable':at.position==='vector'?'a vector-matching label cannot come from a telemetry variable':TELEMETRY_SCOPED_NUMERIC;
+      if(why)return 'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';
+    }
+  }
+  return null;
 }
 /* #1348: shape warnings for a signal's narrow (keyed by source) as written. source is the
    signal's own source, or null for a field patch whose inherited source is not known here. */
@@ -391,6 +526,7 @@ function telemetryClean(raw,warn,template){
     if(!Object.keys(signals).length){warn('.signals','needs at least one valid signal — '+(template?'template':'binding')+' ignored');ok=false;}
   }
   out.signals=signals;
+  if(!template && telemetryOwn(raw,'variables')){var scopedVars=telemetryScopedVariables(raw.variables,warn,'.variables');if(Object.keys(scopedVars).length)out.variables=scopedVars;}
   if(!template && telemetryOwn(raw,'needsNarrow') && raw.needsNarrow!==null){
     if(telemetryNeedsNarrowValid(raw.needsNarrow))out.needsNarrow=telemetryClone(raw.needsNarrow);
     else warn('.needsNarrow','must be true or a list of the field names a board must narrow by — ignored');
@@ -467,7 +603,7 @@ function telemetryExpand(raw,templates,invalid){
   if(missing)return null;
   var base={};Object.keys(template).forEach(function(key){if(key!=='params' && key!=='card')base[key]=telemetryClone(template[key]);});
   var out=telemetrySubstitute(base,values);
-  ['kind','card','needsNarrow'].forEach(function(key){if(telemetryOwn(raw,key))out[key]=telemetryClone(raw[key]);});
+  ['kind','card','needsNarrow','variables'].forEach(function(key){if(telemetryOwn(raw,key))out[key]=telemetryClone(raw[key]);});
   ['signals','proof','links'].forEach(function(key){
     if(!telemetryOwn(raw,key))return;
     if(!telemetryObject(raw[key])){warn('.'+key,'must be an object — carrier '+key+' ignored');return;}
@@ -480,7 +616,7 @@ function telemetryExpand(raw,templates,invalid){
 /* #1266: a consumer overlay on an imported carrier. `{extends:true, ...}` merges with the
    inherited (provider) binding through FlowTopology.mergeTelemetry (canon-topology.js); an
    overlay without `extends` replaces the inherited binding (the original rule). */
-var TELEMETRY_MERGE_FIELDS=['extends','kind','signals','hide','proof','links','card'];
+var TELEMETRY_MERGE_FIELDS=['extends','kind','signals','hide','proof','links','card','variables'];
 function telemetryMergeOverlay(overlay){return telemetryObject(overlay) && overlay.extends===true;}
 // Metrics rule for a removed or hidden signal: its limit goes, and so does any ratio limit based on it.
 function telemetryDropSignal(binding,name){
@@ -499,6 +635,7 @@ function telemetryMergeOverlayWarnings(overlay,invalid,inheritedNames){
   var warn=telemetryWarn(invalid);
   telemetryUnknown(overlay,TELEMETRY_MERGE_FIELDS,warn);
   if(telemetryOwn(overlay,'kind') && TELEMETRY_KINDS.indexOf(overlay.kind)<0)warn('.kind','must be one of '+TELEMETRY_KINDS.join(', ')+' — ignored');
+  if(telemetryOwn(overlay,'variables'))telemetryScopedVariables(overlay.variables,warn,'.variables');
   if(telemetryOwn(overlay,'hide') && !(Array.isArray(overlay.hide) && overlay.hide.every(function(name){return typeof name==='string' && telemetryNamePattern.test(name);})))warn('.hide','must be an array of inherited signal names — ignored');
   ['signals','proof','links','card'].forEach(function(field){
     if(!telemetryOwn(overlay,field))return;
@@ -547,6 +684,10 @@ function carrierTelemetry(obj,templates,invalid,environment){
     var values=Object.assign(Object.create(null),config.variables || {});
     if(config.environment)values.env=config.environment;
     if(config.grafana && config.grafana.accountId)values.account=config.grafana.accountId;
+    // #1357: the carrier's and its import's values come before the environment and the board's (D6),
+    // literal and the same in every environment.
+    var scoped=telemetryScopedVariables(expanded.variables,null,'');
+    Object.keys(scoped).forEach(function(name){values[name]=scoped[name];});
     Object.keys(expanded).forEach(function(key){
       if(key==='signals' && telemetryObject(expanded[key]))Object.keys(expanded[key]).forEach(function(name){
         // #1354: the narrowing as written, to tell a fragment broken by a filled-in variable from one written broken.
@@ -558,7 +699,15 @@ function carrierTelemetry(obj,templates,invalid,environment){
         // The optional grouped query owns its configuration errors. Resolve it
         // separately, once, so it cannot suppress an otherwise readable total.
         if(hasBreakdown)delete logs.breakdown;if(hasTrend)delete logs.trend;
-        function missingReason(missing){return 'Set telemetry variable ${'+missing+'} in the active environment'+(missing==='account'?' or tracking.telemetry.grafana.accountId':'')+'.';}
+        function missingReason(missing){return 'Set telemetry variable ${'+missing+'} for this import, this node or connection, or the active environment'+(missing==='account'?', or tracking.telemetry.grafana.accountId':'')+'.';}
+        // #1357: a scoped value that would escape or widen the provider's query keeps the signal from being sent.
+        if(telemetryObject(authored)){
+          var sourceKey=TELEMETRY_SOURCES.filter(function(k){return telemetryOwn(authored,k);})[0];
+          var checked=sourceKey==='cloudwatchLogs'?Object.assign({},authored.cloudwatchLogs,hasBreakdown?{breakdown:breakdown}:{},hasTrend?{trend:trend}:{}):sourceKey?authored[sourceKey]:null;
+          var narrowFragments=sourceKey && telemetryObject(authored.narrow)?telemetryNarrowList(authored.narrow[sourceKey]):[];
+          var unsafe=sourceKey?telemetryScopedValueProblem(sourceKey,checked,scoped,narrowFragments):null;
+          if(unsafe)errors[name]=unsafe;
+        }
         expanded[key][name]=telemetrySubstitute(expanded[key][name],values,function(missing){
           errors[name]=missingReason(missing);
         },true);
@@ -569,7 +718,7 @@ function carrierTelemetry(obj,templates,invalid,environment){
         if(hasTrend)expanded[key][name].cloudwatchLogs.trend=telemetrySubstitute(trend,values,function(missing){trendErrors[name]=missingReason(missing);},true);
         if(hasBreakdown)expanded[key][name].cloudwatchLogs.breakdown=telemetrySubstitute(breakdown,values,function(missing){breakdownErrors[name]=missingReason(missing);},true);
       });
-      else expanded[key]=telemetrySubstitute(expanded[key],values,null,true);
+      else if(key!=='variables')expanded[key]=telemetrySubstitute(expanded[key],values,null,true);
     });
   }
   var clean=telemetryClean(expanded,warn,false);

@@ -21,6 +21,7 @@
 | X19 | (#1348) A source switch keeps the inherited narrowing, so a fragment in the old language fails closed with a reason. | provider Honeycomb signal narrowed by the middle; consumer switches to Grafana | signal error | a stale fragment applied to another language |
 | X20 | (#1348) No widening: a null narrow, a null for an inherited source, or a null/false needsNarrow is ignored and warns at the overlay. | consumer patches | merged binding unchanged; warnings exactly | a board removing the provider's narrowing |
 | X21 | (#1348, D10) A board that narrows an inherited signal no longer gets the provider's query link (it opens the unnarrowed query) unless it sets its own; other links stay. | provider signal with links.query | merged links | a link to the unnarrowed query |
+| X22 | (#1353 review c1 minors 1 and 3) A replacing binding (no extends) keeps the provider carrier's needsNarrow on every signal it writes, so a restated query fails closed unless it narrows; it warns at the overlay. Narrowing an inherited signal also drops the provider's carrier-level query link unless the board sets its own. | provider needsNarrow; replacing consumer bindings | sent signal; warnings; merged links | reading the unnarrowed number by restating the provider query |
 | X6 | Validator: a merge overlay produces no telemetry warnings; a malformed `hide` warns at its overlay path. Compatibility declares `flow.telemetry-merge` only for merge overlays. | consumer docs | warnings; features | warnings on valid merges; silent malformed filters; older runtimes treating merges as replaces |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
@@ -356,4 +357,20 @@ test('#1348 X21 narrowing an inherited signal hides the provider\'s query link u
   assert.equal(Object.hasOwn(merged({narrow:{honeycomb:{filters:[flt('event_code','X')]}}}),'links'),false,'the unnarrowed query link is gone');
   assert.deepEqual(merged({narrow:{honeycomb:{filters:[flt('event_code','X')]}},links:{query:'https://ui.honeycomb.io/q/2'}}).links,{query:'https://ui.honeycomb.io/q/2'},'the board\'s own link stays');
   assert.deepEqual(merged({unit:'n'}).links,{query:'https://ui.honeycomb.io/q/1'},'a patch that does not narrow keeps it');
+});
+
+test('#1353 X22 a replacing binding keeps the provider\'s needsNarrow; narrowing drops the carrier query link',()=>{
+  const provider=narrowProvider();
+  const replace=telemetry=>{const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry}}}]);return {consumer,context:{version:1,id:'consumer',specs:[provider,consumer]}};};
+  let r=replace({kind:'service',signals:{count:{honeycomb:NARROW_HC()}}});
+  const s=plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(r.consumer,r.context)).nodes['fc::dcf'],{}).signals.count);
+  assert.equal(s.error,'The provider asks each board to narrow this signal by event_code, and nothing narrows it here, so it is not shown.','the restated query is not shown');
+  assert.deepEqual(findings(r.consumer,r.context).warnings.filter(w=>/replaces/.test(w)),['sections[0].diagram.topologyImports[0].nodeTracking.dcf.telemetry: this binding replaces the provider\'s on node dcf, whose signals must be narrowed by event_code; each signal here keeps that requirement']);
+  r=replace({kind:'service',signals:{count:{honeycomb:NARROW_HC(),narrow:{honeycomb:{filters:[flt('event_code','FULL_CHARGE')]}}}}});
+  assert.equal(plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(r.consumer,r.context)).nodes['fc::dcf'],{}).signals.count).error,undefined,'a replacement that narrows is shown');
+  const linked=spec('provider',{nodes:{dcf:{title:'DCF',telemetry:{kind:'service',links:{query:'https://ui.honeycomb.io/q/carrier',dashboard:'https://grafana.test/d'},signals:{received:{honeycomb:NARROW_HC()}}}}},rows:[['dcf']],topologyExports:{core:{nodes:['dcf'],edges:[]}}});
+  const merged=overlay=>{const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:overlay}}}]);return plain(diagramOf(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[linked,consumer]})).nodes['fc::dcf'].telemetry.links);};
+  assert.deepEqual(merged(narrowWith(flt('event_code','X'))),{dashboard:'https://grafana.test/d'},'the carrier query link goes; the dashboard stays');
+  assert.deepEqual(merged({...narrowWith(flt('event_code','X')),links:{query:'https://ui.honeycomb.io/q/board'}}),{query:'https://ui.honeycomb.io/q/board',dashboard:'https://grafana.test/d'},'the board\'s own stays');
+  assert.deepEqual(merged({extends:true,signals:{received:{unit:'n'}}}),{query:'https://ui.honeycomb.io/q/carrier',dashboard:'https://grafana.test/d'},'no narrowing, no change');
 });

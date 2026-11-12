@@ -31,11 +31,11 @@ test('P1 desktop Add shared variable writes tracking.telemetry.variables; an env
   await metrics.getByRole('button',{name:'Add shared variable',exact:true}).click();
   await expect.poll(async()=>(await telemetry(src)).variables).toEqual({team:'core'});
   await expect(metrics.getByLabel('Shared variable 1 name',{exact:true})).toHaveValue('team');
-  await typeInto(environments.getByLabel('New stg variable name',{exact:true}),'team');
-  const value=environments.getByLabel('New stg variable value',{exact:true});await typeInto(value,'edge');await value.press('Enter');
+  await typeInto(environments.getByLabel('New stg environment variable name',{exact:true}),'team');
+  const value=environments.getByLabel('New stg environment variable value',{exact:true});await typeInto(value,'edge');await value.press('Enter');
   await expect.poll(async()=>(await telemetry(src)).environments.stg.variables).toEqual({team:'edge'});
   expect((await telemetry(src)).environments.qa.variables).toBeUndefined();
-  await expect(environments.getByLabel('stg variable 1 value',{exact:true})).toHaveValue('edge');
+  await expect(environments.getByLabel('stg environment variable 1 value',{exact:true})).toHaveValue('edge');
   await page.screenshot({path:info.outputPath('metrics-variables-rows.png')});
 });
 

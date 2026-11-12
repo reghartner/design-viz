@@ -245,7 +245,7 @@ makes no second call. Without `dataset` (#1414) the query runs across the whole
 environment (`environment_wide_query: true`), so spans of every service's dataset
 get their attributes, joined on `trace.span_id`; validation adds a note that it is
 environment-wide. If the `run_query` schema has no `environment_wide_query`, no
-second call is made and **Source and limitations** says to add a dataset. The
+second call is made and **Source and limitations** says why. The
 arguments are:
 
 - the profile's literals and context arguments, as `get_trace` receives them,

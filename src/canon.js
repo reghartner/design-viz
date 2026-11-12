@@ -219,8 +219,6 @@ var FlowCanon = (function(){
     Object.keys(connections).forEach(function(id){(connections[id].allowedAttributes || []).forEach(function(k){(out[k]=out[k] || []).push(connections[id].provider);});});
     return out;
   }
-  /* Honeycomb trace attributes are text: get_trace table cells, and the run_query
-     raw rows a Honeycomb profile reads its allowedAttributes from (#1197). */
   /* #1414: a Honeycomb profile with allowedAttributes and no dataset reads them with an
      environment-wide run_query; the validator says so as a note. */
   function traceNotes(raw){
@@ -228,6 +226,8 @@ var FlowCanon = (function(){
     Object.keys(connections).forEach(function(id){var c=connections[id];if(c.provider==='honeycomb' && (c.allowedAttributes || []).length && !c.dataset)notes.push('tracking.telemetry.traceConnections.'+id+': no `dataset`, so the allowedAttributes query (run_query) runs environment-wide across every dataset; add `dataset` to narrow it');});
     return notes;
   }
+  /* Honeycomb trace attributes are text: get_trace table cells, and the run_query
+     raw rows a Honeycomb profile reads its allowedAttributes from (#1197). */
   function traceWarnings(raw){
     var listed=profileAttributes(raw),warnings=[],connections=pageConnections(raw);
     sections(raw).forEach(function(sec){(Array.isArray(sec.diagram.steps)?sec.diagram.steps:[]).forEach(function(st){

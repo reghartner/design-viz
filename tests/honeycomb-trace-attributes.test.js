@@ -282,6 +282,8 @@ test('13. #1414 environment-wide answer fills the allowed attribute on spans of 
   assert.deepEqual([FRONTEND,CATALOG,DATABASE].map(id=>[by(id).service,by(id).attributes['server.address']]),
     [['frontend','shop.example'],['productcatalog','catalog.internal'],['database','db.internal']]);
   for(const id of [FRONTEND,CATALOG,DATABASE])assert.equal(by(id).attributes.name,undefined,'a column that was not asked for is not added');
+  const absent=e.spans.filter(s=>![FRONTEND,CATALOG,DATABASE].includes(s.id));
+  assert.ok(absent.length>0 && absent.every(s=>s.attributes['server.address']===undefined),'a span the answer does not name gets no server.address');
   assert.ok(!e.warnings.some(w=>/server\.address/.test(w)),JSON.stringify(e.warnings));
 });
 test('14. #1414 with a dataset nothing changes; a run_query schema without environment_wide_query leaves a datasetless profile\'s attributes missing, with a reason',async()=>{

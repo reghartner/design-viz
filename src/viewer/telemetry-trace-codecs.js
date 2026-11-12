@@ -141,7 +141,7 @@ function telemetryTraceAttributeQuery(tool,base,allowed){
   if(!telemetryOwn(input,'environment_slug') && base.environment!==undefined)input.environment_slug=base.environment;
   if(telemetryTraceString(base.dataset))input.dataset_slug=base.dataset;
   else if(telemetryOwn(props,'environment_wide_query'))input.environment_wide_query=true;
-  else telemetryTraceFail('run_query takes no environment_wide_query; add a dataset to the profile.');
+  else telemetryTraceFail('no dataset is set and this run_query takes no environment_wide_query, so it cannot read the whole environment.');
   input.query_spec=types.indexOf('object')<0?JSON.stringify(spec):spec;input.raw_row_columns=['trace.span_id'].concat(columns);input.results_limit=TELEMETRY_TRACE_SPANS;
   FlowTraceConnections.validate(input,schema);
   return {input:input,columns:columns,warnings:allowed.length>columns.length?['Span attributes not loaded ('+allowed.slice(29).join(', ')+'): run_query takes at most 30 columns.']:[]};

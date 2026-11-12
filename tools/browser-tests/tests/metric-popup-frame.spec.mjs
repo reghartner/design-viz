@@ -145,27 +145,40 @@ test('desktop Jira view: the Charge and GetCart popups stay inside the diagram f
  await expectInFrame(root,'checkout->cart','Work status · GetCart');
 });
 
-// Review #1380: a popup taller than the frame is capped and scrolls; a repaint while it is open (a data refresh;
-// Over time and late Evidence take the same path) keeps the reader's scroll position, and Close stays in view.
-test('desktop a capped popup scrolls, keeps its scroll position through a repaint, and keeps Close in view',async({page,server})=>{
+// Review #1380: a popup taller than the frame is capped and its body scrolls. Opens the GetCart popup on a short
+// diagram tile, checks it is inside the frame, scrolls its body with the wheel and returns the scroll reader.
+async function openCapped(page,server){
  const root=await setup(page,server,{jira:false,rows:10});await pickExample(root);
  const card=root.locator('.dv-metrics-card[data-metrics-card="checkout->cart"]'),pop=root.locator('.dv-live-popover');
  await cameraSettled(root);await card.click();await expect(pop).toContainText('Metrics · GetCart');await expect(pop).toContainText('Evidence');await popupSettled(root);
- const inFrame=async when=>{const g=await root.evaluate(geometry);expect({boards:g.boards,pops:g.pops,status:g.status,steps:g.steps}).toEqual({boards:1,pops:1,status:1,steps:1});
-  expect(g.outside,'popup inside the diagram frame '+when+'; popup '+JSON.stringify(g.pop)+' frame '+JSON.stringify(g.frame)).toBe(false);expect(g.overSteps,'popup off the step area '+when).toBe(false);};
- await inFrame('when opened');
+ await expectCappedInFrame(root,'when opened');
  const scroll=()=>pop.evaluate(el=>({top:el.scrollTop,max:el.scrollHeight-el.clientHeight}));
  expect((await scroll()).max,'the popup is capped to the frame and its body scrolls').toBeGreaterThan(40);
  const box=await pop.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.wheel(0,30);
  await expect.poll(async()=>(await scroll()).top,{message:'the wheel scrolls the popup body'}).toBeGreaterThan(10);
- await popupSettled(root);const before=(await scroll()).top;
- expect(await root.evaluate(closeShown),'Close stays in view while the body is scrolled').toBe(true);
+ await popupSettled(root);
+ return {root,card,pop,scroll};
+}
+async function expectCappedInFrame(root,when){
+ const g=await root.evaluate(geometry);expect({boards:g.boards,pops:g.pops,status:g.status,steps:g.steps}).toEqual({boards:1,pops:1,status:1,steps:1});
+ expect(g.outside,'popup inside the diagram frame '+when+'; popup '+JSON.stringify(g.pop)+' frame '+JSON.stringify(g.frame)).toBe(false);expect(g.overSteps,'popup off the step area '+when).toBe(false);
+}
+// A repaint while the popup is open (a data refresh; Over time, late Evidence and a step change take the same
+// refreshPopover path) keeps the reader's scroll position.
+test('desktop a capped popup keeps its scroll position through a repaint',async({page,server})=>{
+ const {root,card,pop,scroll}=await openCapped(page,server),before=(await scroll()).top;
  await pop.evaluate(el=>{window.__popMutations=0;new MutationObserver(()=>window.__popMutations++).observe(el,{subtree:true,childList:true,characterData:true,attributes:true});});
  await page.evaluate(()=>{const next=structuredClone(window.samples);Object.values(next).forEach(v=>Object.values(v.signals).forEach(s=>{s.value=Math.round(s.value*1.1)+1;s.series=s.series.map(([t,n])=>[t,Math.round(n*1.1)+1]);}));window.viewer.controller.telemetry.apply(next);});
  await expect.poll(()=>page.evaluate(()=>window.__popMutations),{message:'the open popup repainted'}).toBeGreaterThan(0);
  await expect(pop).toBeVisible();await popupSettled(root);
  const after=(await scroll()).top;expect(Math.abs(after-before),'the scroll position is kept through the repaint ('+before+' then '+after+')').toBeLessThanOrEqual(1);
- await inFrame('after the repaint');expect(await root.evaluate(closeShown),'Close in view after the repaint').toBe(true);
+ await expectCappedInFrame(root,'after the repaint');
+ await page.keyboard.press('Escape');await expect(pop).toBeHidden();await expect(card).toBeFocused();
+});
+// Close stays in its corner while the capped body scrolls, and still closes the popup.
+test('desktop a capped popup keeps Close in view while its body is scrolled',async({page,server})=>{
+ const {card,pop,root}=await openCapped(page,server);
+ expect(await root.evaluate(closeShown),'Close stays in view while the body is scrolled').toBe(true);
  await pop.getByRole('button',{name:/^Close/}).click();await expect(pop).toBeHidden();await expect(card).toBeFocused();
 });
 // The reader's Explore View (as in status-explore.spec.mjs): its tab in the Views strip, else the View picker.

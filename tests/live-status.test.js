@@ -5667,4 +5667,9 @@ test('#1241 Workbench Tickets rows drag onto nodes and connections through the E
   assert.equal(drop(x,x.view.querySelector('g.node[data-dv-node="c"]'),'BB-1'),false);x.ctl.liveStatus.destroy();
  }
  assert.equal(calls.length,2,'neither calls ticketDrop');
+ // A refused Workbench drop says why in the panel's status line (review c1 MINOR 2).
+ const r=harness(fixture(),{},{authoring:true,ticketDrop:()=>({error:'BB-1 was not attached: the connection changed.'})});mountStatus(r);r.ctl.liveStatus.apply(fixed);r.flush();
+ drop(r,r.view.querySelector('g.node[data-dv-node="c"]'),'BB-1');
+ assert.deepEqual(JSON.parse(JSON.stringify(r.ctl.liveStatus.snapshot().note)),{text:'BB-1 was not attached: the connection changed.',kind:'warn'});
+ r.ctl.liveStatus.destroy();
 });

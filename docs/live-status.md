@@ -3385,8 +3385,13 @@ literal, never expanded, and the same in every environment.
   `label_replace` argument, a LogQL `regexp` or `pattern` string) no regex character; in a
   SQL `LIKE`/`ILIKE` pattern no `%` or `_`; outside a string only letters, digits and
   `. _ : - @`. The scan skips the provider's comments (SQL `--` and block comments; `#`
-  in PromQL, LogQL and Logs Insights), and a placeholder inside one is refused. TraceQL
-  strings are `"…"` and `` `…` `` only. Otherwise the
+  in PromQL, LogQL and Logs Insights), and a placeholder inside one is refused (so is a
+  placeholder that also appears in a comment). TraceQL strings are `"…"` and `` `…` ``
+  only. In SQL, a string anywhere in a `LIKE`, `ILIKE` or `SIMILAR TO` operand (joined by
+  `||` or inside `CONCAT`) is a pattern, a string after `~`, `~*`, `!~`, `!~*`, `REGEXP`
+  or `RLIKE` is a regex, and a query using a form the scan cannot read in step (a
+  backslash before a quote, a `#` comment, a nested or unclosed block comment, dollar
+  quoting) is refused, naming the form. Otherwise the
   signal is not shown: "Variable ${code} from this import or carrier cannot be filled in
   safely here (…)". A narrowing fragment that uses a scoped value is checked again after
   it is filled in. Board-wide and profile variables keep their meaning.

@@ -303,11 +303,35 @@ var TELEMETRY_SCOPED_QUOTES={loki:'"`',grafana:'"\'`',tempo:'"`',sql:'\'"`',clou
    (with their escapes) and comments (SQL -- and block comments; # in PromQL, LogQL and Logs
    Insights), and keeps the function call each ( opens. A placeholder in a comment, or in a string
    the scan cannot place, gets no permissive rule. */
+/* #1359 review c2: SQL dialect forms the scan cannot read in step fail closed, named. */
+function telemetrySqlUnreadable(text){
+  if(/\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/.test(text))return 'dollar quoting';
+  if(/\\['"]/.test(text))return 'a backslash before a quote';
+  var quote=null;
+  for(var i=0;i<text.length;i++){
+    var c=text[i];
+    if(quote){if(c===quote)quote=null;continue;}
+    if(c==="'" || c==='"' || c==='`'){quote=c;continue;}
+    if(c==='#')return 'a # comment';
+    if(text.slice(i,i+2)==='--'){var nl=text.indexOf('\n',i);if(nl<0)break;i=nl;continue;}
+    if(text.slice(i,i+2)==='/*'){var close=text.indexOf('*/',i+2);if(close<0)return 'an unclosed block comment';if(text.slice(i+2,close).indexOf('/*')>=0)return 'a nested block comment';i=close+1;}
+  }
+  return null;
+}
+// Words that end a SQL LIKE or regex operand: a string after one of them is not that operand's.
+var TELEMETRY_SQL_CLAUSE=/\b(?:and|or|not|where|select|from|on|then|when|else|group|order|having|limit|union|join|as|in|is|between)\b|[=<>;]/i;
+function telemetrySqlOperand(before,keyword){
+  var hit=null,re=new RegExp(keyword,'gi'),m;while((m=re.exec(before)))hit=m;
+  if(!hit)return false;
+  var between=before.slice(hit.index+hit[0].length).replace(/'(?:[^']|'')*'/g,"''");
+  return !TELEMETRY_SQL_CLAUSE.test(between.replace(/\bconcat\b/gi,''));
+}
 function telemetryScopedPlacement(source,text,index){
+  if(source==='sql'){var unreadable=telemetrySqlUnreadable(text);if(unreadable)return {unreadable:unreadable};}
   var quotes=TELEMETRY_SCOPED_QUOTES[source] || '"\'`',quote=null,opened=-1,calls=[],openedIn=null;
   for(var i=0;i<index;i++){
     var c=text[i];
-    if(quote){if(quote!=='`' && quote!=='/' && c==='\\'){i++;continue;}if(quote==='/' && c==='\\'){i++;continue;}if(c===quote)quote=null;continue;}
+    if(quote){if(source!=='sql' && quote!=='`' && c==='\\'){i++;continue;}if(c===quote)quote=null;continue;}
     var comment=source==='sql'?(text.slice(i,i+2)==='--'?'\n':text.slice(i,i+2)==='/*'?'*/':null):(source==='grafana' || source==='loki' || source==='cloudwatchLogs') && c==='#'?'\n':null;
     if(comment){var end=text.indexOf(comment,i+(comment==='*/'?2:1));if(end<0 || end>=index)return {comment:true};i=end+comment.length-1;continue;}
     if(c==='('){var callee=/([A-Za-z_][A-Za-z0-9_]*)\s*$/.exec(text.slice(0,i));calls.push(callee?callee[1].toLowerCase():'');continue;}
@@ -318,7 +342,14 @@ function telemetryScopedPlacement(source,text,index){
   var before=text.slice(0,opened).replace(/\s+$/,'');
   var regex=quote==='/' || source!=='cloudwatchLogs' && source!=='sql' && /(?:=~|!~|\|~)$/.test(before) ||
     source==='grafana' && openedIn==='label_replace' || source==='loki' && /\|\s*(?:regexp|pattern)$/.test(before);
-  return {string:true,quote:quote,regex:regex,pattern:source==='sql' && /\b(?:i?like|similar\s+to)$/i.test(before)};
+  if(source==='sql'){
+    // A string anywhere in a LIKE / ILIKE / SIMILAR TO operand is a pattern (|| and CONCAT join it);
+    // after ~, ~*, !~, !~*, REGEXP or RLIKE (or SIMILAR TO) it is a regex.
+    var pattern=telemetrySqlOperand(before,'\\b(?:i?like|similar\\s+to)\\b');
+    regex=telemetrySqlOperand(before,'(?:!?~\\*?|\\bregexp\\b|\\brlike\\b|\\bsimilar\\s+to\\b)');
+    return {string:true,quote:quote,regex:regex,pattern:pattern};
+  }
+  return {string:true,quote:quote,regex:regex,pattern:false};
 }
 function telemetryScopedValueProblem(source,query,scoped){
   var texts=[];
@@ -332,7 +363,8 @@ function telemetryScopedValueProblem(source,query,scoped){
     while((hit=re.exec(texts[t]))){
       var name=hit[1];if(!telemetryOwn(scoped,name))continue;
       var value=String(scoped[name]),at=telemetryScopedPlacement(source,texts[t],hit.index),why=null;
-      if(at.comment)why='it sits in a comment of the provider\'s query';
+      if(at.unreadable)why='this SQL query uses '+at.unreadable+', which Flowview cannot read safely';
+      else if(at.comment)why='it sits in a comment of the provider\'s query';
       else if(at.string && at.regex && /[.*+?()\[\]{}|^$\\\/]/.test(value))why='it is filled into a regex and holds regex characters';
       else if(at.string && at.pattern && /[%_]/.test(value))why='it is filled into a LIKE pattern and holds % or _';
       else if(at.string && (value.indexOf(at.quote)>=0 || value.indexOf('\\')>=0 || /[\x00-\x1f\x7f]/.test(value)))why='it would end the string it is filled into';

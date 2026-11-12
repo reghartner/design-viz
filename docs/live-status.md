@@ -857,9 +857,9 @@ A query that succeeds but returns no data (an empty Prometheus vector or Loki
 result, CloudWatch with no data points, SQL with no rows, Honeycomb with no
 result rows) is reported as `{empty: true}` on boards with the flag and reads as
 0 for traffic: an empty rate-like signal is zero traffic, and an empty
-`role: "error"` signal means no errors. Any other signal that comes back empty,
-such as a p95 latency, proves nothing, so its carrier is UNPROVEN even when its
-`max` would hold at 0. Its card value reads "no data". Without the flag such a
+`role: "error"` signal means no errors. Any other signal with a limit that comes
+back empty, such as a p95 latency, proves nothing, so its carrier is UNPROVEN
+even when its `max` would hold at 0. A signal without a limit never affects Proof. Its card value reads "no data". Without the flag such a
 signal stays unobserved, as before.
 
 - The headline reads **End to end proven** only when every counted carrier is

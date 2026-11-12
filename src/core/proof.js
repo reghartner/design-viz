@@ -71,7 +71,8 @@
 
    End-to-end metrics (options.endToEndMetrics === true, #1404): Jira is not an
    input. A signal sample {empty: true} without a value reads as 0; when that
-   signal is neither rate-like nor role "error", the carrier is unproven. jira is null, since.doneAt is null and step ticket narrowing is not
+   signal has a limit and is neither rate-like nor role "error", the carrier
+   is unproven. jira is null, since.doneAt is null and step ticket narrowing is not
    used. A bound carrier is counted when at least one signal has a finite min or
    max limit; it then gets one verdict, first match wins:
      null       nothing observed yet, or a limit or rate-like signal is pending
@@ -244,9 +245,10 @@ var proofVerdicts = (function(){
     var state = !observed ? 'unobserved' : silent ? 'silent' : rateLike.length && !traffic ? 'unobserved' :
       failing.length ? 'degraded' : pending ? 'unobserved' : !minimumObserved ? 'unmeasured' : 'flowing';
     // #1404: an empty answer is a measured 0 only for traffic (rate-like) and error-role signals; any
-    // other signal that came back empty (a latency, a gauge) proves nothing, so the carrier is unproven.
+    // other limited signal that came back empty (a latency) proves nothing, so the carrier is unproven.
+    // A signal without a proof limit (a display-only gauge) never affects Proof.
     var emptyEvidence = names.some(function(name){
-      return readings[name] && readings[name].empty && rateLike.indexOf(name) < 0 && carrier.signals[name].role !== 'error';
+      return readings[name] && readings[name].empty && proofObject(proof[name]) && rateLike.indexOf(name) < 0 && carrier.signals[name].role !== 'error';
     });
     return {state: state, minimumObserved: minimumObserved, failing: failing, readings: readings, rateLike: rateLike,
       proof: proof, observed: observed, pending: pending, traffic: traffic, emptyEvidence: emptyEvidence};

@@ -99,7 +99,8 @@ test('timeline Shared cadence is disabled with a reason while lanes exist, and e
   await inspectPageElement(page,root.locator('.pt-timeline .ptitle'));
   await expect(cadence().getByLabel('Every',{exact:true})).toBeDisabled();
   await expect(cadence().getByLabel('Name',{exact:true})).toBeDisabled();
-  const reason=guide.locator('.panel-setup-field').filter({has:cadence()}).locator('.panel-setup-reason');
+  // The reason note is a sibling of the cadence row inside its field wrapper.
+  const reason=guide.locator('.panel-setup-field').filter({has:page.locator('.flab',{hasText:/^Shared cadence$/})}).locator('.panel-setup-reason');
   await expect(reason).toBeVisible();await expect(reason).toContainText('Lanes set their own cadence');
   await expect(cadence().getByLabel('Every',{exact:true})).toHaveAttribute('aria-describedby',await reason.getAttribute('id'));
 

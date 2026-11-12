@@ -3380,21 +3380,29 @@ literal, never expanded, and the same in every environment.
   the provider; this value is ignored"). A provider page's board-level variables do not
   travel with an import.
 - **Never escaping or widening.** A scoped value is filled into the provider's query only
-  where it cannot change its meaning: inside a string it holds no quote of that kind, no
-  `\` and no control character; inside a regex (`=~`, `!~`, `|~`, a Logs `/regex/`, a
-  `label_replace` argument, a LogQL `regexp` or `pattern` string) no regex character; in a
-  SQL `LIKE`/`ILIKE` pattern no `%` or `_`; outside a string only letters, digits and
-  `. _ : - @`. The scan skips the provider's comments (SQL `--` and block comments; `#`
-  in PromQL, LogQL and Logs Insights), and a placeholder inside one is refused (so is a
-  placeholder that also appears in a comment). TraceQL strings are `"…"` and `` `…` ``
-  only. In SQL, a string anywhere in a `LIKE`, `ILIKE` or `SIMILAR TO` operand (joined by
-  `||` or inside `CONCAT`) is a pattern, a string after `~`, `~*`, `!~`, `!~*`, `REGEXP`
-  or `RLIKE` is a regex, and a query using a form the scan cannot read in step (a
-  backslash before a quote, a `#` comment, a nested or unclosed block comment, dollar
-  quoting) is refused, naming the form. Otherwise the
-  signal is not shown: "Variable ${code} from this import or carrier cannot be filled in
-  safely here (…)". A narrowing fragment that uses a scoped value is checked again after
-  it is filled in. Board-wide and profile variables keep their meaning.
+  where it cannot change its meaning. Otherwise the signal is not shown: "Variable
+  ${code} from this import or carrier cannot be filled in safely here (…)".
+  - Inside a string: no quote of that kind, no `\` and no control character.
+  - Inside a regex (`=~`, `!~`, `|~`, a Logs `/regex/`, a `label_replace` string argument
+    in PromQL or LogQL other than a matcher in its selector, a LogQL `regexp` or `pattern`
+    string, SQL `~`, `~*`, `!~`, `!~*`, `REGEXP`, `RLIKE`): no regex character.
+  - In a SQL `LIKE`, `ILIKE`, `SIMILAR TO`, `~~`, `~~*`, `!~~` or `!~~*` operand (a string
+    anywhere in it, joined by `||` or inside `CONCAT`, `N'…'` included): no `%` or `_`. A
+    `_` matches any one character, so a value such as `full_charge` must be compared with
+    `=` instead. `SIMILAR TO` also refuses `| * + ? { } ( ) [ ]`. A `%` is refused in every
+    SQL string.
+  - In a LogQL `|>` or `!>` pattern line filter: no `<` or `>`. In a `line_format` or
+    `label_format` template: no `{` or `}`. In a Logs Insights `parse` glob: no `*`.
+  - Outside a string: only letters, digits and `. _ : - @`; in SQL no `--`; inside a
+    PromQL or LogQL `[range]` no `:` (it would make a subquery).
+  - The scan skips the provider's comments (SQL `--` and block comments; `#` in PromQL,
+    LogQL and Logs Insights). A placeholder inside one is refused, and so is a placeholder
+    that also appears in a comment. TraceQL strings are `"…"` and `` `…` `` only.
+  - A SQL query the scan cannot read in step (a backslash before a quote, a `#` (a MySQL
+    comment or a Postgres `#>` / `#` operator), a nested or unclosed block comment, dollar
+    quoting) takes only a plain token there: letters, digits and `. @ -`, no `--`.
+  - A narrowing fragment that uses a scoped value is checked again after it is filled in.
+    Board-wide and profile variables keep their meaning.
 - **SQL and Tempo.** A provider that wants boards to choose a value writes a `${name}`
   placeholder in its query (in a string for SQL: `WHERE code = '${code}'`); the import
   sets it. This is the route for sources that cannot be narrowed.

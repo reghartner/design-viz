@@ -312,7 +312,7 @@ function telemetrySqlUnreadable(text){
     var c=text[i];
     if(quote){if(c===quote)quote=null;continue;}
     if(c==="'" || c==='"' || c==='`'){quote=c;continue;}
-    if(c==='#')return 'a # comment';
+    if(c==='#')return 'a # (MySQL comment, or a Postgres #> / # operator)';
     if(text.slice(i,i+2)==='--'){var nl=text.indexOf('\n',i);if(nl<0)break;i=nl;continue;}
     if(text.slice(i,i+2)==='/*'){var close=text.indexOf('*/',i+2);if(close<0)return 'an unclosed block comment';if(text.slice(i+2,close).indexOf('/*')>=0)return 'a nested block comment';i=close+1;}
   }
@@ -327,8 +327,9 @@ function telemetrySqlOperand(before,keyword){
   return !TELEMETRY_SQL_CLAUSE.test(between.replace(/\bconcat\b/gi,''));
 }
 function telemetryScopedPlacement(source,text,index){
-  if(source==='sql'){var unreadable=telemetrySqlUnreadable(text);if(unreadable)return {unreadable:unreadable};}
-  var quotes=TELEMETRY_SCOPED_QUOTES[source] || '"\'`',quote=null,opened=-1,calls=[],openedIn=null;
+  // SQL the scan cannot follow in step: only a plain token may be filled in, wherever it sits (VARTEST-1359).
+  if(source==='sql'){var unreadable=telemetrySqlUnreadable(text);if(unreadable)return {string:false,unreadable:unreadable};}
+  var quotes=TELEMETRY_SCOPED_QUOTES[source] || '"\'`',quote=null,opened=-1,calls=[],openedIn=null,braces=0,openedInBraces=false,brackets=0;
   for(var i=0;i<index;i++){
     var c=text[i];
     if(quote){if(source!=='sql' && quote!=='`' && c==='\\'){i++;continue;}if(c===quote)quote=null;continue;}
@@ -336,20 +337,31 @@ function telemetryScopedPlacement(source,text,index){
     if(comment){var end=text.indexOf(comment,i+(comment==='*/'?2:1));if(end<0 || end>=index)return {comment:true};i=end+comment.length-1;continue;}
     if(c==='('){var callee=/([A-Za-z_][A-Za-z0-9_]*)\s*$/.exec(text.slice(0,i));calls.push(callee?callee[1].toLowerCase():'');continue;}
     if(c===')'){calls.pop();continue;}
-    if(quotes.indexOf(c)>=0 || source==='cloudwatchLogs' && c==='/' && typeof telemetryLogsRegexOpens==='function' && telemetryLogsRegexOpens(text.slice(0,i))){quote=c;opened=i;openedIn=calls[calls.length-1] || '';}
+    if(c==='{'){braces++;continue;}if(c==='}'){braces=Math.max(0,braces-1);continue;}
+    if(c==='['){brackets++;continue;}if(c===']'){brackets=Math.max(0,brackets-1);continue;}
+    if(quotes.indexOf(c)>=0 || source==='cloudwatchLogs' && c==='/' && typeof telemetryLogsRegexOpens==='function' && telemetryLogsRegexOpens(text.slice(0,i))){quote=c;opened=i;openedIn=calls[calls.length-1] || '';openedInBraces=braces>0;}
   }
-  if(!quote)return {string:false};
+  // A bare value inside a PromQL or LogQL [range] is a duration.
+  if(!quote)return {string:false,range:(source==='grafana' || source==='loki') && brackets>0};
   var before=text.slice(0,opened).replace(/\s+$/,'');
-  var regex=quote==='/' || source!=='cloudwatchLogs' && source!=='sql' && /(?:=~|!~|\|~)$/.test(before) ||
-    source==='grafana' && openedIn==='label_replace' || source==='loki' && /\|\s*(?:regexp|pattern)$/.test(before);
+  var out={string:true,quote:quote,regex:false,pattern:false};
   if(source==='sql'){
-    // A string anywhere in a LIKE / ILIKE / SIMILAR TO operand is a pattern (|| and CONCAT join it);
-    // after ~, ~*, !~, !~*, REGEXP or RLIKE (or SIMILAR TO) it is a regex.
-    var pattern=telemetrySqlOperand(before,'\\b(?:i?like|similar\\s+to)\\b');
-    regex=telemetrySqlOperand(before,'(?:!?~\\*?|\\bregexp\\b|\\brlike\\b|\\bsimilar\\s+to\\b)');
-    return {string:true,quote:quote,regex:regex,pattern:pattern};
+    // A string anywhere in a LIKE / ILIKE / SIMILAR TO / ~~ operand is a pattern (|| and CONCAT join it);
+    // SIMILAR TO also reads regex-like characters; after ~, ~*, !~, !~*, REGEXP or RLIKE it is a regex.
+    out.pattern=telemetrySqlOperand(before,'(?:\\b(?:i?like|similar\\s+to)\\b|!?~~\\*?)');
+    out.similar=telemetrySqlOperand(before,'\\bsimilar\\s+to\\b');
+    out.regex=telemetrySqlOperand(before,'(?:(?<!~)!?~(?!~)\\*?|\\bregexp\\b|\\brlike\\b)');
+    return out;
   }
-  return {string:true,quote:quote,regex:regex,pattern:false};
+  // label_replace's string arguments are regexes, except a matcher inside its selector braces.
+  out.regex=quote==='/' || source!=='cloudwatchLogs' && /(?:=~|!~|\|~)$/.test(before) ||
+    (source==='grafana' || source==='loki') && openedIn==='label_replace' && !openedInBraces || source==='loki' && /\|\s*(?:regexp|pattern)$/.test(before);
+  if(source==='loki'){
+    out.linePattern=/(?:\|>|!>)$/.test(before);
+    out.template=/\|\s*line_format$/.test(before) || /\|\s*label_format\b[^|]*=$/.test(before);
+  }
+  if(source==='cloudwatchLogs')out.glob=quote!=='/' && /(?:^|\|)\s*parse\s+(?:[@A-Za-z_][\w.@]*|`[^`]*`)$/i.test(before);
+  return out;
 }
 function telemetryScopedValueProblem(source,query,scoped){
   var texts=[];
@@ -363,12 +375,21 @@ function telemetryScopedValueProblem(source,query,scoped){
     while((hit=re.exec(texts[t]))){
       var name=hit[1];if(!telemetryOwn(scoped,name))continue;
       var value=String(scoped[name]),at=telemetryScopedPlacement(source,texts[t],hit.index),why=null;
-      if(at.unreadable)why='this SQL query uses '+at.unreadable+', which Flowview cannot read safely';
-      else if(at.comment)why='it sits in a comment of the provider\'s query';
+      if(at.comment)why='it sits in a comment of the provider\'s query';
+      else if(at.unreadable){if(!/^[A-Za-z0-9.@-]+$/.test(value) || value.indexOf('--')>=0)why='this SQL query uses '+at.unreadable+', which Flowview cannot read safely';}
+
       else if(at.string && at.regex && /[.*+?()\[\]{}|^$\\\/]/.test(value))why='it is filled into a regex and holds regex characters';
       else if(at.string && at.pattern && /[%_]/.test(value))why='it is filled into a LIKE pattern and holds % or _';
+      else if(at.string && at.similar && /[|*+?{}()\[\]]/.test(value))why='it is filled into a SIMILAR TO pattern and holds pattern characters';
+      else if(at.string && at.linePattern && /[<>]/.test(value))why='it is filled into a pattern line filter and holds < or >';
+      else if(at.string && at.template && /[{}]/.test(value))why='it is filled into a line_format or label_format template and holds { or }';
+      else if(at.string && at.glob && value.indexOf('*')>=0)why='it is filled into a parse pattern and holds *';
+      // #1359 review c3: an operand the scan misreads may still be a LIKE pattern, so % is refused in every SQL string.
+      else if(at.string && source==='sql' && value.indexOf('%')>=0)why='it is filled into a SQL string and holds %, which a LIKE pattern reads as a wildcard';
       else if(at.string && (value.indexOf(at.quote)>=0 || value.indexOf('\\')>=0 || /[\x00-\x1f\x7f]/.test(value)))why='it would end the string it is filled into';
       else if(!at.string && !/^[A-Za-z0-9_.:@-]+$/.test(value))why='outside a string it may hold only letters, digits and . _ : - @';
+      else if(!at.string && source==='sql' && value.indexOf('--')>=0)why='outside a string it may not hold --, which starts a SQL comment';
+      else if(!at.string && at.range && value.indexOf(':')>=0)why='inside a range it may not hold :, which turns the range into a subquery';
       if(why)return 'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';
     }
   }

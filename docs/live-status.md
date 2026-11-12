@@ -877,6 +877,8 @@ engine for the panel, the canvas cues and the step caption.
 In the desktop Workbench, **Status board settings → Metrics → End-to-end metrics
 applied** sets the flag (checked writes `true`, unchecked removes the key; one
 Undo step). An invalid authored value shows its warning next to the checkbox.
+While Allow metrics is off, or no node or connection has metrics, a note by the
+box says it has no effect until metrics are on.
 
 ### Metrics and proof authoring
 

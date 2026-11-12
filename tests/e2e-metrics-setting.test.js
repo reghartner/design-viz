@@ -4,7 +4,8 @@
 | row | rule | broken implementation it rejects |
 |---|---|---|
 | W1 | The checkbox is in the Metrics section, unchecked while the flag is absent; checking writes `tracking.endToEndMetrics: true` keeping the rest of tracking; one Undo restores the exact text; unchecking removes the key | no control; a control in another section; a value written as a string; two Undo steps; `false` left behind |
-| W2 | An authored non-boolean shows unchecked, and its validator warning sits in the Metrics section next to the checkbox, not in Jira | a warning routed to Jira by the `tracking.*` rule; a truthy string read as checked |
+| W2 | An authored non-boolean shows unchecked, and its validator warning sits once in the Metrics section next to the checkbox (aria-invalid, aria-describedby), not in Jira | a warning routed to Jira by the `tracking.*` rule; a truthy string read as checked; a warning shown twice or not linked to the box |
+| W3 | With Allow metrics off, or with no telemetry block and no metrics binding, a note by the box says it has no effect until metrics are on; with metrics available there is no such note | a setting that looks active while metrics cannot run |
 Desktop only. */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -49,7 +50,23 @@ test('W1 End-to-end metrics applied writes tracking.endToEndMetrics true as one 
 test('W2 an authored non-boolean reads unchecked and its warning sits in Metrics, not Jira',()=>{
   const ui=harness(board({endToEndMetrics:'yes'})),box=ui.control();
   assert.equal(box.checked,false,'a string is not the flag');
-  assert.match(ui.words(ui.section('metrics')),/must be true or false/);
+  assert.match(ui.words(ui.section('metrics')),/must be true or false/i);
   assert.doesNotMatch(ui.words(ui.section('jira')),/endToEndMetrics|must be true or false/);
+  assert.equal(box.getAttribute('aria-invalid'),'true','the checkbox is marked invalid');
+  const ids=(box.getAttribute('aria-describedby') || '').split(' ').filter(Boolean),warning=ids.map(id=>ui.h.guide.querySelector('#'+id)).find(el=>el && /must be true or false/i.test(el.textContent));
+  assert.ok(warning,'aria-describedby names the warning next to the checkbox');
+  assert.ok(ids.some(id=>ui.h.guide.querySelector('#'+id) && /Proof reads/.test(ui.h.guide.querySelector('#'+id).textContent)),'and the explanation note');
+  const shown=ui.section('metrics').querySelectorAll('p,li').filter(el=>/must be true or false/i.test(el.textContent));
+  assert.equal(shown.length,1,'the warning is shown once, next to the checkbox, not again in the section list');
   ui.check(true);assert.equal(ui.raw.page.tracking.endToEndMetrics,true,'checking repairs it to the boolean');
+});
+
+test('W3 the box says it has no effect while metrics are off or the board has no metrics',()=>{
+  const idle=ui=>{const box=ui.control(),ids=(box.getAttribute('aria-describedby') || '').split(' ');return ids.map(id=>ui.h.guide.querySelector('#'+id)).filter(Boolean).map(el=>el.textContent).find(t=>/No effect until metrics are on/.test(t)) || null;};
+  assert.equal(idle(harness(board())),null,'metrics allowed with a telemetry block: no note');
+  assert.match(idle(harness(board({telemetry:{enabled:false}}))),/Allow metrics is off/);
+  const bare=board();delete bare.page.tracking.telemetry;
+  assert.equal(idle(harness(bare)),null,'a metrics binding without a telemetry block still runs metrics: no note');
+  delete bare.page.sections[0].diagram.nodes.api.telemetry;
+  assert.match(idle(harness(bare)),/no node or connection on this board has metrics/);
 });

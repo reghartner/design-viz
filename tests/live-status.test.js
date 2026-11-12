@@ -5608,7 +5608,39 @@ test('#1371 Status controls hold the view controls; the Status panel leaves them
  h.view.appendChild(controls.body);api.note('back');assert.deepEqual(inStatus(),[]);
  // Gone: Status draws them at once, without waiting for another change.
  controls.destroy();assert.deepEqual(inStatus(),CONTROLS,'no controls panel: Status draws them');
- // A board without the panel is unchanged: the Status panel has every control.
- const plain=harness(overFixture()),only=mountStatus(plain);assert.deepEqual(CONTROLS.filter(sel=>sel==='.dv-live-connection' || only.body.querySelector(sel)),CONTROLS);
+ // A board without the panel is unchanged: the Status panel has every control, the connector line included.
+ const plain=harness(overFixture());plain.ctl.liveStatus.apply(overToday());const only=mountStatus(plain);assert.deepEqual(CONTROLS.filter(sel=>only.body.querySelector(sel)),CONTROLS);
+ const line=only.body.querySelector('.dv-live-connection');assert.ok(line,'its connector line is drawn');assert.equal(line.getAttribute('data-state'),plain.ctl.liveStatus.snapshot().connection.state,'with the connection state');
  plain.ctl.liveStatus.destroy();h.ctl.liveStatus.destroy();
+});
+/* #1371 review c1: a step (panelVisibility) or "visible": false hides a Standard panel with .panel-step-hidden, not the hidden
+   attribute, and resizes nothing. Through the real step path (buildPanels → setStep) the controls come back to the Status
+   panel at the step that hides the controls panel, and leave again at the next step; a control the reader was on keeps focus
+   in its new place. */
+test('#1371 a step that hides the Status controls panel brings the controls back to the Status panel; focus follows the control',async()=>{
+ const raw=overFixture(),d=raw.page.sections[0].diagram;
+ d.panels=[{id:'status',type:'live-status',title:'Status'},{id:'controls',type:'status-controls',title:'Status controls'}];
+ d.steps=[{id:'one',text:'One'},{id:'two',text:'Two',panelVisibility:{controls:false}},{id:'three',text:'Three',panelVisibility:{controls:true}}];
+ const h=harness(raw),api=overReady(h.ctl.liveStatus);api.apply(overToday());
+ const aside=h.view.appendChild(new Element('div',{class:'panelcol'})),panels=h.C.buildPanels(aside,h.ctl.page.sections[0].diagram,'pastel',{active:true});
+ const card=type=>aside.children.find(c=>c.classList.contains('pt-'+type)),body=type=>card(type).children.find(c=>c.classList.contains('pbody'));
+ const has=type=>!!body(type).querySelector('.dv-status-modes') && !!body(type).querySelector('button.dv-live-toggle');
+ panels.setStep(0,false);assert.equal(card('status-controls').classList.contains('panel-step-hidden'),false);
+ assert.equal(has('status-controls'),true,'step one: the controls panel holds them');assert.equal(has('live-status'),false,'and Status leaves them out');
+ // The reader is on Live in the controls panel when the step hides that panel.
+ let active=null;h.doc.activeElement=null;const focus=Element.prototype.focus;Element.prototype.focus=function(){active=this;h.doc.activeElement=this;};
+ try{
+  body('status-controls').querySelector('button.dv-live-toggle').focus();
+  panels.setStep(1,false);assert.equal(card('status-controls').classList.contains('panel-step-hidden'),true,'the step hides the controls panel');
+  assert.equal(has('live-status'),true,'step two: the controls are back in the Status panel');
+  assert.ok(active===body('live-status').querySelector('button.dv-live-toggle'),'focus moves to Live in the Status panel');
+  panels.setStep(2,false);assert.equal(has('live-status'),false,'step three: the controls panel shows again and Status leaves them out');
+  assert.ok(active===body('status-controls').querySelector('button.dv-live-toggle'),'focus follows Live back to the controls panel');
+ }finally{Element.prototype.focus=focus;}
+ // "visible": false hides it at every step the same way.
+ const hidden=overFixture(),hd=hidden.page.sections[0].diagram;hd.panels=[{id:'status',type:'live-status',title:'Status'},{id:'controls',type:'status-controls',title:'Status controls',visible:false}];hd.steps=[{id:'one',text:'One'}];
+ const h2=harness(hidden);h2.ctl.liveStatus.apply(overToday());const aside2=h2.view.appendChild(new Element('div',{class:'panelcol'})),p2=h2.C.buildPanels(aside2,h2.ctl.page.sections[0].diagram,'pastel',{active:true});p2.setStep(0,false);
+ const status2=aside2.children.find(c=>c.classList.contains('pt-live-status')).children.find(c=>c.classList.contains('pbody'));
+ assert.ok(status2.querySelector('.dv-status-modes') && status2.querySelector('button.dv-live-toggle'),'visible:false: the Status panel has the controls');
+ panels.destroy();p2.destroy();h.ctl.liveStatus.destroy();h2.ctl.liveStatus.destroy();
 });

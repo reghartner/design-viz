@@ -1,6 +1,6 @@
 /* Authored placement, runtime evidence. No ticket status is folded into the spec. */
 // #1371: the panel mount, shared with the Status controls panel (panels/types/status-controls.js).
-var liveStatusPanelMount=null;
+var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
 (function(){
   var LIVE_SAMPLE=[["BE-67", "Build the notification service", "Riley"], ["BE-68", "Accept firmware events over HTTPS", "Riley"], ["FW-45", "Deliver firmware events", "Sam"], ["FW-46", "Integrate hardware interrupts", "Sam"], ["HW-123", "Debounce the doorbell button", "Alex"], ["HW-124", "Stabilize the hardware event signal", "Alex"], ["UX-89", "Show resident notifications", "Morgan"], ["UX-90", "Alert sound setting", "Morgan"]];
   var states=['todo','active','testing','done','blocked','missing'];
@@ -41,12 +41,33 @@ var liveStatusPanelMount=null;
      those out while a Status controls panel of the same controller is shown (controlsElsewhere); Edit stays here. */
   var controlPanels=[],statusPanels=[];
   // Shown: in the page, with no hidden ancestor (across shadow roots) and, where layout exists, a box on screen.
+  // A step or "visible": false hides a Standard panel with .panel-step-hidden (visibility:hidden, an inert body); Explore and
+  // Views use the hidden attribute or display:none.
   function panelShown(node){
     if(!node || node.isConnected===false)return false;
-    for(var at=node;at;at=at.parentNode || at.host || null)if(at.hidden)return false;
+    for(var at=node;at;at=at.parentNode || at.host || null){
+      if(at.hidden || at.inert || at.classList && typeof at.classList.contains==='function' && at.classList.contains('panel-step-hidden'))return false;
+    }
+    var view=node.ownerDocument && node.ownerDocument.defaultView,style=view && typeof view.getComputedStyle==='function' && typeof node.getClientRects==='function'?view.getComputedStyle(node):null;
+    if(style && style.visibility==='hidden')return false;
     return typeof node.getClientRects!=='function' || node.getClientRects().length>0;
   }
-  function repaintStatus(api){statusPanels.forEach(function(p){if(p.api()===api)p.repaint();});}
+  // The control a reader is on, by what it does (its controller method and argument), else its class.
+  function controlKey(node){return node && node._liveMethod?node._liveMethod+'|'+JSON.stringify(node._liveArgument):node && node.className || '';}
+  function focusedIn(entries){
+    var at=null;entries.some(function(p){var root=p.host.getRootNode && p.host.getRootNode(),doc=p.host.ownerDocument || (typeof document!=='undefined'?document:null);at=root && root.activeElement!==undefined && root!==p.host?root.activeElement:doc && doc.activeElement;return !!at;});
+    return at && entries.some(function(p){return p.host.contains(at);})?at:null;
+  }
+  /* Repaint the Status panels of `api`. #1371 review: when the controls move between panels while the reader is on one,
+     focus goes to the same control in its new place. */
+  function repaintStatus(api,leaving){
+    var mine=controlPanels.concat(statusPanels).filter(function(p){return p.api()===api;}),focused=focusedIn(mine.concat(leaving || [])),key=focused && controlKey(focused);
+    statusPanels.forEach(function(p){if(p.api()===api)p.repaint();});
+    if(!key || panelShown(focused) && focused.isConnected!==false && mine.some(function(p){return p.host.contains(focused);}))return;
+    mine.some(function(p){var match=Array.prototype.slice.call(p.host.querySelectorAll('button,input,select')).filter(function(n){return controlKey(n)===key && !n.disabled && panelShown(n);})[0];if(match && match.focus)match.focus({preventScroll:true});return !!match;});
+  }
+  // #1371 review: the step path (panels/shared.js setStep) calls this after it shows or hides panels.
+  liveStatusPanelVisibility=function(){controlPanels.forEach(function(p){p.check();});};
   function mount(host,role){
     if(host._panelMotionCleanup)host._panelMotionCleanup();
     role=role==='controls'?'controls':'status';
@@ -951,11 +972,12 @@ var liveStatusPanelMount=null;
     var entry={host:host,api:function(){return api;},repaint:function(){if(live && api)paint(api.snapshot());}},seen=null,watch=null,ending=false;
     (role==='controls'?controlPanels:statusPanels).push(entry);
     function controlsChanged(){var now=panelShown(host);if(now===seen)return;seen=now;if(api)repaintStatus(api);}
+    entry.check=controlsChanged;
     if(role==='controls' && typeof ResizeObserver!=='undefined'){watch=new ResizeObserver(controlsChanged);watch.observe(host);}
     function cleanup(){if(!live)return;live=false;stopFocusWatch();stopListCap();
       var list=role==='controls'?controlPanels:statusPanels,at=list.indexOf(entry);if(at>=0)list.splice(at,1);if(watch)watch.disconnect();
       var owner=api;host._livePanelApi=null;host._liveSortHandler=null;if(offChange)offChange();if(offDestroy)offDestroy();if(offReady)offReady();
-      if(role==='controls' && owner && !ending)repaintStatus(owner);}
+      if(role==='controls' && owner && !ending)repaintStatus(owner,[entry]);}
     host._panelMotionCleanup=cleanup;
     function connect(controller){if(!live || api)return;api=controller;host._livePanelApi=api;if(offReady)offReady();paint(api.snapshot());offChange=api.onChange(paint);offDestroy=api.onDestroy(function(){var value=api.snapshot();value.metrics=Object.assign({},value.metrics,{proof:null,available:false,enabled:false});value.trace=Object.assign({},value.trace,{entries:[],selected:null,available:false,enabled:false});paint(value);ending=true;cleanup();});
       if(role==='controls'){seen=panelShown(host);repaintStatus(api);}}

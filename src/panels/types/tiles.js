@@ -238,7 +238,7 @@ PanelRegistry.extend('tiles', {
       colors: { label: 'State colors' },
     },
     setupFields: [
-      ['tiles', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }], max: 12 }],
+      ['tiles', 'rows', { cols: [{ k: 'id', label: 'Device ID', req: true }, { k: 'label', label: 'Name' }], max: 12 }],
       ['states', 'csv'],
       ['colors', 'map'],
       ['initial', 'json'],

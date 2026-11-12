@@ -832,6 +832,9 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // #828: the shared-board editor outlives this controller (each edit re-renders the page); Workbench authoring never edits here.
   var editor=!authoring && renderOptions && renderOptions.boardEditor || null;
   function editing(){return !!(editor && editor.state().active);}
+  /* #1241: in the desktop Workbench a Tickets row drags onto a node or connection through the same drop
+     targets as Edit mode; ticketDrop(ref, key) writes it into the authored source (one Undo step). */
+  var ticketDrop=authoring && renderOptions && typeof renderOptions.ticketDrop==='function'?renderOptions.ticketDrop:null;
   var destroyListeners=[],listeners=[],bindings=[],observer=null,frame=0,firstPaint=0,painting=false;
   var provider=typeof options.provider==='function'?options.provider:null;
   var refresh=Number(options.refreshMs),delay=isFinite(refresh)?Math.max(30000,refresh):30000;
@@ -1412,7 +1415,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       overTime:overTimeState(),
       // #1253: no provider, no host-applied map and no connector adapter: the page cannot show live status here.
       noProvider:!provider && !applied && !demoMode && connection.state==='none' && (refs().tickets.length || refs().epics.length)?{prs:refs().prs.slice()}:null,
-      editHistory:copy(editHistory),edit:editState(),
+      editHistory:copy(editHistory),edit:editState(),ticketDrag:!!ticketDrop,
       updatedText:cacheUpdatedAt || latest?'updated '+relative(cacheUpdatedAt || latest):'',
       connection:{state:connection.state,busy:connection.busy,checkedAt:connection.checkedAt,source:connection.source,checkedText:connection.checkedAt?'refreshed '+clockTime(connection.checkedAt):'',github:{state:connection.github.state,busy:connection.github.busy}},
       metrics:metricsSnapshot(),mode:statusMode,trace:traceSnapshot()};
@@ -1520,7 +1523,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     // marker; a repaint or a re-render only redraws it, so the question stays pending.
     if(asked && !painting && !retired && editor)editor.endQuestion();
     var trigger=active;active=null;asked=false;
-    document.removeEventListener('click',outside,true);document.removeEventListener('keydown',escape,true);
+    document.removeEventListener('click',outside,true);document.removeEventListener('keydown',escape,true);window.removeEventListener('resize',resized);
     if(trigger)trigger.setAttribute('aria-expanded','false');
     if(pop){if(pop.hidePopover && pop.matches(':popover-open'))pop.hidePopover();pop.hidden=true;}
     if(focus && trigger && trigger.isConnected)trigger.focus();
@@ -1529,6 +1532,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(active && pop.querySelector('.dv-live-production') && view.contains(ev.target) && ev.target.closest('.dv-live-over-time-slider,.dv-live-step'))return;
     if(active && !active.contains(ev.target) && !pop.contains(ev.target) && carrierFrom(ev.target)!==active)close(true);
   }
+  // After the frame: Explore refits its camera on the same resize.
+  function resized(){requestAnimationFrame(function(){if(!retired && active && pop && !pop.hidden && active.isConnected)place(active);});}
   function escape(ev){if(ev.key==='Escape' && active){ev.preventDefault();ev.stopPropagation();close(true);}}
   function productionRow(trigger){
     if(authoring || !trigger || !trigger._liveCarrier)return null;
@@ -1594,7 +1599,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(active._liveCarrier && !active._liveCarrier.metricsOnly){rebuildPopover(active);active.setAttribute('aria-expanded','true');return;}
     var hadProduction=!!pop.querySelector('.dv-live-production');
     if(!paintProduction(active) && hadProduction){close(true);return;}
-    active.setAttribute('aria-expanded','true');
+    // #1165: the Metrics section can change size; keep the popover inside the diagram frame.
+    place(active);active.setAttribute('aria-expanded','true');
   }
   function popoverControlKey(el){var row=el.closest('[data-live-ticket]');return [row?row.getAttribute('data-live-ticket'):'',el.tagName,el.className,el.getAttribute('href') || '',el.getAttribute('aria-label') || ''].join('|');}
   function popoverMarkup(nodes){return nodes.every(function(node){return typeof node.outerHTML==='string';})?nodes.map(function(node){return node.outerHTML;}).join(''):null;}
@@ -1688,15 +1694,76 @@ function createLiveStatus(ctl,page,options,renderOptions){
     found.prs.forEach(function(url){link(box,url,url);});
     return {dismiss:dismiss,asking:asking && marker && marker.clearable?asking:null};
   }
+  // #1165: the visible part of the diagram frame (the trigger's .board cut by every clipping ancestor and the
+  // window), so the popover never covers the Status panel or the step controls. No board: the window.
+  function popoverFrame(trigger){
+    var frame={left:0,top:0,right:window.innerWidth,bottom:window.innerHeight},board=trigger.closest && trigger.closest('.board');
+    function cut(el){var b=el.getBoundingClientRect();frame={left:Math.max(frame.left,b.left),top:Math.max(frame.top,b.top),right:Math.min(frame.right,b.right),bottom:Math.min(frame.bottom,b.bottom)};}
+    for(var el=board;el && el!==document.body && el!==document.documentElement;el=el.parentElement || (el.parentNode && el.parentNode.host) || null){
+      var style=getComputedStyle(el);if(el===board || style.overflowX!=='visible' || style.overflowY!=='visible')cut(el);
+    }
+    return frame.right-frame.left>=80 && frame.bottom-frame.top>=80?frame:{left:0,top:0,right:window.innerWidth,bottom:window.innerHeight};
+  }
+  // Explore view: the floating panel windows and the step player sit on the canvas; the popover keeps clear of them.
+  function popoverObstacles(trigger){
+    var board=trigger.closest && trigger.closest('.board.explore-board'),stage=board && board.closest('.explore-stage');
+    if(!stage)return [];
+    return Array.prototype.map.call(stage.querySelectorAll('.explore-window,.explore-player'),function(el){return el.getBoundingClientRect();}).filter(function(r){return r.width>0 && r.height>0;});
+  }
+  // Explore: the top-left corner and height for the popover that keeps clear of the windows, the step player and its
+  // trigger. Corners come from the trigger's sides, the frame's edges and the obstacles' edges; each is clamped to the
+  // frame, and its clear height is how far it reaches down before an obstacle. A full-height slot nearest the trigger
+  // wins, else the tallest; null when no slot is at least 120 px tall (the popover then covers rather than shrinks).
+  function exploreSlot(rect,inner,w,h,obstacles,gap){
+    var blocks=obstacles.concat([{left:rect.left-gap,top:rect.top-gap,right:rect.right+gap,bottom:rect.bottom+gap}]),xs=[rect.left,rect.right-w,rect.right+gap,rect.left-gap-w,inner.left,inner.right-w],ys=[rect.bottom+gap,rect.top-gap-h,rect.top,rect.bottom-h,inner.top,inner.bottom-h];
+    obstacles.forEach(function(o){xs.push(o.right+gap,o.left-gap-w);ys.push(o.bottom+gap,o.top-gap-h);});
+    var best=null;
+    xs.forEach(function(x){x=Math.max(inner.left,Math.min(inner.right-w,x));ys.forEach(function(y){
+      y=Math.max(inner.top,Math.min(inner.bottom-h,y));
+      var tall=Math.min(h,inner.bottom-y);
+      blocks.forEach(function(o){if(Math.min(x+w,o.right)-Math.max(x,o.left)<=0 || o.bottom<=y)return;tall=Math.min(tall,o.top<=y?0:o.top-gap-y);});
+      var full=tall>=h-.5,dx=Math.max(rect.left-(x+w),x-rect.right,0),dy=Math.max(rect.top-(y+tall),y-rect.bottom,0),distance=dx+dy;
+      if(!best || (full && !best.full) || (full===best.full && (full?distance<best.distance:tall>best.tall+.5 || Math.abs(tall-best.tall)<=.5 && distance<best.distance)))best={left:x,top:y,tall:tall,full:full,distance:distance};
+    });});
+    return best && best.tall>=Math.min(h,120)?best:null;
+  }
+  // Below the trigger when it fits, else above, right or left where it fits, else the side with the most room;
+  // then clamped to the frame. In Explore a slot clear of the windows and the step player wins (exploreSlot). A
+  // popover taller or wider than the frame is capped to it and its body scrolls; a re-place keeps the reader's scroll.
   function place(trigger){
-    var rect=trigger.getBoundingClientRect();
-    pop.style.left=Math.max(8,Math.min(window.innerWidth-pop.offsetWidth-8,rect.left))+'px';
-    pop.style.top=Math.max(8,Math.min(window.innerHeight-pop.offsetHeight-8,rect.bottom+6))+'px';
+    var scrollTop=pop.scrollTop,scrollLeft=pop.scrollLeft;
+    var rect=trigger.getBoundingClientRect(),frame=popoverFrame(trigger),gap=6;
+    var m=Math.min(8,(frame.right-frame.left)/20,(frame.bottom-frame.top)/20),inner={left:frame.left+m,top:frame.top+m,right:frame.right-m,bottom:frame.bottom-m};
+    pop.style.maxWidth='';pop.style.maxHeight='';
+    // Whole pixels: a fractional cap or position lays the rows out on fractional pixels.
+    if(pop.offsetWidth>inner.right-inner.left)pop.style.maxWidth=Math.floor(inner.right-inner.left)+'px';
+    if(pop.offsetHeight>inner.bottom-inner.top)pop.style.maxHeight=Math.floor(inner.bottom-inner.top)+'px';
+    var w=pop.offsetWidth,h=pop.offsetHeight,obstacles=popoverObstacles(trigger),slot=obstacles.length?exploreSlot(rect,inner,w,h,obstacles,gap):null;
+    if(slot){
+      if(!slot.full){
+        // A capped body gains a scrollbar, which can widen an auto-width popover: look again at its new width.
+        pop.style.maxHeight=Math.floor(slot.tall)+'px';
+        var wider=pop.offsetWidth,again=wider>w?exploreSlot(rect,inner,wider,h,obstacles,gap):null;
+        if(again){slot=again;pop.style.maxHeight=Math.floor(again.full?h:again.tall)+'px';}
+        else if(wider>w)slot.left=Math.max(inner.left,Math.min(inner.right-wider,slot.left));
+      }
+      pop.style.left=Math.round(slot.left)+'px';pop.style.top=Math.round(slot.top)+'px';
+    }else{
+      var sides=[
+        {room:inner.bottom-rect.bottom-gap,size:h,left:rect.left,top:rect.bottom+gap},
+        {room:rect.top-gap-inner.top,size:h,left:rect.left,top:rect.top-gap-h},
+        {room:inner.right-rect.right-gap,size:w,left:rect.right+gap,top:rect.top},
+        {room:rect.left-gap-inner.left,size:w,left:rect.left-gap-w,top:rect.top}];
+      var side=sides.find(function(s){return s.room>=s.size;}) || sides.reduce(function(best,s){return s.room/s.size>best.room/best.size?s:best;});
+      pop.style.left=Math.round(Math.max(inner.left,Math.min(inner.right-w,side.left)))+'px';
+      pop.style.top=Math.round(Math.max(inner.top,Math.min(inner.bottom-h,side.top)))+'px';
+    }
+    pop.scrollTop=scrollTop;pop.scrollLeft=scrollLeft;
   }
   function reveal(trigger,dismiss,ask){
     active=trigger;asked=ask;trigger.setAttribute('aria-expanded','true');pop.hidden=false;if(pop.showPopover)pop.showPopover();
-    place(trigger);
-    dismiss.focus({preventScroll:true});document.addEventListener('click',outside,true);document.addEventListener('keydown',escape,true);
+    pop.scrollTop=0;pop.scrollLeft=0;place(trigger);
+    dismiss.focus({preventScroll:true});document.addEventListener('click',outside,true);document.addEventListener('keydown',escape,true);window.addEventListener('resize',resized);
   }
   /* Cards and edge labels remain the single keyboard ticket triggers. Small
      Jira cues are pointer aliases, never an additional status badge or tab stop.
@@ -1861,7 +1928,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
      carrier of this page. Detail pages loaded from other specs are not editable. */
   var EDIT_TICKET_TYPE='application/x-flowview-ticket',dropOver=null;
   function dropRef(target){
-    if(!editing() || !target || !target.closest)return null;
+    if(!(editing() || ticketDrop) || !target || !target.closest)return null;
     var inside=bindings.filter(function(binding){return binding.ordinal!=null && binding.el.contains(target);});
     var binding=inside.filter(function(candidate){return !inside.some(function(other){return other!==candidate && candidate.el.contains(other.el);});})[0];
     if(!binding)return null;
@@ -1906,11 +1973,17 @@ function createLiveStatus(ctl,page,options,renderOptions){
     ev.preventDefault();
     var key=ev.dataTransfer.getData(EDIT_TICKET_TYPE);if(!trackingKeyPattern.test(key))return;
     // The editor re-renders the page; leave this event's dispatch first.
-    setTimeout(function(){if(editor)editor.add(hit.ref,key);},0);
+    setTimeout(function(){
+      if(editor){editor.add(hit.ref,key);return;}
+      if(!ticketDrop || retired)return;
+      // #1241: a refused Workbench drop says why in the panel's status line.
+      var result=ticketDrop(hit.ref,key);
+      if(result && typeof result.error==='string' && !retired){noteText=result.error;noteKind='warn';notify();}
+    },0);
   }
-  if(editor){
+  if(editor || ticketDrop){
     view.addEventListener('dragover',dragOver);view.addEventListener('dragleave',dragLeave);view.addEventListener('drop',drop);view.addEventListener('dragend',dragEnd);
-    var offEditor=editor.onChange(function(){if(!retired){paint();notify();}});
+    var offEditor=editor?editor.onChange(function(){if(!retired){paint();notify();}}):function(){};
     destroyListeners.push(function(){offEditor();setDropOver(null);view.removeEventListener('dragover',dragOver);view.removeEventListener('dragleave',dragLeave);view.removeEventListener('drop',drop);view.removeEventListener('dragend',dragEnd);restoreTitles();});
   }
   function sourceBindings(){
@@ -2545,7 +2618,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       if(observer)observer.disconnect();
       bindings.forEach(function(binding){binding.el.removeEventListener('dv:pathrender',schedule);binding.el.removeEventListener('dv:pathchange',schedule);});bindings.forEach(function(binding){if(binding.section.diagram)liveStatusEdgeBreaks(binding.el,binding.section.diagram,{},false);});bindings=[];
       events.forEach(function(type){view.removeEventListener(type,schedule);});
-      if(pop)pop.remove();listeners=[];
+      if(typeof window!=='undefined')window.removeEventListener('resize',resized);if(pop)pop.remove();listeners=[];
       view.querySelectorAll('.dv-live-board-lane').forEach(function(el){el.classList.remove('dv-live-board-lane');});
       view.querySelectorAll('.dv-live-step-tickets,.dv-live-caption').forEach(function(el){el.remove();});
       if(applied || availabilityOn || refs().tickets.length){

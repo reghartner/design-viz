@@ -47,15 +47,15 @@ test('doorbell chime uses the shared initial/step inspector, undo and panel pick
  const root=page.locator('#docview'),guide=page.locator('#guide'),src=page.locator('#src');
  await inspectPageElement(page,root.locator('.pt-chime .ptitle'));
  const initial=guide.locator('.initialedit');await openInspectorGroup(initial);
- await initial.getByLabel('playback',{exact:true}).selectOption('playing');
+ await initial.getByLabel('Playback',{exact:true}).selectOption('playing');
  expect(JSON.parse(await src.inputValue()).page.sections[0].diagram.panels[0].initial.playback).toBe('playing');
  const edited=await src.inputValue();await page.locator('#undo-builder').click();await expect(src).toHaveValue(source);
  await page.locator('#redo-builder').click();await expect(src).toHaveValue(edited);
  await page.locator('#undo-builder').click();
  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();await page.locator('#editor-tab-inspect').click();
  const patch=guide.locator('.patchedit[data-panel-state="step"]');await openInspectorGroup(patch);
- await patch.getByLabel('playback',{exact:true}).selectOption('stopped');
- await patch.getByLabel('text',{exact:true}).fill('Please use the side door.');await patch.getByLabel('text',{exact:true}).press('Tab');
+ await patch.getByLabel('Playback',{exact:true}).selectOption('stopped');
+ await patch.getByLabel('Message',{exact:true}).fill('Please use the side door.');await patch.getByLabel('Message',{exact:true}).press('Tab');
  const d=JSON.parse(await src.inputValue()).page.sections[0].diagram;
  expect(d.steps[1].panels.bell).toEqual({playback:'stopped',text:'Please use the side door.'});
  await page.locator('#diagram-add').click();await page.locator('[data-add-kind=panel]').click();

@@ -173,8 +173,10 @@ test('rendered table keeps real header semantics, scrolls inside the card and ty
   assert.match(html, /grid-cell grid-high grid-unknown grid-hl-row grid-hl-col" style="--grid-d:0\.000" title="Late × Motif A: no value"/);
   assert.match(html, /grid-cell grid-high grid-hl-col" style="--grid-d:0\.000" title="Early × Motif A: 1\.0 log2"/);
   assert.match(html, /<div class="grid-key" aria-hidden="true"><span>1\.0 log2<\/span>.*<span>2\.0 log2<\/span><em>auto<\/em>/);
-  const collected = C.patchFieldsCollect(C.panelPatchFields(panel()), {cells:'{"early.a": 0.5}', marks:'null', highlight:'{"cell":"early.a"}', note:'Half'});
-  assert.equal(collected.error, undefined); assert.deepEqual(plain(collected.item), {cells:{'early.a':0.5}, marks:null, highlight:{cell:'early.a'}, note:'Half'});
+  const collected = C.patchFieldsCollect(C.panelPatchFields(panel()), {cells:'{"early.a": 0.5}', marks:'null', note:'Half'});
+  assert.equal(collected.error, undefined); assert.deepEqual(plain(collected.item), {cells:{'early.a':0.5}, marks:null, note:'Half'});
+  // Highlight is a fixed-field group (#1000) whose choices come from the declared axes.
+  assert.deepEqual(plain(C.panelPatchFields(panel()).find(f => f[0] === 'highlight')[2].map(f => [f[0], f[1]])), [['row', 'enum'], ['col', 'enum'], ['cell', 'enum']]);
   assert.match(C.patchFieldsCollect(C.panelPatchFields(panel()), {cells:'[1]'}).error || '', /JSON object or null/);
   assert.equal(C.PanelRegistry.get('grid').render({}, panel(), {cells:{'early.a':1}}).html, C.gridHTML(panel(), {cells:{'early.a':1}}));
 });

@@ -906,7 +906,10 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
         if(proof)proofBox(body,proof);
         if(hasData){
         // Tickets first and tall (#765); lane data stays on step pills, row stripes and Blockers lanes (#767).
-        el(body,'h3','tickets-heading','','Tickets');var scroll=el(body,'div','scroll','dv-live-tickets-scroll'),table=el(scroll,'table','table','dv-live-tickets');table.setAttribute('aria-label','Tickets');
+        el(body,'h3','tickets-heading','','Tickets');
+        // #1241: the desktop Workbench says how a row attaches its ticket, and the keyboard way.
+        if(value.ticketDrag)el(body,'p','tickets-drag-hint','dv-live-tickets-hint','Drag a row onto a node or connection to attach its ticket; Undo removes it. Keyboard: select the node or connection, then Inspect → Tracking → Add ticket.');
+        var scroll=el(body,'div','scroll','dv-live-tickets-scroll'),table=el(scroll,'table','table','dv-live-tickets');table.setAttribute('aria-label','Tickets');
         var tr=el(el(table,'thead','thead',''),'tr','tr',''),sort=host._liveTicketSort;
         ['Key','Title','State','Owner','Depends on','PRs'].forEach(function(label){
           var th=el(tr,'th',label,'');th.setAttribute('scope','col');
@@ -920,9 +923,11 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
           }else th.textContent=label;
         });
         var tbody=el(table,'tbody','tbody','');sortedTickets(value.tickets,sort).forEach(function(item){
-          var row=el(tbody,'tr',item.key,'dv-live-ticket-row'+(item.tag?' dv-live-ticket-with-tag':'')+(editing?' dv-live-draggable':''));row.setAttribute('data-live-ticket',item.key);
-          // Edit mode: a row drags its key onto a node or an edge (the board adds it there; drag only, #825).
-          if(editing)row.setAttribute('draggable','true');else row.removeAttribute('draggable');
+          var dragging=editing || !!value.ticketDrag;
+          var row=el(tbody,'tr',item.key,'dv-live-ticket-row'+(item.tag?' dv-live-ticket-with-tag':'')+(dragging?' dv-live-draggable':''));row.setAttribute('data-live-ticket',item.key);
+          // Edit mode and the desktop Workbench (#1241): a row drags its key onto a node or an edge (the board adds it there; drag only, #825).
+          if(dragging){row.setAttribute('draggable','true');if(value.ticketDrag)row.setAttribute('title','Drag onto a node or connection to attach '+item.key+'. Undo removes it.');else row.removeAttribute('title');}
+          else{row.removeAttribute('draggable');row.removeAttribute('title');}
           if(!row._liveDrag){row._liveDrag=function(ev){if(row.getAttribute('draggable')!=='true' || !ev.dataTransfer)return;var key=row.getAttribute('data-live-ticket');ev.dataTransfer.setData('application/x-flowview-ticket',key);ev.dataTransfer.setData('text/plain',key);ev.dataTransfer.effectAllowed='copy';};row.addEventListener('dragstart',row._liveDrag);}if(item.laneColor)row.style.setProperty('--dv-live-lane-color',item.laneColor);else row.style.removeProperty('--dv-live-lane-color');
           // The keyed renderer keeps data rows and controls in order, with a companion row only for an informational tag.
           var keyCell=el(row,'td','key','dv-live-ticket-key');keyCell.setAttribute('tabindex','-1');link(keyCell,'link',item.key,item.url);if(item.epicLabel)el(keyCell,'div','epic','dv-live-ticket-epic',item.epicLabel);el(row,'td','title','dv-live-ticket-title',item.title);
@@ -1204,6 +1209,7 @@ body.sk-aurora:not(.sk-editorial):not(.sk-pastel) .dv-trace-overlay[data-trace-l
 .dv-live-edit-reason,.dv-live-edit-notice{flex-basis:100%;font:12px/1.5 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .dv-live-edit-notice[data-kind="warn"],.dv-live-edit-notice[data-kind="error"]{color:var(--dv-live-blocked);}
 .dv-live-draggable{cursor:grab;}
+.dv-live-tickets-hint{margin:2px 0 6px;font-size:12px;opacity:.85;}
 .dv-live-draggable:active{cursor:grabbing;}
 .dv-live-remove{justify-self:end;}
 .dv-live-clear{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:6px 0;}

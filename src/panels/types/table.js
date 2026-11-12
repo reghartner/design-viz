@@ -185,7 +185,7 @@ PanelRegistry.extend('table', {
       },
     },
     setupFields: [
-      ['columns', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'width', kind: 'num', label: 'Width (px)' }], max: 4 }],
+      ['columns', 'rows', { cols: [{ k: 'id', label: 'Column ID', req: true }, { k: 'label', label: 'Header' }, { k: 'width', kind: 'num', label: 'Width (px)' }], max: 4 }],
       ['showChange', 'jsonAny'],
       ['initial', 'json'],
     ],

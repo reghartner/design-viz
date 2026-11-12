@@ -313,6 +313,19 @@ test('PANEL_PATCH_FIELDS covers all 20 panel types with supported kinds and none
 });
 
 
+test('every table-style setup column has a plain label, not its spec key (#997)', () => {
+  const missing = [];
+  for (const [type, fields] of Object.entries(B.PANEL_SETUP_FIELDS)){
+    for (const field of fields){
+      if (field[1] !== 'rows' && field[1] !== 'objf') continue;
+      for (const col of field[2].cols){
+        if (typeof col.label !== 'string' || !col.label.trim() || col.label === col.k) missing.push(type + '.' + field[0] + '.' + col.k);
+      }
+    }
+  }
+  assert.deepStrictEqual(missing, []);
+});
+
 test('PANEL_SETUP_FIELDS covers exactly the engine panel types with known control kinds', () => {
   assert.deepStrictEqual(Object.keys(B.PANEL_SETUP_FIELDS).sort(), [...V.PANEL_TYPES].sort());
   const kinds = new Set(['text', 'num', 'csv', 'scene', 'image', 'json', 'jsonArr', 'jsonAny',
@@ -349,9 +362,9 @@ test('every key the palette starter templates carry has a setup control', () => 
   }
 });
 
-test('trace spans is a list field in Inspect (#996)', () => {
+test('trace spans is a list field in Inspect (#996, row editor since #1000)', () => {
   const spans = B.PANEL_SETUP_FIELDS.trace.find(f => f[0] === 'spans');
-  assert.strictEqual(spans && spans[1], 'jsonArr');
+  assert.strictEqual(spans && spans[1], 'rows');
 });
 
 test('every JSON setup field accepts its palette starter value (#996)', () => {
@@ -367,8 +380,7 @@ test('every JSON setup field accepts its palette starter value (#996)', () => {
 
 test('Inspect guide text does not tell authors to edit JSON and click Render (#996)', () => {
   for (const [kind, guide] of Object.entries(B.BUILDER_GUIDES)){
-    assert.ok(!/Render/.test(guide.how), kind + ' guide still mentions Render: ' + guide.how);
-    assert.ok(!/selected JSON/.test(guide.how), kind + ' guide still says to edit the selected JSON: ' + guide.how);
+    assert.ok(!/click Render|and Render|selected JSON/.test(guide.how), kind + ' guide still describes the JSON-and-Render workflow: ' + guide.how);
   }
 });
 
@@ -1471,15 +1483,16 @@ test('builderInsertTargetText handles a headingless section and bare shapes', ()
 test('homemap setup and dynamic patch fields follow declared devices', () => {
   assert.deepStrictEqual(plain(B.PANEL_SETUP_FIELDS.homemap), [
     ['outline', 'objf', {cols:[{k:'w',kind:'num',label:'Width'}, {k:'h',kind:'num',label:'Height'}, {k:'x',kind:'num',label:'Left (auto)'}, {k:'y',kind:'num',label:'Top (auto)'}], hint:'Floor plan: width 20–320, height 20–180. Blank left/top centers the house. Rooms and devices keep their coordinates. Press Enter or leave a field to save.'}], ['rooms', 'rows', {cols: [
-      {k:'label'}, {k:'kind',kind:'enum',options:['room','outdoor']}, {k:'x', kind:'num', req:true}, {k:'y', kind:'num', req:true},
-      {k:'w', kind:'num', req:true}, {k:'h', kind:'num', req:true}]}], ['devices', 'rows', {cols: [
-      {k: 'id', req: true}, {k: 'kind', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
-      {k: 'display', kind: 'enum', options: ['marker', 'door']},
-      {k: 'label'}, {k: 'x', kind: 'num', req: true}, {k: 'y', kind: 'num', req: true},
-      {k: 'facing', kind: 'num'}, {k: 'spread', kind: 'num'}, {k: 'range', kind: 'num'}, {k: 'icon', kind: 'icon'}, {k: 'doorWidth', kind: 'num'}, {k: 'doorSwing', kind: 'num'}
+      {k:'label',label:'Name'}, {k:'kind',label:'Area type',kind:'enum',options:['room','outdoor']}, {k:'x',label:'Left', kind:'num', req:true}, {k:'y',label:'Top', kind:'num', req:true},
+      {k:'w',label:'Width', kind:'num', req:true}, {k:'h',label:'Height', kind:'num', req:true}]}], ['devices', 'rows', {cols: [
+      {k: 'id', label: 'Device ID', req: true}, {k: 'kind', label: 'Device type', kind: 'enum', options: ['camera', 'entry', 'sensor', 'hub']},
+      {k: 'display', label: 'Show as', kind: 'enum', options: ['marker', 'door']},
+      {k: 'label', label: 'Name'}, {k: 'x', label: 'Position X', kind: 'num', req: true}, {k: 'y', label: 'Position Y', kind: 'num', req: true},
+      {k: 'facing', label: 'Facing (degrees)', kind: 'num'}, {k: 'spread', label: 'View width (degrees)', kind: 'num'}, {k: 'range', label: 'View range', kind: 'num'},
+      {k: 'icon', label: 'Icon', kind: 'icon'}, {k: 'doorWidth', label: 'Door width', kind: 'num'}, {k: 'doorSwing', label: 'Door swing (degrees)', kind: 'num'}
     ], max: 12}], ['subjects', 'rows', {cols: [
-      {k: 'id', req: true}, {k: 'label'}, {k: 'x', kind: 'num', req: true},
-      {k: 'y', kind: 'num', req: true}, {k: 'icon', kind: 'icon'}], max: 6}], ['initial', 'json']
+      {k: 'id', label: 'Subject ID', req: true}, {k: 'label', label: 'Name'}, {k: 'x', label: 'Position X', kind: 'num', req: true},
+      {k: 'y', label: 'Position Y', kind: 'num', req: true}, {k: 'icon', label: 'Icon', kind: 'icon'}], max: 6}], ['initial', 'json']
   ]);
   const decl = {type: 'homemap', devices: ['camera', 'entry', 'sensor', 'hub'].map((kind, i) => ({id: 'd' + i, kind, x: 20, y: 40}))};
   assert.deepStrictEqual(plain(B.panelPatchFields(decl)), [

@@ -10,7 +10,7 @@
 | L6 | New log search drafts survive a re-render of the same selection; Enter in the label adds; the drafts clear after Add | board | input values after a re-render; after Enter | drafts lost on a repaint |
 | L7 | The section header names the count; one fold per search keyed by its id; a pick-list, typed or fixed search says which it is | two searches | header text; fold titles; kind notes | |
 | L8 | Command errors: bad id, duplicate id, missing label or query; an unknown search | telemetryEditPage | error texts | silent no-ops |
-| L9 (#1415) | "Only lines with a trace ID starts checked" writes requireTraceId false when cleared and removes the key when checked, one Undo step each; a non-boolean value is marked at the checkbox | one search | source; undo; aria-invalid + note | a string "false"; the key kept as true |
+| L9 (#1415) | "Only lines with a trace ID starts checked" writes requireTraceId false when cleared and removes the key when checked, one Undo step each; a non-boolean value is marked at the checkbox | one search | source; undo; aria-invalid + note | a string "false"; the key kept as true; a bad value dropping the search |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
@@ -174,8 +174,9 @@ test('L9 #1415 the "Only lines with a trace ID starts checked" checkbox writes r
   const again=ui.control(label);again.checked=true;again.fire('change');ui.settle();
   assert.deepEqual(plain(ui.lookups.order),{label:'Order',query:QUERY},'checked is the default: the key is removed');
   assert.equal(ui.undoSteps(),2,'one Undo step per change');assert.equal(ui.text,start);
-  // An authored non-boolean is marked at the checkbox with the validator's reason.
+  // An authored non-boolean is marked at the checkbox with the validator's reason; the search keeps working with the default.
   const bad=harness(board({lookups:{order:{label:'Order',query:QUERY,requireTraceId:'no'}}})),mark=bad.control(label);
   assert.equal(mark.getAttribute('aria-invalid'),'true');
-  assert.equal(bad.section().querySelectorAll('p').find(p=>p.id===mark.getAttribute('aria-describedby'))?.textContent,'Must be true or false. The Trace view drops this search until it is fixed.');
+  assert.equal(bad.section().querySelectorAll('p').find(p=>p.id===mark.getAttribute('aria-describedby'))?.textContent,'Must be true or false — the default true is used.','#1415: the search is kept, so no "drops this search"');
+  assert.equal(mark.checked,true,'the checkbox shows the default it falls back to');
 });

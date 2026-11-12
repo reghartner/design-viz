@@ -3934,7 +3934,7 @@ names lookups in `tracking.telemetry.lookups`:
 | `values` | optional suggested values (1–50) the reader can pick; the query must then have a `$value` slot |
 | `datasource` | optional Loki datasource UID; default `tracking.telemetry.grafana.loki` of the active environment |
 | `fields` | optional `{traceId, spanId}` field names; default `trace_id` and `span_id` |
-| `requireTraceId` | optional `true` or `false` (#1415): whether **Only lines with a trace ID** starts checked for this search; default `true`. Use `false` for a search whose useful lines may have no trace ID. Any other value drops the lookup with a warning |
+| `requireTraceId` | optional `true` or `false` (#1415): whether **Only lines with a trace ID** starts checked for this search; default `true`. Use `false` for a search whose useful lines may have no trace ID. Any other value gives a warning and uses `true`; the search stays |
 
 The reader opens Status → Trace → **Load trace**, chooses a connection and
 environment, then uses **Find a trace from a log line** (#1349). One **Log search**

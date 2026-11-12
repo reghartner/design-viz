@@ -795,8 +795,9 @@ function telemetryLookups(raw,warn){
       if(telemetryText(entry.query) && !telemetryLookupSlot(entry.query))bad('.query','has suggested values but no $value slot');
     }
     if(telemetryOwn(entry,'datasource') && !telemetryText(entry.datasource))bad('.datasource','must be a non-empty Loki datasource UID');
-    // #1415: whether "Only lines with a trace ID" starts checked for this search (default true, #1158).
-    if(telemetryOwn(entry,'requireTraceId') && typeof entry.requireTraceId!=='boolean')bad('.requireTraceId','must be true or false');
+    // #1415: whether "Only lines with a trace ID" starts checked for this search (default true, #1158). A bad value
+    // falls back to the default and keeps the search.
+    if(telemetryOwn(entry,'requireTraceId') && typeof entry.requireTraceId!=='boolean')warn(at+'.requireTraceId','must be true or false — the default true is used');
     var fields={traceId:'trace_id',spanId:'span_id'};
     if(telemetryOwn(entry,'fields')){
       if(!telemetryObject(entry.fields))bad('.fields','must be an object {traceId?, spanId?}');
@@ -810,7 +811,7 @@ function telemetryLookups(raw,warn){
     var clean={label:entry.label.trim(),query:entry.query};
     if(entry.values)clean.values=entry.values.slice();
     if(entry.datasource)clean.datasource=entry.datasource;
-    if(telemetryOwn(entry,'requireTraceId'))clean.requireTraceId=entry.requireTraceId;
+    if(typeof entry.requireTraceId==='boolean')clean.requireTraceId=entry.requireTraceId;
     clean.fields=fields;out[id]=clean;
   });
   return out;

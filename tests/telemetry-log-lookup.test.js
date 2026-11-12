@@ -245,16 +245,22 @@ test('#1415 B: requireTraceId false starts "Only lines with a trace ID" unchecke
  assert.equal(explicit.api.snapshot().form.traced,true);explicit.api.set('value','arch');await explicit.api.find();assert.deepEqual(explicit.calls.map(c=>c.args.logql),[EXPANDED+FILTER]);
 });
 
-test('#1415 B: the validator keeps requireTraceId true or false and warns on any other value',()=>{
+test('#1415 B: the validator keeps requireTraceId true or false; any other value warns and keeps the search with the default',()=>{
  const C=context(),warnings=[];
  const parsed=C.trackingTelemetry({tracking:{telemetry:{lookups:{
   off:{label:'Off',query:QUERY,requireTraceId:false},on:{label:'On',query:QUERY,requireTraceId:true},plain:{label:'Plain',query:QUERY},
   text:{label:'Text',query:QUERY,requireTraceId:'false'},number:{label:'Number',query:QUERY,requireTraceId:0}}}}},(at,message)=>warnings.push(at+': '+message));
- assert.deepEqual(Object.keys(parsed.lookups),['off','on','plain']);
- assert.deepEqual([parsed.lookups.off.requireTraceId,parsed.lookups.on.requireTraceId,parsed.lookups.plain.requireTraceId],[false,true,undefined]);
- assert.deepEqual(warnings,['.lookups.text.requireTraceId: must be true or false — lookup ignored','.lookups.number.requireTraceId: must be true or false — lookup ignored']);
+ assert.deepEqual(Object.keys(parsed.lookups),['off','on','plain','text','number'],'a bad requireTraceId does not drop a working search');
+ assert.deepEqual(['off','on','plain','text','number'].map(id=>parsed.lookups[id].requireTraceId),[false,true,undefined,undefined,undefined]);
+ assert.deepEqual(warnings,['.lookups.text.requireTraceId: must be true or false — the default true is used','.lookups.number.requireTraceId: must be true or false — the default true is used']);
  const result=C.validate({tracking:{telemetry:{lookups:{text:{label:'Text',query:QUERY,requireTraceId:'no'}}}},sections:[{id:'s',diagram:{nodes:{a:{}},rows:[['a']]}}]});
- assert.ok(result.warnings.includes('tracking.telemetry.lookups.text.requireTraceId: must be true or false — lookup ignored'),result.warnings.join(' | '));
+ assert.ok(result.warnings.includes('tracking.telemetry.lookups.text.requireTraceId: must be true or false — the default true is used'),result.warnings.join(' | '));
+});
+
+test('#1415 B: a search with a bad requireTraceId starts checked and Find adds the trace ID filter',async()=>{
+ const h=setup({p:board({camera:{label:'Camera model',query:QUERY,requireTraceId:'false'}})});await settle();
+ assert.deepEqual(clone(h.api.snapshot().lookups).map(l=>l.id),['camera'],'the search is offered');assert.equal(h.api.snapshot().form.traced,true,'its box starts checked');
+ h.api.set('value','arch');await h.api.find();assert.deepEqual(h.calls.map(c=>c.args.logql),[EXPANDED+FILTER]);
 });
 
 /* #1233 (plan 2): no fixed number of lookups; the per-field rules are unchanged. */

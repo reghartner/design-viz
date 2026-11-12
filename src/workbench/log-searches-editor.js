@@ -12,7 +12,9 @@ function logSearchWarnings(list,ids){
     var m=LOG_SEARCH_WARNING_FIELD.exec(text),field=m && (m[2]==='fields'?m[3]:m[2]);
     if(!m || !field || ids.indexOf(m[1])<0){out.general.push(text);return;}
     // The validator says "— lookup ignored"; next to the field the editor says what that means for readers.
-    var message=text.slice(text.indexOf(': ')+2).replace(/\s+— lookup ignored$/,'');message=message.charAt(0).toUpperCase()+message.slice(1)+'. The Trace view drops this search until it is fixed.';
+    // #1415: a requireTraceId warning keeps the search, so its own text stands.
+    var message=text.slice(text.indexOf(': ')+2),dropped=/\s+— lookup ignored$/.test(message);message=message.replace(/\s+— lookup ignored$/,'');
+    message=message.charAt(0).toUpperCase()+message.slice(1)+(dropped?'. The Trace view drops this search until it is fixed.':'.');
     var at=out.byId[m[1]] || (out.byId[m[1]]=Object.create(null));(at[field] || (at[field]=[])).push(message);
   });
   return out;

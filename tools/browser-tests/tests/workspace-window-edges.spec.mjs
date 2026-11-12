@@ -77,11 +77,16 @@ test('resize strips leave the pane scrollbar, the grip and the close button usab
   // The right strip sits beside the pane, so it covers none of its scrollbar.
   const strip=await box(win.locator('.workspace-window-edge[data-edge="e"]')),paneBox=await box(pane);
   expect(strip[0]).toBeGreaterThanOrEqual(paneBox[0]+paneBox[2]);
-  // Corner squares leave every pixel of the grip and the close button reachable.
-  for(const control of ['.workspace-window-grip','.workspace-window-close'])expect(await win.locator(control).evaluate(el=>{
-    const r=el.getBoundingClientRect(),points=[[r.left+1,r.top+1],[r.right-1,r.top+1],[r.left+1,r.bottom-1],[r.right-1,r.bottom-1]];
-    return points.every(([x,y])=>{const hit=document.elementFromPoint(x,y);return hit===el || el.contains(hit);});
-  }),control).toBe(true);
+  // Corner squares leave the grip and the close button reachable up to their
+  // edges: edge midpoints 1px in and corners 3px in (inside a 6px radius).
+  for(const control of ['.workspace-window-grip','.workspace-window-close']){
+    const missed=await win.locator(control).evaluate(el=>{
+      const r=el.getBoundingClientRect(),cx=(r.left+r.right)/2,cy=(r.top+r.bottom)/2;
+      const points=[[r.left+3,r.top+3],[r.right-3,r.top+3],[r.left+3,r.bottom-3],[r.right-3,r.bottom-3],[cx,r.top+1],[cx,r.bottom-1],[r.left+1,cy],[r.right-1,cy]];
+      return points.map(([x,y])=>{const hit=document.elementFromPoint(x,y);return hit===el || el.contains(hit)?null:[Math.round(x-r.left),Math.round(y-r.top),hit && (hit.className || hit.tagName)];}).filter(Boolean);
+    });
+    expect(missed,control).toEqual([]);
+  }
   // With a classic scrollbar, dragging its thumb scrolls the pane and never resizes the window.
   const bar=await pane.evaluate(el=>({width:el.offsetWidth-el.clientWidth,overflow:el.scrollHeight-el.clientHeight}));
   expect(bar.overflow).toBeGreaterThan(40);

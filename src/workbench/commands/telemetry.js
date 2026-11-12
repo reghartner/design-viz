@@ -85,6 +85,55 @@ function telemetryEffectiveBinding(binding,templates){
   });
   return out;
 }
+/* #1363: narrowing, needsNarrow and scoped variables as the editor reads and writes them. A
+   Honeycomb or CloudWatch fragment is JSON; the text sources take the fragment as written. The
+   same check the viewer runs refuses a fragment before it is stored. */
+var TELEMETRY_NARROW_JSON={honeycomb:'{"filters":[{"column":"event_code","op":"=","value":"FULL_CHARGE"}]}',cloudwatch:'{"dimensions":{"Type":"FULL_CHARGE"}}'};
+function telemetryNarrowText(fragment){return typeof fragment==='string'?fragment:JSON.stringify(fragment);}
+function telemetryNarrowFragmentValue(source,text){
+  var label=TELEMETRY_NARROW_LABELS[source] || source;
+  if(source==='sql' || source==='tempo')return {error:label+' signals cannot be narrowed. Ask the provider to write a ${name} placeholder in its query, then set that variable.'};
+  if(typeof text!=='string' || !text.trim())return {error:'Enter a narrowing to add.'};
+  var value=text.trim();
+  if(telemetryOwn(TELEMETRY_NARROW_JSON,source)){try{value=JSON.parse(value);}catch(ex){return {error:'A '+label+' narrowing is JSON, such as '+TELEMETRY_NARROW_JSON[source]+'.'};}}
+  var problem=telemetryNarrowFragmentProblem(source,value);
+  if(problem)return {error:'This '+label+' narrowing is not valid ('+problem.message+'), so it was not added.'};
+  return {value:value};
+}
+// needsNarrow as typed: field names separated by commas, "any" for true, empty for none.
+function telemetryNeedsValue(text){
+  if(text==null || !String(text).trim())return {value:null};
+  if(/^any$/i.test(String(text).trim()))return {value:true};
+  var fields=[];String(text).split(',').forEach(function(f){f=f.trim();if(f && fields.indexOf(f)<0)fields.push(f);});
+  if(fields.some(function(f){return /[\s"'`]/.test(f);}))return {error:'List the field names a board must narrow by, separated by commas (or any).'};
+  return {value:fields};
+}
+/* #1363 c1: what the provider requires of a signal on an imported carrier, which this board can
+   only add to: an inherited signal keeps its own needsNarrow and the binding-level one; a signal
+   this board adds, and every signal of a replacing (copied) binding, gets the carrier's union
+   (canon-topology, #1353). null when nothing is required. */
+function telemetryRequiredNeeds(inherited,name,merging){
+  if(!telemetryObject(inherited))return null;
+  var signals=telemetryObject(inherited.signals)?inherited.signals:{},own=telemetryOwn(signals,name) && telemetryObject(signals[name])?signals[name]:null;
+  if(merging && own)return telemetryNeedsMerge(own.needsNarrow,inherited.needsNarrow);
+  var all=telemetryNeedsMerge(null,inherited.needsNarrow);
+  Object.keys(signals).forEach(function(key){if(telemetryObject(signals[key]))all=telemetryNeedsMerge(all,signals[key].needsNarrow);});
+  return all;
+}
+function telemetryNeedsKept(required,next){
+  if(required==null)return true;
+  if(required===true)return next===true;
+  return next===true || Array.isArray(next) && required.every(function(f){return next.indexOf(f)>=0;});
+}
+function telemetryNeedsText(needs){return needs===true?'any':Array.isArray(needs)?needs.join(', '):'';}
+function telemetryVariablesValue(text){
+  if(text==null || !String(text).trim())return {value:null};
+  var value;try{value=JSON.parse(text);}catch(ex){return {error:'Variables are a JSON object of named strings, such as {"code":"FULL_CHARGE"}.'};}
+  if(!telemetryObject(value))return {error:'Variables are a JSON object of named strings, such as {"code":"FULL_CHARGE"}.'};
+  var bad=null;telemetryScopedVariables(value,function(at){if(!bad)bad=at.slice(1);},'');
+  if(bad)return {error:'Variable '+bad+': use a name that is not reserved (env, account) and a non-empty string value.'};
+  return {value:Object.keys(value).length?value:null};
+}
 /* One edit of a carrier binding or (options.template) a page template.
    binding is the authored object or null; options.templates are the page
    templates from trackingTelemetry(page). */
@@ -122,6 +171,36 @@ function telemetryEditBinding(binding,edit,options){
     }
     if(TELEMETRY_KINDS.indexOf(edit.value)<0)return {error:'Choose a kind: '+TELEMETRY_KINDS.join(', ')+'.'};
     b.kind=edit.value;return {value:b};
+  }
+  if(op==='variables'){
+    var vars=telemetryVariablesValue(edit.value);if(vars.error)return vars;
+    if(vars.value)b.variables=vars.value;else delete b.variables;
+    return {value:b};
+  }
+  if(op==='narrow' || op==='needsNarrow'){
+    if(usesTemplate)return {error:'This binding uses template "'+b.use+'"; narrow its signals in Status board settings → Metrics.'};
+    var own=telemetryObject(b.signals)?b.signals:{};
+    if(!telemetryOwn(own,edit.name) || !telemetryObject(own[edit.name]))return {error:'Signal "'+edit.name+'" not found. Render and select it again.'};
+    var target=own[edit.name],from=telemetrySignalSource(target);
+    if(!from)return {error:'Choose a source for this signal first.'};
+    if(op==='needsNarrow'){
+      var needs=telemetryNeedsValue(edit.value);if(needs.error)return needs;
+      if(needs.value==null)delete target.needsNarrow;else target.needsNarrow=needs.value;
+      return {value:b};
+    }
+    var narrow=telemetryObject(target.narrow)?Object.assign({},target.narrow):{},list=telemetryNarrowList(narrow[from]).slice();
+    if(edit.action==='add'){
+      var fragment=telemetryNarrowFragmentValue(from,edit.fragment);if(fragment.error)return fragment;
+      var key=telemetryNarrowCanonical(fragment.value);
+      if(list.some(function(f){return telemetryNarrowCanonical(f)===key;}))return {error:'This narrowing is already there.'};
+      list.push(fragment.value);
+    }else if(edit.action==='remove'){
+      if(typeof edit.index!=='number' || edit.index<0 || edit.index>=list.length)return {error:'Narrowing not found. Render and select it again.'};
+      list.splice(edit.index,1);
+    }else return {error:'Unknown narrowing edit.'};
+    if(list.length)narrow[from]=list;else delete narrow[from];
+    if(Object.keys(narrow).length)target.narrow=narrow;else delete target.narrow;
+    return {value:b};
   }
   if(op==='signal' || op==='removeSignal'){
     if(usesTemplate)return {error:'This binding uses template "'+b.use+'"; edit its signals in Status board settings → Metrics.'};
@@ -171,6 +250,8 @@ function telemetryEditBinding(binding,edit,options){
     if(label!=null){if(!telemetryText(label) || label.length>120 || /[\x00-\x1f\x7f]/.test(label))return {error:'A label is 1–120 plain-text characters without control characters.'};next.label=label.trim();}
     var queryLink=edit.field==='queryLink'?edit.value:entry.links && entry.links.query;
     if(queryLink!=null){if(!telemetryQueryUrl(queryLink))return {error:'A query link is an absolute HTTP(S) URL without credentials or signed result tokens.'};next.links={query:queryLink};}
+    // #1363: a field edit keeps the signal's narrowing and needsNarrow.
+    ['narrow','needsNarrow'].forEach(function(key){if(telemetryOwn(entry,key))next[key]=entry[key];});
     signals[name]=next;b.signals=signals;
     return {value:b};
   }
@@ -422,24 +503,74 @@ function telemetryDiffImported(inherited,effective,previous){
   // Keep hides for names the provider does not have now, so a signal it re-adds stays hidden.
   if(telemetryMergeOverlay(previous) && Array.isArray(previous.hide))previous.hide.forEach(function(name){if(inheritedSignals.indexOf(name)<0 && hide.indexOf(name)<0)hide.push(name);});
   if(hide.length)out.hide=hide;
-  var patch={};
+  var patch={},narrows=false;
   Object.keys(signals).forEach(function(name){
-    var from=telemetryObject(base.signals) && telemetryOwn(base.signals,name)?base.signals[name]:null;
-    var d=from?telemetryFieldDiff(from,signals[name]):telemetryClone(signals[name]);if(d)patch[name]=d;
+    var from=telemetryObject(base.signals) && telemetryOwn(base.signals,name)?base.signals[name]:null,next=signals[name],d;
+    if(!from)d=telemetryClone(next);
+    else{
+      // #1363: narrow appends and needsNarrow adds up when merged, so only the board's own are stored;
+      // a board's narrowing also drops the inherited query link, which is not a change of its own.
+      var own=telemetryNarrowOwn(from,next),a=telemetryClone(from),z=telemetryObject(next)?telemetryClone(next):{};
+      ['narrow','needsNarrow'].forEach(function(key){delete a[key];delete z[key];});
+      if(own.narrow)telemetryWithoutQueryLink(a,z);
+      d=telemetryFieldDiff(a,z);
+      if(own.narrow){d=d || {};d.narrow=own.narrow;narrows=true;}
+      if(own.needs){d=d || {};d.needsNarrow=own.needs;}
+    }
+    if(d)patch[name]=d;
+    if(!from && telemetryObject(next) && telemetryNarrowMerge(null,next.narrow))narrows=true;
   });
   if(Object.keys(patch).length)out.signals=patch;
   var proof={},baseProof=telemetryObject(base.proof)?base.proof:{},nextProof=telemetryObject(effective.proof)?effective.proof:{};
   Object.keys(nextProof).forEach(function(name){var d=telemetryFieldDiff(baseProof[name],nextProof[name]);if(d)proof[name]=d;});
   Object.keys(baseProof).forEach(function(name){if(!telemetryOwn(nextProof,name))proof[name]=null;});
   if(Object.keys(proof).length)out.proof=proof;
-  ['links','card'].forEach(function(field){var d=telemetryFieldDiff(base[field],effective[field]);if(d)out[field]=d;});
+  ['links','card'].forEach(function(field){
+    var from=base[field],next=effective[field];
+    if(field==='links' && narrows){var a={links:from},z={links:next};telemetryWithoutQueryLink(a,z);from=a.links;}
+    var d=telemetryFieldDiff(from,next);if(d)out[field]=d;
+  });
+  // The carrier's own scoped variables and binding needsNarrow are not part of the merged binding.
+  if(telemetryMergeOverlay(previous))['variables','needsNarrow'].forEach(function(key){if(telemetryOwn(previous,key))out[key]=telemetryClone(previous[key]);});
   return out;
+}
+// The fragments and needsNarrow fields next has beyond from (by canonical value), or null.
+function telemetryNarrowOwn(from,next){
+  var out={narrow:null,needs:null},a=telemetryObject(from) && telemetryObject(from.narrow)?from.narrow:{},b=telemetryObject(next) && telemetryObject(next.narrow)?next.narrow:{};
+  Object.keys(b).forEach(function(source){
+    var seen=telemetryNarrowList(a[source]).map(telemetryNarrowCanonical),extra=telemetryNarrowList(b[source]).filter(function(f){return seen.indexOf(telemetryNarrowCanonical(f))<0;});
+    if(extra.length){out.narrow=out.narrow || {};out.narrow[source]=telemetryClone(extra);}
+  });
+  var was=telemetryObject(from)?from.needsNarrow:null,now=telemetryObject(next)?next.needsNarrow:null;
+  if(now===true && was!==true)out.needs=true;
+  else if(Array.isArray(now) && was!==true){var more=now.filter(function(f){return !(Array.isArray(was) && was.indexOf(f)>=0);});if(more.length)out.needs=more;}
+  return out;
+}
+// Drop links.query from a (inherited) when z (effective) has none: merging a board's narrowing drops it.
+function telemetryWithoutQueryLink(a,z){
+  if(!telemetryObject(a.links) || !telemetryOwn(a.links,'query') || telemetryObject(z.links) && telemetryOwn(z.links,'query'))return;
+  a.links=Object.assign({},a.links);delete a.links.query;if(!Object.keys(a.links).length)delete a.links;
 }
 function telemetryEditMerge(inherited,overlay,edit,options){
   inherited=telemetryObject(inherited)?inherited:{};
   var o=telemetryMergeOverlay(overlay)?telemetryClone(overlay):{extends:true},op=edit && edit.op,names=telemetryObject(inherited.signals)?inherited.signals:{};
   if(op==='use')return {error:'A template cannot be used on an imported node or connection: its metrics merge with the provider\'s, and a template would replace them. To use a template\'s signals here, add them with New signal; they are kept as this document\'s additions.'};
   if(op==='remove')return {value:null};
+  // #1363: the carrier's own scoped variables live in its overlay, beside the merged binding.
+  if(op==='variables'){
+    var vars=telemetryVariablesValue(edit.value);if(vars.error)return vars;
+    if(vars.value)o.variables=vars.value;else delete o.variables;
+    return {value:Object.keys(o).length>1?o:null};
+  }
+  var was=op==='narrow' || op==='needsNarrow'?(telemetryObject(names[edit.name])?names[edit.name]:{}):null;
+  if(op==='narrow' && edit.action==='remove'){
+    var source=telemetrySignalSource(was),count=source && telemetryObject(was.narrow)?telemetryNarrowList(was.narrow[source]).length:0;
+    if(typeof edit.index==='number' && edit.index<count)return {error:'This narrowing comes from the provider, so it cannot be removed here. To change it, use Copy provider queries.'};
+  }
+  if(op==='needsNarrow'){
+    var asked=telemetryNeedsValue(edit.value),required=telemetryRequiredNeeds(inherited,edit.name,true);if(asked.error)return asked;
+    if(!telemetryNeedsKept(required,asked.value))return {error:'The provider asks each board to narrow this signal by '+telemetryNeedsText(required)+'; a board can add fields, never remove them.'};
+  }
   var staleHide=op==='hide' && !edit.value && Array.isArray(o.hide) && o.hide.indexOf(edit.name)>=0;
   if(op==='hide' || op==='revert'){
     if(!telemetryOwn(names,edit.name) && !staleHide)return {error:'Signal "'+edit.name+'" is not inherited from the provider.'};
@@ -462,6 +593,25 @@ function telemetryEditMerge(inherited,overlay,edit,options){
 function planCarrierTelemetry(text,raw,target,edit,context){
   var t=telemetryCarrierTarget(text,raw,target,context);if(t.error)return t;
   var inherited=telemetryInheritedBinding(text,raw,target,t,context);
+  // #1363: an import's scoped variables (topologyImports[i].variables) apply to all its carriers.
+  if(edit && edit.op==='importVariables'){
+    var imports=Array.isArray(t.got.d.topologyImports)?t.got.d.topologyImports:[],at=t.owner?imports.findIndex(function(imp){return imp && imp.as===t.owner.as;}):-1;
+    if(at<0)return {error:'Variables for an import are set on its imported nodes and connections.'};
+    var vars=telemetryVariablesValue(edit.value);if(vars.error)return vars;
+    if(JSON.stringify(vars.value)===JSON.stringify(telemetryOwn(imports[at],'variables')?imports[at].variables:null))return {text:text};
+    return planSetField(text,raw,t.got.path.concat(['topologyImports',at]),'variables',vars.value==null?null:JSON.stringify(vars.value,null,2));
+  }
+  // #1363: copy the provider's queries into this document as its own (replacing) binding, to edit them.
+  if(edit && edit.op==='copyProviderQuery'){
+    if(!t.owner)return {error:'Copy provider queries works on imported nodes and connections.'};
+    if(!telemetryMergeMode(t))return {error:'This node or connection already has its own copy of the metrics.'};
+    if(!inherited)return {error:'The provider has no metrics here to copy.'};
+    var overlay=telemetryMergeOverlay(t.binding)?t.binding:{extends:true},copy=FlowTopology.mergeTelemetry(inherited,overlay);
+    if(telemetryObject(overlay.variables))copy.variables=Object.assign({},copy.variables,overlay.variables);
+    if(telemetryOwn(overlay,'needsNarrow'))copy.needsNarrow=telemetryClone(overlay.needsNarrow);
+    if(!telemetryObject(copy.signals) || !Object.keys(copy.signals).length)return {error:'Every inherited signal is hidden here, so there is nothing to copy.'};
+    return planTopologyTracking(text,raw,target.section,target.kind,t.id,'telemetry',copy,false,context,target.index);
+  }
   // #1266: convert an older replacing overlay into the merge overlay with exactly the same result.
   if(edit && edit.op==='mergeWithProvider'){
     if(!inherited || !t.hasField || telemetryMergeOverlay(t.binding))return {error:'Only a document binding that replaces an inherited one can be merged with the provider.'};
@@ -476,6 +626,11 @@ function planCarrierTelemetry(text,raw,target,edit,context){
     var merged=telemetryEditMerge(inherited,t.binding,edit,{templates:telemetryPageTemplates(raw)});if(merged.error)return merged;
     if(JSON.stringify(merged.value)===JSON.stringify(t.hasField?t.binding:null))return {text:text};
     return planTopologyTracking(text,raw,target.section,target.kind,t.id,'telemetry',merged.value,merged.value==null,context,target.index);
+  }
+  // #1363 c1: a copied (replacing) binding still carries the provider carrier's needsNarrow.
+  if(edit && edit.op==='needsNarrow' && t.owner && inherited){
+    var asked=telemetryNeedsValue(edit.value),required=telemetryRequiredNeeds(inherited,edit.name,false);if(asked.error)return asked;
+    if(!telemetryNeedsKept(required,asked.value))return {error:'The provider asks each board to narrow this signal by '+telemetryNeedsText(required)+'; a board can add fields, never remove them.'};
   }
   // A placement edit of inherited telemetry creates a consumer override from
   // the resolver's expanded binding, never a reference to a provider template.
@@ -635,7 +790,31 @@ function telemetryCarrierState(raw,target,context){
     }
   }
   var template=binding && telemetryOwn(binding,'use')?binding.use:null;
-  return {id:t.id,imported:!!t.owner,provider:t.owner?t.owner.spec+' / '+t.owner.export:null,edge:target.kind==='edge',binding:binding,inherited:inherited,merge:merge,mergeEffects:mergeEffects,templates:templates,
+  // #1363: each signal's narrowing (inherited first, read-only), and what the viewer would send or
+  // why it would not, for the page's default environment. Nothing is queried.
+  var narrow=null,sent=null,signals=template==null && binding && telemetryObject(binding.signals)?binding.signals:null;
+  if(signals){
+    narrow={};
+    Object.keys(signals).forEach(function(name){
+      var entry=telemetryObject(signals[name])?signals[name]:{},source=telemetrySignalSource(entry);if(!source)return;
+      var from=merge && inherited && telemetryObject(inherited.signals) && telemetryObject(inherited.signals[name])?inherited.signals[name]:{};
+      var all=telemetryObject(entry.narrow)?telemetryNarrowList(entry.narrow[source]):[],before=telemetryObject(from.narrow)?telemetryNarrowList(from.narrow[source]):[];
+      var required=t.owner?telemetryRequiredNeeds(inherited,name,!!merge && telemetryObject(inherited) && telemetryObject(inherited.signals) && telemetryOwn(inherited.signals,name)):null;
+      var keys=before.map(telemetryNarrowCanonical),needs=telemetryNarrowOwn({needsNarrow:required},{needsNarrow:entry.needsNarrow}).needs;
+      narrow[name]={source:source,inherited:telemetryClone(all.filter(function(f){return keys.indexOf(telemetryNarrowCanonical(f))>=0;})),
+        own:telemetryClone(all.filter(function(f){return keys.indexOf(telemetryNarrowCanonical(f))<0;})),
+        needs:{inherited:required===true?true:Array.isArray(required)?telemetryClone(required):[],own:needs===true?true:needs || []}};
+    });
+  }
+  if(telemetryOwn(t.resolved,'telemetry')){
+    var out=carrierTelemetry(t.resolved,resolvedTemplates,null,telemetryEnvironmentConfig(resolvedPage && resolvedPage.page));
+    if(out){sent={};Object.keys(out.signals).forEach(function(name){var one=out.signals[name],q={query:telemetryQueryText(one.source,one.query)};if(one.error)q.error=one.error;sent[name]=q;});}
+  }
+  var ownVars=merge?(merge.overlay && merge.overlay.variables):binding && binding.variables;
+  var importVariables=null;
+  if(t.owner){var imps=Array.isArray(t.got.d.topologyImports)?t.got.d.topologyImports:[],imp=imps.find(function(i){return i && i.as===t.owner.as;});if(imp)importVariables={as:t.owner.as,value:telemetryObject(imp.variables)?telemetryClone(imp.variables):{}};}
+  return {narrow:narrow,sent:sent,variables:{own:telemetryObject(ownVars)?telemetryClone(ownVars):{},inherited:merge && inherited && telemetryObject(inherited.variables)?telemetryClone(inherited.variables):{}},importVariables:importVariables,
+    id:t.id,imported:!!t.owner,provider:t.owner?t.owner.spec+' / '+t.owner.export:null,edge:target.kind==='edge',binding:binding,inherited:inherited,merge:merge,mergeEffects:mergeEffects,templates:templates,
     mode:template!=null?'template':'raw',template:template,
     templateBase:template!=null?telemetryTemplateBase(binding,templates):null,
     effective:telemetryEffectiveBinding(binding,templates),warnings:warnings};

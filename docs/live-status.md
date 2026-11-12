@@ -649,6 +649,32 @@ before merging existed keeps it; **Merge with provider** converts it in one Undo
 into the same metrics stored as changes (provider signals it dropped become hidden),
 and **Remove metrics** restores the inherited one.
 
+**Narrowing and variables in Inspect** (#1363, desktop only). Each signal of a node or
+connection, local or imported, lists its narrowing in the signal's own language
+([Narrowing inherited signals](#narrowing-inherited-signals)): fragments it inherits are
+shown read-only ("… narrowing from the provider: …"), and the board's own have **Remove**.
+**Add <signal> narrowing** takes one fragment: JSON for Honeycomb
+(`{"filters":[…]}`) and CloudWatch (`{"dimensions":{…}}`), the text as written for LogQL,
+PromQL and Logs Insights. It runs the viewer's check first, so a refused fragment shows
+its reason and is not stored. **<signal> boards must narrow by** sets `needsNarrow`
+(field names separated by commas, or `any`). What the provider requires (the signal's and
+the binding-level `needsNarrow` of an imported carrier, and the carrier's requirement on a
+copied binding) is shown read-only as **<signal> required by the provider**; the field
+holds only the board's own fields, so a board can add fields, never remove the provider's. The signal shows the viewer's **Not shown:** reason
+for the page's default environment (an unmet `needsNarrow`, a refused fragment or
+variable, an unset variable), and a narrowed signal shows **<signal> query sent**, the
+query the viewer would send; nothing is queried. **Variables for this node** (or
+connection) sets the carrier's `telemetry.variables`; on an imported carrier it is stored
+in its overlay, and **Variables for import <as>** sets `topologyImports[i].variables`,
+which applies to every node and connection from that import
+([Variable scopes](#variable-scopes)). On an imported carrier, **Copy provider queries**
+stores the provider's signals, with every narrowing and change made here, as this
+document's own binding, to edit their queries; a note beside it says so
+([When narrowing or a variable cannot express the filter](#when-narrowing-or-a-variable-cannot-express-the-filter));
+the copy no longer follows the provider, and **Merge with provider** turns it back into
+changes. The overlay stores only the board's own fragments and `needsNarrow` fields, so
+provider changes to its own keep flowing. Each change is one Undo step.
+
 **Status board settings → Metrics** edits the page
 `tracking.telemetry` block: the Grafana Prometheus, Loki, Tempo and SQL datasource
 UIDs, the Honeycomb environment and dataset, **Metrics window** (such as `1h`) and

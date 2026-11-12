@@ -4,15 +4,18 @@ import {editorSpec} from '../fixtures/editor-spec.mjs';
 /* #1376 part 1 (Chuck, 2026-11-12): Workbench tool windows resize from all four
    corners and all four edges, like desktop windows. Docked, the free left edge
    resizes the docked width (pointer and Left/Right arrows) and the canvas
-   follows. Desktop only. Real pointer input: each drag starts 3px inside the
+   follows. Desktop only. Real pointer input: each drag starts just inside the
    window's dragged sides, and the landed rect must equal start + pointer delta
    on the dragged sides with the opposite sides unchanged. */
 
 const CURSORS={n:'ns-resize',s:'ns-resize',e:'ew-resize',w:'ew-resize',ne:'nesw-resize',sw:'nesw-resize',nw:'nwse-resize',se:'nwse-resize'};
 async function box(locator){return locator.evaluate(el=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height].map(Math.round);});}
 function near(got,want){return got.every((v,i)=>Math.abs(v-want[i])<=1);}
+// Edges are pressed 3px inside; corners 6px inside on both axes, because the
+// window's 12px rounded corner clips the outermost pixels of a corner handle.
 function pointFor(r,edge){
-  return [edge.includes('w')?r[0]+3:edge.includes('e')?r[0]+r[2]-3:r[0]+r[2]/2,edge.includes('n')?r[1]+3:edge.includes('s')?r[1]+r[3]-3:r[1]+r[3]/2];
+  const inset=edge.length===2?6:3;
+  return [edge.includes('w')?r[0]+inset:edge.includes('e')?r[0]+r[2]-inset:r[0]+r[2]/2,edge.includes('n')?r[1]+inset:edge.includes('s')?r[1]+r[3]-inset:r[1]+r[3]/2];
 }
 async function pointerDrag(page,[x,y],dx,dy){await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:6});await page.mouse.up();}
 async function cursorAt(page,[x,y]){return page.evaluate(([x,y])=>{const hit=document.elementFromPoint(x,y);return hit?getComputedStyle(hit).cursor:'none';},[x,y]);}

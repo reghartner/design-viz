@@ -10,6 +10,8 @@ function createBuilderInspector(opts){
   var proseDraft={key:null,fields:Object.create(null)};
   // #1233: uncommitted New log search text in Status board settings; cleared when the selection changes.
   var LOG_SEARCH_DRAFTS=new Map();
+  // #1237: uncommitted New dependency text and the focus target after a dependency edit; cleared when the selection changes.
+  var JIRA_DRAFTS=new Map();
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
   function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;invalidateTopologyExport=null;invalidateAlignment=null;invalidateEdgeEndpoints=null;}
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
@@ -50,7 +52,7 @@ function createBuilderInspector(opts){
     if(!same){
       OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_SPAN_DRAFTS.clear();TRACE_SCOPE_VIEW.clear();TRACE_MATCH_REVEALED.clear();
       OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;FORM_NOTICE=null;
-      LOG_SEARCH_DRAFTS.clear();
+      LOG_SEARCH_DRAFTS.clear();JIRA_DRAFTS.clear();
     }
     if(!same)METRICS_DRAFTS.clear();
     retireForm();
@@ -589,15 +591,17 @@ function deltaControls(val){
     return fold;
   }
 
+/* One page tracking edit (planPageTracking), one Undo step. */
+function commitPageTracking(edit){
+    var snapshot=parseEditor();if(snapshot.error){formError(snapshot.error);return false;}
+    var plan=planPageTracking(snapshot.text,snapshot.raw,edit);
+    // Nothing to change (for example the stored site already ends in "/"): no history entry.
+    if(!plan.error && plan.text===snapshot.text){formError('');refreshFormSoon();return true;}
+    return applyPlan(plan,{after:refreshFormSoon},snapshot);
+  }
 /* #1236: the page Jira and GitHub controls, rendered into Status board settings → Jira. */
 function pageTrackingControls(val,box){
-    function update(edit){
-      var snapshot=parseEditor();if(snapshot.error){formError(snapshot.error);return false;}
-      var plan=planPageTracking(snapshot.text,snapshot.raw,edit);
-      // Nothing to change (for example the stored site already ends in "/"): no history entry.
-      if(!plan.error && plan.text===snapshot.text){formError('');refreshFormSoon();return true;}
-      return applyPlan(plan,{after:refreshFormSoon},snapshot);
-    }
+    var update=commitPageTracking;
     var jira=val.tracking && val.tracking.jira || {};
     box.appendChild(frow('Jira site',textControl(jira.site,function(value){
       var url=value==null?null:deltaLinkUrl(value);
@@ -642,6 +646,174 @@ function pageTrackingControls(val,box){
       if(bad){formError('Use owner/repo names separated by commas, or org:name.');return false;}
       return update(function(jira,page,tracking){if(parts.length)tracking.github=github;else delete tracking.github;});
     },{placeholder:'acme/firmware, acme/backend or org:acme'})));
+    return box;
+  }
+
+/* #1237: Status board settings → Jira: dependencies, "waits on" link names and no-activity days.
+   Each edit is one commitPageTracking call, so one Undo step. Edits read the current source, and
+   authored entries the form cannot read are kept as written. Validator warnings for these paths are
+   also shown next to the field they name. */
+function jiraDependencyControls(page,box,warnings){
+    var tracking=specObject(page.tracking)?page.tracking:{},jira=specObject(tracking.jira)?tracking.jira:{},serial=0;
+    var intent=JIRA_DRAFTS.get('focus');JIRA_DRAFTS.delete('focus');
+    function el(tag,cls,text){var node=document.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node;}
+    function note(parent,text,cls){var p=el('p','fnote'+(cls?' '+cls:''),text);parent.appendChild(p);return p;}
+    function named(control,name,title){control.setAttribute('aria-label',name);if(title)control.title=title;return control;}
+    function group(cls,legend){var set=el('fieldset','board-jira-group '+cls);set.appendChild(el('legend',null,legend));box.appendChild(set);return set;}
+    function matching(pattern){return (warnings || []).filter(function(text){return pattern.test(text);});}
+    // The validator text without its path, next to the controls it names.
+    function warn(parent,controls,texts){
+      if(!texts.length)return null;
+      var p=note(parent,texts.map(function(text){var m=text.slice(text.indexOf(': ')+2);return m.charAt(0).toUpperCase()+m.slice(1)+(/[.!?]$/.test(m)?'':'.');}).join(' '),'board-field-warning');
+      p.id=prefix+'-jira-warning-'+(serial++);p.setAttribute('role','note');
+      controls.forEach(function(control){control.setAttribute('aria-invalid','true');control.setAttribute('aria-describedby',((control.getAttribute('aria-describedby') || '')+' '+p.id).trim());});
+      return p;
+    }
+    function currentTracking(){var snap=parseEditor();if(snap.error){formError(snap.error);return null;}var doc=builderDocumentPage(snap.raw);return doc && specObject(doc.page.tracking)?doc.page.tracking:{};}
+    function jiraKey(value){return value==null?'':value.trim().toUpperCase();}
+
+    /* Dependencies: tracking.dependencies [{ticket, on, reason?}]. */
+    var deps=group('board-dependencies','Dependencies');
+    note(deps,'A ticket waits on another ticket until that one is Done, and the board shows it as waiting. Jira issue links are read as well, so list only the pairs Jira does not link.');
+    function currentDeps(){
+      var t=currentTracking();if(!t)return null;
+      if(t.dependencies!=null && !Array.isArray(t.dependencies)){formError('Dependencies in the JSON is not a list. Fix tracking.dependencies in JSON first; nothing was changed.');return null;}
+      return Array.isArray(t.dependencies)?t.dependencies.slice():[];
+    }
+    function writeDeps(list){return commitPageTracking(function(jira,page,tracking){if(list.length)tracking.dependencies=list;else delete tracking.dependencies;});}
+    function pairProblem(list,index,ticket,on){
+      if(!trackingKeyPattern.test(ticket) || !trackingKeyPattern.test(on))return 'Use Jira keys like DOOR-100.';
+      if(ticket===on)return 'A ticket cannot wait on itself.';
+      if(list.some(function(entry,i){return i!==index && specObject(entry) && entry.ticket===ticket && entry.on===on;}))return ticket+' already waits on '+on+'.';
+      return '';
+    }
+    var authored=tracking.dependencies;
+    if(authored!=null && !Array.isArray(authored)){
+      warn(deps,[],matching(/^tracking\.dependencies:/));
+      note(deps,'Dependencies in the JSON is not a list. Fix tracking.dependencies in JSON first.');
+    }else{
+      var rows=Array.isArray(authored)?authored:[];
+      rows.forEach(function(entry,index){
+        var value=specObject(entry)?entry:{},n=index+1,item=el('div','board-dependency');
+        item.setAttribute('role','group');item.setAttribute('aria-label','Dependency '+n);item.setAttribute('data-board-dependency',String(index));deps.appendChild(item);
+        function edit(field,v){
+          var list=currentDeps();if(!list)return false;
+          if(index>=list.length){formError('The dependencies changed. Reopen Status board settings.');return false;}
+          var next=specObject(list[index])?builderClone(list[index]):{};
+          if(field==='reason'){if(v==null)delete next.reason;else next.reason=v;}
+          else {
+            var key=jiraKey(v);
+            if(!key){formError('A dependency needs both tickets. Use Remove dependency '+n+' to delete it.');return false;}
+            next[field]=key;
+            var problem=typeof next.ticket==='string' && typeof next.on==='string'?pairProblem(list,index,next.ticket,next.on):trackingKeyPattern.test(key)?'':'Use Jira keys like DOOR-100.';
+            if(problem){formError(problem);return false;}
+          }
+          list[index]=next;return writeDeps(list);
+        }
+        function field(label,name,current,key,placeholder,title){
+          var control=named(textControl(typeof current==='string'?current:'',function(v){return edit(key,v);},{placeholder:placeholder}),'Dependency '+n+' '+name,title);
+          item.appendChild(frow(label,control));return control;
+        }
+        var ticket=field('Ticket','ticket',value.ticket,'ticket','DOOR-101','The ticket that waits');
+        var on=field('Waits on','waits on',value.on,'on','DOOR-102','The ticket it waits on');
+        field('Reason','reason',value.reason,'reason','Optional','Optional. Shown with the dependency in the ticket list.');
+        if(!specObject(entry))note(item,'Written in the JSON as '+JSON.stringify(entry)+'. Typing a ticket here replaces it.');
+        warn(item,[ticket,on],matching(new RegExp('^tracking\\.dependencies\\['+index+'\\]')));
+        var actions=actionGroup('Dependency '+n+' actions','board-dependency-actions');item.appendChild(actions);
+        function move(offset){
+          var list=currentDeps();if(!list)return false;var to=index+offset;
+          if(index>=list.length || to<0 || to>=list.length)return false;
+          var moved=list.splice(index,1)[0];list.splice(to,0,moved);
+          var ok=writeDeps(list);if(ok)JIRA_DRAFTS.set('focus','Move dependency '+(to+1)+(offset<0?' up':' down'));return ok;
+        }
+        var up=named(actionButton('Move up',function(){return move(-1);}),'Move dependency '+n+' up'),down=named(actionButton('Move down',function(){return move(1);}),'Move dependency '+n+' down');
+        up.disabled=index===0;down.disabled=index===rows.length-1;
+        up.title=up.disabled?'Already the first dependency':'Move this dependency one place up';down.title=down.disabled?'Already the last dependency':'Move this dependency one place down';
+        actions.appendChild(up);actions.appendChild(down);
+        actions.appendChild(named(actionButton('Remove',function(){
+          var list=currentDeps();if(!list)return false;if(index>=list.length)return false;
+          list.splice(index,1);var ok=writeDeps(list);
+          if(ok)JIRA_DRAFTS.set('focus',list.length>index?'Dependency '+n+' ticket':list.length?'Dependency '+list.length+' ticket':'New dependency ticket');return ok;
+        },'bdanger'),'Remove dependency '+n,'Remove this dependency. Undo brings it back.'));
+      });
+      var add=el('div','board-dependency board-dependency-new');add.setAttribute('role','group');add.setAttribute('aria-label','New dependency');deps.appendChild(add);
+      function drafted(label,name,key,placeholder,title){
+        var input=el('input','fctl');input.type='text';input.placeholder=placeholder;named(input,'New dependency '+name,title);
+        var k='new:'+key;if(JIRA_DRAFTS.has(k))input.value=JIRA_DRAFTS.get(k);
+        function keep(){if(input.value)JIRA_DRAFTS.set(k,input.value);else JIRA_DRAFTS.delete(k);}
+        listen(input,'input',keep);listen(input,'change',keep);
+        // The form refresh waits while a focused field holds a draft.
+        input._flowviewHasDraft=function(){return JIRA_DRAFTS.has(k);};
+        listen(input,'keydown',function(ev){if(ev.key==='Enter' && !ev.isComposing){ev.preventDefault();submit();}});
+        add.appendChild(frow(label,input));return input;
+      }
+      var newTicket=drafted('Ticket','ticket','ticket','DOOR-101','The ticket that waits'),newOn=drafted('Waits on','waits on','on','DOOR-102','The ticket it waits on'),
+        newReason=drafted('Reason','reason','reason','Optional','Optional. Shown with the dependency in the ticket list.');
+      function submit(){
+        var list=currentDeps();if(!list)return false;
+        var ticket=jiraKey(newTicket.value),on=jiraKey(newOn.value),reason=newReason.value.trim();
+        if(!ticket || !on){formError('Type the ticket and the ticket it waits on.');return false;}
+        var problem=pairProblem(list,-1,ticket,on);if(problem){formError(problem);return false;}
+        var entry={ticket:ticket,on:on};if(reason)entry.reason=reason;
+        var ok=writeDeps(list.concat([entry]));
+        if(ok){['ticket','on','reason'].forEach(function(k){JIRA_DRAFTS.delete('new:'+k);});newTicket.value='';newOn.value='';newReason.value='';JIRA_DRAFTS.set('focus','New dependency ticket');}
+        return ok;
+      }
+      var addActs=actionGroup('New dependency actions','board-dependency-actions');add.appendChild(addActs);
+      addActs.appendChild(named(actionButton('Add dependency',submit),'Add dependency','Save this dependency as one Undo step. Enter in any of the three fields does the same.'));
+    }
+
+    /* "Waits on" link names: tracking.jira.dependencyLinks; the defaults apply while it is unset. */
+    var links=group('board-link-names','“Waits on” link names');
+    note(links,'Jira issue links whose name, as shown on the waiting ticket, means “waits on”. The board reads these links as dependencies. Case does not matter.');
+    var linkValue=jira.dependencyLinks,linkSet=Object.prototype.hasOwnProperty.call(jira,'dependencyLinks'),defaults=TRACKING_DEFAULT_DEPENDENCY_LINKS;
+    function currentLinks(){
+      var t=currentTracking();if(!t)return null;var j=specObject(t.jira)?t.jira:{};
+      if(!Object.prototype.hasOwnProperty.call(j,'dependencyLinks'))return defaults.slice();
+      if(!Array.isArray(j.dependencyLinks)){formError('Link names in the JSON are not a list. Use default link names to reset them.');return null;}
+      return j.dependencyLinks.slice();
+    }
+    function writeLinks(list){return commitPageTracking(function(jira){if(list && list.length)jira.dependencyLinks=list;else delete jira.dependencyLinks;});}
+    function linkText(value){return typeof value==='string'?value.trim().toLowerCase():'';}
+    var linkWarnings=matching(/^tracking\.jira\.dependencyLinks/);
+    if(linkSet && !Array.isArray(linkValue))note(links,'Link names in the JSON are not a list; the board uses the defaults.');
+    else (linkSet?linkValue:defaults).forEach(function(name,index){
+      var row=el('div','board-link-name'),label=el('span',null,typeof name==='string'?name+(linkSet?'':' (default)'):JSON.stringify(name));row.appendChild(label);
+      row.appendChild(named(actionButton('Remove',function(){
+        var list=currentLinks();if(!list || index>=list.length)return false;
+        list.splice(index,1);return writeLinks(list);
+      },'bdanger'),'Remove link name '+(index+1),linkSet?'Stop reading this link as “waits on”. Removing the last name returns to the defaults.':'Stop reading this default link as “waits on”; the other names are saved.'));
+      links.appendChild(row);
+    });
+    var addLink=named(textControl('',function(v){
+      if(v==null){formError('');return true;}
+      var name=linkText(v),list=currentLinks();if(!list)return false;
+      if(list.some(function(item){return linkText(item)===name;})){formNote('“'+name+'” is already listed.',true);return false;}
+      return writeLinks(list.concat([name]));
+    },{placeholder:'is blocked by'}),'Add link name','Type a Jira link name and press Enter. The defaults stay unless you remove them.');
+    warn(links,[],linkWarnings);
+    links.appendChild(frow('Add link name',addLink));
+    if(linkSet){
+      var reset=actionGroup('Link name actions','board-dependency-actions');links.appendChild(reset);
+      reset.appendChild(named(actionButton('Use default link names',function(){return writeLinks(null);}),'Use default link names','Remove the saved list so the board uses “is blocked by” and “depends on”.'));
+    }else note(links,'Using the defaults. Adding or removing a name saves the list.');
+
+    /* No activity after (days): tracking.staleDays, default 7. */
+    var stale=group('board-stale-days','No activity');
+    var days=named(numberControl(Object.prototype.hasOwnProperty.call(tracking,'staleDays')?tracking.staleDays:null,function(v){
+      return commitPageTracking(function(jira,page,tracking){if(v==null)delete tracking.staleDays;else tracking.staleDays=v;});
+    }),'No activity after (days)','Days without a Jira update before a ticket is marked “no activity”. Empty uses 7.');
+    days.placeholder='7';days.inputMode='decimal';
+    stale.appendChild(frow('No activity after (days)',days));
+    note(stale,'A ticket with no Jira update for this many days is marked “no activity” on the board. Empty uses 7.');
+    warn(stale,[days],matching(/^tracking\.staleDays:/));
+
+    if(intent && intent!=='')opts.schedule(function(){
+      if(disposed)return;
+      var target=guide.querySelector('[aria-label="'+intent+'"]');
+      if(target && target.disabled){var item=target.closest('.board-dependency');target=item && Array.prototype.find.call(item.querySelectorAll('button'),function(b){return !b.disabled;});}
+      if(target && target.focus)target.focus();
+    },0);
     return box;
   }
 
@@ -3073,6 +3245,8 @@ function boardForm(){
     var scope=trackingGithubScope(doc.page),excluded=trackingExclusions(doc.page).length;
     if(scope.repos.length || scope.org)jiraStatus.push('GitHub scope');
     if(excluded)jiraStatus.push(excluded+' excluded');
+    var dependencyCount=trackingDependencies(doc.page).length;
+    if(dependencyCount)jiraStatus.push(dependencyCount+(dependencyCount===1?' dependency':' dependencies'));
     var hasTelemetry=Object.prototype.hasOwnProperty.call(tracking,'telemetry');
     var jira=section('jira','Jira',count(warnings.jira) || jiraStatus.join(' · ') || 'Not set',warnings.jira.length>0);
     var metrics=section('metrics','Metrics',count(warnings.metrics) || (!hasTelemetry?(statusBoardHasBindings(raw)?'No page settings':'Not set'):telemetry.enabled===false?'Off':''),hasTelemetry || warnings.metrics.length>0);
@@ -3081,7 +3255,7 @@ function boardForm(){
     var lookupSet=specObject(telemetry.lookups)?Object.keys(telemetry.lookups).length:0;
     var lookups=section('lookups','Log searches',count(warnings.lookups) || (!Object.prototype.hasOwnProperty.call(telemetry,'lookups')?'Not set':lookupSet?lookupSet+(lookupSet===1?' search':' searches'):'Typed query only'),warnings.lookups.length>0);
     pageTrackingControls(doc.page,jira);
-    note(jira,'Dependencies, dependency link names and no-activity days: edit in JSON for now.');
+    jiraDependencyControls(doc.page,jira,warnings.jira);
     warningList(jira,warnings.jira,'Jira warnings');
     var metricsForm=metricsSettingsControls(environments,warnings.metrics);if(metricsForm)metrics.appendChild(metricsForm);
     warningList(environments,warnings.environments,'Environments warnings');

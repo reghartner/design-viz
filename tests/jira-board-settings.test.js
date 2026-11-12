@@ -77,6 +77,9 @@ test('J2 Add link name keeps the defaults and adds the name; Use default link na
   assert.equal(ui.raw.page.tracking.jira.site,'https://acme.atlassian.net');
   assert.equal(ui.button('Use default link names'),null,'no Use defaults button while the defaults apply');
   assert.equal(ui.h.session.undo(),true);assert.deepEqual(ui.raw.page.tracking.jira.dependencyLinks,['depends on','is gated by'],'one Undo brings the list back');
+  const junk=harness(board({jira:{site:'https://acme.atlassian.net',dependencyLinks:['is blocked by','']}}));
+  const note=junk.h.guide.querySelector('fieldset.board-link-names').querySelector('.board-field-warning');
+  assert.equal(note?.textContent,'Use a non-empty link description — entry ignored.','an authored bad name is warned in the link names group');
 });
 
 test('J3 No activity after (days) writes tracking.staleDays; an invalid value shows the validator warning next to the field',()=>{
@@ -91,7 +94,7 @@ test('J3 No activity after (days) writes tracking.staleDays; an invalid value sh
   const field=ui.field('No activity after (days)');
   assert.equal(field.getAttribute('aria-invalid'),'true');
   assert.match(ui.described(field),/Must be a positive number — using 7 days/,'the validator warning sits next to the field');
-  assert.equal(ui.jira().open,true,'the warning opens the Jira section');
+  assert.equal(harness(board({staleDays:0})).jira().open,true,'on a new selection the warning opens the Jira section');
   ui.type('No activity after (days)','');
   assert.equal(Object.hasOwn(ui.raw.page.tracking,'staleDays'),false,'empty removes the key');
 });

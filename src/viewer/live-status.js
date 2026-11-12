@@ -1691,9 +1691,26 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(!stage)return [];
     return Array.prototype.map.call(stage.querySelectorAll('.explore-window,.explore-player'),function(el){return el.getBoundingClientRect();}).filter(function(r){return r.width>0 && r.height>0;});
   }
+  // Explore: the top-left corner and height for the popover that keeps clear of the windows, the step player and its
+  // trigger. Corners come from the trigger's sides, the frame's edges and the obstacles' edges; each is clamped to the
+  // frame, and its clear height is how far it reaches down before an obstacle. A full-height slot nearest the trigger
+  // wins, else the tallest; null when no slot is at least 120 px tall (the popover then covers rather than shrinks).
+  function exploreSlot(rect,inner,w,h,obstacles,gap){
+    var blocks=obstacles.concat([{left:rect.left-gap,top:rect.top-gap,right:rect.right+gap,bottom:rect.bottom+gap}]),xs=[rect.left,rect.right-w,rect.right+gap,rect.left-gap-w,inner.left,inner.right-w],ys=[rect.bottom+gap,rect.top-gap-h,rect.top,rect.bottom-h,inner.top,inner.bottom-h];
+    obstacles.forEach(function(o){xs.push(o.right+gap,o.left-gap-w);ys.push(o.bottom+gap,o.top-gap-h);});
+    var best=null;
+    xs.forEach(function(x){x=Math.max(inner.left,Math.min(inner.right-w,x));ys.forEach(function(y){
+      y=Math.max(inner.top,Math.min(inner.bottom-h,y));
+      var tall=Math.min(h,inner.bottom-y);
+      blocks.forEach(function(o){if(Math.min(x+w,o.right)-Math.max(x,o.left)<=0 || o.bottom<=y)return;tall=Math.min(tall,o.top<=y?0:o.top-gap-y);});
+      var full=tall>=h-.5,dx=Math.max(rect.left-(x+w),x-rect.right,0),dy=Math.max(rect.top-(y+tall),y-rect.bottom,0),distance=dx+dy;
+      if(!best || (full && !best.full) || (full===best.full && (full?distance<best.distance:tall>best.tall+.5 || Math.abs(tall-best.tall)<=.5 && distance<best.distance)))best={left:x,top:y,tall:tall,full:full,distance:distance};
+    });});
+    return best && best.tall>=Math.min(h,120)?best:null;
+  }
   // Below the trigger when it fits, else above, right or left where it fits, else the side with the most room;
-  // then clamped to the frame. A placement clear of the Explore windows wins over one that is not. A popover taller
-  // or wider than the frame is capped to it and its body scrolls; a re-place keeps the reader's scroll position.
+  // then clamped to the frame. In Explore a slot clear of the windows and the step player wins (exploreSlot). A
+  // popover taller or wider than the frame is capped to it and its body scrolls; a re-place keeps the reader's scroll.
   function place(trigger){
     var scrollTop=pop.scrollTop,scrollLeft=pop.scrollLeft;
     var rect=trigger.getBoundingClientRect(),frame=popoverFrame(trigger),gap=6;
@@ -1701,21 +1718,20 @@ function createLiveStatus(ctl,page,options,renderOptions){
     pop.style.maxWidth='';pop.style.maxHeight='';
     if(pop.offsetWidth>inner.right-inner.left)pop.style.maxWidth=(inner.right-inner.left)+'px';
     if(pop.offsetHeight>inner.bottom-inner.top)pop.style.maxHeight=(inner.bottom-inner.top)+'px';
-    var w=pop.offsetWidth,h=pop.offsetHeight,obstacles=popoverObstacles(trigger);
-    var sides=[
-      {room:inner.bottom-rect.bottom-gap,size:h,left:rect.left,top:rect.bottom+gap},
-      {room:rect.top-gap-inner.top,size:h,left:rect.left,top:rect.top-gap-h},
-      {room:inner.right-rect.right-gap,size:w,left:rect.right+gap,top:rect.top},
-      {room:rect.left-gap-inner.left,size:w,left:rect.left-gap-w,top:rect.top}].map(function(s){
-      s.left=Math.max(inner.left,Math.min(inner.right-w,s.left));s.top=Math.max(inner.top,Math.min(inner.bottom-h,s.top));
-      s.clear=!obstacles.some(function(o){return Math.min(s.left+w,o.right)-Math.max(s.left,o.left)>0 && Math.min(s.top+h,o.bottom)-Math.max(s.top,o.top)>0;});
-      return s;
-    });
-    function fits(s){return s.room>=s.size;}
-    function roomiest(list){return list.reduce(function(best,s){return s.room/s.size>best.room/best.size?s:best;});}
-    var clear=sides.filter(function(s){return s.clear;});
-    var side=sides.find(function(s){return fits(s) && s.clear;}) || (clear.length?roomiest(clear):sides.find(fits) || roomiest(sides));
-    pop.style.left=side.left+'px';pop.style.top=side.top+'px';
+    var w=pop.offsetWidth,h=pop.offsetHeight,obstacles=popoverObstacles(trigger),slot=obstacles.length?exploreSlot(rect,inner,w,h,obstacles,gap):null;
+    if(slot){
+      if(!slot.full)pop.style.maxHeight=Math.floor(slot.tall)+'px';
+      pop.style.left=slot.left+'px';pop.style.top=slot.top+'px';
+    }else{
+      var sides=[
+        {room:inner.bottom-rect.bottom-gap,size:h,left:rect.left,top:rect.bottom+gap},
+        {room:rect.top-gap-inner.top,size:h,left:rect.left,top:rect.top-gap-h},
+        {room:inner.right-rect.right-gap,size:w,left:rect.right+gap,top:rect.top},
+        {room:rect.left-gap-inner.left,size:w,left:rect.left-gap-w,top:rect.top}];
+      var side=sides.find(function(s){return s.room>=s.size;}) || sides.reduce(function(best,s){return s.room/s.size>best.room/best.size?s:best;});
+      pop.style.left=Math.max(inner.left,Math.min(inner.right-w,side.left))+'px';
+      pop.style.top=Math.max(inner.top,Math.min(inner.bottom-h,side.top))+'px';
+    }
     pop.scrollTop=scrollTop;pop.scrollLeft=scrollLeft;
   }
   function reveal(trigger,dismiss,ask){

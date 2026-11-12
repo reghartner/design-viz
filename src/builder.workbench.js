@@ -1193,16 +1193,17 @@ function initWorkbenchBuilder(opts){
      connection. ref is the viewer's drop target {section, kind:'node', id} or {section, kind:'edge', index};
      the write is the Links window's (planLinksTicket), so imported carriers get a consumer overlay and the
      edit is one Undo step. The carrier is selected afterwards, so Inspect → Tracking shows the new ticket. */
+  // A refused drop returns {error}; the Live status panel shows it next to the Tickets list.
   function dropTicket(ref,key){
-    var snap=session.snapshot();if(snap.error){formError(snap.error);return false;}
-    if(!ref || (ref.kind!=='node' && ref.kind!=='edge'))return false;
-    var link=ref.kind==='node'?{kind:'node',section:ref.section,id:ref.id}:{kind:'edge',section:ref.section,index:ref.index};
-    var plan=planLinksTicket(snap.text,snap.raw,link,key,key,false,session.topologyContext());
+    var snap=session.snapshot();if(snap.error){formError(snap.error);return {error:snap.error};}
+    var plan=planTicketDrop(snap.text,snap.raw,ref,key,session.topologyContext());
+    if(!plan || plan.error){var why=plan?plan.error:'The ticket was not attached.';formError(why);return {error:key+' was not attached: '+why};}
     var target=ref.kind==='node'?{kind:'node',section:ref.section,id:ref.id}:{kind:'edge',section:ref.section,index:ref.index};
     function show(){selectTarget(Object.assign({},target,{el:findTargetEl(target)}),true);}
     // Already there: select it, so Inspect → Tracking shows the ticket; no history entry.
-    if(plan && !plan.error && plan.text===snap.text){show();return true;}
-    return applyPlan(plan,{after:show},snap);
+    if(plan.text===snap.text){show();return true;}
+    var refused=null,ok=applyPlan(plan,{after:show,editError:function(message){refused=message;formError('This edit was not applied: '+message);}},snap);
+    return ok?true:{error:key+' was not attached: '+(refused || 'the edit was refused.')};
   }
   /* #1243: the Links window reads the same session and writes through applyPlan (one Undo step per edit). */
   var linksView=typeof initWorkbenchLinksView==='function'?initWorkbenchLinksView({document:document,window:window,view:view,session:session,apply:applyPlan,

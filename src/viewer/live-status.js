@@ -1893,7 +1893,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     ev.preventDefault();
     var key=ev.dataTransfer.getData(EDIT_TICKET_TYPE);if(!trackingKeyPattern.test(key))return;
     // The editor re-renders the page; leave this event's dispatch first.
-    setTimeout(function(){if(editor)editor.add(hit.ref,key);else if(ticketDrop && !retired)ticketDrop(hit.ref,key);},0);
+    setTimeout(function(){
+      if(editor){editor.add(hit.ref,key);return;}
+      if(!ticketDrop || retired)return;
+      // #1241: a refused Workbench drop says why in the panel's status line.
+      var result=ticketDrop(hit.ref,key);
+      if(result && typeof result.error==='string' && !retired){noteText=result.error;noteKind='warn';notify();}
+    },0);
   }
   if(editor || ticketDrop){
     view.addEventListener('dragover',dragOver);view.addEventListener('dragleave',dragLeave);view.addEventListener('drop',drop);view.addEventListener('dragend',dragEnd);

@@ -519,6 +519,7 @@ with the same drop targets (the card or line highlights while a row is over it).
 adds the ticket key there (a move is not offered; an imported carrier gets the consumer
 overlay), as one Undo step, and selects that carrier so Inspect → Tracking shows it. With a
 snapshot this includes the epic's tickets that are on no element yet (**NOT ON DIAGRAM**).
+A drop that cannot be made says why in the Epic status line.
 The Workbench never calls Jira: the list comes only from the demo or a loaded snapshot.
 The keyboard way is Inspect → Tracking → **Add ticket**, which the list's hint names.
 

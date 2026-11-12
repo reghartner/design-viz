@@ -177,6 +177,14 @@ function linksStepTicketPlan(text,raw,step,key,show,context){
   return planSetField(text,raw,rec.diagram.concat(['steps',step.index]),'ticketFilter',all?null:JSON.stringify(next));
 }
 
+/* #1241: a Tickets row dropped on the Workbench preview. ref is the viewer's Edit mode drop target
+   ({section, kind:'node', id} or {section, kind:'edge', index} on the rendered page); the write is
+   planLinksTicket's, so an imported carrier gets the consumer overlay. */
+function planTicketDrop(text,raw,ref,key,context){
+  if(!ref || (ref.kind!=='node' && ref.kind!=='edge'))return {error:'Drop a ticket on a node or connection.'};
+  var link=ref.kind==='node'?{kind:'node',section:ref.section,id:ref.id}:{kind:'edge',section:ref.section,index:ref.index};
+  return planLinksTicket(text,raw,link,key,key,false,context);
+}
 /* One ticket on one element. `link` is a node, edge or step element. */
 function planLinksTicket(text,raw,link,key,ref,remove,context){
   if(!trackingKeyPattern.test(key))return {error:'Use a Jira key like HW-123.'};

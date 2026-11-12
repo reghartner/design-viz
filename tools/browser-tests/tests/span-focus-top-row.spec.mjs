@@ -2,7 +2,8 @@
 // diagram's Scroll row. The taller toolbar must not cover the top row of nodes: before the focus every top-row
 // card is fully shown; after it the focused step's cards (Checkout service, Payment service) are fully inside
 // the visible diagram frame below the toolbar, and no top-row card is partly hidden under the toolbar. N4 setup
-// (Metrics overlay on) and a guard with the overlay off. The camera animates (no reduced motion). Desktop only.
+// (Metrics overlay on) and a guard with the overlay off. The camera animates (no reduced motion); every frame from the
+// click on is sampled, so the follow camera's first frame counts even when its tween later moves on. Desktop only.
 import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {test,expect} from '../helpers/test.mjs';
@@ -51,7 +52,7 @@ async function setup(page,server){
 // Runs in the page from #host's shadow root. For each top-row node card: its box, the visible diagram frame (the
 // section's .board cut by every clipping ancestor and the window) with the toolbar (the board's .lg) bottom as its
 // top, whether the card is fully inside it, whether it straddles the toolbar's bottom edge (partly under the
-// toolbar), and whether elementFromPoint at points just inside its corners and top edge finds its own node.
+// toolbar), and whether the toolbar or anything outside the board is topmost at points just inside its corners and top edge.
 // The toolbar and every clipping ancestor are returned for the failure message.
 function topRow(host,ids){
  const scope=host.shadowRoot || host,box=el=>{const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom};};
@@ -68,7 +69,9 @@ function topRow(host,ids){
  const nodes=ids.map(id=>{
   const g=board.querySelector('g.node[data-dv-node="'+id+'"]'),card=g && g.querySelector('.card');if(!card)return {id,found:false};
   const b=box(card),inset=3,points=[[b.left+inset,b.top+inset],[b.right-inset,b.top+inset],[(b.left+b.right)/2,b.top+inset],[b.left+inset,b.bottom-inset],[b.right-inset,b.bottom-inset]];
-  const hidden=points.filter(([x,y])=>{const at=scope.elementFromPoint(x,y);return !(at && g.contains(at));}).map(([x,y])=>{const at=scope.elementFromPoint(x,y);return Math.round(x)+','+Math.round(y)+' → '+(at?(at.getAttribute('class') || at.tagName):'nothing');});
+  // A card can ignore pointer events (the hit test then falls through to the board behind it), so a point counts as
+  // covered only when the topmost element there is the toolbar or lies outside the board.
+  const hidden=points.filter(([x,y])=>{const at=scope.elementFromPoint(x,y);return !at || !board.contains(at) || !!(lg && lg.contains(at));}).map(([x,y])=>{const at=scope.elementFromPoint(x,y);return Math.round(x)+','+Math.round(y)+' → '+(at?(at.getAttribute('class') || at.tagName):'nothing');});
   const across=Math.min(b.right,frame.right)-Math.max(b.left,frame.left)>.5;
   return {id,found:true,card:round(b),inside:b.left>=visible.left-.5 && b.right<=visible.right+.5 && b.top>=visible.top-.5 && b.bottom<=visible.bottom+.5,
    underToolbar:!!bar && across && b.top<bar.bottom-.5 && b.bottom>bar.bottom+.5,hidden};
@@ -99,10 +102,23 @@ async function expectTopRowShown(root,when,shown=TOP){
   expect(n.underToolbar,n.id+' card '+JSON.stringify(n.card)+' is not partly hidden under the toolbar'+where).toBe(false);
   if(!shown.includes(n.id))continue;
   expect(n.inside,n.id+' card '+JSON.stringify(n.card)+' lies inside the visible diagram frame below the toolbar'+where).toBe(true);
-  expect(n.hidden,n.id+' card: nothing covers its corners or top edge'+where).toEqual([]);
+  expect(n.hidden,n.id+' card: neither the toolbar nor anything outside the board covers its corners or top edge'+where).toEqual([]);
  }
  return g;
 }
+// Records every top-row card seen partly under the toolbar after each DOM change and on every frame, from the
+// span click until the camera settles: the follow camera's first frame keeps the graph where it was while the
+// Scroll row grows the toolbar, and a later tween (or none, when it is cancelled) must not be needed to fix it.
+const TOP_ROW=topRow.toString();
+function startSampling(root){
+ return root.evaluate((host,{source,ids})=>{
+  const scope=host.shadowRoot || host,check=(0,eval)('('+source+')'),seen=window.__topRowSeen=[];window.__topRowStop=false;
+  const sample=()=>{const g=check(host,ids);if(!g.nodes)return;g.nodes.forEach(n=>{if(n.underToolbar && seen.length<6)seen.push(n.id+' card '+JSON.stringify(n.card)+' under toolbar '+JSON.stringify(g.toolbar && g.toolbar.rect)+', Scroll row '+g.scrollRow+', zoom '+g.zoom+', scrollTop '+g.scrollTop);});};
+  const observer=new MutationObserver(sample);observer.observe(scope,{subtree:true,childList:true,attributes:true,attributeFilter:['style','class','hidden','transform','viewBox']});
+  const frame=()=>{if(window.__topRowStop){observer.disconnect();return;}sample();requestAnimationFrame(frame);};requestAnimationFrame(frame);
+ },{source:TOP_ROW,ids:TOP});
+}
+function stopSampling(page){return page.evaluate(()=>{window.__topRowStop=true;return window.__topRowSeen;});}
 async function loadAndFocus(root){
  const page=root.page();
  await root.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
@@ -110,12 +126,14 @@ async function loadAndFocus(root){
  const span=root.locator('.dv-trace-span[data-span-id="'+CHARGE+'"]');await expect(span).toHaveCount(1);
  await expectTopRowShown(root,'trace loaded, before the span focus');
  const pageY=await page.evaluate(()=>scrollY);
- await span.click();
+ await startSampling(root);await span.click();
  // The focused span's carrier wears the current-level marker (an edge ring or node brackets).
  await expect(root.locator('.dv-trace-edge-focus[data-trace-level="current"],.dv-trace-focus-overlay[data-trace-level="current"]').first()).toBeAttached();
  await expect.poll(()=>page.evaluate(()=>window.viewer.controller.sections[0].stepper.current().id),{message:'the Charge span focus jumps to its step'}).toBe('charge');
  // The focus may scroll the page to the panel; bring the page back so the diagram is on screen (the board's own camera is unchanged).
- await settled(root);await page.evaluate(y=>scrollTo(0,y),pageY);
+ await settled(root);
+ expect(await stopSampling(page),'no top-row card is partly under the toolbar at any frame from the span click on').toEqual([]);
+ await page.evaluate(y=>scrollTo(0,y),pageY);
 }
 
 test('desktop N4: with the Metrics overlay on, focusing the Charge span keeps the top row of nodes below the toolbar',async({page,server})=>{

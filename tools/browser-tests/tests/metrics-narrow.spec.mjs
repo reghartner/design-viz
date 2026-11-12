@@ -5,6 +5,7 @@
 |---|---|---|---|---|
 | B1 | The imported signal's run_query has the provider filter then the board's, and the provider calculations. | provider with received (needsNarrow event_code) and dropped (needsNarrow event_code); consumer narrows received only | the recorded query_spec | a narrowing that replaces the query or is never sent |
 | B2 | The unmet signal is never queried; the Metrics status names it with its reason. | same | no run_query for it; the status note | an unfiltered number shown for an unmet signal |
+| B4 | (#1357) Scoped variables: the same canon imported twice sends two Loki requests, each with its own import's value; a signal whose variable no scope sets is never queried and is named in the Metrics note with the scopes to set it in. | provider Loki signal with ${code}, imported as fc and et with two values, plus one with ${region} unset | the recorded logql; the status note | one value for both imports, or an unset variable queried |
 | B3 | (#1354) Text fragments: the imported LogQL and PromQL signals reach query_loki_logs and query_prometheus with the board's stage and matcher in every pipeline and selector. | provider with a Loki ratio and a Prometheus rate, both needsNarrow; consumer narrows both | the recorded logql and expr | a fragment that never reaches the provider, or a leg left unnarrowed |
 */
 import {writeFile} from 'node:fs/promises';
@@ -107,4 +108,42 @@ test('B3 desktop: imported LogQL and PromQL signals reach Grafana narrowed in ev
   expect(logql.length).toBeGreaterThan(0);expect(expr.length).toBeGreaterThan(0);
   for(const q of logql)expect(q).toBe('sum(count_over_time({app="dcf"} |= "notify" | event_code="FULL_CHARGE" [5m])) / sum(count_over_time({app="dcf"} | event_code="FULL_CHARGE" [5m]))');
   for(const q of expr)expect(q).toBe('sum(rate(notify_total{job="dcf",type="full_charge"}[5m]))');
+});
+
+function scopedPage(){
+  const provider=spec('provider',{nodes:{dcf:{title:'DCF',telemetry:{kind:'service',signals:{
+      sent:{loki:'sum(count_over_time({app="dcf", code="${code}"}[5m]))'},
+      regional:{loki:'sum(count_over_time({app="dcf", region="${region}"}[5m]))'}}}}},
+    rows:[['dcf']],topologyExports:{core:{nodes:['dcf'],edges:[]}}});
+  const consumer=spec('consumer',{nodes:{local:{title:'Local',tickets:['LOC-1']}},rows:[['local']],panels:[{id:'status',type:'live-status',title:'Status'}],
+    topologyImports:[{spec:'provider',export:'core',as:'fc',position:{x:80,y:300},variables:{code:'FULL_CHARGE'}},{spec:'provider',export:'core',as:'et',position:{x:80,y:600},variables:{code:'EARLY'}}]},
+    {tracking:{telemetry:{grafana:{loki:'loki-uid'}}}});
+  const context=vm.createContext({});vm.runInContext(sourceLoader.composeSources(['validator.js','canon.js']),context);
+  return JSON.parse(JSON.stringify(context.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,consumer]})));
+}
+
+test('B4 desktop: two imports send their own scoped value; an unset variable is never queried and says why',async({page,server})=>{
+  const specPath=path.join(server.root,'scoped.spec.json'),out=path.join(server.root,'scoped.html');
+  await writeFile(specPath,JSON.stringify(scopedPage()));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),specPath,path.join(repo,'template/flowview.html'),out],{stdio:'pipe'});
+  await page.addInitScript(()=>{
+    window.calls=[];
+    window.flowviewLiveStatus={provider:async()=>({'LOC-1':{state:'done'}})};
+    window.claude={use:async name=>name==='mcp'?{
+      listTools:async()=>[{server:'Grafana',tools:['query_prometheus','query_loki_logs','search_tempo_traces','get_annotations','generate_deeplink']}],
+      callTool:async(server,tool,input)=>{window.calls.push({server,tool,input});if(tool==='query_loki_logs'){const at=Date.now()/1000;return {payload:{data:[{values:[[at-3600,'5'],[at,'7']]}]}};}return {payload:[]};}
+    }:name==='permissions'?{request:async names=>Object.fromEntries(names.map(n=>[n,'granted']))}:null};
+    window.flowviewBooted=ctl=>{window.ctl=ctl;};
+  });
+  await page.setViewportSize({width:1600,height:1000});
+  await page.goto(server.origin+'/scoped.html');
+  await page.waitForFunction(()=>!!window.ctl);
+  const metrics=page.locator('#docview').getByRole('switch',{name:'Metrics overlay',exact:true});
+  await expect(metrics).toBeVisible();await metrics.click();
+  await expect.poll(()=>page.evaluate(()=>new Set(window.calls.filter(c=>c.tool==='query_loki_logs').map(c=>c.input.logql)).size)).toBe(2);
+  const logql=[...new Set(await page.evaluate(()=>window.calls.filter(c=>c.tool==='query_loki_logs').map(c=>c.input.logql)))].sort();
+  expect(logql).toEqual(['sum(count_over_time({app="dcf", code="EARLY"}[5m]))','sum(count_over_time({app="dcf", code="FULL_CHARGE"}[5m]))']);
+  expect(logql.some(q=>q.includes('region')),'the unset variable is never queried').toBe(false);
+  const note=await page.evaluate(()=>window.ctl.telemetry.snapshot().status.note || '');
+  expect(note).toContain('fc::dcf regional: Set telemetry variable ${region} for this import, this node or connection, or the active environment.');
 });

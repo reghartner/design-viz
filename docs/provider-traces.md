@@ -195,6 +195,10 @@ other profile fields:
 "allowedAttributes": ["device.model"]
 ```
 
+A board that uses a company profile may add names in its connection entry
+(`{"profile": "operations", "allowedAttributes": ["device.model"]}`); the connection
+allows the company list plus the board's.
+
 With that profile, this step maps only the message-consumer span for device
 model X:
 

@@ -27,7 +27,9 @@ function setup({p=board(),data=[entry()],servers=[DETAIL,GRAFANA],lookback={star
  const api=C.createTelemetryLogLookup(p,transport,{config:()=>C.telemetryEnvironmentConfig(p,'stg'),lookback:()=>lookback,changed:()=>changes++,...(day?{day}:{}),...(wanted?{wanted}:{})});
  return {C,p,api,calls,counts,changes:()=>changes};
 }
-const rows=api=>clone(api.snapshot().result.rows).map(r=>[r.time,r.value,r.traceId,r.spanId,r.missing]);
+// #1415: a row shows its log line for every search; a $value search's value is in the tooltip (title).
+const rows=api=>clone(api.snapshot().result.rows).map(r=>[r.time,r.line,r.traceId,r.spanId,r.missing]);
+const LINE='Handling camera stats message';
 
 test('plan 1: an authored lookup with a value makes one query_loki_logs call with the expanded query, the lookback range and limit 10',async()=>{
  const later=entry({at:'1794040000000000000',meta:{cameraModel:'arch',trace_id:OTHER}}),h=setup({data:[entry(),later].concat(Array.from({length:10},()=>later))});
@@ -38,7 +40,7 @@ test('plan 1: an authored lookup with a value makes one query_loki_logs call wit
  await h.api.find();
  assert.deepEqual(h.calls,[{server:'Grafana',tool:'query_loki_logs',args:{datasourceUid:'loki-stg',logql:EXPANDED+FILTER,startRfc3339:'now-2h',endRfc3339:'now',limit:10,direction:'backward',queryType:'range'}}]);
  s=h.api.snapshot();assert.equal(s.busy,false);assert.equal(s.result.error,undefined);assert.equal(s.result.query,EXPANDED+FILTER);assert.equal(s.result.rows.length,10,'at most 10 lines are listed');
- assert.deepEqual(rows(h.api).slice(0,2),[['2026-11-07T09:42:13.123Z','arch',TRACE,SPAN,''],['2026-11-07T08:26:40.000Z','arch',OTHER,null,'']]);
+ assert.deepEqual(rows(h.api).slice(0,2),[['2026-11-07T09:42:13.123Z',LINE,TRACE,SPAN,''],['2026-11-07T08:26:40.000Z',LINE,OTHER,null,'']]);
  // Absolute Load trace bounds reach Loki unchanged; a missing environment variable calls nothing.
  const absolute=setup({lookback:{start:'2026-11-07T06:00:00Z',end:'2026-11-07T10:00:00.5Z',lookback:'2h'}});await settle();absolute.api.set('value','arch');await absolute.api.find();
  assert.equal(absolute.calls[0].args.startRfc3339,'2026-11-07T06:00:00Z');assert.equal(absolute.calls[0].args.endRfc3339,'2026-11-07T10:00:00.5Z');
@@ -56,7 +58,7 @@ test('plan 3: the trace id is read from structured metadata or a label; a line w
  assert.deepEqual(clone(named.rows).map(r=>[r.traceId,r.spanId,r.missing]),[[TRACE,SPAN,''],[null,null,'This log line has no tid']]);
  assert.throws(()=>C.telemetryLogLines({streams:[]},fields),/no log lines/);
  const h=setup({data:[entry({meta:{cameraModel:'arch'}})]});await settle();h.api.set('value','arch');h.api.set('traced',false);await h.api.find();
- assert.deepEqual(rows(h.api),[['2026-11-07T09:42:13.123Z','arch',null,null,'This log line has no trace_id']]);
+ assert.deepEqual(rows(h.api),[['2026-11-07T09:42:13.123Z',LINE,null,null,'This log line has no trace_id']]);
 });
 
 test('plan 4: a reader-typed LogQL log query runs the same way',async()=>{
@@ -149,7 +151,7 @@ test('#1158 checked by default, Find appends the trace ID label filter: an autho
  assert.equal(custom.api.snapshot().form.traced,true,'the checkbox starts checked');
  custom.api.set('value','arch');await custom.api.find();
  assert.deepEqual(custom.calls.map(c=>c.args.logql),[EXPANDED+'\n| tid =~ "[0-9a-fA-F]{16,32}"'],'the filter goes after the $value fill, on the lookup field');
- assert.equal(custom.api.snapshot().result.query,EXPANDED+'\n| tid =~ "[0-9a-fA-F]{16,32}"');assert.deepEqual(rows(custom.api),[['2026-11-07T09:42:13.123Z','arch',TRACE,SPAN,'']]);
+ assert.equal(custom.api.snapshot().result.query,EXPANDED+'\n| tid =~ "[0-9a-fA-F]{16,32}"');assert.deepEqual(rows(custom.api),[['2026-11-07T09:42:13.123Z',LINE,TRACE,SPAN,'']]);
  const typed=setup({p:board({})});await settle();typed.api.set('logql','{env="$env"} |= "Handling camera stats message"');await typed.api.find();
  assert.deepEqual(typed.calls.map(c=>c.args.logql),['{env="stg"} |= "Handling camera stats message"'+FILTER]);
 });
@@ -207,6 +209,54 @@ test('#1158 review: a query whose last line ends with a # comment still gets the
  assert.deepEqual(authored.calls.map(c=>c.args.logql),[EXPANDED+' # one camera model\n| trace_id =~ "[0-9a-fA-F]{16,32}"']);
 });
 
+/* #1415 test plan (coverage = this list): A row text is the log line for slot and typed searches, the slot
+   value in the tooltip; B requireTraceId:false starts unchecked and Find omits the trace_id filter, the default
+   stays checked, and the validator warns on a non-boolean. */
+test('#1415 A: rows of a $value search show each log line (after the query\'s line_format); the typed value is in the tooltip',async()=>{
+ const FORMATTED='{env="$env"} | deviceId="$value" | regexp "(?P<who>[AB])" | line_format "{{.who}} sent request"';
+ const h=setup({p:board({device:{label:'Device ID',query:FORMATTED}}),data:[entry({line:'A sent request'}),entry({at:'1794040000000000000',line:'B reported: low battery',meta:{deviceId:'cam-1',trace_id:OTHER}})]});await settle();
+ h.api.set('value','cam-1');await h.api.find();
+ assert.deepEqual(rows(h.api).map(r=>r[1]),['A sent request','B reported: low battery'],'each row shows its own line, not the value');
+ assert.deepEqual(clone(h.api.snapshot().result.rows).map(r=>r.title),['A sent request\nDevice ID: cam-1','B reported: low battery\nDevice ID: cam-1'],'the tooltip keeps the full line and names the value');
+ assert.equal(clone(h.api.snapshot().result.rows)[0].value,undefined,'no separate value text');
+ // A typed query and a search without $value show the line; the tooltip is the line.
+ const typed=setup({p:board({errors:{label:'Recent errors',query:'{env="$env"} |= "error"'}}),data:[entry({line:'error: timeout'})]});await settle();
+ await typed.api.find('errors');assert.deepEqual(clone(typed.api.snapshot().result.rows).map(r=>[r.line,r.title]),[['error: timeout','error: timeout']]);
+ typed.api.set('logql','{env="$env"}');await typed.api.find(typed.C.TELEMETRY_LOG_TYPED);
+ assert.deepEqual(clone(typed.api.snapshot().result.rows).map(r=>[r.line,r.title]),[['error: timeout','error: timeout']]);
+});
+
+test('#1415 B: requireTraceId false starts "Only lines with a trace ID" unchecked for that search; Find omits the filter and lists lines without a trace ID',async()=>{
+ const DEVICE='{env="$env"} |= "Handling camera stats message" | deviceId="$value"';
+ const h=setup({p:board({camera:{label:'Camera model',query:QUERY},device:{label:'Device ID',query:DEVICE,requireTraceId:false}}),data:[entry({meta:{deviceId:'cam-1'}}),entry()]});await settle();
+ assert.equal(h.api.snapshot().form.lookup,'camera');assert.equal(h.api.snapshot().form.traced,true,'the default stays checked (#1158)');
+ h.api.set('lookup','device');assert.equal(h.api.snapshot().form.traced,false,'this search starts unchecked');
+ h.api.set('value','cam-1','device');await h.api.find('device');
+ assert.deepEqual(h.calls.map(c=>c.args.logql),['{env="stg"} |= "Handling camera stats message" | deviceId="cam-1"'],'no trace_id filter on the first Find');
+ assert.deepEqual(rows(h.api).map(r=>[r[2],r[4]]),[[null,'This log line has no trace_id'],[TRACE,'']],'the line without a trace ID is listed');
+ // Each search keeps its own box state: the reader can check it here, and the other search keeps its default.
+ h.api.set('traced',true);assert.equal(h.api.snapshot().form.traced,true);assert.equal(h.api.snapshot().result,null,'checking it clears this search\'s results');
+ h.api.set('lookup','camera');assert.equal(h.api.snapshot().form.traced,true);h.api.set('traced',false);
+ h.api.set('lookup','device');assert.equal(h.api.snapshot().form.traced,true,'the reader\'s choice for this search is kept');
+ h.api.set('lookup','camera');assert.equal(h.api.snapshot().form.traced,false,'and so is the other search\'s');
+ h.api.set('lookup',h.C.TELEMETRY_LOG_TYPED);assert.equal(h.api.snapshot().form.traced,true,'a typed LogQL query starts checked');
+ // requireTraceId true is the same as leaving it out.
+ const explicit=setup({p:board({camera:{label:'Camera model',query:QUERY,requireTraceId:true}})});await settle();
+ assert.equal(explicit.api.snapshot().form.traced,true);explicit.api.set('value','arch');await explicit.api.find();assert.deepEqual(explicit.calls.map(c=>c.args.logql),[EXPANDED+FILTER]);
+});
+
+test('#1415 B: the validator keeps requireTraceId true or false and warns on any other value',()=>{
+ const C=context(),warnings=[];
+ const parsed=C.trackingTelemetry({tracking:{telemetry:{lookups:{
+  off:{label:'Off',query:QUERY,requireTraceId:false},on:{label:'On',query:QUERY,requireTraceId:true},plain:{label:'Plain',query:QUERY},
+  text:{label:'Text',query:QUERY,requireTraceId:'false'},number:{label:'Number',query:QUERY,requireTraceId:0}}}}},(at,message)=>warnings.push(at+': '+message));
+ assert.deepEqual(Object.keys(parsed.lookups),['off','on','plain']);
+ assert.deepEqual([parsed.lookups.off.requireTraceId,parsed.lookups.on.requireTraceId,parsed.lookups.plain.requireTraceId],[false,true,undefined]);
+ assert.deepEqual(warnings,['.lookups.text.requireTraceId: must be true or false — lookup ignored','.lookups.number.requireTraceId: must be true or false — lookup ignored']);
+ const result=C.validate({tracking:{telemetry:{lookups:{text:{label:'Text',query:QUERY,requireTraceId:'no'}}}},sections:[{id:'s',diagram:{nodes:{a:{}},rows:[['a']]}}]});
+ assert.ok(result.warnings.includes('tracking.telemetry.lookups.text.requireTraceId: must be true or false — lookup ignored'),result.warnings.join(' | '));
+});
+
 /* #1233 (plan 2): no fixed number of lookups; the per-field rules are unchanged. */
 test('#1233 plan 2: telemetryLookups accepts 20 lookups without a count warning; per-field validation unchanged',()=>{
  const C=context(),warnings=[],lookups=Object.fromEntries(Array.from({length:20},(_,i)=>['search'+i,{label:'Search '+i,query:QUERY}]));
@@ -219,7 +269,7 @@ test('#1233 plan 2: telemetryLookups accepts 20 lookups without a count warning;
  assert.ok(result.warnings.some(w=>w.startsWith('tracking.telemetry.lookups.noSlot.query:')));
 });
 /* #1233: each search box keeps its own value; Find on a box runs that box's lookup; typing in one box leaves
-   another box's results alone; the shared "Only lines with a trace ID" still clears them. */
+   another box's results alone. #1415: "Only lines with a trace ID" is per search; changing it clears that search's results. */
 test('#1233 each search keeps its own value and Find runs the box it is given',async()=>{
  const DEVICE='{env="$env"} |= "Handling camera stats message" | deviceId="$value"';
  const h=setup({p:board({camera:{label:'Camera model',query:QUERY,values:['arch','wren']},device:{label:'Search for my device ID',query:DEVICE}})});await settle();
@@ -233,7 +283,7 @@ test('#1233 each search keeps its own value and Find runs the box it is given',a
  await h.api.find('camera');assert.equal(h.calls.at(-1).args.logql,EXPANDED.replace('"arch"','"wren"')+FILTER);assert.equal(h.api.snapshot().result.lookup,'camera');
  h.api.set('logql','{env="$env"}');assert.equal(h.api.snapshot().result.lookup,'camera','typing a LogQL query keeps an authored box\'s results');
  await h.api.find(h.C.TELEMETRY_LOG_TYPED);assert.equal(h.calls.at(-1).args.logql,'{env="stg"}'+FILTER);assert.equal(h.api.snapshot().result.lookup,h.C.TELEMETRY_LOG_TYPED);
- h.api.set('traced',false);assert.equal(h.api.snapshot().result,null,'the shared checkbox clears the results');
+ h.api.set('traced',false);assert.equal(h.api.snapshot().result,null,'the checkbox clears the shown search\'s results');
  assert.equal(await h.api.find('nope'),null,'an unknown box runs nothing new');
  // Lookup ids are names, so one may be an Object.prototype key: its box starts empty and runs its own query.
  const own=setup({p:board({constructor:{label:'Constructor ID',query:DEVICE}})});await settle();const values=own.api.snapshot().form.values;

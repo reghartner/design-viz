@@ -47,7 +47,7 @@ function cli(argv,transport){const lines=[];const stdout={write(text){lines.push
 
 test('R1 a resolved importing board: the narrowed query and the import\'s value are sent; an unmet signal is never queried and says why',async()=>{
   const snap=require(SNAP),repo=repository(),g=grafana();
-  const {snapshot,summary}=await snap.takeSnapshot({specText:await resolvedText(repo),board:'consumer.spec.json',transport:transportOf(g),resolved:true,timeoutMs:20000});
+  const {snapshot,summary}=await snap.takeSnapshot({specText:await resolvedText(repo),board:'consumer.spec.json',transport:transportOf(g),timeoutMs:20000});
   assert.ok(snapshot,'a resolved importing board is snapshotted, not refused');
   assert.deepEqual([...new Set(g.asked)].sort(),['sum(count_over_time({app="dcf", code="EARLY"}[5m]))','sum(count_over_time({app="dcf"} | code="FULL" [5m]))'],'only the narrowed query and the import\'s value are sent');
   assert.ok(!g.asked.some(q=>q.includes('dcf-drops')),'the unmet signal is never queried');

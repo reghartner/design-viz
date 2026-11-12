@@ -21,7 +21,7 @@
 | N14 | (#1354) PromQL placement (keywords are case-insensitive, #1356 c1 minor 3): the matcher text goes into every vector selector, inside its braces or as braces after a bare metric name; by/without/on/ignoring/group_left/group_right lists are skipped; ranges with $__rate_interval stay; a $var outside strings and ranges, an unknown token, or no selector fails closed. |
 | N15 | (#1354) PromQL fragment safety: matcher text only (label op "value" joined by commas); a }, or, unless, a trailing comma, an unquoted value or a newline fails closed. |
 | N16 | (#1354) Logs Insights placement: "| filter …" before the first stats, or at the end; breakdown and trend queries are narrowed too, and a failure there sets only their own error; only fields, filter, filterIndex, parse, sort, unmask, unnest and SOURCE may come before the insertion point; any other command fails closed, named (#1356 review c2). A provider's parse <field> /regex/ at command start, and like, not like or =~ after an operand, are opaque; any other / is a division; provider text is never rewritten (#1356 review c1 MAJOR 2, c2). |
-| N17 | (#1354) Logs Insights fragment safety: one filter command; a "|", "#", a newline, unbalanced quotes or a non-filter command fails closed; a board's fragment may hold no / outside a quoted string (no regex literal, no division; #1356 review c1 MAJOR 1 and c2 MAJOR). |
+| N17 | (#1354) Logs Insights fragment safety: one filter command; a "|", "#", a newline, unbalanced quotes or a non-filter command fails closed; a board's fragment may hold no / outside a quoted string (no regex literal, no division; #1356 review c1 MAJOR 1 and c2 MAJOR) and no \ at all (c3). |
 | N18 | (#1354) needsNarrow pins with text: a PromQL or LogQL label "=" with a value; a Logs Insights top-level and chain of field = value or field in [...] (no parentheses or functions); a fragment with or (or not) pins nothing; true is met by a LogQL |= line filter whose every alternative is non-empty. |
 | N19 | (#1353 review c1 minor 5) A narrowed Honeycomb trace search (query_spec) is not shown, with a narrowing reason. |
 | N11 | (minor 6) The text view prints "Not shown: <reason>" for a fail-closed signal instead of its provider query; a narrowed signal prints the narrowed query. |
@@ -289,6 +289,8 @@ test('N16 Logs Insights: "| filter …" before the first stats, or at the end; b
   ok('filter m not like /x|y/ and k =~ /p|q/ | stats count() as n','filter code = "E1"','filter m not like /x|y/ and k =~ /p|q/ | filter code = "E1" | stats count() as n');
   ok('filter parse / 2 > 1 | stats count() as n','filter code = "E1"','filter parse / 2 > 1 | filter code = "E1" | stats count() as n');
   ok('filter like / 2 > 1 | stats count() as n','filter code = "E1"','filter like / 2 > 1 | filter code = "E1" | stats count() as n');
+  // #1356 review c3 minor 2: a regex after a keyword is not read as one; the reason says so.
+  assert.deepEqual(logs('filter by like /a|b/ | stats count() as n','filter code = "E1"'),{kind:'placement',error:'This Logs Insights query has a regex after like or =~ that Flowview cannot read, so a filter cannot be added safely; it is not shown.'});
   const side=logs('stats count() as n','filter code = "E1"',{breakdown:{query:'dedup clientId | stats count() as n by clientId',labelField:'clientId',valueField:'n',limit:20}});
   assert.equal(side.error,undefined,'the total is still narrowed and shown');
   assert.equal(side.breakdownError,'This Logs Insights query has a dedup command before its stats, so a filter cannot be added safely; it is not shown.');
@@ -311,6 +313,8 @@ test('N17 Logs Insights: one filter command; every escape attempt fails closed',
   // #1356 review c2 MAJOR: a board's fragment holds no / at all: no regex literal, no division.
   for(const frag of ['filter parse / 1 or 1 = 1 | stats count(*) as n # / and tenant = "A"','filter like / 1 or 1 = 1 | stats count(*) as n # / and tenant = "A"','filter tenant = "A" and parse / 1 or 1 / 1 = 1','filter tenant = "A" and like / 1','filter @message like /a|b/','filter x =~ /a/','filter bytes / 2 > 1','filter m not like /x/'])bad(frag,'a Logs Insights narrowing may not contain / (use like \"text\" or a quoted string)');
   assert.match(narrow('cloudwatchLogs',{logGroups:['g'],query:'stats count() as n',region:'us-east-1'},{cloudwatchLogs:'filter tenant = "A" and x.like / 1 or 1 / 1 = 1'},['tenant']).error || '',/may not contain \//,'refused outright, so it never counts as narrowing by tenant');
+  // #1356 review c3 minor 1: a board fragment holds no \, so its safety never rests on how Logs Insights reads escapes.
+  for(const frag of ['filter tenant = "A\\" | stats count() as n # "',"filter tenant = 'A\\' | stats count() as n # '",'filter path = "a\\b"'])bad(frag,'a Logs Insights narrowing may not contain \\');
   for(const frag of ['filter @message like "a/b"','filter @message not like "x"','filter path = "/a/b"'])assert.equal(logs('stats count() as n',frag).error,undefined,'a / inside a string is fine: '+frag);
   bad('stats count()','a Logs Insights narrowing is one filter command');
 });

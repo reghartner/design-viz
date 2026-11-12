@@ -389,6 +389,9 @@ function telemetryScopedPlacement(source,text,index,end){
 }
 // A numeric literal (signed, decimal, exponent) or a duration (5m, 1h30m, 250ms).
 function telemetryScopedNumber(value){return /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(value) || /^(?:\d+(?:\.\d+)?(?:ns|us|µs|ms|s|m|h|d|w|y))+$/.test(value);}
+// #1360: when a narrowing or a scoped variable cannot express the filter, the board can copy the
+// provider's query into a replacing binding and edit it there.
+function telemetryCopyHint(first){return first+', or copy the provider\'s query and edit it.';}
 function telemetryScopedValueProblem(source,query,scoped,fragments){
   var texts=[];
   if(typeof query==='string')texts.push(query);
@@ -412,7 +415,7 @@ function telemetryScopedValueProblem(source,query,scoped,fragments){
       else if(!at.string && at.range && value.indexOf(':')>=0)why='inside a range it may not hold :, which turns the range into a subquery';
       else if(!at.string && !telemetryScopedNumber(value) && !(at.position==='label' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) || (at.position==='status' || at.position==='kind') && TELEMETRY_TRACE_ENUMS[at.position].indexOf(value)>=0 || at.position==='is' && /^(?:null|true|false)$/i.test(value)))
         why=at.position==='label'?'a label name may hold only letters, digits and _, and may not start with a digit':at.position==='table'?'a table name cannot come from a telemetry variable':at.position==='vector'?'a vector-matching label cannot come from a telemetry variable':TELEMETRY_SCOPED_NUMERIC;
-      if(why)return 'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown.';
+      if(why)return 'Variable ${'+name+'} from this import or carrier cannot be filled in safely here ('+why+'), so the signal is not shown. '+telemetryCopyHint('Use another value');
     }
   }
   return null;
@@ -745,6 +748,8 @@ function carrierTelemetry(obj,templates,invalid,environment){
       var narrowed=telemetryNarrowQuery(source,signals[name].query,entry.narrow,entry.needsNarrow);
       if(narrowed.error && narrowed.kind==='shape' && authoredNarrow[name] && !telemetryNarrowProblem(source,authoredNarrow[name]))
         narrowed.error='After its variables were filled in, '+narrowed.error.charAt(0).toLowerCase()+narrowed.error.slice(1);
+      // #1360: a refused narrowing names the other way out.
+      if(narrowed.error && narrowed.kind==='shape')narrowed.error+=' '+telemetryCopyHint('Change the narrowing');
       if(narrowed.error){if(!signals[name].error)signals[name].error=narrowed.error;signals[name].narrowFailure=narrowed.kind;if(narrowed.written)signals[name].narrowWritten=true;
         // Its query links open the unnarrowed query: none for this signal, and none for the carrier.
         delete signals[name].links;unnarrowedLinks=true;}

@@ -16,13 +16,13 @@
 | N8 | Viewer: a carrier whose signal is not shown reads "Not shown: <reason>" instead of "Evidence is missing or incomplete." in Proof and the metrics popup; a narrowed signal lists its fragments in the Proof predicate ("Narrowed: …"). |
 | N9 | (review c1 minor 2) needsNarrow counts only a filter that pins values: Honeycomb = or in with a value, a CloudWatch dimension with a value. exists, !=, not-in, does-not-exist (and an empty =) do not; true needs one pinning filter too. The reason names the field. |
 | N10 | (minor 1) No link opens an unnarrowed query: a signal that fails closed loses its own and the carrier's query link; a narrowed signal's card never falls back to the carrier's query link. |
-| N12 | (#1354) LogQL placement: each stage goes at the end of every log pipeline, after the selector's stages and before an inherited unwrap, a [range], a closing ) or the end; every leg of a ratio; $__range and offset untouched; a line filter meeting an inherited line_format, or a query without a stream selector, fails closed. |
+| N12 | (#1354) LogQL placement (a label filter after drop, keep or label_format fails closed, #1356 c1 minor 4): each stage goes at the end of every log pipeline, after the selector's stages and before an inherited unwrap, a [range], a closing ) or the end; every leg of a ratio; $__range and offset untouched; a line filter meeting an inherited line_format, or a query without a stream selector, fails closed. |
 | N13 | (#1354) LogQL fragment safety: one line filter (with or chains), label filter expression or parser per entry; anything else fails closed: a second "|", [ ] { }, #, a newline, unbalanced quotes or parentheses, a refused stage (line_format, label_format, unwrap, drop, keep, decolorize, distinct); a variable value that breaks the stage says so. |
-| N14 | (#1354) PromQL placement: the matcher text goes into every vector selector, inside its braces or as braces after a bare metric name; by/without/on/ignoring/group_left/group_right lists are skipped; ranges with $__rate_interval stay; a $var outside strings and ranges, an unknown token, or no selector fails closed. |
+| N14 | (#1354) PromQL placement (keywords are case-insensitive, #1356 c1 minor 3): the matcher text goes into every vector selector, inside its braces or as braces after a bare metric name; by/without/on/ignoring/group_left/group_right lists are skipped; ranges with $__rate_interval stay; a $var outside strings and ranges, an unknown token, or no selector fails closed. |
 | N15 | (#1354) PromQL fragment safety: matcher text only (label op "value" joined by commas); a }, or, unless, a trailing comma, an unquoted value or a newline fails closed. |
-| N16 | (#1354) Logs Insights placement: "| filter …" before the first stats, or at the end; breakdown and trend queries are narrowed too, and a failure there sets only their own error; a limit or dedup before the insertion point fails closed. |
-| N17 | (#1354) Logs Insights fragment safety: one filter command; a "|", "#", a newline, unbalanced quotes or a non-filter command fails closed; /regex/ is masked. |
-| N18 | (#1354) needsNarrow pins with text: a PromQL or LogQL label "=" with a value; a Logs Insights field = value or field in [...]; a fragment with or (or not) pins nothing; true is met by a LogQL |= line filter too. |
+| N16 | (#1354) Logs Insights placement: "| filter …" before the first stats, or at the end; breakdown and trend queries are narrowed too, and a failure there sets only their own error; a limit or dedup before the insertion point fails closed. A provider parse /regex/ is opaque, a / elsewhere is a division, and provider text is never rewritten (#1356 review c1 MAJOR 2). |
+| N17 | (#1354) Logs Insights fragment safety: one filter command; a "|", "#", a newline, unbalanced quotes or a non-filter command fails closed; /regex/ is masked only after a standalone like, not like or =~ (#1356 review c1 MAJOR 1: x.like / … is a division). |
+| N18 | (#1354) needsNarrow pins with text: a PromQL or LogQL label "=" with a value; a Logs Insights top-level and chain of field = value or field in [...] (no parentheses or functions); a fragment with or (or not) pins nothing; true is met by a LogQL |= line filter whose every alternative is non-empty. |
 | N19 | (#1353 review c1 minor 5) A narrowed Honeycomb trace search (query_spec) is not shown, with a narrowing reason. |
 | N11 | (minor 6) The text view prints "Not shown: <reason>" for a fail-closed signal instead of its provider query; a narrowed signal prints the narrowed query. |
 */
@@ -190,6 +190,10 @@ test('N12 LogQL: each stage goes at the end of every log pipeline',()=>{
   ok('sum by (code) (count_over_time({app="a", env=~"p.*"} | logfmt [1h]))','| code!="200"','sum by (code) (count_over_time({app="a", env=~"p.*"} | logfmt | code!="200" [1h]))');
   ok('{app="a"} | line_format "{{.msg}}"','| code="E1"','{app="a"} | line_format "{{.msg}}" | code="E1"');
   assert.deepEqual(lq('{app="a"} | line_format "{{.msg}}"','|= "FULL"'),{kind:'placement',error:'This LogQL query reformats its lines with line_format, so a line filter cannot be added safely; it is not shown.'});
+  // #1356 review c1 minor 4: a label filter after drop, keep or label_format reads changed labels.
+  for(const q of ['{a="b"} | drop code','{a="b"} | keep c','sum by (code) (count_over_time({a="b"} | json | label_format code=`{{.x}}` [5m]))'])
+    assert.deepEqual(lq(q,'| code="E1"'),{kind:'placement',error:'This LogQL query changes its labels with drop, keep or label_format, so a label filter cannot be added safely; it is not shown.'},q);
+  ok('{a="b"} | drop code','|= "x"','{a="b"} | drop code |= "x"');
   assert.deepEqual(lq('vector(1)','| a="1"'),{kind:'placement',error:'This LogQL query has no stream selector Flowview can find, so the narrowing cannot be added; it is not shown.'});
   assert.deepEqual(lq('{app="a" | json','| a="1"'),{kind:'placement',error:'This LogQL query has unbalanced braces, brackets or parentheses, so the narrowing cannot be added; it is not shown.'});
   assert.deepEqual(lq('{app="a} | json','| a="1"'),{kind:'placement',error:'This LogQL query has an unclosed string, so the narrowing cannot be added; it is not shown.'});
@@ -240,6 +244,12 @@ test('N14 PromQL: the matcher text goes into every vector selector',()=>{
   ok('label_replace(up{job="a"}, "dst", "$1", "src", "(.*)")','type="full"','label_replace(up{job="a",type="full"}, "dst", "$1", "src", "(.*)")');
   ok('count{job="a"}','type="full"','count{job="a",type="full"}');
   ok('sum(rate(x[5m]))',['type="full"','region="eu"'],'sum(rate(x{type="full",region="eu"}[5m]))');
+  // #1356 review c1 minor 3: PromQL keywords are case-insensitive.
+  ok('sum BY (job) (rate(x[5m]))','t="1"','sum BY (job) (rate(x{t="1"}[5m]))');
+  ok('x OR y','t="1"','x{t="1"} OR y{t="1"}');
+  ok('up == Inf','t="1"','up{t="1"} == Inf');
+  ok('a UNLESS ON(job) b','t="1"','a{t="1"} UNLESS ON(job) b{t="1"}');
+  ok('SUM(rate(x[5m]))','t="1"','SUM(rate(x{t="1"}[5m]))');
   assert.deepEqual(pq('sum(rate(x{job="$job"}[5m])) / $total','type="full"'),{kind:'placement',error:'This PromQL query has a $ variable outside a string or range, so the narrowing cannot be added; it is not shown.'});
   assert.deepEqual(pq('vector(1)','type="full"'),{kind:'placement',error:'This PromQL query has no vector selector Flowview can find, so the narrowing cannot be added; it is not shown.'});
   assert.deepEqual(pq('sum(rate(x[5m]) ; drop','type="full"'),{kind:'placement',error:'This PromQL query has a token Flowview does not recognise (;), so the narrowing cannot be added; it is not shown.'});
@@ -262,6 +272,12 @@ test('N16 Logs Insights: "| filter …" before the first stats, or at the end; b
   const r=logs('filter a = 1 | stats count() as n','filter code = "E1"',{breakdown:{query:'filter a = 1 | stats count() as n by clientId | sort n desc | limit 20',labelField:'clientId',valueField:'n',limit:20},trend:{query:'filter a = 1 | stats count() as n by bin(1h)',timeField:'bin(1h)',valueField:'n'}});
   assert.equal(r.query.breakdown.query,'filter a = 1 | filter code = "E1" | stats count() as n by clientId | sort n desc | limit 20','a limit after stats is fine');
   assert.equal(r.query.trend.query,'filter a = 1 | filter code = "E1" | stats count() as n by bin(1h)');
+  // #1356 review c1 MAJOR 2: a provider parse /regex/ is opaque, and provider text is never rewritten.
+  ok('parse @message /(?<level>INFO|WARN|ERROR)/ | stats count() as n by level','filter tenant = "A"','parse @message /(?<level>INFO|WARN|ERROR)/ | filter tenant = "A" | stats count() as n by level');
+  ok('parse @message /a|stats x/ | stats count() as n','filter tenant = "A"','parse @message /a|stats x/ | filter tenant = "A" | stats count() as n');
+  ok('parse /(?<a>[^#]+)/ | stats count() as n','filter tenant = "A"','parse /(?<a>[^#]+)/ | filter tenant = "A" | stats count() as n');
+  ok('fields a|filter b = 1|stats sum(bytes)/1024 as kb','filter tenant = "A"','fields a|filter b = 1|filter tenant = "A" | stats sum(bytes)/1024 as kb');
+  ok('fields  bytes / 1024 as kb ','filter tenant = "A"','fields  bytes / 1024 as kb | filter tenant = "A"');
   assert.deepEqual(logs('fields a | limit 10 | stats count() as n','filter code = "E1"'),{kind:'placement',error:'This Logs Insights query has limit or dedup before its stats, so a filter cannot be added safely; it is not shown.'});
   const side=logs('stats count() as n','filter code = "E1"',{breakdown:{query:'dedup clientId | stats count() as n by clientId',labelField:'clientId',valueField:'n',limit:20}});
   assert.equal(side.error,undefined,'the total is still narrowed and shown');
@@ -279,6 +295,11 @@ test('N17 Logs Insights: one filter command; every escape attempt fails closed',
   bad('filter a = "x"\n| fields b','a narrowing is one line');
   bad('filter a = "x','its quotes are unbalanced');
   bad('fields a','a Logs Insights narrowing is one filter command');
+  // #1356 review c1 MAJOR 1: a regex opens only after a standalone like, not like or =~; x.like / … is a division.
+  bad('filter x.like / 1 or 1 = 1 | stats count(*) as n # / and tenant = "A"','"#" would comment out the rest of the query');
+  bad('filter x.like / 2 | stats sum(bytes) as n | filter n / 1 > 0','one filter command: this one has a "|"');
+  assert.match(narrow('cloudwatchLogs',{logGroups:['g'],query:'stats count() as n',region:'us-east-1'},{cloudwatchLogs:'filter tenant = "A" and x.like / 1 or 1 / 1 = 1'},['tenant']).error || '',/narrow this signal by tenant/,'an or outside any regex pins nothing');
+  for(const frag of ['filter @message not like /a|b/','filter (@message like /a|b/)','filter x =~ /a|b/'])assert.equal(logs('stats count() as n',frag).error,undefined,frag);
   bad('stats count()','a Logs Insights narrowing is one filter command');
 });
 
@@ -293,6 +314,12 @@ test('N18 needsNarrow pins with text fragments',()=>{
   const q={logGroups:['g'],query:'stats count() as n',region:'us-east-1'};
   assert.ok(met('cloudwatchLogs',q,'filter code = "E1"',['code']));assert.ok(met('cloudwatchLogs',q,'filter code in ["a","b"]',['code']));
   for(const f of ['filter code = "E1" or x = 1','filter not code = "E1"','filter code != "E1"','filter code like /E/'])assert.ok(!met('cloudwatchLogs',q,f,['code']),f);
+  // #1356 review c1 minors 1 and 2.
+  assert.ok(!met('loki','{a="b"}','|= "x" or ""',true),'an empty alternative matches every line');
+  assert.ok(met('loki','{a="b"}','|= "x" or "y"',true));
+  assert.ok(!met('loki','{a="b"}','|~ "x"',true),'a regex line filter does not pin');
+  for(const f of ['filter ispresent(tenant = "A")','filter (tenant = "A" or tenant = "B")','filter tenant = "A" or x = 1'])assert.ok(!met('cloudwatchLogs',q,f,['tenant']),f);
+  assert.ok(met('cloudwatchLogs',q,'filter tenant = "A" and level > 3',['tenant']),'an and chain pins');
   assert.equal(narrow('loki','{a="b"}',{loki:'| code!="E1"'},['code']).error,'The provider asks each board to narrow this signal by code; a filter on code counts only with = and a value, so it is not shown.');
 });
 

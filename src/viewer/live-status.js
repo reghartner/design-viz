@@ -1720,7 +1720,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(pop.offsetHeight>inner.bottom-inner.top)pop.style.maxHeight=(inner.bottom-inner.top)+'px';
     var w=pop.offsetWidth,h=pop.offsetHeight,obstacles=popoverObstacles(trigger),slot=obstacles.length?exploreSlot(rect,inner,w,h,obstacles,gap):null;
     if(slot){
-      if(!slot.full)pop.style.maxHeight=Math.floor(slot.tall)+'px';
+      if(!slot.full){
+        // A capped body gains a scrollbar, which can widen an auto-width popover: look again at its new width.
+        pop.style.maxHeight=Math.floor(slot.tall)+'px';
+        var wider=pop.offsetWidth,again=wider>w?exploreSlot(rect,inner,wider,h,obstacles,gap):null;
+        if(again){slot=again;pop.style.maxHeight=Math.floor(again.full?h:again.tall)+'px';}
+        else if(wider>w)slot.left=Math.max(inner.left,Math.min(inner.right-wider,slot.left));
+      }
       pop.style.left=slot.left+'px';pop.style.top=slot.top+'px';
     }else{
       var sides=[

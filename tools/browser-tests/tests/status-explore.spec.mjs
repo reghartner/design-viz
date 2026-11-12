@@ -89,7 +89,7 @@ test('X2 Explore: the demo story advances its days',async({page,server},info)=>{
  await expect(status.locator('.dv-live-note')).toHaveText('Day 1 — kickoff');const first=await node(root,'button').getAttribute('class');
  for(let day=2;day<=12;day++)await next.click();
  await expect(status.locator('.dv-live-note')).not.toHaveText('Day 1 — kickoff');
- expect(await node(root,'button').getAttribute('class'),'the demo repaints the Explore canvas').not.toBe(first);
+ await expect.poll(()=>node(root,'button').getAttribute('class'),{message:'the demo repaints the Explore canvas'}).not.toBe(first);
  await shot(page,info,'x2-demo');
 });
 
@@ -122,10 +122,14 @@ test('X4 Explore: Metrics cards on the canvas, Proof, and Over time',async({page
  await status.getByRole('switch',{name:'Metrics overlay',exact:true}).click();
  await expect(root.locator('.explore-stage .dv-metrics-card').first(),'metrics cards on the Explore canvas').toBeVisible();
  await expect(status.locator('.dv-live-proof-row')).toHaveCount(6);
+ const card=root.locator('.explore-stage [data-metrics-card="ingest->app"]');await expect(card,'Live value on the Explore canvas').toContainText('100 req/h');
  await shot(page,info,'x4-metrics');
  await status.getByRole('button',{name:'Over time',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>window.calls.history.length),{message:'Over time loads the history'}).toBe(1);
- await expect(root.locator('[data-metrics-card="ingest->app"]').first()).toBeVisible();
+ // Move to day 2, then day 0: the panel names the day and the canvas card shows that day's value.
+ const slider=status.getByRole('slider',{name:'Day',exact:true}),day=async index=>{await slider.focus();await slider.press('Home');for(let i=0;i<index;i++)await slider.press('ArrowRight');await expect(slider).toHaveValue(String(index));};
+ await day(2);await expect(status.locator('.dv-live-over-time-day')).toHaveText('Day 2');await expect(card,'day 2 value on the Explore canvas').toContainText('50 req/h');
+ await day(0);await expect(status.locator('.dv-live-over-time-day')).toHaveText('Day 0');await expect(card,'day 0 verdict on the Explore canvas').toHaveAttribute('data-verdict','done-unproven');await expect(card).not.toContainText('50 req/h');
  await shot(page,info,'x4-over-time');
 });
 
@@ -142,7 +146,13 @@ test('X5 Explore: Trace view log search, trace load and span focus',async({page,
  await page.addInitScript(()=>{try{localStorage.setItem('dv_tour_v1','done');}catch(e){}window.claude={use:async name=>name==='permissions'?{request:keys=>window.logPermission(keys)}:{listTools:()=>window.logTools(),describeTool:()=>window.logDescribe(),callTool:(s,n,a)=>window.logCall(s,n,a)}};});
  const spec={page:{title:'Camera stats',tracking:{telemetry:{grafana:{loki:'loki-$env'},environment:'stg',environments:{stg:{},prd:{}},traceConnections:{company:PROFILE},
   lookups:{camera:{label:'Camera model',query:'{env="$env"} |= "Handling camera stats message" | cameraModel="$value"',values:['arch']}}}},
-  sections:[{id:'main',diagram:addExplore({nodes:{consumer:{title:'Camera stats consumer'}},rows:[['consumer']],panels:[{id:'status',type:'live-status',title:'Status'}]})}]}};
+  // The log line's span (frontend client msdemo.CurrencyService/GetSupportedCurrencies) belongs to the frontend node:
+  // declared spans (#1290) and a step traceMatch on that node, so focusing it highlights the node on the canvas.
+  sections:[{id:'main',diagram:addExplore({view:'step',autoplay:false,
+   nodes:{frontend:{title:'Checkout frontend',trace:{spans:{currencies:{serviceName:'frontend',operation:'msdemo.CurrencyService/GetSupportedCurrencies',role:'call'}}}},currency:{title:'Currency service',trace:{spans:{process:{serviceName:'currency',operationPrefix:'grpc.msdemo.CurrencyService/',role:'process'}}}}},
+   rows:[['frontend','currency']],edges:[{from:'frontend',to:'currency',label:'GetSupportedCurrencies'}],
+   steps:[{id:'currencies',text:'Ask for the supported currencies',nodes:['frontend'],traceMatch:{serviceName:'frontend',operation:'msdemo.CurrencyService/GetSupportedCurrencies',nodeId:'frontend'}}],
+   panels:[{id:'status',type:'live-status',title:'Status'}]})}]}};
  await page.goto(await inject(server,'status-explore-trace',spec));const root=page.locator('#docview');await expect(root.locator('.dv-live-trace').first()).toBeVisible();
  await enterExplore(root);const status=statusWindow(root);await expect(status.locator('.dv-live-trace')).toBeVisible();
  await status.getByRole('combobox',{name:'Connection environment',exact:true}).selectOption('prod');
@@ -152,6 +162,10 @@ test('X5 Explore: Trace view log search, trace load and span focus',async({page,
  await expect(status.locator('.dv-trace-selected')).toHaveAttribute('data-trace-id',ID);
  const span=status.locator('.dv-trace-span[data-span-id="'+SPAN+'"]');await expect(span,'the line\'s span is focused').toHaveAttribute('aria-pressed','true');
  await expect(span,'and shown in the floating panel').toBeInViewport();
+ // The focused span is highlighted on the Explore canvas, on the node it belongs to.
+ const focus=root.locator('.explore-stage g.node[data-dv-node="frontend"] .dv-trace-focus-overlay[data-trace-level="current"]');
+ await expect(focus,'span highlight on the Explore canvas').toHaveCount(1);
+ await expect(root.locator('.explore-stage .dv-trace-focus-overlay[data-trace-level="current"]'),'only that node').toHaveCount(1);
  await shot(page,info,'x5-trace');
 });
 

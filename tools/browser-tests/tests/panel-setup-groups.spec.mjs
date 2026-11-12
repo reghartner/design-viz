@@ -89,24 +89,30 @@ for(const [index,decl] of panels.entries()){
   });
 }
 
-test('timeline Shared cadence is disabled with a reason while lanes exist, and editable without lanes',async({page,server})=>{
-  const timeline=(lanes)=>({id:'beat',type:'timeline',title:'Heartbeat',span:'6h',cadence:{every:'30m',label:'heartbeat'},...(lanes?{lanes:[{id:'a',label:'Lane A',every:'15m'}]}:{}),initial:{now:'0m'}});
-  const make=(lanes)=>JSON.stringify({page:{sections:[{heading:'Timeline',diagram:{nodes:{api:{title:'API'}},rows:[['api']],panels:[timeline(lanes)]}}]}},null,2);
-  const guide=page.locator('#guide'),source=page.locator('#src'),root=page.locator('#docview');
-  const cadence=()=>guide.locator('.frow').filter({has:page.locator(':scope > .flab',{hasText:/^Shared cadence$/})});
+/* Each board gets its own test (a fresh page): a reload restores the open
+   document, so the welcome paste is only available once per page. */
+const timeline=(lanes)=>({id:'beat',type:'timeline',title:'Heartbeat',span:'6h',cadence:{every:'30m',label:'heartbeat'},...(lanes?{lanes:[{id:'a',label:'Lane A',every:'15m'}]}:{}),initial:{now:'0m'}});
+const timelineBoard=(lanes)=>JSON.stringify({page:{sections:[{heading:'Timeline',diagram:{nodes:{api:{title:'API'}},rows:[['api']],panels:[timeline(lanes)]}}]}},null,2);
+const cadenceRow=page=>page.locator('#guide .frow').filter({has:page.locator(':scope > .flab',{hasText:/^Shared cadence$/})});
 
-  await page.goto(server.origin+'/workbench.html');await pastePage(page,make(true));
+test('timeline Shared cadence is disabled with a reason while lanes exist',async({page,server})=>{
+  const guide=page.locator('#guide'),root=page.locator('#docview'),cadence=cadenceRow(page);
+  await page.goto(server.origin+'/workbench.html');await pastePage(page,timelineBoard(true));
   await inspectPageElement(page,root.locator('.pt-timeline .ptitle'));
-  await expect(cadence().getByLabel('Every',{exact:true})).toBeDisabled();
-  await expect(cadence().getByLabel('Name',{exact:true})).toBeDisabled();
+  await expect(cadence.getByLabel('Every',{exact:true})).toBeDisabled();
+  await expect(cadence.getByLabel('Name',{exact:true})).toBeDisabled();
   // The reason note is a sibling of the cadence row inside its field wrapper.
   const reason=guide.locator('.panel-setup-field').filter({has:page.locator('.flab',{hasText:/^Shared cadence$/})}).locator('.panel-setup-reason');
   await expect(reason).toBeVisible();await expect(reason).toContainText('Lanes set their own cadence');
-  await expect(cadence().getByLabel('Every',{exact:true})).toHaveAttribute('aria-describedby',await reason.getAttribute('id'));
+  await expect(cadence.getByLabel('Every',{exact:true})).toHaveAttribute('aria-describedby',await reason.getAttribute('id'));
+});
 
-  await page.goto(server.origin+'/workbench.html');const original=make(false);await pastePage(page,original);
+test('timeline Shared cadence is editable without lanes',async({page,server})=>{
+  const guide=page.locator('#guide'),source=page.locator('#src'),root=page.locator('#docview'),cadence=cadenceRow(page);
+  const original=timelineBoard(false);
+  await page.goto(server.origin+'/workbench.html');await pastePage(page,original);
   await inspectPageElement(page,root.locator('.pt-timeline .ptitle'));
-  const every=cadence().getByLabel('Every',{exact:true});
+  const every=cadence.getByLabel('Every',{exact:true});
   await expect(every).toBeEnabled();await expect(guide.locator('.panel-setup-reason')).toHaveCount(0);
   await every.click();await page.keyboard.press('ControlOrMeta+A');await page.keyboard.type('20m');await page.keyboard.press('Tab');
   await expect.poll(async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.panels[0].cadence).toEqual({every:'20m',label:'heartbeat'});

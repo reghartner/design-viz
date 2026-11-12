@@ -116,6 +116,10 @@ test('C5 a board that does not use traces inherits nothing: header, options and 
   assert.equal(ui.traces().querySelector('summary').textContent,'Traces · 1 connection');
   const off=harness(board({enabled:false}));
   assert.equal(off.traces().querySelector('summary').textContent,'Traces · Off');
+  off.set('operations on this board','use');
+  assert.deepEqual(off.t.traceConnections,{operations:{profile:'operations'},archive:{profile:'archive'}},'a trace board with metrics off still inherits both, so Use keeps archive');
+  const broken=harness(board(),{operations:profile('Operations Tempo'),bad:{version:2}});
+  assert.equal(broken.traces().querySelector('summary').textContent,'Traces · None','a trace board whose company profiles do not resolve says None, not "no traces"');
 });
 
 test('C6 a board adds allowed attributes to a company profile; the resolver allows the union',()=>{
@@ -134,4 +138,6 @@ test('C6 a board adds allowed attributes to a company profile; the resolver allo
   assert.deepEqual(ui.t.traceConnections.operations,{profile:'operations'},'Remove drops the last addition and its key');
   const bad=[];ui.e.C.FlowTraceConnections.resolve({tracking:{telemetry:{traceConnections:{x:{profile:'operations',allowedAttributes:'device.model'}}}}},company,(path,message)=>bad.push(path+' '+message));
   assert.match(bad.join(' '),/\.traceConnections\.x .*Board allowedAttributes must be an array/,'a non-array board list is refused by the resolver');
+  const secret=[];ui.e.C.FlowTraceConnections.resolve({tracking:{telemetry:{traceConnections:{x:{profile:'operations',allowedAttributes:['auth.token']}}}}},company,(path,message)=>secret.push(message));
+  assert.match(secret.join(' '),/Board allowedAttributes\[0\]/,'the message names the index in the board list');
 });

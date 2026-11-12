@@ -48,7 +48,7 @@ function flowMetricsDom(o){
   }
   /* merge (#1266): an imported carrier's merge state. Inherited signals are tagged, can be hidden
      for this document and keep their provider name; edits store only the changed fields. */
-  function signalEditors(parent,binding,prefix,commit,extra,merge){
+  function signalEditors(parent,binding,prefix,commit,extra,merge,state){
     var signals=telemetryObject(binding.signals)?binding.signals:{},names=Object.keys(signals);
     names.forEach(function(name){
       var inherited=!!merge && merge.inheritedNames.indexOf(name)>=0,overridden=inherited && merge.overridden.indexOf(name)>=0;
@@ -75,6 +75,7 @@ function flowMetricsDom(o){
       row(box,prefix+name+' scope',c.text(telemetryObject(entry)?entry.scope:null,function(v){return commit({op:'signal',name:name,field:'scope',value:v});},{placeholder:'Exact counting scope (optional)'}));
       // #1194: scope "" hides the scope line; unchecking removes the key, so the generated scope returns.
       row(box,prefix+name+' hide scope',c.checkbox(telemetryObject(entry) && entry.scope==='',function(v){return commit({op:'signal',name:name,field:'scope',value:v?'':null});}));
+      if(state)narrowEditors(box,name,source,state,commit);
       proofEditors(box,binding.proof,names,name,prefix,commit);
       if(overridden)box.appendChild(c.action('Revert '+name+' to inherited',function(){return commit({op:'revert',name:name});}));
       if(!inherited)box.appendChild(c.action(prefix?'Remove '+prefix+'signal '+name:'Remove signal '+name,function(){return commit({op:'removeSignal',name:name});}));
@@ -100,6 +101,31 @@ function flowMetricsDom(o){
     }
     [nameInput,unit].forEach(function(input){o.listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();submit();}});});
     add.appendChild(c.action(prefix?'Add '+prefix+'signal':'Add signal',submit));
+  }
+  /* #1363: a carrier signal's narrowing. Inherited fragments are read-only; the board's own have
+     Remove. Add narrowing runs the viewer's check first, so a refused fragment is never stored. The
+     editor shows the viewer's Not shown reason and the query it would send (never queried). */
+  function narrowEditors(box,name,source,state,commit){
+    var n=state.narrow && state.narrow[name],sent=state.sent && state.sent[name];
+    if(sent && sent.error)note(box,'Not shown: '+sent.error,'metrics-not-shown');
+    if(!n)return;
+    n.inherited.forEach(function(f){note(box,name+' narrowing from the provider: '+telemetryNarrowText(f),'metrics-narrow-inherited');});
+    n.own.forEach(function(f,i){
+      var index=n.inherited.length+i;
+      note(box,name+' narrowing: '+telemetryNarrowText(f),'metrics-narrow');
+      box.appendChild(c.action('Remove '+name+' narrowing '+(index+1),function(){return commit({op:'narrow',name:name,action:'remove',index:index});}));
+    });
+    if(source!=='sql' && source!=='tempo'){
+      var json=telemetryOwn(TELEMETRY_NARROW_JSON,source),label=name+' add narrowing',input=keptDraft(box,label,json?'textarea':'text',null,'');
+      input.placeholder=json?TELEMETRY_NARROW_JSON[source]:{loki:'| event_code="FULL_CHARGE"',grafana:'type="full_charge"',cloudwatchLogs:'filter code = "FULL_CHARGE"'}[source] || '';
+      function add(){var ok=commit({op:'narrow',name:name,action:'add',fragment:input.value});if(ok)forget([label]);return ok;}
+      if(!json)o.listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();add();}});
+      box.appendChild(c.action('Add '+name+' narrowing',add));
+    }
+    row(box,name+' boards must narrow by',c.text(telemetryNeedsText(n.needs.inherited===true || n.needs.own===true?true:[].concat(n.needs.inherited,n.needs.own)) || null,function(v){return commit({op:'needsNarrow',name:name,value:v});},{placeholder:'event_code, type (or any)'}));
+    if(sent && !sent.error && (n.inherited.length || n.own.length)){
+      var query=el('textarea','fctl');query.readOnly=true;query.value=sent.query;row(box,name+' query sent',query);
+    }
   }
   /* min / max / ratio of for one signal. proof is the effective proof. */
   function proofEditors(parent,proof,names,name,prefix,commit){
@@ -179,7 +205,18 @@ function createFlowMetricsEditor(o){
       names.forEach(function(name){d.proofEditors(d.fold(box,'metrics-signal','Signal '+name),effective.proof,names,name,'',commit);});
     }
   }else{
-    d.signalEditors(box,b || {},'',commit,function(edit){edit.kind=draftKind;},s.merge);
+    d.signalEditors(box,b || {},'',commit,function(edit){edit.kind=draftKind;},s.merge,s);
+  }
+  // #1363: scoped variables for this carrier and, on an imported one, for its import.
+  if(b){
+    var vars=s.variables || {own:{},inherited:{}};
+    d.row(box,'Variables for this '+(s.edge?'connection':'node'),c.text(Object.keys(vars.own).length?JSON.stringify(vars.own):null,function(v){return commit({op:'variables',value:v});},{textarea:true,placeholder:'{"code":"FULL_CHARGE"}'}));
+    if(Object.keys(vars.inherited).length)d.note(box,'Set by the provider: '+JSON.stringify(vars.inherited)+'.');
+    if(s.importVariables){
+      d.row(box,'Variables for import '+s.importVariables.as,c.text(Object.keys(s.importVariables.value).length?JSON.stringify(s.importVariables.value):null,function(v){return commit({op:'importVariables',value:v});},{textarea:true,placeholder:'{"code":"FULL_CHARGE"}'}));
+      d.note(box,'Applies to every node and connection from import '+s.importVariables.as+'.');
+    }
+    if(s.merge && s.inherited)box.appendChild(c.action('Copy provider queries',function(){return commit({op:'copyProviderQuery'});})).setAttribute('title','Copy the provider\'s signals into this document as its own binding, to edit their queries. The copy no longer follows later provider changes, and a provider needsNarrow still applies.');
   }
   if(b){
     d.note(box,'Proof limits: min is a floor and max a ceiling; with ratio of, max is the highest allowed ratio to that signal.');

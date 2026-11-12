@@ -1,7 +1,7 @@
 // #1172: focusing a span (Trace view, Auto view, a trace loaded by ID) follows its step and can show the
 // diagram's Scroll row. The taller toolbar must not cover the top row of nodes: before the focus every top-row
 // card is fully shown; after it the focused step's cards (Checkout service, Payment service) are fully inside
-// the visible diagram frame below the toolbar, and no top-row card is partly hidden under the toolbar. N4 setup
+// the visible diagram frame below the toolbar, and no top-row card is partly or wholly under the toolbar. N4 setup
 // (Metrics overlay on) and a guard with the overlay off. The camera animates (no reduced motion); every frame from the
 // click on is sampled, so the follow camera's first frame counts even when its tween later moves on. Desktop only.
 import {readFile,writeFile} from 'node:fs/promises';
@@ -74,11 +74,14 @@ function topRow(host,ids){
   const hidden=points.filter(([x,y])=>{const at=scope.elementFromPoint(x,y);return !at || !board.contains(at) || !!(lg && lg.contains(at));}).map(([x,y])=>{const at=scope.elementFromPoint(x,y);return Math.round(x)+','+Math.round(y)+' → '+(at?(at.getAttribute('class') || at.tagName):'nothing');});
   const across=Math.min(b.right,frame.right)-Math.max(b.left,frame.left)>.5;
   return {id,found:true,card:round(b),inside:b.left>=visible.left-.5 && b.right<=visible.right+.5 && b.top>=visible.top-.5 && b.bottom<=visible.bottom+.5,
-   underToolbar:!!bar && across && b.top<bar.bottom-.5 && b.bottom>bar.bottom+.5,hidden};
+   underToolbar:!!bar && across && b.top<bar.bottom-.5,hidden};
  });
+ // Metric cards in the frame's width whose box reaches above the toolbar's bottom edge (partly or wholly under it).
+ const metrics=Array.from(board.querySelectorAll('.dv-metrics-card')).map(card=>{const b=box(card.querySelector('.dv-metrics-card-box') || card);return {id:card.getAttribute('data-metrics-card'),card:round(b),
+  under:!!bar && b.right>b.left && Math.min(b.right,frame.right)-Math.max(b.left,frame.left)>.5 && b.top<bar.bottom-.5};});
  const pan=board.querySelector('.board-pan'),zoom=board.querySelector('.board-zoom-value');
  return {boards:1,frame:round(frame),toolbar:bar?{element:'.lg.'+String(lg.className).trim().split(/\s+/).join('.'),rect:round(bar),height:Math.round(bar.bottom-bar.top)}:null,ancestors,
-  scrollRow:!!(pan && !pan.hidden),zoom:zoom && zoom.textContent,scrollTop:Math.round(board.scrollTop),pageY:Math.round(scrollY),nodes};
+  metrics,scrollRow:!!(pan && !pan.hidden),zoom:zoom && zoom.textContent,scrollTop:Math.round(board.scrollTop),pageY:Math.round(scrollY),nodes};
 }
 // The camera has settled once the zoom, the viewBox, the scroll offsets and the toolbar height hold for two frames.
 async function settled(root){
@@ -99,21 +102,21 @@ async function expectTopRowShown(root,when,shown=TOP){
  expect(g.frame.bottom-g.frame.top,'the diagram frame is on screen'+where).toBeGreaterThan(200);
  for(const n of g.nodes){
   expect(n.found,n.id+' node card found in the shadow root').toBe(true);
-  expect(n.underToolbar,n.id+' card '+JSON.stringify(n.card)+' is not partly hidden under the toolbar'+where).toBe(false);
+  expect(n.underToolbar,n.id+' card '+JSON.stringify(n.card)+' is not partly or wholly hidden under the toolbar'+where).toBe(false);
   if(!shown.includes(n.id))continue;
   expect(n.inside,n.id+' card '+JSON.stringify(n.card)+' lies inside the visible diagram frame below the toolbar'+where).toBe(true);
   expect(n.hidden,n.id+' card: neither the toolbar nor anything outside the board covers its corners or top edge'+where).toEqual([]);
  }
  return g;
 }
-// Records every top-row card seen partly under the toolbar after each DOM change and on every frame, from the
+// Records every top-row card and metric card seen partly or wholly under the toolbar after each DOM change and on every frame, from the
 // span click until the camera settles: the follow camera's first frame keeps the graph where it was while the
 // Scroll row grows the toolbar, and a later tween (or none, when it is cancelled) must not be needed to fix it.
 const TOP_ROW=topRow.toString();
 function startSampling(root){
  return root.evaluate((host,{source,ids})=>{
   const scope=host.shadowRoot || host,check=(0,eval)('('+source+')'),seen=window.__topRowSeen=[];window.__topRowStop=false;
-  const sample=()=>{const g=check(host,ids);if(!g.nodes)return;g.nodes.forEach(n=>{if(n.underToolbar && seen.length<6)seen.push(n.id+' card '+JSON.stringify(n.card)+' under toolbar '+JSON.stringify(g.toolbar && g.toolbar.rect)+', Scroll row '+g.scrollRow+', zoom '+g.zoom+', scrollTop '+g.scrollTop);});};
+  const sample=()=>{const g=check(host,ids);if(!g.nodes)return;g.metrics.forEach(m=>{if(m.under && seen.length<6)seen.push('metric card '+m.id+' '+JSON.stringify(m.card)+' under toolbar '+JSON.stringify(g.toolbar && g.toolbar.rect)+', Scroll row '+g.scrollRow+', zoom '+g.zoom+', scrollTop '+g.scrollTop);});g.nodes.forEach(n=>{if(n.underToolbar && seen.length<6)seen.push(n.id+' card '+JSON.stringify(n.card)+' under toolbar '+JSON.stringify(g.toolbar && g.toolbar.rect)+', Scroll row '+g.scrollRow+', zoom '+g.zoom+', scrollTop '+g.scrollTop);});};
   const observer=new MutationObserver(sample);observer.observe(scope,{subtree:true,childList:true,attributes:true,attributeFilter:['style','class','hidden','transform','viewBox']});
   const frame=()=>{if(window.__topRowStop){observer.disconnect();return;}sample();requestAnimationFrame(frame);};requestAnimationFrame(frame);
  },{source:TOP_ROW,ids:TOP});
@@ -125,14 +128,16 @@ async function loadAndFocus(root){
  await root.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await root.getByRole('button',{name:'Load trace',exact:true}).click();
  const span=root.locator('.dv-trace-span[data-span-id="'+CHARGE+'"]');await expect(span).toHaveCount(1);
  await expectTopRowShown(root,'trace loaded, before the span focus');
- const pageY=await page.evaluate(()=>scrollY);
+ const pageY=await page.evaluate(()=>scrollY),before=await root.evaluate(topRow,TOP);
  await startSampling(root);await span.click();
+ // The follow camera has started (its setup shows or hides the Scroll row, or the zoom moves) before settling is checked.
+ await expect.poll(async()=>{const now=await root.evaluate(topRow,TOP);return now.scrollRow!==before.scrollRow || now.zoom!==before.zoom;},{message:'the follow camera starts after the span click'}).toBe(true);
  // The focused span's carrier wears the current-level marker (an edge ring or node brackets).
  await expect(root.locator('.dv-trace-edge-focus[data-trace-level="current"],.dv-trace-focus-overlay[data-trace-level="current"]').first()).toBeAttached();
  await expect.poll(()=>page.evaluate(()=>window.viewer.controller.sections[0].stepper.current().id),{message:'the Charge span focus jumps to its step'}).toBe('charge');
  // The focus may scroll the page to the panel; bring the page back so the diagram is on screen (the board's own camera is unchanged).
  await settled(root);
- expect(await stopSampling(page),'no top-row card is partly under the toolbar at any frame from the span click on').toEqual([]);
+ expect(await stopSampling(page),'no top-row card or metric card is partly or wholly under the toolbar at any frame from the span click on').toEqual([]);
  await page.evaluate(y=>scrollTo(0,y),pageY);
 }
 

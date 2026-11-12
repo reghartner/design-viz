@@ -124,6 +124,7 @@
     "workbench/brand.js",
     "workbench/metrics-editor.js",
     "workbench/log-searches-editor.js",
+    "workbench/trace-connections-editor.js",
     "workbench/inspector.js",
     "workbench/links-view.js",
     "workbench/io-model.js",

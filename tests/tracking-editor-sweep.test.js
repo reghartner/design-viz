@@ -19,7 +19,7 @@ const {inspectorEnvironment}=require('./helpers/inspector-dom.js');
 const repo=path.join(__dirname,'..');
 const names=['canon','validator','compatibility','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology','workbench/commands/telemetry',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/log-searches-editor','workbench/inspector']
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/metrics-editor','workbench/log-searches-editor','workbench/trace-connections-editor','workbench/inspector']
   .filter(name=>['canon','validator'].includes(name) || fs.existsSync(path.join(repo,'src',name+'.js')));
 const plain=v=>JSON.parse(JSON.stringify(v));
 const NODE={kind:'node',section:0,id:'api'},EDGE={kind:'edge',section:0,index:0},BOARD={kind:'board'};
@@ -132,7 +132,8 @@ test('T18 focus stays in the form after Remove and Add buttons and lands on the 
   assert.equal(ui.focused,ui.button('Remove ticket 1'),'the next row takes the removed row\'s place and its focus');
   ui=harness(page({tracking:{telemetry:{grafana:{prometheus:'prom'}}}}),BOARD);
   ui.control('New environment id').value='qa';ui.click('Add environment');
-  assert.equal(ui.focused,ui.control('qa Grafana Prometheus UID'),'focus moves into the new environment');
+  // #1240: a new environment's first control is its id (rename).
+  assert.equal(ui.focused?.getAttribute('aria-label'),'qa environment id','focus moves into the new environment');
   const edge=page();edge.page.sections[0].diagram.edges[0].telemetry={kind:'call',signals:{rate:{grafana:'up',unit:'req/s'}}};
   ui=harness(edge,EDGE);
   ui.control('New signal name').value='errors';ui.control('New signal query').value='errors_total';ui.click('Add signal');

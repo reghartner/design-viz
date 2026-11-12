@@ -77,6 +77,8 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
 .explore-window-edge[data-edge="se"]{bottom:0;right:0;cursor:nwse-resize;}
 :not(.explore-stacked)>.explore-window-edge[data-edge="se"],.explore-stacked>.explore-window-edge[data-edge="sw"]{display:none;}
 [data-explore-width-locked]>.explore-window-edge:is([data-edge="n"],[data-edge="s"]){display:none;}
+/* The right strip sits beside a floating window's body, clear of its scrollbar. */
+.explore-stage>.explore-window>.explore-window-body{width:calc((100% - 8px) / var(--explore-overlay-scale,1));}
 .explore-window-edge:hover,.viewport-gesturing .explore-window-edge:active{background:color-mix(in srgb,var(--acc) 35%,transparent);}
 .explore-window :focus-visible,.explore-panel-menu summary:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
 .explore-player{position:absolute;z-index:20;left:var(--float-x);top:var(--float-y);width:var(--float-w);height:var(--float-h);box-sizing:border-box;overflow:hidden;overscroll-behavior:contain;border:1px solid var(--explore-border);border-radius:12px;box-shadow:0 6px 22px #14244224;background:var(--explore-bg);}

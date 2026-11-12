@@ -63,6 +63,23 @@ test('an Explore panel window and the step controls resize from every corner and
   await expect.poll(async()=>near(await box(fresh.locator('[data-explore-panel=home]')),final)).toBe(true);await fresh.close();
 });
 
+test('the right resize strip of a floating Explore window leaves the body scrollbar usable',async({page,server})=>{
+  await page.setViewportSize({width:1600,height:1000});
+  await page.goto(server.origin+'/workbench.html');await paste(page,floatingSpec());await closeTools(page);
+  const panel=page.locator('[data-explore-panel=home]'),body=panel.locator('.explore-window-body');
+  // Make the body scroll: shrink the window from its bottom-right button.
+  await panel.locator('.explore-window-resize').focus();for(let i=0;i<10;i++)await page.keyboard.press('Shift+ArrowUp');
+  await closeTools(page);
+  const strip=await box(panel.locator('.explore-window-edge[data-edge="e"]')),bodyBox=await box(body);
+  expect(strip[0]).toBeGreaterThanOrEqual(bodyBox[0]+bodyBox[2]-1);
+  const bar=await body.evaluate(el=>({width:el.offsetWidth-el.clientWidth,overflow:el.scrollHeight-el.clientHeight}));
+  if(bar.width>0 && bar.overflow>20){
+    const before=await box(panel),scale=bodyBox[2]/(await body.evaluate(el=>el.offsetWidth));
+    await pointerDrag(page,[bodyBox[0]+bodyBox[2]-bar.width*scale/2,bodyBox[1]+bar.width*scale+4],0,30);
+    expect(await body.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);expect(await box(panel)).toEqual(before);
+  }
+});
+
 const starter=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 function canvasSpec(){
   const raw=structuredClone(starter),s=raw.page.sections[0],d=s.diagram;s.id='canvas-story';d.autoplay=false;d.defaultLayout='service-flow';

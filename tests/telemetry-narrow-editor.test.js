@@ -128,7 +128,7 @@ test('E5 variables for this node or connection and for the import',()=>{
   assert.deepEqual(plain(p.state(NODE).variables),{own:{code:'A'},inherited:{}});
   p.apply(NODE,{op:'importVariables',value:'{"region":"eu"}'});
   assert.deepEqual(plain(diagramOf(p.raw).topologyImports[0].variables),{region:'eu'});
-  assert.deepEqual(plain(p.state(NODE).importVariables),{as:'fc',value:{region:'eu'}});
+  assert.deepEqual(plain(p.state(NODE).importVariables),{as:'fc',value:{region:'eu'},warnings:[]},'#1393 review c1: the read model carries the import variables\' validator warnings');
   p.refuse(NODE,{op:'importVariables',value:'{"region":""}'},/string/);
   p.refuse(LOCAL,{op:'importVariables',value:'{"region":"eu"}'},/imported/);
   p.apply(NODE,{op:'importVariables',value:null});assert.equal(Object.hasOwn(diagramOf(p.raw).topologyImports[0],'variables'),false);

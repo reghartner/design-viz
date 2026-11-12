@@ -280,7 +280,7 @@ function createFlowMetricsEditor(o){
       var as=s.importVariables.as;
       d.variableRows(box,s.importVariables.value,{title:'Import '+as,lower:'import '+as,legend:'Variables for import '+as,
         note:'Apply to every node and connection from import '+as+', under this '+what+'\'s own. Letters, digits, _ . @ : and inner - (and spaces) only.'},
-        function(e){return commit(Object.assign({},e,{op:'variableRow',scope:'import'}));},[],'');
+        function(e){return commit(Object.assign({},e,{op:'variableRow',scope:'import'}));},s.importVariables.warnings || [],'variables');
     }
     if(s.merge && s.inherited){
       box.appendChild(c.action('Copy provider queries',function(){return commit({op:'copyProviderQuery'});}));

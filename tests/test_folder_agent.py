@@ -1004,7 +1004,7 @@ class FolderAgentTests(unittest.TestCase):
                     return value
                 errors = io.StringIO()
                 with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Terminal change']), patch.object(helper, 'write', side_effect=write), patch.object(helper, 'read', side_effect=read), patch.object(helper.time, 'sleep', side_effect=AssertionError('Terminal acknowledgement errors must not retry')) as sleeping, patch.object(sys, 'stderr', errors):
-                    with self.assertRaises(SystemExit if change == 'owner' else ValueError) as raised:
+                    with self.assertRaises(SystemExit if change in ('owner', 'cancel') else ValueError) as raised:
                         helper.main()
                     sleeping.assert_not_called()
                 self.assertNotIn('in time', errors.getvalue())
@@ -1017,6 +1017,9 @@ class FolderAgentTests(unittest.TestCase):
                                   'new session session, connection replacement).', errors.getvalue())
                     self.assertNotIn('Workbench acknowledgement failed', errors.getvalue())
                 else:
+                    if change == 'cancel':
+                        # #1120: a stopped turn exits 1 with one line instead of a traceback.
+                        self.assertEqual(raised.exception.code, 1)
                     self.assertIn('Workbench acknowledgement failed', errors.getvalue())
                     self.assertTrue(attempt['withdrawn'])
 

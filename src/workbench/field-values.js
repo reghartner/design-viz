@@ -31,9 +31,10 @@ var PANEL_PATCH_FIELDS = panelAuthoringMap('patchFields');
    authoring.fieldMeta.<key> and tuple[3] accept:
      label / help / group / advanced / hidden / assignment
      setup / initial / step — context-specific overrides of those properties
-     ignoredWhen(panel) — returns the reason the renderer ignores this setup
+     ignoredWhen(panel) — setup form only (declare it at the top level or under
+                          setup): returns the reason the renderer ignores the
                           field for the given panel, or nothing; Inspect then
-                          shows the field disabled with that reason
+                          shows the field disabled, described by that reason
      unsetLabel — copy for an omitted assignment
      nullLabel — opt in to an explicit JSON null assignment
    Context metadata is merged last. */

@@ -23,6 +23,8 @@
 | X21 | (#1348, D10) A board that narrows an inherited signal no longer gets the provider's query link (it opens the unnarrowed query) unless it sets its own; other links stay. | provider signal with links.query | merged links | a link to the unnarrowed query |
 | X22 | (#1353 review c1 minors 1 and 3, c2 MAJOR) A replacing binding (no extends) keeps the provider carrier's needsNarrow on every signal it writes, also those a consumer use template writes (all-template, or template plus literal signals), so a restated query fails closed unless it narrows; it warns at the overlay naming those signals. Narrowing an inherited signal also drops the provider's carrier-level query link unless the board sets its own. | provider needsNarrow; replacing consumer bindings | sent signal; warnings; merged links | reading the unnarrowed number by restating the provider query |
 | X23 | (#1353, needsNarrow belongs to the canon carrier) A new signal an extends overlay adds to a carrier whose provider signals have needsNarrow inherits the same union: it fails closed unless it narrows, and the overlay warns; an inherited signal's own requirement is unchanged. | provider needsNarrow; overlay adding a signal | sent signals; warnings | reading the unnarrowed number through an added signal |
+| X24 | (#1354) Text fragments across imports: a provider LogQL signal with needsNarrow, a middle that adds | json and a board that pins event_code send one query with both stages at the end of every pipeline; two imports pin two values; a PromQL signal and a Logs Insights signal narrow the same way; a local carrier too. | provider → middle → consumer; twice imported | sent queries | text fragments applied once, out of order, or to one import only |
+| X25 | (#1353 review c3 minor 1) A replacing binding that writes an invalid or weakening needsNarrow (false, [], "x", null) keeps the carrier's and warns that its own is ignored. | replacing bindings | sent signal; warnings | a silently ignored weakening |
 | X6 | Validator: a merge overlay produces no telemetry warnings; a malformed `hide` warns at its overlay path. Compatibility declares `flow.telemetry-merge` only for merge overlays. | consumer docs | warnings; features | warnings on valid merges; silent malformed filters; older runtimes treating merges as replaces |
 */
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
@@ -412,4 +414,44 @@ test('#1353 X22 a replacing use-template binding keeps the provider\'s needsNarr
   r=run({use:'t',svc:'dcf',signals:{count:{honeycomb:{calculations:[{op:'COUNT'}],filters:[flt('service.name','dcf')]},narrow:{honeycomb:{filters:[flt('event_code','FULL_CHARGE')]}}}}});
   assert.equal(r.sent.count.error,undefined,'a signal the board narrows is shown');
   assert.deepEqual(r.sent.count.query.filters,[flt('service.name','dcf'),flt('event_code','FULL_CHARGE')]);
+});
+
+test('#1354 X24 text fragments across imports: nested order, two imports, every leg',()=>{
+  const LOGQL='sum(count_over_time({app="dcf"} |= "notify" [5m])) / sum(count_over_time({app="dcf"}[5m]))';
+  const provider=spec('provider',{nodes:{dcf:{title:'DCF',telemetry:{kind:'service',signals:{
+      sent:{loki:LOGQL,needsNarrow:['event_code']},
+      calls:{grafana:'sum(rate(notify_total{job="dcf"}[5m]))',needsNarrow:['type']},
+      warned:{cloudwatchLogs:{logGroups:['g'],query:'fields @message | stats count() as n',region:'us-east-1',valueField:'n'},needsNarrow:['messageType']}}}}},
+    rows:[['dcf']],topologyExports:{core:{nodes:['dcf'],edges:[]}}});
+  const middle=spec('middle',{nodes:{},rows:[[]],topologyImports:[{spec:'provider',export:'core',as:'inner',nodeTracking:{dcf:{telemetry:{extends:true,signals:{sent:{narrow:{loki:'| json'}}}}}}}],
+    topologyExports:{nested:{nodes:['inner::dcf'],edges:[]}}});
+  const pin=value=>({extends:true,signals:{sent:{narrow:{loki:'| event_code="'+value+'"'}},calls:{narrow:{grafana:'type="'+value.toLowerCase()+'"'}},warned:{narrow:{cloudwatchLogs:'filter messageType = "'+value+'"'}}}});
+  const consumer=consumerOf([
+    {spec:'middle',export:'nested',as:'fc',nodeTracking:{'inner::dcf':{telemetry:pin('FULL_CHARGE')}}},
+    {spec:'provider',export:'core',as:'et',position:{x:40,y:400},nodeTracking:{dcf:{telemetry:pin('EARLY')}}}],
+    {nodes:{local:{title:'Local',telemetry:{kind:'service',signals:{up:{grafana:'up',narrow:{grafana:'job="local"'}}}}}}});
+  const d=diagramOf(C.FlowTopology.resolveSource(consumer,{version:1,id:'consumer',specs:[provider,middle,consumer]}));
+  const sent=id=>plain(C.carrierTelemetry(d.nodes[id],{}).signals);
+  const fc=sent('fc::inner::dcf'),et=sent('et::dcf');
+  assert.equal(fc.sent.error,undefined,fc.sent.error);
+  assert.equal(fc.sent.query,'sum(count_over_time({app="dcf"} |= "notify" | json | event_code="FULL_CHARGE" [5m])) / sum(count_over_time({app="dcf"} | json | event_code="FULL_CHARGE" [5m]))','the middle stage first, then the board\'s, on both legs');
+  assert.equal(et.sent.query,'sum(count_over_time({app="dcf"} |= "notify" | event_code="EARLY" [5m])) / sum(count_over_time({app="dcf"} | event_code="EARLY" [5m]))','the other import pins its own value');
+  assert.equal(fc.calls.query,'sum(rate(notify_total{job="dcf",type="full_charge"}[5m]))');
+  assert.equal(et.calls.query,'sum(rate(notify_total{job="dcf",type="early"}[5m]))');
+  assert.equal(fc.warned.query.query,'fields @message | filter messageType = "FULL_CHARGE" | stats count() as n');
+  assert.equal(sent('local').up.query,'up{job="local"}','a local carrier narrows too');
+  const bare=consumerOf([{spec:'provider',export:'core',as:'fc'}]);
+  const unmet=plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(bare,{version:1,id:'consumer',specs:[provider,bare]})).nodes['fc::dcf'],{}).signals);
+  assert.deepEqual(Object.keys(unmet).filter(n=>!unmet[n].error),[],'without narrowing, none of the three is shown');
+});
+
+test('#1353 X25 a replacing binding cannot weaken the carrier\'s needsNarrow; it says so',()=>{
+  const provider=narrowProvider();
+  for(const weak of [false,[],'x',null]){
+    const consumer=consumerOf([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{kind:'service',needsNarrow:weak,signals:{count:{honeycomb:NARROW_HC()}}}}}}]);
+    const context={version:1,id:'consumer',specs:[provider,consumer]};
+    const s=plain(C.carrierTelemetry(diagramOf(C.FlowTopology.resolveSource(consumer,context)).nodes['fc::dcf'],{}).signals.count);
+    assert.match(s.error || '',/narrow this signal by event_code/,JSON.stringify(weak)+' keeps the requirement');
+    assert.ok(findings(consumer,context).warnings.includes('sections[0].diagram.topologyImports[0].nodeTracking.dcf.telemetry.needsNarrow: a board cannot drop the provider\'s needsNarrow — ignored'),JSON.stringify(weak));
+  }
 });

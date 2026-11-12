@@ -182,9 +182,11 @@ test('the first canvas drag after an uncommitted Inspector edit saves the edit a
   await open(page,server);await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();
   await drag(page,page.locator('#workspace-window-inspect .workspace-window-grip'),-900,0);
   const title=page.locator('#guide').getByLabel('Name',{exact:true}),panel=page.locator('[data-explore-panel=home]');
-  const before=await geometry(panel);await title.fill('Committed on leaving Inspector');
+  const before=await geometry(panel),old=await panel.elementHandle();await title.fill('Committed on leaving Inspector');
   await drag(page,panel.locator('.explore-window-grip'),-350,60);
   await expect(page.locator('#src')).toHaveValue(/Committed on leaving Inspector/);
+  // The commit rebuilt the viewport, so the replacement window took over the press.
+  expect(await old.evaluate(el=>el.isConnected)).toBe(false);
   await expectLanded(panel,before,-350,60);
   const both=await page.locator('#src').inputValue();expect(JSON.parse(both).page.blocks[0].diagram.layouts[0].exploreLayout).toBeTruthy();
   await page.locator('#undo-builder').click();await expect.poll(()=>geometry(panel)).toEqual(before);

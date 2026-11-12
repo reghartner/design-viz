@@ -20,12 +20,15 @@ function telemetryNarrowCanonical(v){
 }
 /* #1354 text fragments. Strings are masked first: each character inside quotes becomes "x", so
    structure (pipes, braces, comments) is read only outside strings. regex masks a Logs Insights
-   /regex/ after like or =~. null when a string never closes. */
+   /regex/ only where Logs Insights reads one: after a standalone like or not like, after =~, or
+   after parse and its field. Any other / is a division (x.like / 1 is one, #1356 review). null
+   when a string never closes. */
+var TELEMETRY_LOGS_REGEX_BEFORE=/(?:(?:^|[\s(])(?:not\s+)?like|=~|(?:^|[\s(|])parse(?:\s+[@A-Za-z_][\w.@]*)?)\s*$/i;
 function telemetryNarrowMask(text,quotes,regex){
   var out='',i=0,n=text.length;
   while(i<n){
     var c=text[i];
-    if(quotes.indexOf(c)>=0 || regex && c==='/' && /(?:\blike|=~)\s*$/i.test(text.slice(0,i))){
+    if(quotes.indexOf(c)>=0 || regex && c==='/' && TELEMETRY_LOGS_REGEX_BEFORE.test(text.slice(0,i))){
       var j=i+1;out+=c;
       while(j<n && text[j]!==c){if(c!=='`' && text[j]==='\\'){out+=j+1<n?'xx':'x';j+=2;continue;}out+='x';j++;}
       if(j>=n)return null;
@@ -106,6 +109,7 @@ function telemetryLokiPlace(query,stages){
   if(m.indexOf('#')>=0)return telemetryNarrowPlacement('LogQL','has a # comment');
   if(!telemetryNarrowBalanced(m))return telemetryNarrowPlacement('LogQL','has unbalanced braces, brackets or parentheses');
   var lineFilter=stages.some(function(stage){return /^\s*(?:\|=|\|~|!=|!~)/.test(stage);}),points=[];
+  var labelFilter=stages.some(function(stage){return !/^\s*(?:\|=|\|~|!=|!~)/.test(stage) && !/^\s*\|\s*(?:json|logfmt|unpack|regexp|pattern)\b/.test(stage);});
   for(var i=0;i<m.length;i++){
     if(m[i]!=='{')continue;
     var close=m.indexOf('}',i);if(close<0 || m.slice(i+1,close).indexOf('{')>=0)return telemetryNarrowPlacement('LogQL','has unbalanced braces, brackets or parentheses');
@@ -119,6 +123,7 @@ function telemetryLokiPlace(query,stages){
       else if(c==='|' && !depth && /^\|\s*unwrap\b/.test(m.slice(at)))break;
       at++;
     }
+    if(labelFilter && /\|\s*(?:drop|keep|label_format)\b/.test(m.slice(close+1,at)))return {kind:'placement',error:'This LogQL query changes its labels with drop, keep or label_format, so a label filter cannot be added safely; it is not shown.'};
     if(lineFilter && /\|\s*line_format\b/.test(m.slice(close+1,at)))return {kind:'placement',error:'This LogQL query reformats its lines with line_format, so a line filter cannot be added safely; it is not shown.'};
     points.push(at);i=close;
   }
@@ -152,9 +157,11 @@ function telemetryPromPlace(query,text){
       var word=/^[A-Za-z_:][A-Za-z0-9_:]*/.exec(m.slice(i))[0],after=i+word.length,next=after;
       while(next<n && /\s/.test(m[next]))next++;
       i=after;
-      if(TELEMETRY_PROM_GROUPING.indexOf(word)>=0){if(m[next]==='('){var shut=match('(',')',next);if(shut<0)return telemetryNarrowPlacement('PromQL','has unbalanced braces, brackets or parentheses');i=shut+1;}continue;}
-      if(TELEMETRY_PROM_KEYWORDS.indexOf(word)>=0 || m[next]==='(')continue;
-      if(TELEMETRY_PROM_AGGREGATORS.indexOf(word)>=0 && m[next]!=='{')continue;
+      var lower=word.toLowerCase();
+      // PromQL keywords and aggregation operators are case-insensitive (#1356 review).
+      if(TELEMETRY_PROM_GROUPING.indexOf(lower)>=0){if(m[next]==='('){var shut=match('(',')',next);if(shut<0)return telemetryNarrowPlacement('PromQL','has unbalanced braces, brackets or parentheses');i=shut+1;}continue;}
+      if(TELEMETRY_PROM_KEYWORDS.indexOf(lower)>=0 || m[next]==='(')continue;
+      if(TELEMETRY_PROM_AGGREGATORS.indexOf(lower)>=0 && m[next]!=='{')continue;
       if(m[next]==='{'){if(!braces(next))return telemetryNarrowPlacement('PromQL','has unbalanced braces, brackets or parentheses');}
       else edits.push({from:after,to:after,braces:false});
       continue;
@@ -174,14 +181,19 @@ function telemetryPromPlace(query,text){
 }
 function telemetryLogsPlace(query,commands){
   var m=typeof query==='string'?telemetryNarrowMask(query,'"\'`',true):null;
-  if(m===null)return {kind:'placement',error:'This Logs Insights query has an unclosed string, so a filter cannot be added safely; it is not shown.'};
+  if(m===null)return {kind:'placement',error:'This Logs Insights query has an unclosed string or regex, so a filter cannot be added safely; it is not shown.'};
   if(m.indexOf('#')>=0)return {kind:'placement',error:'This Logs Insights query has a # comment, so a filter cannot be added safely; it is not shown.'};
-  var parts=[],start=0;
-  for(var i=0;i<=m.length;i++)if(i===m.length || m[i]==='|'){parts.push({text:query.slice(start,i).trim(),masked:m.slice(start,i).trim()});start=i+1;}
-  var at=parts.findIndex(function(p){return /^stats\b/i.test(p.masked);});if(at<0)at=parts.length;
-  if(parts.slice(0,at).some(function(p){return /^(?:limit|dedup)\b/i.test(p.masked);}))return {kind:'placement',error:'This Logs Insights query has limit or dedup before its stats, so a filter cannot be added safely; it is not shown.'};
-  var texts=parts.map(function(p){return p.text;});
-  return {query:texts.slice(0,at).concat(commands.map(function(c){return c.trim();}),texts.slice(at)).filter(function(t){return t.length;}).join(' | ')};
+  // Commands split at each | outside strings and regexes; the provider's text is kept as written and
+  // the filter is spliced in at one point only (#1356 review).
+  var starts=[0];for(var i=0;i<m.length;i++)if(m[i]==='|')starts.push(i+1);
+  var parts=starts.map(function(from,k){var to=k+1<starts.length?starts[k+1]-1:m.length;return {from:from,masked:m.slice(from,to).trim()};});
+  var at=parts.findIndex(function(p){return /^stats\b/i.test(p.masked);});
+  var before=at<0?parts:parts.slice(0,at);
+  if(before.some(function(p){return /^(?:limit|dedup)\b/i.test(p.masked);}))return {kind:'placement',error:'This Logs Insights query has limit or dedup before its stats, so a filter cannot be added safely; it is not shown.'};
+  var added=commands.map(function(c){return c.trim();}).join(' | ');
+  if(at<0)return {query:query.replace(/\s+$/,'')+' | '+added};
+  var from=parts[at].from;while(from<query.length && /\s/.test(query[from]))from++;
+  return {query:query.slice(0,from)+added+' | '+query.slice(from)};
 }
 // Fields a text fragment pins (label = value), and those it only mentions. "|=" marks a LogQL line
 // filter, which meets needsNarrow: true only. A fragment with or (or not) pins nothing.
@@ -189,9 +201,12 @@ function telemetryNarrowTextFields(source,fragment,pinned,named){
   if(typeof fragment!=='string')return;
   var m=telemetryNarrowMask(fragment.trim(),source==='grafana'?'"\'`':source==='loki'?'"`':'"\'`',source==='cloudwatchLogs');
   if(m===null)return;
-  if(source==='loki' && /^\|=\s*(?:"x+"|`x+`)/.test(m)){pinned.push('|=');return;}
+  // A |= line filter meets needsNarrow: true only when every alternative is non-empty ("" matches every line).
+  if(source==='loki' && /^\|=/.test(m)){if(/^\|=\s*(?:"x+"|`x+`)(?:\s+or\s+(?:"x+"|`x+`))*\s*$/.test(m))pinned.push('|=');return;}
+  if(source==='loki' && /^(?:\|~|!=|!~)/.test(m))return;
   if(source==='loki' && (!/^\|/.test(m) || /^\|\s*(?:json|logfmt|unpack|regexp|pattern)\b/.test(m)))return;
-  var negated=source==='grafana'?false:/\b(?:or|not)\b/i.test(m),re=source==='cloudwatchLogs'?/([@A-Za-z_][\w.@]*)\s*(==|=|!=|<>|>=|<=|>|<)\s*("x*"|'x*'|`x*`|[0-9][\w.]*)/g:/([A-Za-z_][A-Za-z0-9_]*)\s*(==|=~|!=|!~|>=|<=|=|>|<)\s*("x*"|'x*'|`x*`|-?[0-9][\w.]*)/g,hit;
+  // A Logs Insights fragment pins only through a top-level and chain: no parentheses or function calls (#1356 review).
+  var negated=source==='grafana'?false:/\b(?:or|not)\b/i.test(m) || source==='cloudwatchLogs' && /\(/.test(m),re=source==='cloudwatchLogs'?/([@A-Za-z_][\w.@]*)\s*(==|=|!=|<>|>=|<=|>|<)\s*("x*"|'x*'|`x*`|[0-9][\w.]*)/g:/([A-Za-z_][A-Za-z0-9_]*)\s*(==|=~|!=|!~|>=|<=|=|>|<)\s*("x*"|'x*'|`x*`|-?[0-9][\w.]*)/g,hit;
   while((hit=re.exec(m))){
     named.push(hit[1]);
     var nonEmpty=/^["'`]/.test(hit[3])?hit[3].length>2:true;

@@ -3290,8 +3290,10 @@ fails closed:
   `decolorize`, `distinct`, which change what is counted.
 - PromQL: `label op "value"` joined by commas, with `=`, `!=`, `=~` or `!~`; anything
   else (a `}`, `or`, `unless`, a trailing comma, an unquoted value) is refused.
-- Logs Insights: one `filter` command; a `|`, `#` or newline is refused (`/regex/` is
-  masked).
+- Logs Insights: one `filter` command; a `|`, `#` or newline is refused. A `/regex/` is
+  read only after a standalone `like`, `not like` or `=~` (or a provider's `parse` and
+  its field); any other `/` is a division, so `x.like / 1` hides nothing. The provider's
+  query text is kept as written: the filter is spliced in at one point.
 
 - **Merge.** Fragments accumulate in order: the provider's, then each importing level's
   (an identical fragment once). The provider's query stays literal, so its later
@@ -3302,9 +3304,10 @@ fails closed:
 - **`needsNarrow`** on a provider signal (`["event_code"]`, or `true`) says every board
   must narrow it. It is met when a fragment pins each field to chosen values: a
   Honeycomb filter with `=` or `in` and a value, a CloudWatch dimension, a PromQL or
-  LogQL label `=` with a value, or a Logs Insights `field = value` or `field in [...]`.
-  A text fragment with `or` (or `not`) pins nothing. A LogQL `|=` line filter meets
-  `true`. A filter that
+  LogQL label `=` with a value, or a Logs Insights `field = value` or `field in [...]`
+  in a top-level `and` chain (no parentheses or function calls). A text fragment with
+  `or` (or `not`) pins nothing. A LogQL `|=` line filter meets `true` when every
+  alternative is non-empty (`|= "x" or ""` matches every line). A filter that
   only tests the field (`exists`, `!=`, `not-in`, `does-not-exist`, `contains` …) still
   counts every value, so it does not count. `true` needs one pinning filter. Lists join
   across levels, so a re-exporter can require more, never less. A replacing binding
@@ -3325,8 +3328,10 @@ fails closed:
   instead); the signal is a Honeycomb trace search (`query_spec`); or a text fragment
   cannot be placed: no stream or vector selector, unbalanced strings or brackets, a `#`
   comment, a token Flowview does not recognise, a PromQL `$var` outside a string or
-  range, a LogQL line filter after an inherited `line_format`, or a Logs Insights `limit`
-  or `dedup` before the insertion point.
+  range, a LogQL line filter after an inherited `line_format`, a LogQL label filter after
+  an inherited `drop`, `keep` or `label_format`, or a Logs Insights `limit` or `dedup`
+  before the insertion point. PromQL keywords (`BY`, `OR`, `Inf` …) are read in any
+  case.
 - **Validator.** A fragment fault as written warns where it is written, on any page. An
   unmet `needsNarrow`, an `OR` query, a dimension conflict or a fragment that cannot be
   placed warns only on a page with a live-status panel, so a canon page that asks boards to narrow still builds.

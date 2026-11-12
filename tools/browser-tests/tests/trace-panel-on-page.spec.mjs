@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
+import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 /* #1411 (Chuck 2026-11-12): "the trace panel should not infinitely scroll that was a bad idea - you want it to stay ON THE
    PAGE so it's always next to the diagram." In the Trace view, with a 60-span trace loaded, the Status panel never reaches
@@ -12,8 +12,8 @@ import {repo} from '../helpers/prepare.mjs';
 | plain | published reader (template/flowview.html, claude.ai host stub), no section layout | a panel that grows with its spans so the page scrolls |
 | tile | the same with a section layout whose tiles fit the window (the Status tile grows to its content) | a tile that grows past the window |
 | explore | the same board's Explore View: the Status panel in its floating window | a window that grows past the window, scrolls the page, or holds the panel in a second scroller |
-| workbench | the board pasted in the Workbench; the Status panel in the preview | a preview panel that grows past the window |
-Desktop only (1440x900). Page functions check the counts they find. */
+The Workbench preview renders with telemetry off (src/workbench/preview.js renderOptions telemetry:false), so it cannot load
+a trace and has no case here. Desktop only (1440x900). Page functions check the counts they find. */
 const PROFILE=JSON.parse(await readFile(path.join(repo,'tests/fixtures/trace-connection-profile.json'),'utf8'));
 const RECORDED=await readFile(path.join(repo,'tests/fixtures/provider-traces/honeycomb-trace.txt'),'utf8');
 const ID='8413cd87a9f15b6bfe8e1acf5b3346d0',LEAF='| dcce084f04baa9e1 | 011114cbd1fd62de |';
@@ -32,7 +32,7 @@ function spec(surface){
   view:'step',autoplay:false,panels:[{id:'status',type:'live-status',title:'Status'}]};
  // follower: a Status controls panel follows the Status card in the same panel column (no section layout).
  if(surface==='follower')d.panels.push({id:'controls',type:'status-controls',title:'Status controls'});
- if(surface==='tile' || surface==='workbench')d.sectionLayout={columns:24,default:structuredClone(TILES)};
+ if(surface==='tile')d.sectionLayout={columns:24,default:structuredClone(TILES)};
  if(surface==='explore'){
   d.layouts=['standard','explore'].map(id=>({id,name:id[0].toUpperCase()+id.slice(1),presentation:id,sectionLayout:{columns:24,default:structuredClone(TILES)}}));d.defaultLayout='standard';
  }
@@ -55,13 +55,9 @@ async function enterExplore(scope){
 // Opens the surface and loads the 60-span trace in its Status panel; returns the panel card locator.
 async function open(page,server,surface,before=null){
  await host(page);
- if(surface==='workbench'){
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec(surface),null,2));await prepareEditorSurface(page);
- }else{
-  const name='trace-panel-on-page-'+surface,file=path.join(server.root,name+'.json'),out=path.join(server.root,name+'.html');await writeFile(file,JSON.stringify(spec(surface)));
-  execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out],{stdio:'pipe'});
-  await page.goto(server.origin+'/'+name+'.html');
- }
+ const name='trace-panel-on-page-'+surface,file=path.join(server.root,name+'.json'),out=path.join(server.root,name+'.html');await writeFile(file,JSON.stringify(spec(surface)));
+ execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),out],{stdio:'pipe'});
+ await page.goto(server.origin+'/'+name+'.html');
  const view=page.locator('#docview');await expect(view.locator('.dv-live-trace').first()).toBeVisible();
  if(before)await before(page);
  if(surface==='explore'){await enterExplore(view);await expect(view.locator('[data-explore-panel="status"] .dv-live-trace')).toBeVisible();}
@@ -81,7 +77,7 @@ const geometry=panel=>panel.evaluate(card=>{
 });
 const frames=page=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))));
 
-for(const surface of ['plain','tile','explore','workbench']){
+for(const surface of ['plain','tile','explore']){
  test(`#1411 ${surface}: the Trace view panel stays on the page beside the diagram and its spans scroll inside it`,async({page,server},info)=>{
   const panel=await open(page,server,surface);
   // The tile grows to its content a frame or two after the trace renders: wait until the panel box holds still.
@@ -122,6 +118,8 @@ test('#1411 follower: a panel after the Status card in its column can be scrolle
 test('#1411 plain: after a page scroll the re-measured cap grows and the panel still ends inside the window',async({page,server})=>{
  const panel=await open(page,server,'plain',async page=>page.evaluate(()=>{const spacer=document.createElement('div');spacer.className='trace-on-page-spacer';spacer.style.height='420px';document.querySelector('#docview .doc-sec').before(spacer);window.scrollTo(0,0);}));
  const settle=async()=>{await expect.poll(async()=>{const a=JSON.stringify((await geometry(panel)).panel);await frames(page);return a===JSON.stringify((await geometry(panel)).panel);},{message:'the panel box has settled'}).toBe(true);return geometry(panel);};
+ // The Load reveals the loaded trace's request line (#1280), which can scroll the page: start this check from the top.
+ await page.evaluate(()=>window.scrollTo(0,0));
  const first=await settle(),h0=first.panel.bottom-first.panel.top;
  expect(first.pageY,'the page starts at the top').toBe(0);expect(first.panel.bottom,'the low card ends inside the window').toBeLessThanOrEqual(first.innerHeight);
  const spacer=await page.locator('.trace-on-page-spacer').boundingBox();await page.mouse.move(spacer.x+spacer.width/2,Math.max(spacer.y+40,first.panel.top-200));await page.mouse.wheel(0,300);

@@ -90,7 +90,7 @@
     }
     function choices(panel) { return screens(panel).map(function (item) { return [item.id, text(item.label) || item.id]; }); }
     function stateScreen(options) {
-      var input = document.createElement('select');input.className = 'fctl';input.setAttribute('aria-label', 'screen');
+      var input = document.createElement('select');input.className = 'fctl';input.setAttribute('aria-label', options.initial ? 'Starting screen' : 'App screen');
       var empty = document.createElement('option');empty.value = '';empty.textContent = 'Choose a screen…';input.appendChild(empty);
       var known = false;
       choices(options.panel).forEach(function (pair) {

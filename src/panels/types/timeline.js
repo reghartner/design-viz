@@ -973,12 +973,12 @@ PanelRegistry.extend('timeline', {
     },
     setupFields: [
       ['span', 'clock'],
-      ['cadence', 'objf', { cols: [{ k: 'every', kind: 'clock', req: true }, { k: 'label' }] }],
+      ['cadence', 'objf', { cols: [{ k: 'every', label: 'Every', kind: 'clock', req: true }, { k: 'label', label: 'Name' }] }],
       [
         'lanes',
         'rows',
         {
-          cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'every', kind: 'clock', req: true }],
+          cols: [{ k: 'id', label: 'Lane ID', req: true }, { k: 'label', label: 'Name' }, { k: 'every', label: 'Every', kind: 'clock', req: true }],
           max: 4,
         },
       ],
@@ -987,10 +987,10 @@ PanelRegistry.extend('timeline', {
         'rows',
         {
           cols: [
-            { k: 'at', kind: 'clock', req: true },
-            { k: 'label' },
-            { k: 'kind', kind: 'enum', options: ['ok', 'alert', 'info'] },
-            { k: 'lane' },
+            { k: 'at', label: 'Time', kind: 'clock', req: true },
+            { k: 'label', label: 'Event label' },
+            { k: 'kind', label: 'Kind', kind: 'enum', options: ['ok', 'alert', 'info'] },
+            { k: 'lane', label: 'Lane' },
           ],
         },
       ],
@@ -1003,7 +1003,8 @@ PanelRegistry.extend('timeline', {
     ],
     fieldMeta: {
       span: { label: 'Timeline span', help: 'A duration such as 6h or 90m.', group: 'Timeline' },
-      cadence: { label: 'Shared cadence', help: 'Used when no per-lane cadences are declared.', group: 'Timeline' },
+      cadence: { label: 'Shared cadence', help: 'Used when no per-lane cadences are declared.', group: 'Timeline',
+        setup: { ignoredWhen: function (panel) { return Array.isArray(panel.lanes) && panel.lanes.length ? 'Lanes set their own cadence. Remove the lanes to use the shared cadence.' : ''; } } },
       lanes: { label: 'Cadence lanes', help: 'Optional independent periodic tracks; declaring lanes replaces the shared cadence.', group: 'Timeline' },
       events: { label: 'Events', setup: { label: 'Reference events', help: 'Markers that are always present on the timeline.' },
         initial: { label: 'Starting events', help: 'Events already present before the first step.' },

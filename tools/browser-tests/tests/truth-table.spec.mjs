@@ -62,7 +62,7 @@ test('desktop truth-table author edits properties, cases and shared icons with e
   await expect(table.locator('[aria-current="true"]')).toContainText('Solar charging');
   await inspectPageElement(page,panel.locator('.ptitle'));
   // Property declarations use the standard editable row controls.
-  const header=guide.getByRole('textbox',{name:'label',exact:true}).first();await header.fill('Supply');await header.press('Tab');
+  const header=guide.getByRole('textbox',{name:'Header',exact:true}).first();await header.fill('Supply');await header.press('Tab');
   await expect.poll(async()=>(await declaration()).columns[0].label).toBe('Supply');
   await expect(table.locator('thead')).toContainText('Supply');
   const changedHeader=await source.inputValue();await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);

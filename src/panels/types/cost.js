@@ -309,21 +309,21 @@ PanelRegistry.define('cost', {
       initial: {messages:1}
     },
     setupFields: [['density','text'],['currency','text'],['unit','text'],['period','text'],['assumptions','text'],
-      ['routes','rows',{wide:true,max:6,cols:[{k:'id',req:true},{k:'label'},{k:'tradeoff'}]}],
-      ['items','rows',{wide:true,max:24,cols:[{k:'route',req:true},{k:'node'},{k:'label'},
+      ['routes','rows',{wide:true,max:6,cols:[{k:'id',label:'Route ID',req:true},{k:'label',label:'Name'},{k:'tradeoff',label:'Trade-off'}]}],
+      ['items','rows',{wide:true,max:24,cols:[{k:'route',label:'Route ID',req:true},{k:'node',label:'Diagram node'},{k:'label',label:'Component'},
         {k:'perMillion',label:'Cost per 1M units',kind:'num',req:true},{k:'fixed',label:'Fixed cost per period',kind:'num'}]}],['initial','json']],
     patchFields: [['messages','num'],['activeRoute','text'],['note','text']],
     expandPatchFields: function (panel) {
       return [['messages','num'],['activeRoute','enum',panelCollectionItems(panel,'routes',6).map(function (route) { return route.id; })],['note','text']];
     },
     fieldMeta: {
-      density:{label:'Display density',help:'Auto uses compact horizontal bars in panels up to 520 px wide. Compact keeps the small layout at any width; Expanded keeps the tall chart. Three to six entries share one row in wide panels and wrap to two columns below 760 px.'},
-      currency:{label:'Currency',help:'One three-letter code for all entries; default USD. No currency conversion.'},
-      unit:{label:'Workload unit',help:'Display label for the volume and per-million rates; defaults to messages. Use operation with volume 1 for a single-operation breakdown.'},
-      period:{label:'Cost period',help:'Use the same period for workload volume and every fixed charge, e.g. per month.'},
-      assumptions:{label:'Basis & exclusions',help:'Describe workload units, included operations, region, rate date and excluded charges. Label fictional rates.'},
-      routes:{label:'Operations / routes',help:'Declare 1–6 entries with unique ids. One shows a breakdown; exactly two compare baseline first and alternative second. Three to six use equal-width cards on one row in wide panels. Remove an entry’s cost lines when removing it.'},
-      items:{label:'Components & cost lines',help:'List each entry’s components. Route is its id; node optionally links an existing diagram node. Rate is the aggregate cost per million workload units, including all billable operations; explicit zero is free / excluded. Fixed cost defaults to zero.'},
+      density:{setup:{advanced:true},label:'Display density',help:'Auto uses compact horizontal bars in panels up to 520 px wide. Compact keeps the small layout at any width; Expanded keeps the tall chart. Three to six entries share one row in wide panels and wrap to two columns below 760 px.'},
+      currency:{setup:{group:'Units'},label:'Currency',help:'One three-letter code for all entries; default USD. No currency conversion.'},
+      unit:{setup:{group:'Units'},label:'Workload unit',help:'Display label for the volume and per-million rates; defaults to messages. Use operation with volume 1 for a single-operation breakdown.'},
+      period:{setup:{group:'Units'},label:'Cost period',help:'Use the same period for workload volume and every fixed charge, e.g. per month.'},
+      assumptions:{setup:{group:'Notes'},label:'Basis & exclusions',help:'Describe workload units, included operations, region, rate date and excluded charges. Label fictional rates.'},
+      routes:{setup:{group:'Cost model'},label:'Operations / routes',help:'Declare 1–6 entries with unique ids. One shows a breakdown; exactly two compare baseline first and alternative second. Three to six use equal-width cards on one row in wide panels. Remove an entry’s cost lines when removing it.'},
+      items:{setup:{group:'Cost model'},label:'Components & cost lines',help:'List each entry’s components. Route is its id; node optionally links an existing diagram node. Rate is the aggregate cost per million workload units, including all billable operations; explicit zero is free / excluded. Fixed cost defaults to zero.'},
       messages:{label:'Workload volume',help:'Non-negative whole number for the authored period; default 1,000,000. Applies to every entry. For one operation use 1 and enter component amounts as fixed costs.'},
       activeRoute:{label:'Following route',help:'Highlight the route being explained by this step. Does not change any estimate.',nullLabel:'No route highlighted'},
       note:{label:'Explanation'}

@@ -147,7 +147,7 @@ PanelRegistry.extend('leds', {
       leds: { label: 'Indicators' },
     },
     setupFields: [
-      ['leds', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }] }],
+      ['leds', 'rows', { cols: [{ k: 'id', label: 'Indicator ID', req: true }, { k: 'label', label: 'Name' }] }],
       ['initial', 'json'],
     ],
     patchFields: [],

@@ -23,6 +23,7 @@ function sectionLayoutVisibilityControl(doc,d,items,name,onChange,listen,content
   }
   return group;
 }
+var ARRANGE_HANDLES='.section-tile-move,.section-tile-resize,.section-tile-edge,.section-controls-resize,.section-controls-edge';
 function createSectionArrangementDisclosureState(){
   var collapsed=false;
   return {
@@ -364,7 +365,7 @@ function initSectionLayoutEditor(opts){
           return ok;
         }
       });
-      section.querySelectorAll('.section-controls-resize').forEach(function(handle){handle.remove();});
+      section.querySelectorAll('.section-controls-resize,.section-controls-edge').forEach(function(handle){handle.remove();});
       if(editing===index){
         fields(section,d);
         if(effectivePresentation(index,definition)!=='explore')section.querySelectorAll('.section-layout-tile').forEach(function(tile){
@@ -372,10 +373,14 @@ function initSectionLayoutEditor(opts){
             var name=tile.getAttribute('data-layout-label');
             var move=el('button','section-tile-move','⠿ '+name);move.type='button';move.setAttribute('aria-label','Move '+name);move.title='Drag to move. Arrow keys move; Shift + arrows resize.';tile.appendChild(move);
             var resize=el('button','section-tile-resize','↘');resize.type='button';resize.setAttribute('aria-label','Resize '+name);resize.title='Drag to resize; arrow keys also resize.';tile.appendChild(resize);
+            // #1376: pointer strips on the other edges and corners; the
+            // bottom-right button keeps the keyboard resize.
+            ['n','e','s','w','nw','ne','sw'].forEach(function(side){var edge=el('div','section-tile-edge');edge.setAttribute('data-edge',side);edge.setAttribute('aria-hidden','true');edge.title='Drag to resize';tile.appendChild(edge);});
           }
           var bar=tile.querySelector('.termbar');
           if(bar && tile.classList.contains('layout-has-attached-controls')){
             var grip=el('button','section-controls-resize','↕');grip.type='button';grip.setAttribute('aria-label','Resize attached step controls');grip.title='Drag vertically, or use Up / Down, to resize controls without shrinking the visualization.';bar.appendChild(grip);
+            var line=el('div','section-controls-edge');line.setAttribute('aria-hidden','true');line.title='Drag to move the line between the visualization and the step controls';bar.appendChild(line);
           }
         });
       }
@@ -393,24 +398,28 @@ function initSectionLayoutEditor(opts){
   });
   life.listen(view,'pointerdown',function(ev){
     if(ev.target.closest('[data-dv-detail-preview]'))return;
-    var handle=ev.target.closest('.section-tile-move,.section-tile-resize,.section-controls-resize');if(!handle || ev.button!==0 || ev.isPrimary===false)return;
+    var handle=ev.target.closest(ARRANGE_HANDLES);if(!handle || ev.button!==0 || ev.isPrimary===false)return;
     // #1375: focus the handle before reading the source. Leaving a changed
     // Inspector field commits that edit and can re-render this section; the
     // gesture then continues on the same handle of the re-rendered tile.
-    if(document.activeElement!==handle){
-      var kind=['section-tile-move','section-tile-resize','section-controls-resize'].find(function(name){return handle.classList.contains(name);}),owner=handle.closest('.section-layout-tile'),key=owner && owner.getAttribute('data-layout-key');
-      handle.focus({preventScroll:true});
+    // #1376: edge strips are pointer-only; their tile's resize button (or the
+    // controls' resize button) takes the focus instead.
+    function focusFor(h){return h.classList.contains('section-tile-edge')?h.closest('.section-layout-tile').querySelector('.section-tile-resize'):h.classList.contains('section-controls-edge')?h.parentNode.querySelector('.section-controls-resize'):h;}
+    var focusTarget=focusFor(handle);
+    if(focusTarget && document.activeElement!==focusTarget){
+      var kind=['section-tile-move','section-tile-resize','section-controls-resize','section-tile-edge','section-controls-edge'].find(function(name){return handle.classList.contains(name);}),side=handle.getAttribute('data-edge'),owner=handle.closest('.section-layout-tile'),key=owner && owner.getAttribute('data-layout-key');
+      focusTarget.focus({preventScroll:true});
       if(!handle.isConnected){
         var hit=document.elementFromPoint(ev.clientX,ev.clientY),next=hit && hit.closest('.'+kind),tile=next && next.closest('.section-layout-tile');
-        if(!next || !view.contains(next) || !tile || tile.getAttribute('data-layout-key')!==key)return;
-        handle=next;handle.focus({preventScroll:true});
+        if(!next || !view.contains(next) || !tile || tile.getAttribute('data-layout-key')!==key || next.getAttribute('data-edge')!==side)return;
+        handle=next;focusTarget=focusFor(handle);if(focusTarget)focusTarget.focus({preventScroll:true});
       }
     }
     var section=handle.closest('.doc-sec'),index=Number(section.getAttribute('data-dv-section'));if(editing!==index||!ready())return;
     var grid=handle.closest('.section-layout-grid');if(getComputedStyle(grid).display!=='grid'){feedback('Use size / position fields on narrow screens, or widen the preview to drag.');return;}
     ev.preventDefault();ev.stopPropagation();cancel();selected=handle.closest('.section-layout-tile').getAttribute('data-layout-key');
     var items=currentItems(index),rect=grid.getBoundingClientRect(),scale=grid.offsetWidth?rect.width/grid.offsetWidth:1;
-    drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),controls:handle.classList.contains('section-controls-resize'),cell:(grid.clientWidth+8)*scale/SECTION_LAYOUT_COLUMNS,row:40*scale,minHeight:grid.style.minHeight};
+    drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),controls:handle.classList.contains('section-controls-resize'),controlsTop:handle.classList.contains('section-controls-edge'),edge:handle.classList.contains('section-tile-edge')?handle.getAttribute('data-edge'):null,cell:(grid.clientWidth+8)*scale/SECTION_LAYOUT_COLUMNS,row:40*scale,minHeight:grid.style.minHeight};
     // Keep the scroll range while moving the bottom tile upward. Otherwise
     // scroll clamping moves the grid origin and feeds back into the next delta.
     grid.style.minHeight=rect.height/scale+'px';
@@ -420,7 +429,8 @@ function initSectionLayoutEditor(opts){
     if(!drag||ev.pointerId!==drag.pointer)return;ev.preventDefault();
     var rect=drag.grid.getBoundingClientRect();
     var dy=(ev.clientY-drag.y+drag.top-rect.top)/drag.row,d=rawDiagram(drag.section);
-    drag.next=drag.controls?sectionLayoutResizeControls(d,drag.items,sectionLayoutControlsRows(d,drag.items)+dy):sectionLayoutGesture(drag.items,drag.key,(ev.clientX-drag.x+drag.left-rect.left)/drag.cell,dy,drag.resize);paint(drag.grid,drag.next);
+    var dx=(ev.clientX-drag.x+drag.left-rect.left)/drag.cell;
+    drag.next=drag.controlsTop?sectionLayoutResizeControlsTop(d,drag.items,dy):drag.controls?sectionLayoutResizeControls(d,drag.items,sectionLayoutControlsRows(d,drag.items)+dy):drag.edge?sectionLayoutEdgeGesture(drag.items,drag.key,dx,dy,drag.edge):sectionLayoutGesture(drag.items,drag.key,dx,dy,drag.resize);paint(drag.grid,drag.next);
   },true);
   life.listen(view,'pointerup',function(ev){
     if(!drag||ev.pointerId!==drag.pointer)return;ev.preventDefault();ev.stopPropagation();var finished=drag;cancel();
@@ -448,7 +458,7 @@ function initSectionLayoutEditor(opts){
       var focus=tile && tile.querySelector(controls?'.section-controls-resize':resize?'.section-tile-resize':'.section-tile-move');if(focus)focus.focus({preventScroll:true});
     },0);
   },true);
-  life.listen(view,'click',function(ev){if(!ev.target.closest('[data-dv-detail-preview]') && ev.target.closest('.section-tile-move,.section-tile-resize,.section-controls-resize')){ev.preventDefault();ev.stopPropagation();}},true);
+  life.listen(view,'click',function(ev){if(!ev.target.closest('[data-dv-detail-preview]') && ev.target.closest(ARRANGE_HANDLES)){ev.preventDefault();ev.stopPropagation();}},true);
   life.listen(document,'keydown',function(ev){if(drag&&ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();}},true);
   life.listen(window,'blur',cancel);life.listen(window,'resize',cancel);life.listen(opts.src,'input',function(){cancel();endEditing();view.querySelectorAll('.section-arranger:popover-open').forEach(function(actions){actions.hidePopover();});view.querySelectorAll('.section-arranging').forEach(function(section){section.classList.remove('section-arranging');});});
   var query=new URLSearchParams(window.location.search).get('layout');if(['backstage','confluence'].indexOf(query)>=0){target.value=query;profile=query;}
@@ -460,7 +470,7 @@ function initSectionLayoutEditor(opts){
     beforeReplace:life.guard(function(request){cancel();if(!request || ['edit','history','arrangement-preview'].indexOf(request.origin)<0)endEditing();clearSections();}),
     destroy:function(){if(!life.alive())return;cancel();life.destroy();endEditing();
       var ctl=opts.ctl && opts.ctl();if(ctl)ctl.sections.forEach(function(rec){var p=rec.presentation || rec.viewport;if(p && p.setArranging)p.setArranging(false);var clear=p && (p.setExploreAuthor || p.setAuthor);if(clear)clear.call(p,null);});
-      view.querySelectorAll('.section-arranger,.section-view-settings,.section-tile-move,.section-tile-resize,.section-controls-resize').forEach(function(node){node.remove();});
+      view.querySelectorAll('.section-arranger,.section-view-settings,.section-tile-move,.section-tile-resize,.section-tile-edge,.section-controls-resize,.section-controls-edge').forEach(function(node){node.remove();});
       view.querySelectorAll('.section-arranging,.layout-selected').forEach(function(node){node.classList.remove('section-arranging','layout-selected');});
       view.style.removeProperty('--home-max-height');
       if(stage.parentNode)stage.parentNode.insertBefore(view,stage);toolbar.remove();stage.remove();

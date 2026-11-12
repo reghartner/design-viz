@@ -1169,11 +1169,24 @@ body.sk-aurora.sk-blueprint{
 .section-tile-move,.section-tile-resize{display:none;position:absolute;z-index:4;touch-action:none;user-select:none;background:var(--card);color:var(--ink);border:1px solid var(--line);font:12px 'IBM Plex Sans',sans-serif;cursor:grab;}
 .section-arranging .section-tile-move{display:block;top:0;left:0;right:0;height:28px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .section-arranging .section-tile-resize{display:block;right:1px;bottom:1px;width:32px;height:32px;cursor:nwse-resize;border-radius:6px 0 0 0;}
+/* #1376: tile edge strips straddle the 8px grid gap (4px out, 4px in); corner
+   squares are 14px. The bottom-right is the resize button. */
+.section-tile-edge,.section-controls-edge{display:none;position:absolute;z-index:5;touch-action:none;}
+.section-arranging .section-tile-edge,.section-arranging .section-controls-edge{display:block;}
+.section-tile-edge[data-edge="n"]{top:-4px;left:10px;right:10px;height:8px;cursor:ns-resize;}
+.section-tile-edge[data-edge="s"]{bottom:-4px;left:10px;right:33px;height:8px;cursor:ns-resize;}
+.section-tile-edge[data-edge="e"]{right:-4px;top:10px;bottom:33px;width:8px;cursor:ew-resize;}
+.section-tile-edge[data-edge="w"]{left:-4px;top:10px;bottom:10px;width:8px;cursor:ew-resize;}
+.section-tile-edge[data-edge="nw"]{top:-4px;left:-4px;width:14px;height:14px;cursor:nwse-resize;}
+.section-tile-edge[data-edge="ne"]{top:-4px;right:-4px;width:14px;height:14px;cursor:nesw-resize;}
+.section-tile-edge[data-edge="sw"]{bottom:-4px;left:-4px;width:14px;height:14px;cursor:nesw-resize;}
+.section-controls-edge{top:-4px;left:10px;right:10px;height:8px;cursor:ns-resize;}
+.section-tile-edge:hover,.section-controls-edge:hover,.layout-dragging .section-tile-edge:active,.layout-dragging .section-controls-edge:active{background:color-mix(in srgb,var(--acc) 35%,transparent);}
 .section-controls-resize{display:none;}
 .section-arranging .section-controls-resize{display:block;position:absolute;bottom:2px;right:38px;width:32px;height:24px;z-index:4;touch-action:none;user-select:none;cursor:ns-resize;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:5px;}
 .layout-dragging{user-select:none;overflow-anchor:none;}
 .layout-dragging .section-layout-tile{transition:none;}
-@media print{.section-arranger,.section-tile-move,.section-tile-resize,.section-controls-resize,.layout-preview-tools{display:none !important;}}
+@media print{.section-arranger,.section-tile-move,.section-tile-resize,.section-tile-edge,.section-controls-resize,.section-controls-edge,.layout-preview-tools{display:none !important;}}
 /* Panel library: a desktop gallery with frozen, actual widget renders. */
 .panel-picker{box-sizing:border-box;width:min(1230px,calc(100vw - 64px));height:min(850px,calc(100dvh - 64px));max-width:none;max-height:none;margin:auto;padding:0;border:1px solid #dcdcea;border-radius:20px;background:#f8f9fc;color:#30394f;box-shadow:0 28px 100px #1413263d;font:14px/1.5 'IBM Plex Sans',sans-serif;overflow:hidden;}
 .panel-picker[open]{display:flex;flex-direction:column;}

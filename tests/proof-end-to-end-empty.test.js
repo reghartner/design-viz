@@ -106,5 +106,8 @@ test('E8 traffic plus an empty p95 latency is unproven and the board is not "End
   const errorRole=call('api',{lag:{source:'grafana',query:'failures',unit:'errors',role:'error'}});errorRole.proof.lag={max:5};
   assert.equal(judge(errorRole,{rate:{value:1300},errors:{value:0},p95:{value:410},lag:{empty:true}}).carriers.api.verdict,'proven','an empty role:error signal means no errors');
   assert.equal(judge(call('api'),{rate:{value:1300},errors:{value:0},p95:{value:410}}).carriers.api.verdict,'proven','control: a real p95 within its limit');
+  const gauge={id:'q',tickets:[],kind:'queue',signals:{rate:{source:'grafana',query:'in',unit:'msg/h'},depth:{source:'grafana',query:'depth',unit:'msgs'}},proof:{rate:{min:10}}};
+  const display=judge(gauge,{rate:{value:100},depth:{empty:true}});
+  assert.equal(display.carriers.q.verdict,'proven','rate 100 (min 10) + an empty gauge with no limit: the gauge does not affect Proof');assert.equal(display.endToEnd.headline,'End to end proven');
   assert.deepEqual(judge(call('api'),{rate:{value:1300},errors:{value:0},p95:{empty:true}},null),judge(call('api'),{rate:{value:1300},errors:{value:0}},null),'flag off: an empty p95 is the same as an absent one');
 });

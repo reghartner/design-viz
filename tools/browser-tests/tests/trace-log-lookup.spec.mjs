@@ -60,7 +60,7 @@ test('desktop authored log lookup lists the newest matching lines and loads the 
  expect(h.calls).toEqual([{server:'Grafana',tool:'query_loki_logs',args:{datasourceUid:'loki-stg',logql:'{env="stg"} |= "Handling camera stats message" | cameraModel="arch"',startRfc3339:'now-2h',endRfc3339:'now',limit:10,direction:'backward',queryType:'range'}}]);
  // #1252: local time with seconds, like the trace card; UTC in the title.
  const shownTime=await page.evaluate(()=>{const d=new Date('2026-11-07T09:42:13.123Z');return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});});
- await expect(lines.nth(0).locator('.dv-trace-log-time')).toContainText(shownTime);await expect(lines.nth(0).locator('.dv-trace-log-time')).toHaveAttribute('title','2026-11-07 09:42:13 UTC');await expect(lines.nth(0).locator('.dv-trace-log-value')).toHaveText('arch');await expect(lines.nth(0).locator('.dv-trace-log-id')).toHaveText(ID);
+ await expect(lines.nth(0).locator('.dv-trace-log-time')).toContainText(shownTime);await expect(lines.nth(0).locator('.dv-trace-log-time')).toHaveAttribute('title','2026-11-07 09:42:13 UTC');await expect(lines.nth(0).locator('.dv-trace-log-value')).toHaveText('Handling camera stats message');await expect(lines.nth(0).locator('.dv-trace-log-value')).toHaveAttribute('title','Handling camera stats message\nCamera model: arch');await expect(lines.nth(0).locator('.dv-trace-log-id')).toHaveText(ID);
  await expect(lines.nth(1)).toContainText('This log line has no trace_id');await expect(lines.nth(1).getByRole('button')).toHaveCount(0);
  await info.attach('log-lookup-results',{body:await h.root.screenshot(),contentType:'image/png'});
  // #1145 (D9): the load searches back to the line's time − 1 h.
@@ -225,6 +225,28 @@ test('desktop "Only lines with a trace ID": checked by default; unchecked Find s
  await find.click();await expect(rows).toHaveCount(1);await expect(rows.nth(0).locator('.dv-trace-log-id')).toHaveText(ID);
  expect(h.calls.map(c=>c.args.logql)).toEqual([query,query+'\n| trace_id =~ "[0-9a-fA-F]{16,32}"']);
  await info.attach('log-lookup-traced-only',{body:await h.root.screenshot(),contentType:'image/png'});
+});
+
+/* #1415: A a $value search lists each formatted log line, not the typed value (in the tooltip now); B a search with
+   requireTraceId false starts with "Only lines with a trace ID" unchecked, so its first Find lists lines without a trace ID. */
+test('desktop #1415 a device search lists the formatted line texts and, with requireTraceId false, its lines without a trace ID on the first Find',async({page,server},info)=>{
+ const DEVICE='{env="$env"} | deviceId="$value" | regexp "^(?P<who>[AB])" | line_format "{{.who}} {{__line__}}"';
+ const lines={data:[
+  {timestamp:'1794044533123456789',line:'A sent request',labels:{env:'stg'},structuredMetadata:{deviceId:'cam-1',trace_id:ID,span_id:SPAN}},
+  {timestamp:'1794044000000000000',line:'B reported: low battery',labels:{env:'stg'},structuredMetadata:{deviceId:'cam-1'}}
+ ],metadata:{linesReturned:2,maxLinesAllowed:10,resultsTruncated:false}};
+ const h=await open(page,server,{lines,lookups:{camera:{label:'Camera model',query:QUERY},device:{label:'Device ID',query:DEVICE,requireTraceId:false}}});
+ const traced=h.logs.getByRole('checkbox',{name:'Only lines with a trace ID',exact:true});await expect(traced).toBeChecked();
+ await h.logs.getByRole('combobox',{name:'Log search',exact:true}).selectOption('device');await expect(traced,'this search starts unchecked').not.toBeChecked();
+ await h.logs.getByLabel('Device ID',{exact:true}).fill('cam-1');await h.logs.getByRole('button',{name:'Find log lines for Device ID',exact:true}).click();
+ const rows=h.logs.locator('.dv-trace-log-row');await expect(rows).toHaveCount(2);
+ expect(h.calls.map(c=>c.args.logql)).toEqual(['{env="stg"} | deviceId="cam-1" | regexp "^(?P<who>[AB])" | line_format "{{.who}} {{__line__}}"']);
+ await expect(rows.locator('.dv-trace-log-value')).toHaveText(['A sent request','B reported: low battery']);
+ await expect(rows.nth(0).locator('.dv-trace-log-value')).toHaveAttribute('title','A sent request\nDevice ID: cam-1');
+ await expect(rows.nth(1)).toContainText('This log line has no trace_id');await expect(rows.nth(0).getByRole('button',{name:'Load trace '+ID,exact:true})).toBeVisible();
+ await info.attach('log-lookup-line-text',{body:await h.root.screenshot(),contentType:'image/png'});
+ // The other search keeps the default.
+ await h.logs.getByRole('combobox',{name:'Log search',exact:true}).selectOption('camera');await expect(traced).toBeChecked();
 });
 
 test('desktop Over time Find searches the selected day: today to now, then the whole previous day',async({page,server},info)=>{

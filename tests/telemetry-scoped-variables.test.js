@@ -391,10 +391,20 @@ test('V19 a bare value is a number or a duration except in a named list of token
     assert.equal(scopedRun({sql:q},{code:'a_b'}).error,unsafe('code',PATTERN),q);
 });
 
-test('V20 #1360: a refused narrowing or scoped variable names the other way out; an unmet needsNarrow does not',()=>{
+test('V20 #1360: the copy route is named where copying helps: placement, Honeycomb OR, a malformed narrowing without needsNarrow, a refused variable',()=>{
+  const COPY=' Copy the provider\'s query and edit it.',COPY_PIN=' Copy the provider\'s query and edit it, keeping a narrowing that pins what the provider requires.',CHANGE=' Change the narrowing, or copy the provider\'s query and edit it.';
   assert.equal(scopedRun({loki:LOKI},{code:'a b"'}).error,'Variable ${code} from this import or carrier cannot be filled in safely here (a telemetry variable may hold only letters, digits and _ . @ : - (and spaces inside a string)), so the signal is not shown. Use another value, or copy the provider\'s query and edit it.');
-  const p=provider({loki:'sum(count_over_time({app="dcf"}[5m]))',needsNarrow:['code']});
-  const run=fragment=>{const c=consumer([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{extends:true,signals:{sent:{narrow:{loki:fragment}}}}}}}]);return sent(c,[p,c],'fc::dcf');};
-  assert.equal(run('| code="A" | drop code').error,'A LogQL narrowing of this signal is not valid (one stage per entry: this one has a second "|"), so it is not shown. Change the narrowing, or copy the provider\'s query and edit it.');
-  assert.equal(run('| other="A"').error,'The provider asks each board to narrow this signal by code, and nothing narrows it here, so it is not shown.','copying cannot meet needsNarrow, so no hint');
+  const narrowed=(signal,narrow)=>{const p=provider(signal);const c=consumer([{spec:'provider',export:'core',as:'fc',nodeTracking:{dcf:{telemetry:{extends:true,signals:{sent:{narrow}}}}}}]);return sent(c,[p,c],'fc::dcf').error;};
+  // placement: the provider's query cannot take the fragment.
+  assert.equal(narrowed({loki:'sum(count_over_time({app="dcf"} | drop code [5m]))'},{loki:'| code="A"'}),'This LogQL query changes its labels with drop, keep or label_format, so a label filter cannot be added safely; it is not shown.'+COPY);
+  assert.equal(narrowed({cloudwatchLogs:{logGroups:['g'],query:'fields a | limit 5 | stats count() as n',region:'us-east-1',valueField:'n'}},{cloudwatchLogs:'filter code = "A"'}),'This Logs Insights query has a limit command before its stats, so a filter cannot be added safely; it is not shown.'+COPY);
+  assert.equal(narrowed({loki:'sum(count_over_time({app="dcf"} | drop code [5m]))',needsNarrow:['code']},{loki:'| code="A"'}),'This LogQL query changes its labels with drop, keep or label_format, so a label filter cannot be added safely; it is not shown.'+COPY_PIN,'with needsNarrow the copy keeps a pinning narrowing');
+  // Honeycomb OR.
+  assert.equal(narrowed({honeycomb:{calculations:[{op:'COUNT'}],filter_combination:'OR',filters:[{column:'a',op:'=',value:'1'}]}},{honeycomb:{filters:[{column:'code',op:'=',value:'A'}]}}),'This Honeycomb query combines its filters with OR, so a filter cannot be added safely; it is not shown.'+COPY);
+  // shape: a malformed narrowing; the copy route only without needsNarrow.
+  const bad='A LogQL narrowing of this signal is not valid (one stage per entry: this one has a second "|"), so it is not shown.';
+  assert.equal(narrowed({loki:'sum(count_over_time({app="dcf"}[5m]))'},{loki:'| code="A" | drop code'}),bad+CHANGE);
+  assert.equal(narrowed({loki:'sum(count_over_time({app="dcf"}[5m]))',needsNarrow:['code']},{loki:'| code="A" | drop code'}),bad,'with needsNarrow a copy needs a valid narrowing too');
+  // unmet needsNarrow: no hint.
+  assert.equal(narrowed({loki:'sum(count_over_time({app="dcf"}[5m]))',needsNarrow:['code']},{loki:'| other="A"'}),'The provider asks each board to narrow this signal by code, and nothing narrows it here, so it is not shown.','copying cannot meet needsNarrow, so no hint');
 });

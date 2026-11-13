@@ -776,11 +776,12 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .trace-match-editor .fnote{margin:0;line-height:1.45;overflow-wrap:anywhere;}
 .trace-match-editor .trace-match-warning{margin:0 0 2px 96px;padding-left:6px;border-left:3px solid #D99A1E;color:var(--ink);}
 .trace-match-editor .trace-match-attr-type{flex:0 0 92px;width:auto;}
-/* #1413: the New attribute row of the trace forms is two rows of two (name and value, then how it
-   matches and Add), so the name field stays wide enough to type in beside the longer match choices;
-   squeezed into one row it was about 25px, mostly its datalist button. */
-.rowline.trace-attr-add{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px;}
+/* #1413: the New attribute row of the trace forms stacks: the name on its own line, then the value,
+   then how it matches beside Add. Squeezed into one row the name was about 25px, mostly its datalist
+   button; two to a row it was 90px, still too narrow for names like deployment.environment.name. */
+.rowline.trace-attr-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px;}
 .rowline.trace-attr-add>.fctl{width:100%;min-width:0;box-sizing:border-box;}
+.rowline.trace-attr-add>input.fctl,.rowline.trace-attr-add>.trace-attr-full{grid-column:1/-1;}
 .rowline.trace-attr-add>[hidden]{display:none;}
 .trace-match-editor .bbtn{min-height:24px;}
 .trace-match-editor .rowx{min-width:24px;}

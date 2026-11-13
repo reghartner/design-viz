@@ -2004,7 +2004,7 @@ function traceMatchEditor(val,ctx,t){
       var newName=named(document.createElement('input'),lead+'new attribute name','A supported span attribute, such as deployment.environment.name.');
       newName.type='text';newName.className='fctl';newName.placeholder='new attribute';if(attributeNames.length)newName.setAttribute('list',attrListId);draft(newName,draftKey+'name');
       var newValue=named(document.createElement('input'),lead+'new attribute value');newValue.type='text';newValue.className='fctl';newValue.placeholder='value';draft(newValue,draftKey+'value');
-      var newBool=booleanSelect(true,lead+'new attribute true/false value');
+      var newBool=booleanSelect(true,lead+'new attribute true/false value');newBool.classList.add('trace-attr-full');
       var newType=typeSelect(TRACE_MATCH_DRAFTS.get(draftKey+'type') || 'string',lead+'new attribute match');
       // A true/false value is chosen from a list; the text box shows for text and numbers.
       function showValue(){var bool=newType.value==='boolean';newValue.hidden=bool;newBool.hidden=!bool;}

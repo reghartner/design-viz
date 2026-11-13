@@ -23,8 +23,9 @@ test('A1 desktop: a starts-with attribute on an imported connection\'s span is s
   if(!await fold.evaluate(el=>el.open))await fold.locator(':scope > summary').click();
   const before=await source.inputValue();
   /* Runs 142af956 and 85a672c4 lost the typed name: the New attribute row was one squeezed row, and the name field
-     was about 25px wide, mostly its datalist button, so the click did not leave a place to type. The row is now
-     two rows of two (#1413), and the name field must be wide enough to type in. Type once, after it is ready. */
+     was about 25px wide, mostly its datalist button, so the click did not leave a place to type. The name and the
+     value now each take a full line (#1413; two to a row was 90px), and both must be wide enough to type in. Type
+     once, after they are ready. */
   const name=fold.getByLabel('send new attribute name',{exact:true}),value=fold.getByLabel('send new attribute value',{exact:true});
   await expect(name).toBeEnabled();await expect(value).toBeEnabled();
   for(const field of [name,value])expect((await field.boundingBox()).width,'the New attribute fields are wide enough to type in').toBeGreaterThan(100);

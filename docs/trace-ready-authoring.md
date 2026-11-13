@@ -61,19 +61,18 @@ The Trace view shows a span's exact service and operation ([details](live-status
 }
 ```
 
-Copy exact, case-sensitive values from evidence. Attribute value types must also
-match (a number is not a string). `parentStepId` names another authored step on
+Copy exact, case-sensitive values (a number is not a string), or use a text
+[operator](provider-traces.md#attribute-operators). `parentStepId` names another authored step on
 the same path whose matched span is an ancestor or reachable same-trace link;
 it is not a raw parent span ID. That parent must map uniquely. Optional
-`namespace` matches `service.namespace`. Only operational attributes retained by
-the [normalizer](canon.md) can disambiguate: `service.namespace`,
+`namespace` matches `service.namespace`. Only operational attributes the
+[normalizer](canon.md) keeps disambiguate: `service.namespace`,
 `service.version`, `deployment.environment.name` / `deployment.environment`,
 `http.response.status_code` / `http.status_code`, `db.system` / `db.system.name`,
 `messaging.queue.depth` / `queue.depth`, `messaging.message.age_ms`,
 `flow.backpressure`, `flow.delivery_failed`, `retry.attempt`, and `flow.step.id`.
 Other tags, payload fields and request IDs are dropped (profiles may keep
-[`allowedAttributes`](provider-traces.md#allowed-match-attributes)); do not write
-selectors against them. Prefer stable instrumentation meaning to timings.
+[`allowedAttributes`](provider-traces.md#allowed-match-attributes)); do not match them. Prefer stable instrumentation meaning to timings.
 
 `occurrence:1` is only for serial, fully timed calls; `repeat:"attempts"` needs
 distinct whole-number `retry.attempt` values and one parent; never combine them. One span

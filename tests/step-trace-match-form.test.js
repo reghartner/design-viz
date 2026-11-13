@@ -267,13 +267,13 @@ test('F7 Inspect keeps every source fixable: occurrence with repeat, string occu
   const attrs=harness(board({serviceName:'a',operation:'b',attributes:{'flow.backpressure':true,'service.version':'1'}})).select(STEP);
   const flag=attrs.control('attribute 1 value');assert.equal(flag.tagName,'SELECT');assert.deepEqual(flag.options.map(o=>o.value),['true','false']);assert.equal(flag.value,'true');
   oneStep(attrs,()=>attrs.set('attribute 1 value','false'));assert.equal(stepOf(attrs.raw).traceMatch.attributes['flow.backpressure'],false);
-  let before=attrs.text;attrs.set('attribute 2 type','boolean');
+  let before=attrs.text;attrs.set('attribute 2 match','boolean');
   assert.equal(attrs.text,before,'a value that is not true/false is never dropped by a type change');
-  assert.equal(attrs.error(),"Value '1' is not true or false; change the value first.");assert.equal(attrs.control('attribute 2 type').value,'string','the type select reverts');
-  attrs.select(STEP);before=attrs.text;attrs.set('attribute 2 type','number');assert.equal(stepOf(attrs.raw).traceMatch.attributes['service.version'],1,'"1" becomes the number 1');
+  assert.equal(attrs.error(),"Value '1' is not true or false; change the value first.");assert.equal(attrs.control('attribute 2 match').value,'string','the type select reverts');
+  attrs.select(STEP);before=attrs.text;attrs.set('attribute 2 match','number');assert.equal(stepOf(attrs.raw).traceMatch.attributes['service.version'],1,'"1" becomes the number 1');
   attrs.select(STEP);before=attrs.text;attrs.set('attribute 2 value','v1');assert.equal(attrs.text,before);assert.match(attrs.error(),/enter a number/);
   attrs.select(STEP);before=attrs.text;attrs.set('attribute 1 name','');assert.equal(attrs.text,before);assert.match(attrs.error(),/needs a name\. To delete flow\.backpressure, use its × button/);
-  attrs.select(STEP);attrs.control('new attribute type').value='boolean';attrs.control('new attribute type').fire('change');
+  attrs.select(STEP);attrs.control('new attribute match').value='boolean';attrs.control('new attribute match').fire('change');
   assert.equal(attrs.control('new attribute value').hidden,true);assert.equal(attrs.control('new attribute true/false value').hidden,false);
   attrs.control('new attribute name').value='flow.delivery_failed';attrs.control('new attribute true/false value').value='false';
   oneStep(attrs,()=>attrs.click('Add attribute'));assert.equal(stepOf(attrs.raw).traceMatch.attributes['flow.delivery_failed'],false);

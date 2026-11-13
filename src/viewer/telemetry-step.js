@@ -56,7 +56,7 @@ function telemetryTraceModel(diagram,pathId,exemplar){
     // a span with that service and operation is in this trace: an alternative after the
     // matched one is not tried; one before it was rejected (ambiguous, parent, occurrence).
     var others=Array.isArray(step.traceMatch)?step.traceMatch.filter(function(a,i){return a && i!==match.alternative;}).map(function(a){
-      return {name:a.serviceName+' '+a.operation,seen:normalized.spans.some(function(s){return s.serviceName===a.serviceName && s.operation===a.operation && (!a.namespace || s.attributes['service.namespace']===a.namespace) && Object.keys(a.attributes || {}).every(function(k){return s.attributes[k]===a.attributes[k];});})};
+      return {name:a.serviceName+' '+a.operation,seen:normalized.spans.some(function(s){return s.serviceName===a.serviceName && s.operation===a.operation && (!a.namespace || s.attributes['service.namespace']===a.namespace) && traceAttributesMatch(s.attributes,a.attributes);})};
     }):[];
     var row={id:match.stepId,nodeId:match.nodeId,edgeIndex:exact.length===1?diagram.edges.indexOf(exact[0]):null,status:match.status,tone:tone,duration:duration,budget:selector.maxDurationMs,label:label,operation:selector.operation || step.text || step.id,service:selector.serviceName,alternative:match.alternative,optional:!!match.optional,notThisFlow:!!match.notThisFlow,inherited:!!match.inherited,hint:match.hint || null,readerHint:match.shared?telemetryTraceReaderHint(diagram,step,match.shared):null,otherAlternatives:others,detail:match.detail,conditions:match.conditions,spanIds:match.spans.map(function(s){return s.id;}),
       intervals:match.spans.map(function(s){return {id:s.id,startMs:s.startMs,durationMs:s.durationMs};})};rows.push(row);

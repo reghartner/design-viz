@@ -217,10 +217,10 @@ test('E8 E9 a receiver without process spans says so and still offers a receive 
   assert.equal(ui.control('New span name').value,'receive');assert.equal(ui.control('New span role').value,'receive');
   // Attribute types: a number value is stored as a number.
   ui.select(NODE);addSpan(ui,{name:'process',service:'s',value:'v',role:'process'});ui.select(NODE);
-  ui.control('process new attribute name').value='http.response.status_code';ui.control('process new attribute value').value='200';ui.control('process new attribute type').value='number';
+  ui.control('process new attribute name').value='http.response.status_code';ui.control('process new attribute value').value='200';ui.control('process new attribute match').value='number';
   oneStep(ui,()=>ui.click('Add attribute to process'),NODE);
   assert.equal(diagramOf(ui.raw).nodes.worker.trace.spans.process.attributes['http.response.status_code'],200);
-  oneStep(ui,()=>ui.set('process attribute http.response.status_code type','string'),NODE);
+  oneStep(ui,()=>ui.set('process attribute http.response.status_code match','string'),NODE);
   assert.equal(diagramOf(ui.raw).nodes.worker.trace.spans.process.attributes['http.response.status_code'],'200');
 });
 
@@ -254,12 +254,12 @@ test('E10 a span name the provider declares is taken even while hidden here: ren
 
 test('E11 a refused attribute type change says why beside the type it changed',()=>{
   const ui=harness(board()).select(NODE);addSpan(ui,{name:'process',service:'s',value:'v',role:'process'});ui.select(NODE);
-  ui.control('process new attribute name').value='http.response.status_code';ui.control('process new attribute value').value='200';ui.control('process new attribute type').value='number';ui.click('Add attribute to process');
-  const held=ui.text;ui.set('process attribute http.response.status_code type','boolean');
+  ui.control('process new attribute name').value='http.response.status_code';ui.control('process new attribute value').value='200';ui.control('process new attribute match').value='number';ui.click('Add attribute to process');
+  const held=ui.text;ui.set('process attribute http.response.status_code match','boolean');
   assert.equal(ui.text,held,'nothing written');
-  assert.match(ui.beside('process attribute http.response.status_code type'),/true or false/,'the message sits beside the type select');
+  assert.match(ui.beside('process attribute http.response.status_code match'),/true or false/,'the message sits beside the type select');
   assert.equal(ui.beside('process new attribute name'),'','not beside the new attribute name');
-  assert.equal(ui.control('process attribute http.response.status_code type').value,'number','the select goes back to the stored type');
+  assert.equal(ui.control('process attribute http.response.status_code match').value,'number','the select goes back to the stored type');
 });
 
 test('E12 note slots stay in the page; each refusal clears its note and sets it again, so a repeated refusal is announced',()=>{
@@ -311,4 +311,24 @@ test('E15 the new span role survives a re-render; hiding a changed inherited spa
   assert.doesNotMatch(c.control('process hidden for this document').title,/drops/);
   c.set('process value','process orders v2');c.select(INODE);
   assert.match(c.control('process hidden for this document').title,/Hiding drops your changes to this span; Undo brings them back\.$/);
+});
+
+/* #1413 (local run 142af956): a second Inspect rebuild for the same connection cleared New attribute text the
+   author had typed. A rebuild for the same carrier keeps it, however the selection is re-published (the edge by
+   index, again with its key, after the Inspector is retired); another carrier clears it. */
+test('E12 a rebuild for the same carrier keeps unsaved New attribute text; another carrier clears it',()=>{
+  const source=board();source.page.sections[0].diagram.edges[0].trace={spans:{send:{serviceName:'api',operation:'POST',role:'send'}}};
+  const ui=harness(source).select(EDGE);
+  const type=(name,value)=>{const el=ui.control(name);el.value=value;el.fire('input');};
+  type('send new attribute name','deployment.environment.name');type('send new attribute value','prd');
+  const kept=label=>{assert.equal(ui.control('send new attribute name').value,'deployment.environment.name',label);assert.equal(ui.control('send new attribute value').value,'prd',label);};
+  ui.select(EDGE);kept('the same selection rebuilt');
+  ui.select({kind:'edge',section:0,index:0,id:'api->worker'});kept('the same connection published with its key');
+  ui.h.inspector.retire();ui.select(EDGE);kept('after the Inspector was retired and rebuilt');
+  ui.select(NODE);ui.select(EDGE);
+  assert.equal(ui.control('send new attribute name').value,'','another carrier in between clears it');
+  // Review c3: another project with the same section and connection does not inherit the text.
+  type('send new attribute name','deployment.environment.name');
+  ui.h.session.replaceProject(JSON.stringify(source,null,2),null,{});ui.select(EDGE);
+  assert.equal(ui.control('send new attribute name').value,'','another project (same section and from->to) starts empty');
 });

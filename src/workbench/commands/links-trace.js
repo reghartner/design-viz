@@ -48,7 +48,7 @@ function linksTraceDeclKey(m){
   if(typeof m.operation==='string')return svc+' · '+m.operation;
   if(typeof m.operationPrefix==='string')return svc+' · '+m.operationPrefix+'… (prefix)';
   var attrs=m.attributes && typeof m.attributes==='object'?m.attributes:{};
-  return svc+' · where '+Object.keys(attrs).map(function(k){return k+'='+String(attrs[k]);}).join(', ');
+  return svc+' · where '+Object.keys(attrs).map(function(k){return traceAttributeLabel(k,attrs[k]);}).join(', ');
 }
 function linksTraceModel(text,raw,context){
   var resolved;try{resolved=linksResolve(raw,context);}catch(ex){return {error:ex.message};}

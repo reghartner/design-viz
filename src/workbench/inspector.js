@@ -36,6 +36,15 @@ function createBuilderInspector(opts){
   function hideDiff(){opts.surface.hideDiff();}
   function clipboard(){return disposed?null:opts.clipboard.current();}
   function clipboardToolbar(){return !!(opts.clipboard.toolbar && opts.clipboard.toolbar());}
+  var TRACE_SPAN_DRAFT_OWNER=null;
+  // The carrier a selection names in this project, independent of how it was published: a connection by its from->to key.
+  function traceSpanDraftOwner(){
+    var t=session.target;if(!t)return null;var project=session.snapshot().project;
+    if(t.kind!=='edge')return JSON.stringify([project,t.kind,t.section,t.id,t.kind==='node'?null:t.index]);
+    var key=null;
+    try{var snap=session.snapshot(),raw=snap.error?null:session.resolve?session.resolve(snap.raw):snap.raw,rec=raw && specSectionPaths(raw)[t.section],d=rec && specValueAt(raw,rec.diagram),e=d && Array.isArray(d.edges)?d.edges[t.index]:null;if(e)key=e.from+'->'+e.to;}catch(ex){key=null;}
+    return JSON.stringify([project,'edge',t.section,key || t.index]);
+  }
   function targetIdentity(){
     var t=session.target;
     return t?JSON.stringify([session.snapshot().project,t.kind,t.section,t.id,t.index,t.bulletPath,t.card,t.block,t.tab,t.pathId,t.layoutId]):null;
@@ -52,11 +61,16 @@ function createBuilderInspector(opts){
     // rendering anything else first drops it, so a later ordinary click opens nothing.
     if(REVEAL_TRACE_SPANS && REVEAL_TRACE_SPANS!==revealKey(session.target))REVEAL_TRACE_SPANS=null;
     if(!same){
-      OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_SPAN_DRAFTS.clear();TRACE_SCOPE_VIEW.clear();TRACE_MATCH_REVEALED.clear();
+      OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();TRACE_MATCH_DRAFTS.clear();TRACE_SCOPE_VIEW.clear();TRACE_MATCH_REVEALED.clear();
       OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;BOARD_READY_TEXT=null;FORM_NOTICE=null;
       LOG_SEARCH_DRAFTS.clear();TRACE_CONNECTION_DRAFTS.clear();JIRA_DRAFTS.clear();
     }
     if(!same)METRICS_DRAFTS.clear();
+    /* #1413 (local run 142af956): a rebuild for the same node or connection keeps unsaved Trace spans text
+       (New span, New attribute), also when the selection is re-published in another form (an edge by index,
+       then with its key) or after the Inspector was retired and rebuilt. Only another carrier clears it. */
+    var spanOwner=traceSpanDraftOwner();
+    if(spanOwner!==TRACE_SPAN_DRAFT_OWNER){TRACE_SPAN_DRAFTS.clear();TRACE_SPAN_DRAFT_OWNER=spanOwner;}
     retireForm();
     inspectorScrollKey=identity;invalidateEffectiveState=null;
     revealInspector();guide.hidden=false;guide.innerHTML='';
@@ -1017,20 +1031,21 @@ function traceSpansControls(){
       // Attributes: one row per key and an add row.
       var attrs=span.attributes && typeof span.attributes==='object'?span.attributes:{},box=document.createElement('div');box.className='rowsedit trace-span-attributes';
       box.setAttribute('role','group');box.setAttribute('aria-label',key+' attributes');
-      var TYPES=[['string','Text'],['number','Number'],['boolean','True/false']];
+      // #1413: the type select also offers the operators (Starts with, Ends with, Contains, Is one of).
+      var TYPES=TRACE_ATTRIBUTE_KINDS;
       Object.keys(attrs).forEach(function(a){
-        var line=el('div','rowline','',box),label=el('span','fnote',a+' = '+String(attrs[a]),line);label.setAttribute('aria-hidden','true');
-        var type=typeof attrs[a],types=select(TYPES,type,key+' attribute '+a+' type');types.title='Value type. Honeycomb table cells are text; Tempo keeps numbers and true/false.';line.appendChild(types);
-        listen(types,'change',function(){if(commit({op:'attribute',name:key,key:a,attrName:a,value:String(attrs[a]),type:types.value},{any:types})===false)types.value=type;});
+        var line=el('div','rowline','',box),label=el('span','fnote',traceAttributeLabel(a,attrs[a]),line);label.setAttribute('aria-hidden','true');
+        var type=traceAttributeKind(attrs[a]),types=select(TYPES,type,key+' attribute '+a+' match');types.title='How the value matches: exactly (text, number or true/false), or Starts with, Ends with, Contains or Is one of (values separated by commas). Honeycomb table cells are text.';line.appendChild(types);
+        listen(types,'change',function(){if(commit({op:'attribute',name:key,key:a,attrName:a,value:traceAttributeText(attrs[a]),type:types.value},{any:types})===false)types.value=type;});
         var x=named(actionButton('\u00d7',function(){return commit({op:'attribute',name:key,key:a,attrName:null},{any:addName});},'rowx'),'Remove attribute '+a+' from '+key,'Remove attribute '+a);line.appendChild(x);
         slot(box,types);
       });
-      var addLine=el('div','rowline','',box),draftKey='attr:'+key+':';
+      var addLine=el('div','rowline trace-attr-add','',box),draftKey='attr:'+key+':';
       var addName=named(document.createElement('input'),key+' new attribute name','A supported span attribute, such as db.system.');addName.type='text';addName.className='fctl';addName.placeholder='attribute';
       var addValue=named(document.createElement('input'),key+' new attribute value');addValue.type='text';addValue.className='fctl';addValue.placeholder='value';
       [addName,addValue].forEach(function(input,i){var k=draftKey+i;if(TRACE_SPAN_DRAFTS.has(k))input.value=TRACE_SPAN_DRAFTS.get(k);listen(input,'input',function(){TRACE_SPAN_DRAFTS.set(k,input.value);});input._flowviewHasDraft=function(){return input.value!=='';};addLine.appendChild(input);});
       if(state.allowed && state.allowed.length){var listId=prefix+'-span-attrs';if(!guide.querySelector('#'+listId) && !fold.querySelector('#'+listId)){var dl=el('datalist','',null);dl.id=listId;state.allowed.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});}addName.setAttribute('list',listId);}
-      var addType=select(TYPES,'string',key+' new attribute type');addType.title='Value type. Honeycomb table cells are text; Tempo keeps numbers and true/false.';addLine.appendChild(addType);
+      var addType=select(TYPES,'string',key+' new attribute match');addType.title='How the value matches: exactly (text, number or true/false), or Starts with, Ends with, Contains or Is one of (values separated by commas). Honeycomb table cells are text.';addLine.appendChild(addType);
       function addAttribute(){if(commit({op:'attribute',name:key,key:null,attrName:addName.value,value:addValue.value,type:addType.value},{any:addName,attribute:addName})!==false){TRACE_SPAN_DRAFTS.delete(draftKey+0);TRACE_SPAN_DRAFTS.delete(draftKey+1);}}
       [addName,addValue].forEach(function(input){listen(input,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addAttribute();}});});
       addLine.appendChild(named(actionButton('Add attribute',addAttribute,'rowadd'),'Add attribute to '+key,'Add the attribute typed to the left (Enter also adds it).'));
@@ -1067,8 +1082,9 @@ function traceSpansControls(){
       el('p','fnote trace-span-receiver','Receive side: '+state.receiver.title+'\'s process span'+(procs.length>1?'s':'')+' ('+procs.map(function(p){return p.key+': '+p.span.serviceName+' '+(p.span.operation || p.span.operationPrefix || '');}).join(', ')+'). Declare a receive span here only when the receiving span is a different one.');
       var first=procs[0].span,receiveMode=first.operation!=null?'operation':first.operationPrefix!=null?'operationPrefix':'attributes';
       var declare=actionButton('Declare receive span here',function(){
-        var value=receiveMode==='attributes'?Object.keys(first.attributes || {}).map(function(k){return k+'='+first.attributes[k];})[0]:first[receiveMode];
-        return commit({op:'add',name:keys.indexOf('receive')<0?'receive':'receive2',serviceName:first.serviceName,mode:receiveMode,value:value,role:'receive'},{any:null});
+        var value=receiveMode==='attributes'?null:first[receiveMode];
+        // #1413: attributes (also operator objects) are copied as they are.
+        return commit({op:'add',name:keys.indexOf('receive')<0?'receive':'receive2',serviceName:first.serviceName,mode:receiveMode,value:value,attributes:receiveMode==='attributes'?first.attributes:undefined,role:'receive'},{any:null});
       });declare.title='Adds a receive span on this connection, starting from the receiving node\'s process span; edit it after.';el('div','iacts').appendChild(declare);
     }
     // Add span.
@@ -1810,20 +1826,20 @@ function traceScopeEditor(val,ctx,t,carriers,hasMatch,stepIdInput){
     box.appendChild(frow('Parent step',parent));slot(box,parent);placed.parent.forEach(function(m){parent._scopeNote(m);});
     // Attributes every inherited span must have.
     var attrs=scope.attributes && typeof scope.attributes==='object' && !Array.isArray(scope.attributes)?scope.attributes:{};
-    var TYPES=[['string','Text'],['number','Number'],['boolean','True/false']];
-    function typeSelect(value,label){var s=document.createElement('select');s.className='fctl';TYPES.forEach(function(x){var o=document.createElement('option');o.value=x[0];o.textContent=x[1];s.appendChild(o);});s.value=value;return named(s,label,'Value type. Honeycomb table cells are text; Tempo keeps numbers and true/false.');}
+    var TYPES=TRACE_ATTRIBUTE_KINDS;
+    function typeSelect(value,label){var s=document.createElement('select');s.className='fctl';TYPES.forEach(function(x){var o=document.createElement('option');o.value=x[0];o.textContent=x[1];s.appendChild(o);});s.value=value;return named(s,label,'How the value matches: exactly (text, number or true/false), or Starts with, Ends with, Contains or Is one of (values separated by commas). Honeycomb table cells are text.');}
     var attrBox=el('div','trace-scope-attributes');
     Object.keys(attrs).forEach(function(a){
-      var line=el('div','rowline','',attrBox),label=el('span','fnote',a+' = '+String(attrs[a]),line);label.setAttribute('aria-hidden','true');
-      var type=typeof attrs[a],types=typeSelect(type,'scope attribute '+a+' type');line.appendChild(types);
-      listen(types,'change',function(){if(commit({op:'attribute',key:a,attrName:a,value:String(attrs[a]),type:types.value},{any:types})===false)types.value=type;});
+      var line=el('div','rowline','',attrBox),label=el('span','fnote',traceAttributeLabel(a,attrs[a]),line);label.setAttribute('aria-hidden','true');
+      var type=traceAttributeKind(attrs[a]),types=typeSelect(type,'scope attribute '+a+' match');line.appendChild(types);
+      listen(types,'change',function(){if(commit({op:'attribute',key:a,attrName:a,value:traceAttributeText(attrs[a]),type:types.value},{any:types})===false)types.value=type;});
       line.appendChild(named(actionButton('×',function(){return commit({op:'attribute',key:a,attrName:null},{any:null});},'rowx'),'Remove scope attribute '+a));
       slot(attrBox,types);
     });
-    var addLine=el('div','rowline','',attrBox);
-    var addName=draft(textInput('new scope attribute name','','A supported trace attribute, such as deployment.environment.name.','attribute'),'attr-name'),addValue=draft(textInput('new scope attribute value','','The exact value every inherited span must have.','value'),'attr-value');
+    var addLine=el('div','rowline trace-attr-add','',attrBox);
+    var addName=draft(textInput('new scope attribute name','','A supported trace attribute, such as deployment.environment.name.','attribute'),'attr-name'),addValue=draft(textInput('new scope attribute value','','The value every inherited span must have; the type to the right says how it matches.','value'),'attr-value');
     if(allowed.length){var listId=prefix+'-scope-attrs',dl=el('datalist','',null,attrBox);dl.id=listId;allowed.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o);});addName.setAttribute('list',listId);}
-    var addType=typeSelect('string','new scope attribute type');
+    var addType=typeSelect('string','new scope attribute match');
     addLine.appendChild(addName);addLine.appendChild(addValue);addLine.appendChild(addType);
     function addAttribute(){var ok=commit({op:'attribute',key:null,attrName:addName.value,value:addValue.value,type:addType.value},{attribute:addName,any:addName});if(ok!==false){TRACE_MATCH_DRAFTS.delete(draftKey('attr-name'));TRACE_MATCH_DRAFTS.delete(draftKey('attr-value'));}return ok;}
     [addName,addValue].forEach(function(i){listen(i,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();addAttribute();}});});
@@ -1950,11 +1966,11 @@ function traceMatchEditor(val,ctx,t){
       /* Attributes: one row per key (name, value, type, remove) and an add row. */
       var attrs=traceMatchFormObject(m.attributes)?m.attributes:{},attrBox=document.createElement('div');attrBox.className='rowsedit trace-match-attributes';
       attrBox.setAttribute('role','group');attrBox.setAttribute('aria-label',lead+'attributes');
-      var TYPES=[['string','Text'],['number','Number'],['boolean','True/false']];
+      var TYPES=TRACE_ATTRIBUTE_KINDS;
       function typeSelect(current,label){
         var sel=document.createElement('select');sel.className='fctl trace-match-attr-type';
         TYPES.forEach(function(pair){var o=document.createElement('option');o.value=pair[0];o.textContent=pair[1];sel.appendChild(o);});
-        sel.value=current;return named(sel,label,'Value type. Honeycomb table cells are text.');
+        sel.value=current;return named(sel,label,'How the value matches: exactly (text, number or true/false), or Starts with, Ends with, Contains or Is one of (values separated by commas). Honeycomb table cells are text.');
       }
       function booleanSelect(current,label){
         var sel=document.createElement('select');sel.className='fctl';
@@ -1963,19 +1979,19 @@ function traceMatchEditor(val,ctx,t){
       }
       Object.keys(attrs).forEach(function(key,n){
         var line=document.createElement('div');line.className='rowline trace-match-attr';
-        var type=typeof attrs[key],rowLead=lead+'attribute '+(n+1)+' ';
+        var type=traceAttributeKind(attrs[key]),rowLead=lead+'attribute '+(n+1)+' ';
         var name=named(textControl(key,function(v){
           if(v==null){formError('An attribute needs a name. To delete '+key+', use its × button.');return false;}
-          return commit({op:'attribute',alternative:i,key:key,name:v,value:String(attrs[key]),type:type});
+          return commit({op:'attribute',alternative:i,key:key,name:v,value:traceAttributeText(attrs[key]),type:type});
         },{placeholder:'attribute name',list:attrListId}),rowLead+'name');
         var value;
         if(type==='boolean'){
           value=booleanSelect(attrs[key],rowLead+'value');
           listen(value,'change',function(){if(commit({op:'attribute',alternative:i,key:key,name:key,value:value.value,type:type})===false)value.value=String(attrs[key]);});
-        }else value=named(textControl(String(attrs[key]),function(v){return commit({op:'attribute',alternative:i,key:key,name:key,value:v==null?'':v,type:type});},{placeholder:'value'}),rowLead+'value');
-        var types=typeSelect(type,rowLead+'type');
+        }else value=named(textControl(traceAttributeText(attrs[key]),function(v){return commit({op:'attribute',alternative:i,key:key,name:key,value:v==null?'':v,type:type});},{placeholder:type==='in'?'a, b':'value'}),rowLead+'value');
+        var types=typeSelect(type,rowLead+'match');
         listen(types,'change',function(){
-          var text=String(attrs[key]);
+          var text=traceAttributeText(attrs[key]);
           if(types.value==='boolean' && text!=='true' && text!=='false'){formError('Value \''+text+'\' is not true or false; change the value first.');types.value=type;return;}
           if(commit({op:'attribute',alternative:i,key:key,name:key,value:text,type:types.value})===false)types.value=type;
         });
@@ -1983,13 +1999,13 @@ function traceMatchEditor(val,ctx,t){
         named(remove,'Remove '+lead.toLowerCase()+'attribute '+key,'Remove attribute '+key);
         line.appendChild(name);line.appendChild(value);line.appendChild(types);line.appendChild(remove);attrBox.appendChild(line);
       });
-      var addLine=document.createElement('div');addLine.className='rowline trace-match-attr-add';
+      var addLine=document.createElement('div');addLine.className='rowline trace-match-attr-add trace-attr-add';
       var draftKey='attr:'+i+':';
       var newName=named(document.createElement('input'),lead+'new attribute name','A supported span attribute, such as deployment.environment.name.');
       newName.type='text';newName.className='fctl';newName.placeholder='new attribute';if(attributeNames.length)newName.setAttribute('list',attrListId);draft(newName,draftKey+'name');
       var newValue=named(document.createElement('input'),lead+'new attribute value');newValue.type='text';newValue.className='fctl';newValue.placeholder='value';draft(newValue,draftKey+'value');
-      var newBool=booleanSelect(true,lead+'new attribute true/false value');
-      var newType=typeSelect(TRACE_MATCH_DRAFTS.get(draftKey+'type') || 'string',lead+'new attribute type');
+      var newBool=booleanSelect(true,lead+'new attribute true/false value');newBool.classList.add('trace-attr-full');
+      var newType=typeSelect(TRACE_MATCH_DRAFTS.get(draftKey+'type') || 'string',lead+'new attribute match');
       // A true/false value is chosen from a list; the text box shows for text and numbers.
       function showValue(){var bool=newType.value==='boolean';newValue.hidden=bool;newBool.hidden=!bool;}
       listen(newType,'change',function(){TRACE_MATCH_DRAFTS.set(draftKey+'type',newType.value);showValue();});showValue();

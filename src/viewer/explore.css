@@ -89,7 +89,7 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
 .explore-stage>.explore-window{overflow:visible;}
 .explore-stage>.explore-window>.explore-window-body{position:relative;z-index:3;width:calc((100% - 4px) / var(--explore-overlay-scale,1));border-radius:0 0 calc(11px / var(--explore-overlay-scale,1)) calc(11px / var(--explore-overlay-scale,1));}
 .explore-stage>.explore-window>.explore-window-resize{border-bottom-right-radius:11px;}
-.explore-stage>.explore-window>.explore-window-header{padding-right:8px;position:relative;z-index:3;}
+.explore-stage>.explore-window>.explore-window-header{padding-right:8px;position:relative;z-index:3;border-radius:11px 11px 0 0;}
 .explore-stage>.explore-window>.explore-window-edge[data-edge="n"]{top:-4px;}
 .explore-stage>.explore-window>.explore-window-edge[data-edge="s"]{bottom:-4px;}
 .explore-stage>.explore-window>.explore-window-edge[data-edge="e"]{right:-4px;}

@@ -77,4 +77,8 @@ test('Explore content follows a pointer-resized window in both dimensions',async
  await info.attach('explore-grown',{body:await page.screenshot(),contentType:'image/png'});
  await drag(page,handle,-260,-420);const narrow=await overflow(region);expect(narrow.scrollWidth-narrow.clientWidth).toBeGreaterThan(100);expect(narrow.scrollHeight-narrow.clientHeight).toBeGreaterThan(20);
  await region.evaluate(el=>{el.scrollLeft=el.scrollWidth;el.scrollTop=el.scrollHeight;});await expect(region.locator('tbody tr').last()).toBeInViewport();await win.locator('.pbody').evaluate(el=>{el.scrollTop=el.scrollHeight;});await expect(win.locator('.swnote')).toBeInViewport();
+ // #1376: printed, the window body fills its window exactly (no resize-strip gutters, no overlay scale).
+ await page.emulateMedia({media:'print'});
+ const printed=await win.evaluate(el=>{const body=el.querySelector('.explore-window-body'),w=el.getBoundingClientRect(),b=body.getBoundingClientRect(),style=getComputedStyle(el);return {inner:w.width-parseFloat(style.borderLeftWidth)-parseFloat(style.borderRightWidth),body:b.width,left:b.left-w.left-parseFloat(style.borderLeftWidth)};});
+ expect(Math.abs(printed.body-printed.inner)).toBeLessThanOrEqual(1);expect(Math.abs(printed.left)).toBeLessThanOrEqual(1);
 });

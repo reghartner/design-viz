@@ -980,6 +980,10 @@ function telemetryEditLookups(t,edit,done){
     else if(typeof value!=='string')return {error:'Enter a field name, or clear the field.'};
     else fields[field]=value.trim();
     if(Object.keys(fields).length)entry.fields=fields;else delete entry.fields;
+  }else if(field==='requireTraceId'){
+    // #1415: true is the default (#1158), so it writes no key.
+    if(typeof value!=='boolean')return {error:'Only lines with a trace ID starts checked must be true or false.'};
+    if(value)delete entry.requireTraceId;else entry.requireTraceId=false;
   }else return {error:'Unknown log search setting.'};
   return done();
 }

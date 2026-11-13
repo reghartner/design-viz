@@ -1,8 +1,10 @@
 'use strict';
 // #1197: Honeycomb get_trace returns no span attributes. A Honeycomb trace profile
-// that lists allowedAttributes (and names its dataset) makes one run_query call
-// after get_trace, for the loaded trace ID, and joins the attributes onto spans
-// by span id. The example-trace path applies the same allowed list.
+// that lists allowedAttributes makes one run_query call after get_trace, for the
+// loaded trace ID, and joins the attributes onto spans by span id. With a dataset
+// the query reads that dataset; without one (#1414) it runs environment-wide
+// (environment_wide_query: true) and joins spans of every service. The
+// example-trace path applies the same allowed list.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const {entrypoint}=require('../tools/source-loader.cjs');
 const fixture=require('./fixtures/trace-connection-profile.json');
@@ -12,7 +14,7 @@ const ID='8413cd87a9f15b6bfe8e1acf5b3346d0',X_SPAN='b01a8fd7791f709b',Y_SPAN='3b
 const clone=x=>JSON.parse(JSON.stringify(x)),settle=async()=>{for(let i=0;i<30;i++)await new Promise(setImmediate);};
 // SYNTHETIC run_query raw rows for the trace: the event-type attribute per span id.
 const ATTRIBUTE_ROWS=['# Raw Rows','','| trace.span_id | device.model |','| --- | --- |',`| ${X_SPAN} | X |`,`| ${Y_SPAN} | Y |`,'| dbd662d250034c44 |  |'].join('\n');
-const RUN_QUERY={name:'run_query',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{environment_slug:{type:'string'},dataset_slug:{type:'string'},query_spec:{type:'object'},raw_row_columns:{type:'array',items:{type:'string'}},results_limit:{type:'integer'}},required:['environment_slug','query_spec']}};
+const RUN_QUERY={name:'run_query',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{environment_slug:{type:'string'},dataset_slug:{type:'string'},environment_wide_query:{type:'boolean'},query_spec:{type:'object'},raw_row_columns:{type:'array',items:{type:'string'}},results_limit:{type:'integer'}},required:['environment_slug','query_spec']}};
 const GET_TRACE={name:'get_trace',annotations:{readOnlyHint:true,destructiveHint:false},inputSchema:{type:'object',properties:{trace_id:{type:'string'},from:{type:'string'},environment_slug:{type:'string'},team_slug:{type:'string'},view_mode:{type:'string'}},additionalProperties:false}};
 function context(now,timers){
   class Clock extends Date{static now(){return now===undefined?super.now():Date.parse(now);}}
@@ -143,10 +145,18 @@ test('6. example traces (Honeycomb): a page profile listing the attribute adds o
   const bare=honeycombExampleBridge(),plain=await example(examplePage(wrapper,{company:clone(fixture)}),bare);
   assert.deepEqual(bare.calls.map(c=>c.name),['run_query','get_trace']);
   assert.equal(plain.map.a.exemplars[0].spans.find(x=>x.id===X_SPAN).attributes['device.model'],undefined);
-  // #1205: a listing profile without a dataset cannot fetch attributes, so it adds no call.
+  // #1414: a listing profile without a dataset adds its attributes too (the page dataset narrows the query).
   const noDataset=profile();delete noDataset.dataset;
-  const skipped=honeycombExampleBridge();await example(examplePage(wrapper,{company:noDataset}),skipped);
-  assert.deepEqual(skipped.calls.map(c=>c.name),['run_query','get_trace']);
+  const listedOnly=honeycombExampleBridge();await example(examplePage(wrapper,{company:noDataset}),listedOnly);
+  assert.deepEqual(listedOnly.calls.map(c=>c.name),['run_query','get_trace','run_query']);
+  assert.equal(listedOnly.calls[2].args.dataset_slug,'doorbell');assert.equal(listedOnly.calls[2].args.environment_wide_query,undefined);
+  // #1414: without a page dataset the example trace's attribute query runs environment-wide.
+  const wide=honeycombExampleBridge(),widePage=examplePage(wrapper,{company:noDataset});delete widePage.tracking.telemetry.honeycomb.dataset;
+  await example(widePage,wide);
+  const attr=wide.calls.find(c=>c.name==='run_query' && c.args.raw_row_columns[0]==='trace.span_id');
+  assert.ok(attr,JSON.stringify(wide.calls.map(c=>c.name)));
+  assert.equal(attr.args.environment_wide_query,true);assert.equal('dataset_slug' in attr.args,false);
+  assert.deepEqual(attr.args.raw_row_columns,['trace.span_id','device.model']);
 });
 
 test('7. example traces (Tempo): the page Tempo profile allowed list keeps the span attribute',async()=>{
@@ -171,19 +181,21 @@ test('7. example traces (Tempo): the page Tempo profile allowed list keeps the s
   assert.equal(dropped.span.attributes['device.model'],undefined);
 });
 
-test('8. a Honeycomb profile with allowedAttributes but no dataset still resolves: the validator warns, Load skips the extra query and names the missing attributes',async()=>{
+test('8. #1414 a Honeycomb profile with allowedAttributes and no dataset: the validator notes it is environment-wide, Load runs run_query environment-wide',async()=>{
   const C=context(),missing=profile();delete missing.dataset;
   assert.equal(C.FlowTraceConnections.profile(missing).dataset,undefined);
   const p=page(missing);
   assert.deepEqual(clone(C.FlowCanon.validate(p).filter(m=>/traceMatch|dataset/.test(m))),[]);
-  assert.deepEqual(clone(C.validate(p).warnings.filter(w=>/dataset/.test(w))),['tracking.telemetry.traceConnections.company: allowedAttributes on a Honeycomb profile need `dataset` to fetch span attributes; without it they stay Not observed']);
-  assert.deepEqual(clone(C.validate(page(profile())).warnings.filter(w=>/dataset/.test(w))),[]);
+  const result=C.validate(p);
+  assert.deepEqual(clone(result.warnings.filter(w=>/dataset|environment-wide|traceConnections/.test(w))),[],'no warning');
+  assert.deepEqual(clone((result.notes || []).filter(n=>/traceConnections/.test(n))),['tracking.telemetry.traceConnections.company: no `dataset`, so the allowedAttributes query (run_query) runs environment-wide across every dataset; add `dataset` to narrow it']);
+  assert.deepEqual(clone((C.validate(page(profile())).notes || []).filter(n=>/traceConnections/.test(n))),[],'a profile with a dataset has no note');
   const {e,report,calls}=await load(C,p);
   assert.ok(e,'trace loads: '+JSON.stringify(report));
-  assert.deepEqual(calls.map(c=>c.name),['get_trace']);
-  assert.equal(e.spans.length,55);
-  assert.ok(e.warnings.some(w=>/device\.model/.test(w) && /dataset/.test(w)),JSON.stringify(e.warnings));
-  assert.equal(status(C,p,e).status,'missing');
+  assert.deepEqual(calls.map(c=>c.name),['get_trace','run_query']);
+  assert.deepEqual(calls[1].args,{environment_slug:'production',environment_wide_query:true,query_spec:{filters:[{column:'trace.trace_id',op:'=',value:ID}],from:'-2h'},raw_row_columns:['trace.span_id','device.model'],results_limit:200});
+  assert.equal(e.spans.find(s=>s.id===X_SPAN).attributes['device.model'],'X');
+  assert.equal(status(C,p,e).status,'matched');
 });
 
 // Never answers; rejects on abort like the real host, so a regression fails instead of hanging.
@@ -253,4 +265,39 @@ test('12. example traces: a hung attribute run_query has its own 30-second deadl
   assert.ok(e,'the chosen trace still loads');
   assert.equal(e.spans.find(x=>x.id===X_SPAN).attributes['device.model'],undefined);
   assert.ok(e.warnings.some(w=>/device\.model/.test(w) && /timed out/.test(w)),JSON.stringify(e.warnings));
+});
+
+// #1414: SYNTHETIC environment-wide raw rows: spans of three services (three datasets), joined on trace.span_id.
+// The answer also carries service.name and name, which were not asked for and must not be added.
+const FRONTEND='dbd662d250034c44',DATABASE='d6667d51428cbb4d',CATALOG=X_SPAN;
+const WIDE_ROWS=['# Raw Rows','','| trace.span_id | service.name | name | server.address |','| --- | --- | --- | --- |',
+  `| ${FRONTEND} | frontend | GET / | shop.example |`,`| ${CATALOG} | productcatalog | GetProduct | catalog.internal |`,`| ${DATABASE} | database | SELECT | db.internal |`].join('\n');
+test('13. #1414 environment-wide answer fills the allowed attribute on spans of three services; only allowed columns are requested and added',async()=>{
+  const C=context(),p=profile(['server.address']);delete p.dataset;
+  const {e,report,calls}=await load(C,page(p),name=>({payload:name==='get_trace'?recorded:WIDE_ROWS}));
+  assert.ok(e,'trace loads: '+JSON.stringify(report));
+  assert.deepEqual(calls[1].args.raw_row_columns,['trace.span_id','server.address'],'columns: trace.span_id plus allowedAttributes only');
+  assert.equal(calls[1].args.environment_wide_query,true);assert.equal('dataset_slug' in calls[1].args,false);
+  const by=id=>e.spans.find(s=>s.id===id);
+  assert.deepEqual([FRONTEND,CATALOG,DATABASE].map(id=>[by(id).service,by(id).attributes['server.address']]),
+    [['frontend','shop.example'],['productcatalog','catalog.internal'],['database','db.internal']]);
+  for(const id of [FRONTEND,CATALOG,DATABASE])assert.equal(by(id).attributes.name,undefined,'a column that was not asked for is not added');
+  const absent=e.spans.filter(s=>![FRONTEND,CATALOG,DATABASE].includes(s.id));
+  assert.ok(absent.length>0 && absent.every(s=>s.attributes['server.address']===undefined),'a span the answer does not name gets no server.address');
+  assert.ok(!e.warnings.some(w=>/server\.address/.test(w)),JSON.stringify(e.warnings));
+});
+test('14. #1414 with a dataset nothing changes; a run_query schema without environment_wide_query leaves a datasetless profile\'s attributes missing, with a reason',async()=>{
+  const C=context();
+  const n=await load(C,page(profile()));
+  assert.equal(n.calls[1].args.dataset_slug,'events');assert.equal('environment_wide_query' in n.calls[1].args,false);
+  // A passed-through argument cannot switch the query to environment-wide behind a dataset.
+  const q=C.telemetryTraceAttributeQuery(RUN_QUERY,{traceId:ID,environment:'production',dataset:'events',from:'-2h',args:{environment_wide_query:true}},['device.model']);
+  assert.equal(q.input.dataset_slug,'events');assert.equal('environment_wide_query' in q.input,false);
+  const old=clone(RUN_QUERY);delete old.inputSchema.properties.environment_wide_query;
+  const wide=profile();delete wide.dataset;
+  const {e,report,calls}=await load(C,page(wide),undefined,false,old);
+  assert.ok(e,'trace loads: '+JSON.stringify(report));
+  assert.deepEqual(calls.map(c=>c.name),['get_trace'],'no run_query that would read one default dataset');
+  assert.ok(e.warnings.some(w=>/device\.model/.test(w) && /environment_wide_query/.test(w) && /dataset/.test(w)),JSON.stringify(e.warnings));
+  assert.equal(status(C,page(wide),e).status,'missing');
 });

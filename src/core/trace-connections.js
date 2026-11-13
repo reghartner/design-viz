@@ -44,7 +44,7 @@ var FlowTraceConnections=(function(){
       p.allowedAttributes=p.allowedAttributes.filter(function(k,i,all){return all.indexOf(k)===i;});
     }
     // #1197: Honeycomb get_trace returns no span attributes; Load reads them with one
-    // run_query over this dataset. Without it they stay unobserved (FlowCanon warns).
+    // run_query over this dataset. Without it the query is environment-wide (#1414; FlowCanon notes it).
     if(own(p,'dataset') && (p.provider!=='honeycomb' || !text(p.dataset)))fail('configuration','dataset must be a Honeycomb dataset name of 1–200 characters.');
     p.links=p.links || [];
     if(!Array.isArray(p.links) || p.links.length>8)fail('configuration','links must contain at most eight descriptors.');

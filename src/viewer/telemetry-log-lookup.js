@@ -56,11 +56,14 @@ function telemetryLogRange(start,end,lookback){
 function createTelemetryLogLookup(page,transport,hooks){
   hooks=hooks || {};
   var holding=false,dead=false,wantedBefore=false,retired=!!(transport && typeof transport.accountRetired==='function' && transport.accountRetired()),off=null,serial=0,abort=null,timer=null,busy=false,connector=null,lastIdentity=null,result=null;
-  // traced: "Only lines with a trace ID" (#1158), reader state like the rest of the form.
+  // traced: "Only lines with a trace ID" (#1158), reader state like the rest of the form. #1415: it is per search;
+  // form.traced is the shown search's. A search starts with its lookup's requireTraceId (default true); boxTraced
+  // holds what the reader set for each search.
   // form.lookup is the box that ran last (or is about to); form.value is its value; boxValues holds every box's value (#1233).
   // #1349: result is form.lookup's; results holds the other searches' last results.
-  var form={lookup:'',value:'',logql:'',traced:true},boxValues=Object.create(null),results=Object.create(null);
+  var form={lookup:'',value:'',logql:'',traced:true},boxValues=Object.create(null),boxTraced=Object.create(null),results=Object.create(null);
   function lookups(){return trackingTelemetry(page).lookups || null;}
+  function traced(id){if(telemetryOwn(boxTraced,id))return boxTraced[id];var ls=lookups() || {};return !(telemetryOwn(ls,id) && ls[id].requireTraceId===false);}
   function supported(){return !!transport && typeof transport.logsConnector==='function' && typeof transport.queryLogs==='function';}
   // '' when enabled, else the cause: a TELEMETRY_LOG_DISABLED key, or true for an unnamed one.
   function disabled(){var cause=typeof hooks.disabled==='function'?hooks.disabled():'';return cause || '';}
@@ -74,13 +77,14 @@ function createTelemetryLogLookup(page,transport,hooks){
     if(form.lookup===id)return;
     if(busy || abort){var running=busy;cancel();if(running)result=null;}
     if(result)results[result.lookup]=result;
-    form.lookup=id;form.value=boxValues[id] || '';result=results[id] || null;delete results[id];
+    form.lookup=id;form.value=boxValues[id] || '';form.traced=traced(id);result=results[id] || null;delete results[id];
   }
   function sync(){
     var key=JSON.stringify(typeof hooks.identity==='function'?hooks.identity():null),ls=lookups() || {},ids=Object.keys(ls);
     if(key!==lastIdentity){if(lastIdentity!==null && !holding){cancel();forget();}lastIdentity=key;}
     Object.keys(results).forEach(function(id){if(id!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,id))delete results[id];});
     if(form.lookup!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,form.lookup)){if(busy)cancel();result=null;select(ids.length?ids[0]:TELEMETRY_LOG_TYPED);}
+    else form.traced=traced(form.lookup);
     return ls;
   }
   // A closed view and host telemetry off name themselves; without a logs connector the
@@ -115,16 +119,17 @@ function createTelemetryLogLookup(page,transport,hooks){
       result:result?Object.assign(JSON.parse(JSON.stringify(result)),{next:next()}):null};
   }
   // `lookup` names the search a 'value' belongs to (default: form.lookup); 'lookup' shows another search.
-  // A search's own edit clears only its results; the shared checkbox clears every search's.
+  // A search's own edit, and its checkbox (#1415), clear only its results; the LogQL text clears every search's.
   function set(field,value,lookup){
     if(dead || !telemetryOwn(form,field) || typeof value!==typeof form[field] || typeof value==='string' && value.length>2000)return;
-    var ls=sync(),at=field==='value'?typeof lookup==='string'?lookup:form.lookup:field==='logql'?TELEMETRY_LOG_TYPED:null;
+    var ls=sync(),at=field==='value'?typeof lookup==='string'?lookup:form.lookup:field==='logql'?TELEMETRY_LOG_TYPED:field==='traced'?form.lookup:null;
     if(field==='value'){
       if(!telemetryOwn(ls,at) || (boxValues[at] || '')===value)return;
       boxValues[at]=value;if(at===form.lookup)form.value=value;
     }else if(field==='lookup'){
       if(form.lookup===value || value!==TELEMETRY_LOG_TYPED && !telemetryOwn(ls,value))return;
       select(value);
+    }else if(field==='traced'){if(form.traced===value)return;boxTraced[at]=form.traced=value;
     }else{if(form[field]===value)return;form[field]=value;}
     if(at===null && field!=='lookup'){if(result)cancel();forget();}
     else if(at!==null){delete results[at];if(result && result.lookup===at){cancel();result=null;}}
@@ -177,7 +182,9 @@ function createTelemetryLogLookup(page,transport,hooks){
       var payload=await transport.queryLogs(args,signal);
       if(dead || mine!==serial || signal.aborted)return null;
       var parsed=telemetryLogLines(payload,fields);if(request.traced)parsed.rows=parsed.rows.filter(function(row){return !!row.traceId;});
-      parsed.rows.forEach(function(row){row.value=slot?value:row.line;});
+      // #1415: a row shows its line (after the query's own line_format); a $value search names its value in the tooltip.
+      // An empty line (or one of only control characters) says so instead of leaving the row blank.
+      parsed.rows.forEach(function(row){if(!row.line)row.line='(empty line)';row.title=slot?row.line+'\n'+lookup.label+': '+value:row.line;});
       busy=false;abort=null;result.rows=parsed.rows;
       var where=searched?'on '+(searched.short || searched.key):range.lookback?'in the last '+range.lookback:'in the selected range';
       if(!parsed.rows.length)result.note=parsed.metric?'That is a metric query; type a log query that returns lines.':request.traced?'No log lines with a trace ID '+where+'. Clear "Only lines with a trace ID" to see every line.':'No matching log lines '+where+'.';

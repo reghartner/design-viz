@@ -21,7 +21,7 @@
      settings: [[path, value]] every authored leaf of page.tracking except
        dependencies and telemetry.lookups (listed below), paths start `tracking.`.
      dependencies: [{ticket, on, reason?}] (trackingDependencies)
-     logSearches: [{id, label, query, datasource, values, fields}] (tracking.telemetry.lookups, authored order)
+     logSearches: [{id, label, query, datasource, values, fields, requireTraceId: true|false|null (null when not authored)}] (tracking.telemetry.lookups, authored order)
      sections: [{reference, number, heading, tab, diagrams:[{imports, problems, elements, paths}]}]
        imports: [{as, spec, export, resolved, overlay:[[path, value]]}] (overlay only when unresolved)
        problems: ['edges[3]: …'] malformed entries, which are listed and otherwise skipped
@@ -289,7 +289,8 @@ function textViewModel(input){
     settings:textViewLeaves(tracking,'tracking').filter(function(leaf){return leaf[0]!=='tracking';}),
     dependencies:trackingDependencies(page),
     logSearches:Object.keys(lookups).map(function(id){
-      var l=lookups[id];return {id:id,label:l.label,query:l.query,datasource:l.datasource || null,values:(l.values || []).slice(),fields:textViewClone(l.fields)};
+      var l=lookups[id];return {id:id,label:l.label,query:l.query,datasource:l.datasource || null,values:(l.values || []).slice(),fields:textViewClone(l.fields),
+        requireTraceId:typeof l.requireTraceId==='boolean'?l.requireTraceId:null};
     }),
     sections:records.map(function(r){
       var s=r.section;
@@ -378,6 +379,7 @@ function textViewFlat(model){
     add('page',null,at+'order',String(i+1));
     l.values.forEach(function(v,j){add('page',null,at+'value['+j+']',v);});
     Object.keys(l.fields || {}).forEach(function(k){add('page',null,at+'fields.'+k,l.fields[k]);});
+    if(l.requireTraceId!==null)add('page',null,at+'requireTraceId',String(l.requireTraceId));
   });
   model.sections.forEach(function(sec){
     var prefix=model.multi?textViewPart(sec.reference)+'/':'',ref=textViewPart(sec.reference);
@@ -520,6 +522,7 @@ function textViewPageBlock(model,full){
       if(full){
         out.push.apply(out,textViewValue('  ','query',l.query));
         Object.keys(l.fields || {}).forEach(function(k){out.push('  - fields.'+k+': '+l.fields[k]);});
+        if(l.requireTraceId!==null)out.push('  - requireTraceId: '+l.requireTraceId);
       }
     });
     out.push('');

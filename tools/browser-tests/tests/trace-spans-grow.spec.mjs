@@ -6,8 +6,8 @@ import {repo} from '../helpers/prepare.mjs';
 /* #1280 (Chuck 2026-11-10): "That shouldn't have a scroll bar. That should just stretch as long as the spans stretch."
 | row | rule | fixture | assertion | broken implementation it rejects |
 |---|---|---|---|---|
-| G2 | Chuck's case (2026-11-10, "i am always going to use a stretching layout"): in the Standard section layout the Live status tile grows to its content, so the 60-span list grows, the panel body has no inner scroll either, the tile holds every row and the page reaches the last one | 60 spans, panel in a section-layout tile | waterfall and panel body scrollHeight <= clientHeight + 1; tile bottom >= the list's bottom; the last row, scrolled into view, is inside every clipping ancestor and the viewport and is hit by elementFromPoint | a list stretched to the tile and scrolling inside it (flex 1 1 0, contain size) |
-| G1 | The same with no section layout (plain panel): the list has no scroll of its own | 60-span trace, board without a section layout | waterfall scrollHeight <= clientHeight + 1; the last row reachable | a capped list (max-height 240px, overflow auto) |
+| G2 | #1411 (Chuck 2026-11-12, "stay ON THE PAGE") replaces #1280's growing tile: in the Standard section layout the 60-span list has no scroll of its own, the panel ends inside the window and its body scrolls to the last row | 60 spans, panel in a section-layout tile | waterfall scrollHeight <= clientHeight + 1; panel body scrollHeight > clientHeight; card bottom <= innerHeight; the last row, scrolled into view, is visible | a tile that grows with the list past the window |
+| G1 | The same with no section layout (plain panel): the list has no scroll of its own; the panel ends inside the window and its body scrolls | 60-span trace, board without a section layout | as G2 | a panel that grows past the window, or a capped list (max-height 240px, overflow auto) |
 | G3 | A short trace adds no empty space under its last row, in both layouts | 3-span trace | waterfall bottom - last row bottom <= its 8px padding + 2 | a fill rule or min-height on the list |
 | G4 | A span the reader focuses far down the list (selectTraceSpan without auto, as a row, step choice or log line does) is brought into view by the scroll that now holds it | 60 spans, tile and plain | the focused row is visible by the all-ancestors check | a reveal that still scrolls only the list |
 | G5 | An automatic focus (the failed span on load, #1188) never scrolls the page | 60 spans, the last one failed and mapped to a step | the failed row is focused (aria-pressed) and window.scrollY is unchanged | a page scrollIntoView for every focus |
@@ -69,22 +69,20 @@ const measure=(panel,which)=>panel.evaluate((p,which)=>{
   const hit=(r.elementFromPoint?r:document).elementFromPoint(x,y);return !!hit && (hit===el || el.contains(hit));
  }
  const scroller=list.closest('.pbody') || p.querySelector('.pbody'),tile=p.closest('.section-layout-tile');
- return {lists:1,items:items.length,scroll:list.scrollHeight,client:list.clientHeight,overflow:getComputedStyle(list).overflowY,gap:lb.bottom-last.bottom,listBottom:lb.bottom,
+ return {lists:1,items:items.length,cardBottom:p.getBoundingClientRect().bottom,innerHeight,pageY:(document.scrollingElement || document.documentElement).scrollTop,scroll:list.scrollHeight,client:list.clientHeight,overflow:getComputedStyle(list).overflowY,gap:lb.bottom-last.bottom,listBottom:lb.bottom,
   body:scroller?{scroll:scroller.scrollHeight,client:scroller.clientHeight}:null,tileBottom:tile?tile.getBoundingClientRect().bottom:null,rowVisible:visible(row),rowId:row.getAttribute('data-span-id')};
 },which);
 const reveal=(panel,index)=>panel.evaluate((p,index)=>{const r=p.shadowRoot || p,items=r.querySelectorAll('.dv-trace-waterfall > .dv-trace-span-item');items[index<0?items.length+index:index].querySelector('.dv-trace-span').scrollIntoView({block:'center'});},index);
 
 for(const tile of [true,false]){
  const where=tile?'the stretching section layout':'a plain panel';
- test('#1280 '+(tile?'G2':'G1')+' in '+where+' the 60-span list has no scroll of its own and its last row is reached',async({page,server},info)=>{
+ test('#1280 #1411 '+(tile?'G2':'G1')+' in '+where+' the 60-span list has no scroll of its own; the panel ends inside the window, its body scrolls, and the last row is reached',async({page,server},info)=>{
   const panel=await open(page,server,{tile,payload:sixty()});
   let m=await measure(panel,-1);expect([m.lists,m.items],'one list of 60 rows').toEqual([1,60]);
   expect(m.scroll,'no inner scroll: scrollHeight '+m.scroll+' vs clientHeight '+m.client+' (overflow '+m.overflow+')').toBeLessThanOrEqual(m.client+1);
-  if(tile){
-   // The tile grows to the panel's content in whole rows after the trace renders.
-   await expect.poll(async()=>{const t=await measure(panel,-1);return t.body && t.body.scroll<=t.body.client+1 && t.tileBottom>=t.listBottom;},{message:'the tile grows: no panel-body scroll, the tile holds the whole list'}).toBe(true);
-  }
-  await reveal(panel,-1);m=await measure(panel,-1);expect(m.rowVisible,'the last row is visible after scrolling the page').toBe(true);
+  // #1411 (Chuck 2026-11-12) replaces #1280's growing tile: the panel stays on the page and its body scrolls the list.
+  await expect.poll(async()=>{const t=await measure(panel,-1);return t.body && t.body.scroll>t.body.client+1 && t.cardBottom<=t.innerHeight;},{message:'the panel ends inside the window and its body scrolls'}).toBe(true);
+  await reveal(panel,-1);m=await measure(panel,-1);expect(m.rowVisible,'the last row is visible after scrolling the panel body').toBe(true);
   await page.screenshot({path:info.outputPath('trace-spans-grow-'+(tile?'tile':'plain')+'.png')});
  });
  test('#1280 G3 in '+where+' a three-span trace adds no empty space under its last row',async({page,server})=>{

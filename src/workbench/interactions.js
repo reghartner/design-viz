@@ -625,7 +625,7 @@ function createBuilderInteractions(opts){
     /* The move/resize handles are the keyboard-focusable entry points for the
        Explore controls surface. Let their generated click select the controls
        before the generic interactive-element guard below. */
-    var controlsHandle=ev.target.closest && ev.target.closest('.explore-player-grip, .explore-window-resize');
+    var controlsHandle=ev.target.closest && ev.target.closest('.explore-player-grip, .explore-window-resize, .explore-window-edge');
     var controlsPlayer=controlsHandle && controlsHandle.closest('.explore-player[data-explore-layout]');
     if(controlsPlayer){
       var controlsSec=controlsPlayer.closest('.doc-sec');
@@ -635,7 +635,7 @@ function createBuilderInteractions(opts){
       };
     }
     var spatialPanel=ev.target.closest('.explore-canvas-objects [data-explore-panel]');
-    if(spatialPanel && (!ev.target.closest('a,button,summary,[role="button"],input,select,textarea,[contenteditable]') || ev.target.closest('.explore-window-grip,.explore-window-resize'))){var panelTarget=spatial.target(spatialPanel);if(panelTarget)return panelTarget;}
+    if(spatialPanel && (!ev.target.closest('a,button,summary,[role="button"],input,select,textarea,[contenteditable]') || ev.target.closest('.explore-window-grip,.explore-window-resize,.explore-window-edge'))){var panelTarget=spatial.target(spatialPanel);if(panelTarget)return panelTarget;}
     if (ev.target.closest('a, button, summary, [role="button"], input, select, textarea')) return null;
     /* In Explore, the caption is part of the authorable controls surface.
        Standard view keeps the legacy shortcut to the current step. */
@@ -1847,7 +1847,7 @@ function createBuilderInteractions(opts){
 
   function focusPointerSelection(ev,target){
     if(!spatial || ev.detail===0 || ['node','panel'].indexOf(target.kind)<0)return;
-    if(ev.target.closest('a,button,summary,[role="button"],input,select,textarea,[contenteditable],.dv-text-editor,.explore-window-grip,.explore-window-resize'))return;
+    if(ev.target.closest('a,button,summary,[role="button"],input,select,textarea,[contenteditable],.dv-text-editor,.explore-window-grip,.explore-window-resize,.explore-window-edge'))return;
     spatial.focusSelection(target);
   }
 

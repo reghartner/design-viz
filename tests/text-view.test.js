@@ -496,6 +496,10 @@ test('log searches and their suggested values keep authored order in the flat li
   lookups.aaa = {label: 'First added', query: '{app="x"} |= "$value"'};
   const orders = lines(C.textViewFlat(C.textViewModel(resolvedPage(board)))).filter(l => / logsearch\.[^.]+\.order /.test(l));
   assert.deepEqual(orders, ['page logsearch.aaa.order 2', 'page logsearch.camera-model.order 1']);
+  // #1415: an authored requireTraceId has its own line; leaving it out adds none.
+  assert.ok(!before.some(l => l.includes('requireTraceId')));
+  lookups['camera-model'].requireTraceId = false;
+  assert.ok(lines(C.textViewFlat(C.textViewModel(resolvedPage(board)))).includes('page logsearch.camera-model.requireTraceId false'));
   // Tickets stay a set: reordering them changes nothing.
   const tickets = read('board.json');tickets.page.blocks[0].diagram.nodes.ingest.tickets.reverse();
   assert.deepEqual(lines(C.textViewFlat(C.textViewModel(resolvedPage(tickets)))), before);

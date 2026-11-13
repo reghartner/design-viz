@@ -91,7 +91,7 @@ environment subset can override its declared `label`, `value`, `context` and
 Overrides cannot add literal/context keys or change server, tool, argument
 mapping or adapter. A board may instead hold a full inline v1 profile. Readers choose only resolved connections.
 `tracking.telemetry.enabled:false` and host `telemetry:false` win.
-Optional `allowedAttributes` (Honeycomb: with `dataset`):
+Optional `allowedAttributes`:
 [provider traces](provider-traces.md#allowed-match-attributes).
 
 ## Absolute bounds and supported links

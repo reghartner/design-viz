@@ -44,9 +44,9 @@ test('#1173 at 1440x900 a loaded trace\'s span list starts beside the diagram, a
  expect(row.y-body.y,'the span list follows the collapsed lines directly').toBeLessThan(260);
 });
 /* #1186 stage 2 (Chuck approved the mockup 2026-11-09): a focused span's detail opens directly under its row.
-   #1280 (Chuck 2026-11-10) replaces "the list fills the panel and scrolls inside it": in this stretching Standard layout the
-   list grows with its spans and the tile grows with it (no inner scroll anywhere); the search still follows the list. */
-test('#1186 #1280 at 1440x900 the span list grows with its spans and the tile grows with it; a focused span\'s detail opens under its row',async({page,server},info)=>{
+   #1280: the list has no scroll of its own and grows with its spans. #1411 (Chuck 2026-11-12, "stay ON THE PAGE") replaces
+   #1280's growing tile: the panel ends inside the window and its body scrolls; the search still follows the list. */
+test('#1186 #1280 #1411 at 1440x900 the span list grows with its spans inside a panel body that scrolls and ends inside the window; a focused span\'s detail opens under its row',async({page,server},info)=>{
  const {panel}=await open(page,server);
  await panel.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await panel.getByRole('button',{name:'Load trace',exact:true}).click();
  const list=panel.locator('.dv-trace-waterfall');await expect(list.locator('.dv-trace-span').first()).toBeVisible();
@@ -57,9 +57,9 @@ test('#1186 #1280 at 1440x900 the span list grows with its spans and the tile gr
  const icons=await panel.locator('.dv-trace-request-icons').boundingBox(),line=await summary.boundingBox();
  expect(Math.abs(icons.y-line.y),'the icons sit at the top of the request line').toBeLessThan(8);expect(icons.x+icons.width,'at its right end').toBeGreaterThan(line.x+line.width-4);
  const g=await geometry();
- // #1280: no scroll of its own; the tile grows to its content, so the panel body has no inner scroll either.
+ // #1280: no scroll of its own. #1411: the panel body scrolls instead, and the panel ends inside the window.
  expect(['auto','scroll'],'the list has no scroll of its own').not.toContain(g.overflow);expect(g.scroll,'the list is as tall as its spans').toBeLessThanOrEqual(g.client+1);
- await expect.poll(()=>panel.locator('.pbody').first().evaluate(el=>el.scrollHeight<=el.clientHeight+1),{message:'the tile grows: no panel-body scroll'}).toBe(true);
+ await expect.poll(()=>panel.evaluate(p=>{const b=p.querySelector('.pbody');return !!b && b.scrollHeight>b.clientHeight+1 && p.getBoundingClientRect().bottom<=innerHeight;}),{message:'the panel body scrolls and the panel ends inside the window'}).toBe(true);
  // #1230: the trace sits above the search, which stays open below the list.
  const search=await panel.locator('.dv-trace-direct').boundingBox();expect(g.box.y+g.box.height,'the list ends above the search').toBeLessThanOrEqual(search.y+1);
  // A span from the middle of the list: its detail opens directly under its row, inside the list.
@@ -69,8 +69,8 @@ test('#1186 #1280 at 1440x900 the span list grows with its spans and the tile gr
  expect(Math.abs(d.y-(r.y+r.height)),'the detail sits directly under its row').toBeLessThan(10);
  await page.screenshot({path:info.outputPath('trace-stage2-1440x900.png')});
 });
-/* #1280: the list no longer scrolls; in this stretching layout the tile grows, so the reveal scrolls the page. */
-test('#1186 #1280 a span focused from the diagram far down the list is scrolled into view by the page (no scroll anchoring)',async({page,server})=>{
+/* #1280: the list itself never scrolls. #1411: the panel body holds it, so the reveal scrolls the panel body. */
+test('#1186 #1280 #1411 a span focused from the diagram far down the list is scrolled into view by the panel body (no scroll anchoring)',async({page,server})=>{
  const {panel}=await open(page,server);
  await panel.getByRole('textbox',{name:'Trace ID or link',exact:true}).fill(ID);await panel.getByRole('button',{name:'Load trace',exact:true}).click();
  const list=panel.locator('.dv-trace-waterfall');await expect(list.locator('.dv-trace-span').first()).toBeVisible();

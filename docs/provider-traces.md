@@ -228,7 +228,8 @@ column as text.
 
 ### Honeycomb attribute query (#1197)
 
-A Honeycomb profile that lists `allowedAttributes` also names its dataset:
+A Honeycomb profile that lists `allowedAttributes` may also name a dataset to
+narrow the attribute query:
 
 ```json
 "allowedAttributes": ["event.type"],
@@ -240,14 +241,19 @@ answers: one `run_query` on the same server, inside the same reader action. It
 gets the time left of the request's 30 seconds; when that runs out only the
 query is cancelled, and the trace loads without those attributes ("run_query
 timed out"). No other action calls it, and a profile without `allowedAttributes`
-makes no second call. Without `dataset` the profile still resolves: validation
-warns, Load makes no second call, and **Source and limitations** names the
-attributes that are missing. The arguments are:
+makes no second call. Without `dataset` (#1414) the query runs across the whole
+environment (`environment_wide_query: true`), so spans of every service's dataset
+get their attributes, joined on `trace.span_id`; validation adds a note that it is
+environment-wide. If the `run_query` schema has no `environment_wide_query`, no
+second call is made and **Source and limitations** says why. The
+arguments are:
 
 - the profile's literals and context arguments, as `get_trace` receives them,
   where the `run_query` schema names them (for example `team_slug`, or an
   `environment_slug` literal); otherwise `environment_slug` is the selected
-  environment's value; `dataset_slug`: the profile `dataset`;
+  environment's value; `dataset_slug`: the profile `dataset`, or without one
+  `environment_wide_query: true` (an argument of that name from the profile is never
+  passed through);
 - `query_spec`: `{"filters":[{"column":"trace.trace_id","op":"=","value":"<loaded
   ID>"}],"from":"-<lookback>"}`, the same lookback as the trace request (an absolute
   window becomes the shortest whole-hour lookback that reaches its start). It is a
@@ -266,12 +272,12 @@ declares `run_query` beside the detail tool on that server (`tools/inject.py`).
 
 The example traces of an authored trace signal use the same allowed list: the
 union of `allowedAttributes` over the page's trace connection profiles for that
-provider; a Honeycomb profile without `dataset` adds none. Tempo keeps those
+provider, with or without `dataset`. Tempo keeps those
 attributes from the trace itself. Honeycomb makes the same one extra `run_query`
 for the chosen trace, with the page's Honeycomb environment and the Metrics
 window, and its own 30-second deadline; a timeout drops only the attributes. Like the trace search, it uses the page's `honeycomb.dataset`, and without
-one it queries the whole environment. Publishing declares `run_query` only for a
-profile that has both `allowedAttributes` and `dataset`.
+one it queries the whole environment (`environment_wide_query: true`). Publishing
+declares `run_query` for every Honeycomb profile that has `allowedAttributes`.
 
 - `allowedAttributes` must be an array of at most 32 non-empty attribute names
   (letters, digits, `_ . : / -`, starting with a letter). A malformed entry fails

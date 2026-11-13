@@ -1144,6 +1144,28 @@ function sectionLayoutGesture(items,key,dx,dy,resize){
   else{item.x=Math.max(0,Math.min(SECTION_LAYOUT_COLUMNS-item.w,item.x+Math.round(dx)));item.y=Math.max(0,Math.min(500,item.y+Math.round(dy)));}
   return sectionLayoutPack(next,key);
 }
+/* #1376: a drag on a tile edge or corner moves only the dragged sides, in whole
+   grid cells; the opposite sides stay put. Width 1-24 columns, height 3-40 rows. */
+function sectionLayoutEdgeGesture(items,key,dx,dy,edge){
+  var next=items.map(function(it){return Object.assign({},it);}),item=next.find(function(it){return sectionLayoutKey(it)===key;});
+  if(!item || typeof edge!=='string')return next;
+  var cols=Math.round(dx),rows=Math.round(dy),right=item.x+item.w,bottom=item.y+item.h;
+  if(edge.indexOf('w')>=0){item.x=Math.max(0,Math.min(right-1,item.x+cols));item.w=right-item.x;}
+  if(edge.indexOf('e')>=0)item.w=Math.max(1,Math.min(SECTION_LAYOUT_COLUMNS-item.x,item.w+cols));
+  if(edge.indexOf('n')>=0){item.y=Math.max(0,Math.max(bottom-40,Math.min(bottom-3,item.y+rows)));item.h=bottom-item.y;}
+  if(edge.indexOf('s')>=0)item.h=Math.max(3,Math.min(40,item.h+rows));
+  return sectionLayoutPack(next,key);
+}
+/* #1376: the top edge of attached step controls moves the line between the
+   visualization and the controls; the tile's outer edges stay put. Both keep
+   at least 3 rows. */
+function sectionLayoutResizeControlsTop(d,items,rows){
+  var next=items.map(function(it){return Object.assign({},it);}),step=next.find(function(it){return it.controls==='steps';});
+  var dock=sectionLayoutDock(next),host=dock && next.find(function(it){return sectionLayoutKey(it)===dock;});
+  if(!step || !host || !Number.isFinite(rows))return next;
+  step.h=Math.max(3,Math.min(40,host.h-3,step.h-Math.round(rows)));
+  return sectionLayoutPack(next,dock);
+}
 function sectionLayoutAttach(d,items,key){
   var next=sectionLayoutDetachSteps(d,items).map(function(it){return Object.assign({},it);});
   var step=next.find(function(it){return it.controls==='steps';});if(!step)return next;

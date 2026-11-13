@@ -37,13 +37,13 @@ function createBuilderInspector(opts){
   function clipboard(){return disposed?null:opts.clipboard.current();}
   function clipboardToolbar(){return !!(opts.clipboard.toolbar && opts.clipboard.toolbar());}
   var TRACE_SPAN_DRAFT_OWNER=null;
-  // The carrier a selection names, independent of how it was published: a connection by its from->to key.
+  // The carrier a selection names in this project, independent of how it was published: a connection by its from->to key.
   function traceSpanDraftOwner(){
-    var t=session.target;if(!t)return null;
-    if(t.kind!=='edge')return JSON.stringify([t.kind,t.section,t.id,t.kind==='node'?null:t.index]);
+    var t=session.target;if(!t)return null;var project=session.snapshot().project;
+    if(t.kind!=='edge')return JSON.stringify([project,t.kind,t.section,t.id,t.kind==='node'?null:t.index]);
     var key=null;
     try{var snap=session.snapshot(),raw=snap.error?null:session.resolve?session.resolve(snap.raw):snap.raw,rec=raw && specSectionPaths(raw)[t.section],d=rec && specValueAt(raw,rec.diagram),e=d && Array.isArray(d.edges)?d.edges[t.index]:null;if(e)key=e.from+'->'+e.to;}catch(ex){key=null;}
-    return JSON.stringify(['edge',t.section,key || t.index]);
+    return JSON.stringify([project,'edge',t.section,key || t.index]);
   }
   function targetIdentity(){
     var t=session.target;

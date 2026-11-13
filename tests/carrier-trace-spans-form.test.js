@@ -327,4 +327,8 @@ test('E12 a rebuild for the same carrier keeps unsaved New attribute text; anoth
   ui.h.inspector.retire();ui.select(EDGE);kept('after the Inspector was retired and rebuilt');
   ui.select(NODE);ui.select(EDGE);
   assert.equal(ui.control('send new attribute name').value,'','another carrier in between clears it');
+  // Review c3: another project with the same section and connection does not inherit the text.
+  type('send new attribute name','deployment.environment.name');
+  ui.h.session.replaceProject(JSON.stringify(source,null,2),null,{});ui.select(EDGE);
+  assert.equal(ui.control('send new attribute name').value,'','another project (same section and from->to) starts empty');
 });

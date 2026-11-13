@@ -57,6 +57,33 @@ test('movement and resize clamp to the grid and minimum readable size',()=>{
   const resize=ctx.sectionLayoutGesture([phone],'panel:phone',100,-100,true)[0];assert.equal(resize.w,16);assert.equal(resize.h,3);
   assert.equal(ctx.sectionLayoutGesture([board],'diagram',0,100,true)[0].h,40);
 });
+test('#1376 each tile edge and corner moves only the dragged sides, in whole cells',()=>{
+  const tile={panel:'phone',x:8,y:10,w:6,h:8},items=[tile],before=JSON.stringify(items);
+  const cases={n:[8,8,6,10],s:[8,10,6,10],e:[8,10,8,8],w:[6,10,8,8],nw:[6,8,8,10],ne:[8,8,8,10],sw:[6,10,8,10],se:[8,10,8,10]};
+  for(const [edge,want] of Object.entries(cases)){
+    const dx=edge.includes('w')?-2:edge.includes('e')?2:0,dy=edge.includes('n')?-2:edge.includes('s')?2:0;
+    const got=ctx.sectionLayoutEdgeGesture(items,'panel:phone',dx,dy,edge)[0];assert.deepEqual([got.x,got.y,got.w,got.h],want,edge);
+  }
+  assert.equal(JSON.stringify(items),before);
+  // Fractions round to whole cells; shrinking stops at 1 column and 3 rows with the opposite sides fixed.
+  const half=ctx.sectionLayoutEdgeGesture(items,'panel:phone',-1.6,0.4,'sw')[0];assert.deepEqual([half.x,half.y,half.w,half.h],[6,10,8,8]);
+  const shrunk=ctx.sectionLayoutEdgeGesture(items,'panel:phone',50,50,'nw')[0];assert.deepEqual([shrunk.x,shrunk.y,shrunk.w,shrunk.h],[13,15,1,3]);
+  // Growing stops at the grid: column 0, column 24, row 0 and 40 rows.
+  const grown=ctx.sectionLayoutEdgeGesture(items,'panel:phone',-50,-50,'nw')[0];assert.deepEqual([grown.x,grown.y,grown.w,grown.h],[0,0,14,18]);
+  const wide=ctx.sectionLayoutEdgeGesture(items,'panel:phone',50,50,'se')[0];assert.deepEqual([wide.x,wide.w,wide.h],[8,16,40]);
+  const tall=ctx.sectionLayoutEdgeGesture([{...tile,y:60}],'panel:phone',0,-50,'n')[0];assert.deepEqual([tall.y,tall.h],[28,40]);
+  // A west or north drag pushes an overlapped neighbour down, as a move does.
+  const pushed=ctx.sectionLayoutEdgeGesture([board,{panel:'phone',x:8,y:0,w:4,h:6}],'panel:phone',-2,0,'w');noOverlap(pushed);
+  assert.deepEqual(plain(pushed.find(t=>t.panel==='phone')),{panel:'phone',x:6,y:0,w:6,h:6});
+});
+test('#1376 the top edge of attached controls moves the line inside the tile; its outer edges stay put',()=>{
+  const d=diagram(),original=plain(ctx.sectionLayoutAttach(d,ctx.sectionLayoutPreset(d,'default'),'diagram'));
+  const host=original.find(t=>ctx.sectionLayoutKey(t)==='diagram'),bar=original.find(t=>t.controls);
+  const taller=plain(ctx.sectionLayoutResizeControlsTop(d,original,-2));
+  assert.equal(taller.find(t=>t.controls).h,bar.h+2);assert.deepEqual(plain(taller.find(t=>ctx.sectionLayoutKey(t)==='diagram')),plain(host));
+  assert.equal(plain(ctx.sectionLayoutResizeControlsTop(d,original,100)).find(t=>t.controls).h,3);
+  assert.equal(plain(ctx.sectionLayoutResizeControlsTop(d,original,-100)).find(t=>t.controls).h,host.h-3);
+});
 test('layout plans preserve story content and other hosts across bare, section and tabbed specs',()=>{
   for(const wrap of [d=>d,d=>({sections:[{diagram:d}]}),d=>({page:{blocks:[{tabs:[{label:'Tab',sections:[{diagram:d}]}]}]}})]){
     const d=diagram();d.sectionLayout={default:[board],confluence:[{...board,w:12}]};

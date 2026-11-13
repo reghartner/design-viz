@@ -32,7 +32,7 @@ scrolling lets you inspect a preview wider than your editor split.
 Opening **Arrange selected section…** preserves the current View, every saved arrangement, and the visible positions; it does not optimize or write JSON. Saved grids can be dragged immediately. A section without an active grid stays visible; choose **Optimize layout** to create an editable grid explicitly.
 
 To arrange a Standard view, choose **View → Arrange selected section…**, then choose **Arrangement profile**: **Responsive**, **Backstage**, or **Confluence**. The editor displays and edits that profile independently of **Preview host**. Editing an inherited arrangement creates that profile without changing its fallback. Each panel, the data-flow diagram, and any detached step controls
-get a grab bar and a lower-right resize handle. Drag either handle to snap to
+get a grab bar and resize edges and corners. Drag any of them to snap to
 a 24-column grid. Overlapping tiles move down to remain visible. Choose
 **Hide arrangement controls** to tuck away the fields while you drag tiles. They stay hidden through moves, resizes, Undo, Redo, and arrangement rerenders until you choose **Show arrangement controls** or finish with **Done arranging**. Diagram nodes and Home elements
 retain their existing separate editing controls. Drag **Step controls** to put
@@ -120,9 +120,9 @@ there to save their floating defaults. View mode remains authoritative while arr
 line samples and response/ack key. It works in the editor, exported viewers and
 agent update previews. Press Escape to close it; opening it does not edit the story.
 The data-flow graph becomes the full-height workspace. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph. Each supporting panel
-starts in a stack at the right edge. Drag its header to move it, drag the corner
-to resize it, or use its **Hide** button. Tab to a header or resize handle and
-use arrow keys; hold Shift for larger changes. Escape cancels a drag. Step
+starts in a stack at the right edge. Drag its header to move it, any edge or
+corner to resize it, or use its **Hide** button. Tab to a header or resize handle and
+use arrow keys; Shift for larger changes. Escape cancels a drag. Step
 controls default to **Floating**, pinned to the viewport. Choose **Panels →
 Step controls → On canvas**, or **Placement** in their inspector, to move and
 zoom them with the graph. Each View remembers both placements separately;

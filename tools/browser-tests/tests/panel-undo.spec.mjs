@@ -194,6 +194,24 @@ test('the first canvas drag after an uncommitted Inspector edit saves the edit a
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
 });
 
+// #1376: the same hand-off for a resize strip. The west strip straddles the
+// window's left border; a press 2px outside it drags the left side.
+test('the first edge-strip resize after an uncommitted Inspector edit saves the edit and lands the resize',async({page,server})=>{
+  await open(page,server);await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();
+  await drag(page,page.locator('#workspace-window-inspect .workspace-window-grip'),-900,0);
+  const title=page.locator('#guide').getByLabel('Name',{exact:true}),panel=page.locator('[data-explore-panel=home]');
+  const before=await geometry(panel),old=await panel.elementHandle();await title.fill('Committed before the resize');
+  const x=before[0]-2,y=before[1]+before[3]/2;
+  await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x-60,y,{steps:6});await page.mouse.up();
+  await expect(page.locator('#src')).toHaveValue(/Committed before the resize/);
+  expect(await old.evaluate(el=>el.isConnected)).toBe(false);
+  const want=[before[0]-60,before[1],before[2]+60,before[3]];
+  await expect.poll(async()=>{const got=await geometry(panel);return got.every((v,i)=>Math.abs(v-want[i])<=1)?want:got;}).toEqual(want);
+  await page.locator('#undo-builder').click();await expect.poll(()=>geometry(panel)).toEqual(before);
+  await expect(page.locator('#src')).toHaveValue(/Committed before the resize/);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+});
+
 test('removing an authored Explore view in handwritten JSON preserves the full source history and draft on Redo',async({page,server})=>{
   await open(page,server);const previous=await page.locator('#src').inputValue();
   await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();

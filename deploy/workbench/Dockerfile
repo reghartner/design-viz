@@ -1,6 +1,6 @@
 # Build from the company fork root. HTML is generated from source in this stage.
 # Explicit inputs keep local credentials and development dependencies out.
-FROM node:24.22.1-bookworm-slim AS build
+FROM node:24.22.2-bookworm-slim AS build
 RUN apt-get update && apt-get install -y --no-install-recommends python3 && apt-get clean
 WORKDIR /build
 COPY tools/browser-tests/package*.json tools/browser-tests/

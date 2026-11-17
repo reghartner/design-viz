@@ -234,7 +234,9 @@ test('missing-work overlays preserve provider intent and reference edits without
  const removed=apply({...f,source:linked},(t,r)=>c.planTopologyTracking(t,r,0,'node','shared::api','missingWork',true,true,f.context));
  assert.deepEqual(d(removed).topologyImports[0].nodeTracking.api,{tickets:['AA-1']});
  d(f.provider).nodes.api.missingWork=true;
- assert.match(c.planTopologyTracking(JSON.stringify(f.source),f.source,0,'node','shared::api','missingWork',true,true,f.context).error,/inherited/);
+ const suppressed=apply(f,(t,r)=>c.planTopologyTracking(t,r,0,'node','shared::api','missingWork',true,true,f.context));
+ assert.deepEqual(d(suppressed).topologyImports[0].nodeTracking,{api:{missingWork:false}});
+ assert.equal(d(c.FlowTopology.resolveSource(suppressed,f.context)).nodes['shared::api'].missingWork,false,'consumer can suppress inherited work');
  assert.equal(d(f.provider).nodes.api.missingWork,true);
 });
 
@@ -284,7 +286,10 @@ test('edge missing-work overlays retain inherited intent and preserve references
  const linked=apply({...f,source},(t,r)=>c.planTopologyTracking(t,r,0,'edge',key,'tickets','AA-1',false,f.context,1));
  const removed=plan(linked,true);assert.deepEqual(d(removed).topologyImports[0].edgeTracking,{'api->store':{tickets:['AA-1']}});
  d(f.provider).edges[0].missingWork=true;
- assert.match(c.planTopologyTracking(JSON.stringify(f.source),f.source,0,'edge',key,'missingWork',true,true,f.context,1).error,/inherited/);
+ const suppressed=plan(f.source,true);
+ assert.deepEqual(d(suppressed).topologyImports[0].edgeTracking,{'api->store':{missingWork:false}});
+ assert.equal(d(c.FlowTopology.resolveSource(suppressed,f.context)).edges[1].missingWork,false,'consumer can suppress inherited edge work');
+ assert.equal(d(f.provider).edges[0].missingWork,true,'provider marker stays authored');
  assert.equal(d(c.FlowTopology.resolveSource(removed,f.context)).edges[1].missingWork,true);
  const nested=plain(f.source);nested.page.canon.id='nested';d(nested).nodes={};d(nested).rows=[[]];d(nested).edges=[];d(nested).topologyImports=[{spec:'consumer',export:'public',as:'outer',edgeTracking:{'shared::api->shared::store':{missingWork:true}}}];
  const middle=plain(f.source);d(middle).topologyExports={public:{nodes:['shared::api','shared::store'],edges:['shared::api->shared::store']}};

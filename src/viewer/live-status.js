@@ -396,7 +396,7 @@ function liveStatusEvidence(value,map){
    and missing provider evidence never claims completion or no-change. */
 function liveStatusPresentation(value,map){
   var keys=trackingRefs(value).tickets,states=keys.map(function(key){return map[key] && map[key].state || 'unknown';});
-  if(value && value.missingWork===true)states.push('missing');
+  if(value && trackingHasMissingWork(value))states.push('missing');
   if(value && value._detailUnavailable)states.push('unknown');
   return liveStatusPresentationRollup(states.length?states:['unchanged']);
 }
@@ -412,7 +412,7 @@ function liveStatusDomainSummary(page,node,loaded){
       var owner={tracking:source.tracking,authoredURL:trackingTicketURL(value,key)},previous=ticketSources[key];
       if(!previous || !previous.authoredURL && !(previous.tracking && previous.tracking.jira && previous.tracking.jira.site))ticketSources[key]=owner;
     });
-    if(value && value.missingWork===true)missing++;
+    missing+=trackingMissingWork(value).length;
   }
   function descend(source,value,depth){
     add(source,value);var detail=value && value.detail;if(!detail)return;
@@ -432,7 +432,7 @@ function liveStatusDomainSummary(page,node,loaded){
 // Unmarked edges retain evidence-only paint; a marker adds authored missing
 // intent without turning an ordinary unticketed connection into a status carrier.
 function liveStatusEdgePresentation(value,map,markerOn){
-  return markerOn!==false && value && value.missingWork===true?liveStatusPresentation(value,map):liveStatusEvidence(value,map);
+  return markerOn!==false && value && trackingHasMissingWork(value)?liveStatusPresentation(value,map):liveStatusEvidence(value,map);
 }
 function liveStatusPresentationRollup(states){
   for(var i=0;i<4;i++){var state=['blocked','missing','active','testing'][i];if(states.indexOf(state)>=0)return state;}
@@ -612,10 +612,10 @@ function liveStatusEdgeBreaks(scope,diagram,map,on,availabilityOn){
     var board={svg:svg,edgeIds:Object.create(null)},failures=Object.create(null),labels=Object.create(null);
     (diagram.edges || []).forEach(function(edge,index){
       var path=svg.querySelector('path.edge[data-dv-edge="'+index+'"]');if(!path)return;
-      var state=on?liveStatusEdgePresentation(edge,map,availabilityOn):null,key=edge.from+'->'+edge.to,unavailable=on && availabilityOn!==false?liveStatusAvailability(edge,map,diagram):null,missing=on && availabilityOn!==false && edge.missingWork===true;
+      var state=on?liveStatusEdgePresentation(edge,map,availabilityOn):null,key=edge.from+'->'+edge.to,unavailable=on && availabilityOn!==false?liveStatusAvailability(edge,map,diagram):null,missing=on && availabilityOn!==false && trackingHasMissingWork(edge);
       if(state==='blocked' || missing || unavailable){
         board.edgeIds[key]={e:edge,idx:index,pathEl:path,haloEl:svg.querySelector('path.halo[data-dv-edge="'+index+'"]')};
-        failures[key]='blocked';labels[key]=[edge.missingWork===true?'Missing work: additional work remains without a linked ticket':'',unavailable?liveStatusAvailabilityLabel(unavailable):liveStatusBlockingKeys(edge,map).join(', ')].filter(Boolean).join('; ');
+        failures[key]='blocked';labels[key]=[trackingHasMissingWork(edge)?'Missing work: additional work remains without a linked ticket':'',unavailable?liveStatusAvailabilityLabel(unavailable):liveStatusBlockingKeys(edge,map).join(', ')].filter(Boolean).join('; ');
         svg.querySelectorAll('g.comm-failure[data-dv-edge="'+index+'"]').forEach(function(el){el.classList.add('dv-live-comm-suppressed');});
       }
       if(state==='todo' || state==='blocked' || missing || unavailable)svg.querySelectorAll('circle.pkt').forEach(function(dot){
@@ -650,7 +650,7 @@ function liveStatusScope(diagram,page,shown){
    carriers. Without one, each direct carrier contributes its presentation. */
 function liveStatusStep(diagram,step,map){
   var filter=liveStatusStepFilter(diagram,step);
-  if(filter)return liveStatusPresentationRollup(filter.map(function(key){return map[key] && map[key].state || 'unknown';}));
+  if(filter){var source=diagram && diagram._liveSource,items=trackingStepMissingWork(source?source.diagram:diagram,step,source && source.page);return liveStatusPresentationRollup(liveStatusStepTickets(diagram,step,true).map(function(key){return map[key] && map[key].state || 'unknown';}).concat(items.length?['missing']:[]));}
   return liveStatusPresentationRollup(liveStatusStepCarriers(diagram,step,true).map(function(carrier){
     return liveStatusPresentation(carrier.value,map) || 'unknown';
   }));
@@ -659,7 +659,7 @@ function liveStatusStepCarriers(diagram,step,directOnly){return trackingStepCarr
 /* The filter narrows only the direct view (state, caption, ticket list). Broad
    aggregates (lanes and the Tickets table's lane stripes) keep every ticket. */
 function liveStatusStepTickets(diagram,step,directOnly){
-  var keys=[],filter=directOnly?liveStatusStepFilter(diagram,step):null;if(filter)return filter.slice();
+  var keys=[],filter=directOnly?liveStatusStepFilter(diagram,step):null;if(filter){var source=diagram && diagram._liveSource,items=trackingStepMissingWork(source?source.diagram:diagram,step,source && source.page);return filter.filter(function(key){return !items.some(function(item){return item.id===key;});});}
   liveStatusStepCarriers(diagram,step,directOnly).forEach(function(carrier){
     trackingRefs(carrier.value).tickets.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});
   });return keys;
@@ -731,14 +731,14 @@ function liveStatusReadiness(page,map,waiting){
   var result={total:0,done:0,ready:true,blockers:0,waiting:0},primaryCount=0,blockers=[];
   sectionRecords(page).forEach(function(record){var d=record.section.diagram;if(!d)return;
     var carriers=Object.keys(d.nodes || {}).filter(function(id){return !isTextBoxNode(d.nodes[id]);}).map(function(id){return d.nodes[id];}).concat(d.edges || []);
-    function complete(value){return value.missingWork!==true && trackingRefs(value).tickets.every(function(key){return map[key] && map[key].state==='done';});}
-    carriers.forEach(function(value){var keys=trackingRefs(value).tickets;if(!keys.length && value.missingWork!==true)return;result.total++;if(complete(value))result.done++;
+    function complete(value){return !trackingHasMissingWork(value) && trackingRefs(value).tickets.every(function(key){return map[key] && map[key].state==='done';});}
+    carriers.forEach(function(value){var keys=trackingRefs(value).tickets;if(!keys.length && !trackingHasMissingWork(value))return;result.total++;if(complete(value))result.done++;
       liveStatusBlockingKeys(value,map).forEach(function(key){if(blockers.indexOf(key)<0)blockers.push(key);});
     });
     result.waiting+=Object.keys(liveStatusCarrierWaiting(d,map,waiting || {})).length;
     var primary=diagramPathList(d)[0];
     (primary?primary.indices:[]).forEach(function(index){liveStatusStepCarriers(d,d.steps[index]).forEach(function(carrier){
-      if(!trackingRefs(carrier.value).tickets.length && carrier.value.missingWork!==true)return;primaryCount++;if(!complete(carrier.value))result.ready=false;
+      if(!trackingRefs(carrier.value).tickets.length && !trackingHasMissingWork(carrier.value))return;primaryCount++;if(!complete(carrier.value))result.ready=false;
     });});
   });result.ready=result.ready && primaryCount>0;result.blockers=blockers.length;return result;
 }
@@ -1507,8 +1507,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
   // Authored carrier occurrences, independent of distinct Jira ticket totals.
   // The shared walk includes resolved imports, nested sections and loaded details.
   function missingWorkCount(){var count=0;eachDiagram(function(d){
-    Object.values(d.nodes || {}).forEach(function(node){if(!isTextBoxNode(node) && node.missingWork===true)count++;});
-    (d.edges || []).forEach(function(edge){if(edge.missingWork===true)count++;});
+    Object.values(d.nodes || {}).forEach(function(node){if(!isTextBoxNode(node))count+=trackingMissingWork(node).length;});
+    (d.edges || []).forEach(function(edge){count+=trackingMissingWork(edge).length;});
   });return count;}
   function presentationActive(){return missingWorkCount()>0 || applied && referencesAvailable();}
   // snapshot().available: ticket, epic or exclusion references, or a missing-work marker.
@@ -1635,18 +1635,24 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var dismiss=element('button','node-link-close','×',box);dismiss.type='button';dismiss.setAttribute('aria-label',metricsOnly?'Close metrics':'Close live tickets');dismiss.addEventListener('click',function(){close(true);});
     if(metricsOnly)return {dismiss:dismiss,asking:null};
     var summary=trigger._liveCarrier && trigger._liveCarrier.summary,found=trackingRefs(summary || value);
-    if(summary)element('p','dv-live-domain-summary','Domain summary: this node and '+summary.carriers+' descendant nodes/connections · '+summary.tickets.length+' unique tickets.'+(summary.missing?' Missing work: '+summary.missing+' marked carriers.':'')+(summary.unavailable.length?' Detail evidence unavailable: '+summary.unavailable.join(', ')+'. Completion is unknown.':''),box);
-    if(value && value.missingWork===true)element('p','dv-live-coverage-detail','Missing work: additional work remains without a linked ticket. Clear this Missing work marker when covered.',box);
+    if(summary)element('p','dv-live-domain-summary','Domain summary: this node and '+summary.carriers+' descendant nodes/connections · '+summary.tickets.length+' unique tickets.'+(summary.missing?' Missing work: '+summary.missing+' unlinked work items.':'')+(summary.unavailable.length?' Detail evidence unavailable: '+summary.unavailable.join(', ')+'. Completion is unknown.':''),box);
+    if(trackingHasMissingWork(value))trackingMissingWork(value).forEach(function(item){element('p','dv-live-coverage-detail',item.id?'Missing work: '+item.title:'Missing work: additional work remains without a linked ticket. Clear this Missing work marker when covered.',box);});
     else if(!summary && !found.tickets.length && referencesAvailable())element('p','dv-live-coverage-detail','No change needed: no linked tickets or missing-work marker.',box);
     // #855 Edit mode: clear a marker set on this board; an inherited one names its source diagram.
-    var marker=ref && editing() && value && value.missingWork===true?editor.missingWork(ref):null;
+    var marker=ref && editing() && value && trackingHasMissingWork(value)?editor.missingWork(ref):null;
     if(asking && !(marker && marker.clearable)){editor.endQuestion();asking=null;}
     if(marker && !marker.clearable)element('p','dv-live-missing-source','Missing work comes from the source diagram "'+marker.source+'" and must be cleared there.',box);
     if(marker && marker.clearable){
       var choice=element('div','dv-live-clear',null,box);
       if(asking)element('p','dv-live-question','Does '+asking.ticket+' cover the missing work?',choice);
       var clear=element('button','reader-button dv-live-clear-missing','Clear Missing work',choice);clear.type='button';
-      clear.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();editor.endQuestion();editFromPopover(ref,function(){return editor.clearMissingWork(ref);});});
+      clear.addEventListener('click',function(ev){
+        ev.preventDefault();ev.stopPropagation();editor.endQuestion();
+        if(marker.items && marker.items.some(function(item){return item.id!==null;})){
+          var revision=editor.state().revision;close(false);
+          trackingMissingWorkPrompt(marker.items,null,function(item){if(item)editor.clearMissingWork(ref,item);},{document:document,valid:function(){return !retired && editing() && editor.state().revision===revision;},own:function(retire){destroyListeners.push(retire);}});
+        }else editFromPopover(ref,function(){return editor.clearMissingWork(ref);});
+      });
       if(asking){
         var keep=element('button','reader-button dv-live-keep','Keep',choice);keep.type='button';
         keep.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();close(true);});
@@ -1782,7 +1788,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     if(authoring)return el;
     el.setAttribute('role','button');el.setAttribute('tabindex','0');el.setAttribute('aria-haspopup','dialog');el.setAttribute('aria-expanded','false');
     if(metricsOnly){el.setAttribute('aria-label','Metrics for '+label);return el;}
-    el.setAttribute('aria-label',(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label+(state?' · '+(state==='unchanged'?'No change needed':state==='missing' && value.missingWork===true?'Missing work':state):'')+(summary?' · Domain summary'+(summary.missing?' · Missing work':'')+(summary.unavailable.length?' · Detail evidence unavailable':''):'')+(availability?' · '+liveStatusAvailabilityLabel(availability):'')+(waiting && waiting.keys?' · waiting on '+waiting.keys.join(', '):''));
+    el.setAttribute('aria-label',(trackingRefs(value).tickets.length?'Live tickets for ':'Work status for ')+label+(state?' · '+(state==='unchanged'?'No change needed':state==='missing' && trackingHasMissingWork(value)?'Missing work':state):'')+(summary?' · Domain summary'+(summary.missing?' · Missing work':'')+(summary.unavailable.length?' · Detail evidence unavailable':''):'')+(availability?' · '+liveStatusAvailabilityLabel(availability):'')+(waiting && waiting.keys?' · waiting on '+waiting.keys.join(', '):''));
     return el;
   }
   function clearTarget(el){
@@ -1974,7 +1980,13 @@ function createLiveStatus(ctl,page,options,renderOptions){
     var key=ev.dataTransfer.getData(EDIT_TICKET_TYPE);if(!trackingKeyPattern.test(key))return;
     // The editor re-renders the page; leave this event's dispatch first.
     setTimeout(function(){
-      if(editor){editor.add(hit.ref,key);return;}
+      if(editor){
+        if(retired || !editing())return;
+        var marker=editor.missingWork(hit.ref,key),source=editor.state().revision;
+        if(marker && marker.items.length)trackingMissingWorkPrompt(marker.items,key,function(item){editor.add(hit.ref,key,item || false);},{document:document,valid:function(){return !retired && editing() && editor.state().revision===source;},own:function(retire){destroyListeners.push(retire);}});
+        else editor.add(hit.ref,key,false);
+        return;
+      }
       if(!ticketDrop || retired)return;
       // #1241: a refused Workbench drop says why in the panel's status line.
       var result=ticketDrop(hit.ref,key);
@@ -2088,8 +2100,8 @@ function createLiveStatus(ctl,page,options,renderOptions){
     }return null;
   }
   function focusBlocker(binding,index){
-    var d=statusDiagram(binding),carriers=liveStatusStepCarriers(d,d.steps[index],true),filter=liveStatusStepFilter(d,d.steps[index]);
-    var carrier=carriers.find(function(carrier){return liveStatusBlockingKeys(carrier.value,map).some(function(key){return !filter || filter.indexOf(key)>=0;}) || !filter && carrier.value.missingWork===true;});if(!carrier)return;
+    var d=statusDiagram(binding),carriers=liveStatusStepCarriers(d,d.steps[index],true),filter=liveStatusStepFilter(d,d.steps[index]),missing=trackingStepProofMissingWork(binding.section.diagram,d.steps[index],binding.page);
+    var carrier=carriers.find(function(carrier){return liveStatusBlockingKeys(carrier.value,map).some(function(key){return !filter || filter.indexOf(key)>=0;}) || missing[carrier.id];});if(!carrier)return;
     focusCarrier(binding,carrier.id);
   }
   function focusCarrier(binding,id){
@@ -2179,7 +2191,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
     });
   }
   function ticketRows(pages,coverage){
-    var carriers=Object.create(null),rank=['blocked','missing','active','testing','todo','done'];
+    var placeholders=[],carriers=Object.create(null),rank=['blocked','missing','active','testing','todo','done'];
     pages.forEach(function(record){sectionRecords(record.page).forEach(function(section){
       var d=section.section.diagram || {};
       var list=Object.keys(d.nodes || {}).filter(function(id){return !isTextBoxNode(d.nodes[id]);}).map(function(id){return {id:id,value:d.nodes[id],label:d.nodes[id].title || id};});
@@ -2187,6 +2199,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
       list.forEach(function(carrier){carrier.page=record.page;carrier.section=section.section;carrier.reference=section.reference;
         carrier.pageKey=Object.keys(remotePages).find(function(key){return remotePages[key]===record.page;});
         trackingRefs(carrier.value).tickets.forEach(function(key){(carriers[key] || (carriers[key]=[])).push(carrier);});
+        trackingMissingWork(carrier.value).forEach(function(item,index){placeholders.push({key:null,rowId:'missing:'+JSON.stringify([carrier.pageKey || '',section.reference,carrier.id,item.id,index]),placeholderId:item.id,title:item.title,state:'missing',owner:'—',url:null,urls:[],dependsOn:[],carriers:[{id:carrier.id,label:carrier.label,reference:carrier.reference,pageKey:carrier.pageKey || ''}],tag:'MISSING WORK'});});
       });
     });});
     // Use the same extra upstream stories as the summary counts.
@@ -2214,7 +2227,7 @@ function createLiveStatus(ctl,page,options,renderOptions){
             disabled:!on || (!mounted && (!route || (route.frames.length && (!ctl.details || !ctl.details.restore)))),
             title:!mounted?'Detail page: '+(carrier.section.heading || carrier.reference):''};
         }),tag:linked.indexOf(key)>=0?'DEPENDENCY ONLY':!owners.length?'NOT ON DIAGRAM':coverage.notInEpic.indexOf(key)>=0?(coverage.initiatives?'NOT IN PARENT INITIATIVE':'NOT IN PARENT EPIC'):''};
-    });
+    }).concat(placeholders);
   }
   /* Jira is a link affordance, independent of provider evidence and Live paint.
      Reserve the complete 22-unit pointer area. Candidates follow the measured
@@ -2287,9 +2300,19 @@ function createLiveStatus(ctl,page,options,renderOptions){
   function paintBinding(binding){
     var on=api.enabled();
     var scope=binding.el,d=binding.section.diagram;if(!d)return;
+    var activeStep=binding.stepper && binding.stepper.mode()==='step' && (d.steps || [])[binding.stepper.sourceIndex()],activeFilter=activeStep && trackingStepTicketFilter(d,activeStep,binding.page),scopedMissing=Object.create(null);
+    if(activeFilter){
+      trackingStepCarriers(d,activeStep,true).forEach(function(carrier){scopedMissing[carrier.id]=trackingCarrierStepWork(binding.page,carrier.value).filter(function(item){return item.id!==null && activeFilter.indexOf(item.id)>=0;});});
+      var nodes=Object.assign({},d.nodes),edges=(d.edges || []).slice();
+      Object.keys(nodes).forEach(function(id){if(Object.prototype.hasOwnProperty.call(scopedMissing,id))nodes[id]=Object.assign({},nodes[id],{missingWork:scopedMissing[id]});});
+      edges=edges.map(function(edge){var id=edge.from+'->'+edge.to;return Object.prototype.hasOwnProperty.call(scopedMissing,id)?Object.assign({},edge,{missingWork:scopedMissing[id]}):edge;});
+      d=Object.assign({},d,{nodes:nodes,edges:edges});
+    }
     var waiting=on?liveStatusCarrierWaiting(d,map,ticketWaiting):{},coverageActive=presentationActive();
     scope.querySelectorAll('g.node[data-dv-node]').forEach(function(el){
-      var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],summary=on && availabilityOn && coverageActive?domainSummary(binding.page,value):null,statusValue=summary || value,state=on && availabilityOn && !el.classList.contains('node-text')?(coverageActive?liveStatusPresentation(statusValue,map):liveStatusCarrier(value,map)):null;
+      var id=el.getAttribute('data-dv-node'),value=(d.nodes || {})[id],summary=on && availabilityOn && coverageActive?domainSummary(binding.page,value):null;
+      if(summary && Object.prototype.hasOwnProperty.call(scopedMissing,id))summary=Object.assign({},summary,{missingWork:scopedMissing[id],missing:scopedMissing[id].length});
+      var statusValue=summary || value,state=on && availabilityOn && !el.classList.contains('node-text')?(coverageActive?liveStatusPresentation(statusValue,map):liveStatusCarrier(value,map)):null;
       // A blocked or missing carrier keeps its own paint (solid or dotted rose): the stronger state wins
       // over the dashed waiting stroke; the popover and panel still record what it waits on.
       var unavailable=on && availabilityOn?liveStatusAvailability(value,map):null;liveStatusAvailabilityClass(el,unavailable);

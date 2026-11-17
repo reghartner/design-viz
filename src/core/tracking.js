@@ -52,6 +52,35 @@ function trackingRefs(obj, invalid){
   });
   return refs;
 }
+/* Missing work is authored work, never a Jira reference. IDs are stable within
+   the document; the boolean form is one unnamed, unfilterable item. */
+var trackingWorkIdPattern=/^[A-Za-z][A-Za-z0-9_.:-]*$/;
+function trackingMissingWork(carrier,invalid){
+  var value=carrier && carrier.missingWork;
+  if(value===true)return [{id:null,title:'Missing work'}];
+  if(value===undefined || value===false)return [];
+  if(!Array.isArray(value)){if(invalid)invalid(null);return [];}
+  var out=[],seen=Object.create(null);
+  value.forEach(function(item,index){
+    if(!item || typeof item!=='object' || Array.isArray(item) || Object.keys(item).some(function(key){return key!=='id' && key!=='title';}) || typeof item.id!=='string' || !trackingWorkIdPattern.test(item.id) || typeof item.title!=='string' || !item.title.trim() || seen[item.id]){if(invalid)invalid(index);return;}
+    seen[item.id]=true;out.push({id:item.id,title:item.title});
+  });return out;
+}
+function trackingHasMissingWork(carrier){return trackingMissingWork(carrier).length>0;}
+function trackingCarrierStepWork(page,value){
+  var out=[],seen=[];
+  function add(carrier){trackingMissingWork(carrier).forEach(function(item){if(!out.some(function(old){return old.id===item.id && old.title===item.title;}))out.push(item);});}
+  function descend(node,depth){
+    add(node);var record=page && node && !isTextBoxNode(node)?detailTarget(page,node.detail):null,child=record && record.section.diagram;
+    if(!child || seen.indexOf(child)>=0 || depth>=DETAIL_MAX_DEPTH)return;seen.push(child);
+    Object.keys(child.nodes || {}).forEach(function(id){if(!isTextBoxNode(child.nodes[id]))descend(child.nodes[id],depth+1);});(child.edges || []).forEach(add);
+  }
+  descend(value,0);return out;
+}
+function trackingStepMissingWork(diagram,step,page){
+  var out=[],filter=trackingStepTicketFilter(diagram,step,page);
+  trackingStepCarriers(diagram || {},step,true).forEach(function(carrier){trackingCarrierStepWork(page,carrier.value).forEach(function(item){if(!filter || item.id!==null && filter.indexOf(item.id)>=0)out.push(item);});});return out;
+}
 /* Carrier identities are section-local; ticket keys are deduplicated only when
    counting work. Broad aggregates may include the endpoints of selected hops;
    visible step state, captions and ticket lists use direct carriers only. */
@@ -67,7 +96,7 @@ function trackingStepCarriers(diagram,step,directOnly){
 }
 /* #1103: `ticketFilter` names the subset of the tickets on a step's directly lit
    carriers that the step shows. It never adds a ticket, and carriers keep all of
-   theirs. The value is a self-contained array of Jira keys so an imported step's
+   theirs. The value is a self-contained array of Jira keys or placeholder IDs so an imported step's
    override can carry the same shape. Malformed entries are skipped like carrier
    tickets; with no valid entry every ticket shows. `invalid` reports them. */
 function trackingStepFilter(step,invalid){
@@ -75,18 +104,18 @@ function trackingStepFilter(step,invalid){
   var value=step.ticketFilter,out=[];
   if(!Array.isArray(value) || !value.length){if(invalid)invalid(null);return null;}
   value.forEach(function(key,index){
-    if(typeof key!=='string' || !trackingKeyPattern.test(key)){if(invalid)invalid(index);}
+    if(typeof key!=='string' || !trackingWorkIdPattern.test(key)){if(invalid)invalid(index);}
     else if(out.indexOf(key)<0)out.push(key);
   });
   return out.length?out:null;
 }
-/* The tickets a step filter may name on one carrier: its own, plus, for a node
+/* The work identities a step filter may name on one carrier: its own, plus, for a node
    whose detail is a section of the same `page`, that section's carriers'
    tickets, recursively. A remote detail (detail.spec) never counts, so the set is
    the same in the viewer, validator and Workbench, before and after it loads. */
 function trackingCarrierStepTickets(page,value){
   var keys=[],seen=[];
-  function add(carrier){trackingRefs(carrier).tickets.forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});}
+  function add(carrier){trackingRefs(carrier).tickets.concat(trackingMissingWork(carrier).map(function(item){return item.id;}).filter(Boolean)).forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});}
   function descend(node,depth){
     add(node);
     var record=page && node && !isTextBoxNode(node)?detailTarget(page,node.detail):null,child=record && record.section.diagram;
@@ -97,7 +126,7 @@ function trackingCarrierStepTickets(page,value){
   }
   descend(value,0);return keys;
 }
-/* Ticket keys a step lights directly, before any filter: the keys a filter may
+/* Jira keys and named placeholders a step lights directly, before any filter: the keys a filter may
    name. `diagram` is the authored (resolved) section diagram of `page`. */
 function trackingStepLitTickets(diagram,step,page){
   var keys=[];trackingStepCarriers(diagram || {},step,true).forEach(function(carrier){
@@ -117,8 +146,12 @@ function trackingStepTicketFilter(diagram,step,page){
 function trackingStepProofTickets(diagram,step,page){
   var filter=trackingStepTicketFilter(diagram,step,page),out=Object.create(null);if(!filter)return null;
   trackingStepCarriers(diagram || {},step,true).forEach(function(carrier){
-    out[carrier.id]=trackingCarrierStepTickets(page,carrier.value).filter(function(key){return filter.indexOf(key)>=0;});
+    out[carrier.id]=trackingCarrierStepTickets(page,carrier.value).filter(function(key){return filter.indexOf(key)>=0 && !trackingCarrierStepWork(page,carrier.value).some(function(item){return item.id===key;});});
   });return out;
+}
+function trackingStepProofMissingWork(diagram,step,page){
+  var filter=trackingStepTicketFilter(diagram,step,page),out=Object.create(null);
+  trackingStepCarriers(diagram || {},step,true).forEach(function(carrier){out[carrier.id]=trackingCarrierStepWork(page,carrier.value).some(function(item){return !filter || item.id!==null && filter.indexOf(item.id)>=0;});});return out;
 }
 /* Page-level parent roots (legacy `epic` field) share the ticket key grammar.
    Jira metadata determines whether each root is an Epic or an Initiative. */
@@ -949,4 +982,29 @@ function telemetrySpanNote(signal,window){
   var span=telemetrySignalSpan(signal),board=telemetryWindowDuration(window);
   function seconds(d){return Number(d.slice(0,-1))*{s:1,m:60,h:3600,d:86400,w:604800}[d.slice(-1)];}
   return span && board && seconds(span)!==seconds(board)?'last '+span:'';
+}
+
+/* One coverage question for every ticket-add surface. Dismiss means Keep.
+   A caller may retire the question without applying either action when its
+   source/lifetime changes. No source is changed until the answer is committed. */
+function trackingMissingWorkPrompt(items,ticket,done,options){
+  options=options || {};var doc=options.document || document,win=doc.defaultView,dialog=doc.createElement('dialog'),finished=false;
+  dialog.className='dv-missing-work-dialog';dialog.setAttribute('aria-label','Cover missing work');
+  var heading=doc.createElement('p');heading.className='dv-missing-work-question';dialog.appendChild(heading);
+  var select=null;
+  if(items.length>1){
+    var label=doc.createElement('label');label.textContent=ticket?'Which missing work does this ticket cover? ':'Which missing work should be cleared? ';
+    select=doc.createElement('select');select.setAttribute('aria-label','Missing work to replace');
+    items.forEach(function(item,index){var option=doc.createElement('option');option.value=String(index);option.textContent=item.title+(item.id?' ('+item.id+')':'');select.appendChild(option);});label.appendChild(select);dialog.appendChild(label);
+    select.addEventListener('change',question);
+  }
+  function selected(){return items[select?Number(select.value):0];}
+  function question(){var item=selected();heading.textContent=ticket?(item.id?'Does '+ticket+' cover: '+item.title+'?':'Does '+ticket+' cover the missing work?'):'Clear missing work: '+item.title+'?';}
+  function finish(clear){if(finished)return;finished=true;var item=selected();dialog.remove();if(!options.valid || options.valid())done(clear?item:undefined);}
+  ['Clear','Keep'].forEach(function(name){var button=doc.createElement('button');button.type='button';button.textContent=name;button.className='reader-button';button.addEventListener('click',function(){finish(name==='Clear');});dialog.appendChild(button);});
+  dialog.addEventListener('cancel',function(ev){ev.preventDefault();finish(false);});
+  dialog.addEventListener('keydown',function(ev){ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();finish(false);}});
+  dialog.addEventListener('click',function(ev){if(ev.target===dialog){var r=dialog.getBoundingClientRect();if(ev.clientX<r.left || ev.clientX>r.right || ev.clientY<r.top || ev.clientY>r.bottom)finish(false);}});
+  question();doc.body.appendChild(dialog);dialog.showModal();
+  var retired=function(){finished=true;dialog.remove();};if(options.own)options.own(retired);return retired;
 }

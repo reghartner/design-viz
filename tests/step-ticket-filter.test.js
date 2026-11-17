@@ -115,8 +115,8 @@ test('T3 a filter key not on a lit node or edge is a warning with its field path
  assert.deepEqual(plain(C.liveStatusStepTickets(nd,nd.steps[0],true)),['ST-1','ST-2','ST-3'],'with no lit key the filter is ignored');
  assert.equal(C.liveStatusStep(nd,nd.steps[0],evidence),'blocked');assert.equal(C.liveStatusCaption(nd,nd.steps[0],evidence),'BLOCKED · ST-1');
  const r=render(none,evidence);assert.deepEqual(r.listed(),['ST-1','ST-2','ST-3']);assert.equal(r.coin(0),'blocked');
- assert.deepEqual(errors(spec({ticketFilter:['ST-2','not a key']})),[STEP+'.ticketFilter[1]: use a Jira key like HW-123']);
- for(const value of [[],'ST-2'])assert.deepEqual(errors(spec({ticketFilter:value})),[STEP+'.ticketFilter: expected a nonempty array of Jira keys from the nodes and edges this step lights; remove it to show every ticket'],JSON.stringify(value));
+ assert.deepEqual(errors(spec({ticketFilter:['ST-2','not a key']})),[STEP+'.ticketFilter[1]: use a Jira key or missing-work ID']);
+ for(const value of [[],'ST-2'])assert.deepEqual(errors(spec({ticketFilter:value})),[STEP+'.ticketFilter: expected a nonempty array of Jira keys or missing-work IDs from the nodes and edges this step lights; remove it to show every ticket'],JSON.stringify(value));
 });
 test('T4 an imported node\'s merged provider and nodeTracking tickets can be filtered',()=>{
  const C=load(),model=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram}]}});
@@ -284,4 +284,48 @@ test('the Workbench checklist can drop stale keys from a step that lights no tic
  const e=inspectorEnvironment(inspectorNames),h=e.mount(raw),box=key=>{h.session.target={kind:'step',section:0,index:0};h.inspector.render();return h.guide.querySelector('fieldset.step-ticket-filter').querySelectorAll('label.frow').find(row=>row.children[0].textContent.startsWith(key)).children[1].children[0];};
  let input=box('ZZ-1');input.checked=false;input.fire('change');h.flush();assert.deepEqual(stepsOf(JSON.parse(h.text))[0].ticketFilter,['ZZ-2']);
  input=box('ZZ-2');input.checked=false;input.fire('change');h.flush();assert.equal(Object.hasOwn(stepsOf(JSON.parse(h.text))[0],'ticketFilter'),false);
+});
+
+test('named missing work filters node and edge step markers, never becomes a Jira reference, and has keyless Tickets rows',()=>{
+ const raw=spec({ticketFilter:['MISSING-1']}),d=raw.page.sections[0].diagram;
+ d.nodes.api.missingWork=[{id:'MISSING-1',title:'Set thermal issue bits'},{id:'MISSING-2',title:'Report issue bits'}];
+ d.edges[0].missingWork=[{id:'EDGE-WORK',title:'Add delivery retries'}];
+ d.steps=[{id:'missing',nodes:['api'],ticketFilter:['MISSING-1'],text:'Set bits'},{id:'done',nodes:['api'],ticketFilter:['ST-2'],text:'Done work'},
+  {id:'edge-missing',edge:'api->db',ticketFilter:['EDGE-WORK'],text:'Retries'},{id:'edge-ticket',edge:'api->db',ticketFilter:['ED-1'],text:'Transport'}];
+ const C=load(),page=C.normalize(raw),view=page.sections[0].diagram,map={...evidence,'ED-1':{state:'done'},'ST-1':{state:'done'},'ST-3':{state:'done'}};
+ assert.deepEqual(filterErrors(C,raw),[]);assert.deepEqual(filterWarnings(C,raw),[]);
+ assert.deepEqual(plain(C.trackingRefs(view.nodes.api).tickets),['ST-1','ST-2','ST-3']);
+ assert.deepEqual(view.steps.map(st=>C.liveStatusStep(view,st,map)),['missing','done','missing','done']);
+ assert.deepEqual(plain(C.liveStatusStepTickets(view,view.steps[0],true)),[],'placeholder IDs never go to Jira ticket lists');
+ const r=render(raw,map),rows=plain(r.ctl.liveStatus.snapshot().tickets),missing=rows.filter(row=>row.key===null);
+ assert.equal(missing.length,3);assert.deepEqual(missing.map(row=>row.title).sort(),['Add delivery retries','Report issue bits','Set thermal issue bits']);
+ assert.ok(missing.every(row=>row.url===null && row.state==='missing'));
+ assert.equal(r.ctl.liveStatus.snapshot().missingWork.count,3);
+ assert.equal(r.coin(0),'missing');assert.equal(r.coin(1),'done');assert.equal(r.coin(2),'missing');assert.equal(r.coin(3),'done');
+ assert.equal(r.node('api'),'missing','carrier keeps all its work');
+ assert.deepEqual(plain(C.trackingStepProofTickets(view,view.steps[0],page)),{api:[]});
+ assert.deepEqual(plain(C.trackingStepProofMissingWork(view,view.steps[0],page)),{api:true});
+ assert.deepEqual(plain(C.trackingStepProofMissingWork(view,view.steps[1],page)),{api:false});
+});
+
+test('legacy true is one unnamed item, omitted by valid ticket filters; malformed and ambiguous IDs are warned',()=>{
+ const C=load(),raw=spec({ticketFilter:['ST-2']}),d=raw.page.sections[0].diagram;
+ d.nodes.api.missingWork=true;let page=C.normalize(raw),view=page.sections[0].diagram;
+ assert.equal(C.liveStatusStep(view,view.steps[0],evidence),'done');delete view.steps[0].ticketFilter;
+ assert.equal(C.liveStatusStep(view,view.steps[0],{'ST-1':{state:'done'},'ST-2':{state:'done'},'ST-3':{state:'done'}}),'missing');
+ assert.deepEqual(plain(C.trackingMissingWork({missingWork:true})),[{id:null,title:'Missing work'}]);
+ const invalid=[];assert.deepEqual(plain(C.trackingMissingWork({missingWork:[{id:'A',title:'One'},{id:'A',title:'Two'},{id:'with space',title:'No'},{id:'OK',title:''}]},i=>invalid.push(i))),[{id:'A',title:'One'}]);assert.deepEqual(invalid,[1,2,3]);
+ d.nodes.api.missingWork=[{id:'ST-2',title:'Ambiguous'}];
+ assert.match(C.validate(C.normalize(raw)).warnings.join('\n'),/ST-2 must be unique/);
+});
+
+test('proof sees selected missing work without inventing Jira keys and excludes it from a ticket-only step',()=>{
+ const C=load(),raw=spec({ticketFilter:['MISSING-1']}),d=raw.page.sections[0].diagram;
+ d.nodes.api.missingWork=[{id:'MISSING-1',title:'Set bits'}];d.nodes.api.telemetry={kind:'service',signals:{rate:{grafana:'sum(rate(api_requests_total[5m]))*3600',unit:'req/h'}},proof:{rate:{min:1}}};
+ d.steps.push({id:'done',nodes:['api'],text:'Completed work',ticketFilter:['ST-2']});
+ const page=C.normalize(raw),nd=page.sections[0].diagram,jira={'ST-1':{state:'done'},'ST-2':{state:'done'},'ST-3':{state:'done'}},samples={api:{signals:{rate:{value:50,unit:'req/h'}},observedAt:'2026-11-07T00:00:00Z'}};
+ const input=C.telemetryProofInput(fn=>Object.keys(nd.nodes).forEach(id=>fn(nd.nodes[id],id,page)),fn=>fn(nd,page),jira,samples),proof=C.proofVerdicts(input);
+ assert.equal(proof.steps.build.verdict,'missing');assert.equal(proof.steps.done.verdict,'proven');assert.equal(proof.carriers.api.verdict,'missing');
+ assert.equal(C.telemetryStepModel(nd,0,C.diagramPathList(nd)[0].id,page,{map:samples},jira,true).verdict,'missing');
+ assert.deepEqual(plain(input.steps[0].tickets.api),[]);assert.ok(!JSON.stringify(input.jiraMap).includes('MISSING-1'));
 });

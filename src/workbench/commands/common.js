@@ -351,3 +351,50 @@ function planBulkDelete(text, targets, resolve){
   }
   return {text: cur, count: list.length};
 }
+
+/* Read the effective carrier, including provider work and consumer overrides. */
+function linksCarrierValue(raw,link,context){
+  var resolved=(typeof FlowTopology==='undefined'?raw:FlowTopology.resolveSource(raw,context)),rec=specSectionPaths(resolved)[link.section],d=rec && specValueAt(resolved,rec.diagram);
+  return d && (link.kind==='node'?(d.nodes || {})[link.id]:link.kind==='edge'?(d.edges || [])[link.index]:null);
+}
+/* Replace exactly one placeholder after the ticket add. One plan contains the
+   carrier write and every authored filter rewrite, so Undo is atomic. */
+function planCoverMissingWork(text,raw,link,item,ticket,context){
+  var value;try{value=linksCarrierValue(raw,link,context);}catch(ex){return {error:ex.message};}
+  var invalid=false,items=trackingMissingWork(value,function(){invalid=true;}),selected=items.find(function(old){return old.id===item.id && old.title===item.title;});
+  if(invalid)return {error:'Fix invalid or duplicate missing-work items in the source before replacing one.'};
+  if(!selected)return {error:'The missing work changed. Render and try again.'};
+  if(item.id!==null && item.id===ticket)return {error:'A missing-work ID cannot also be its replacement Jira key. Rename the placeholder first.'};
+  // A repeated named ID is ambiguous: global filter rewrites must never change
+  // the meaning of another carrier's work. Validate before touching the source.
+  if(item.id!==null){
+    var resolved=(typeof FlowTopology==='undefined'?raw:FlowTopology.resolveSource(raw,context)),occurrences=0,collision=false;
+    specSectionPaths(resolved).forEach(function(rec){var d=specValueAt(resolved,rec.diagram);Object.values(d && d.nodes || {}).concat(d && d.edges || []).forEach(function(v){
+      occurrences+=trackingMissingWork(v).filter(function(work){return work.id===item.id;}).length;
+      if(trackingRefs(v).tickets.indexOf(item.id)>=0)collision=true;
+    });});
+    if(occurrences!==1 || collision)return {error:'Missing-work IDs must be unique across the document and distinct from Jira keys. Rename '+item.id+' before replacing it.'};
+  }
+  var remaining=items.filter(function(old){return old!==selected;}),next=remaining.length?remaining:false;
+  var got=builderDiagram(text,raw,link.section);if(got.error)return got;
+  var local=link.kind==='node'?got.d.nodes && Object.prototype.hasOwnProperty.call(got.d.nodes,link.id):false,path;
+  if(local)path=got.path.concat(['nodes',link.id]);
+  if(link.kind==='edge'){
+    var key=builderEdgeKey(value),index=(got.d.edges || []).findIndex(function(edge){return builderEdgeKey(edge)===key;});
+    if(index>=0){local=true;path=got.path.concat(['edges',index]);}
+  }
+  var out=local?planSetField(text,raw,path,'missingWork',next===false?null:JSON.stringify(next)):
+    planTopologyTracking(text,raw,link.section,link.kind,link.kind==='node'?link.id:builderEdgeKey(value),'missingWork',next,false,context,link.index);
+  if(out.error || item.id===null)return out;
+  var updated=JSON.parse(out.text);
+  specSectionPaths(updated).forEach(function(rec){var d=specValueAt(updated,rec.diagram);
+    (d && Array.isArray(d.steps)?d.steps:[]).forEach(function(st,index){
+      if(!st || !Array.isArray(st.ticketFilter) || st.ticketFilter.indexOf(item.id)<0)return;
+      var filter=st.ticketFilter.map(function(key){return key===item.id?ticket:key;}).filter(function(key,index,all){return key!==null && all.indexOf(key)===index;});
+      var edit=jsonSetField(out.text,rec.diagram.concat(['steps',index]),'ticketFilter',filter.length?JSON.stringify(filter):null);if(edit)out.text=edit.text;
+    });
+  });return out;
+}
+function linksCoverPlan(plan,link,item,ticket,context){
+  return !item || !plan || plan.error?plan:planCoverMissingWork(plan.text,JSON.parse(plan.text),link,item,ticket,context);
+}

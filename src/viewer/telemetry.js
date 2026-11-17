@@ -156,7 +156,7 @@ function telemetryProofInput(eachCarrier,eachDiagram,jiraMap,telemetryMap,enviro
   eachCarrier(function(value,id,source){
     if(typeof id!=='string' || !id || !telemetryObject(value) || isTextBoxNode(value))return;
     var binding=carrierTelemetry(value,templatesOf(source),null,config || telemetryEnvironmentConfig(source,environment));
-    var entry={id:id,title:value.title || value.label || id,tickets:trackingRefs(value).tickets,kind:binding?binding.kind:null,signals:binding?binding.signals:{},proof:binding?binding.proof:{},links:binding?binding.links:{}};
+    var entry={id:id,title:value.title || value.label || id,tickets:trackingRefs(value).tickets,missingWork:trackingHasMissingWork(value),kind:binding?binding.kind:null,signals:binding?binding.signals:{},proof:binding?binding.proof:{},links:binding?binding.links:{}};
     if(!(id in index)){index[id]=carriers.length;carriers.push(entry);}
     else if(binding && !Object.keys(carriers[index[id]].signals).length)carriers[index[id]]=entry;
   });
@@ -164,7 +164,7 @@ function telemetryProofInput(eachCarrier,eachDiagram,jiraMap,telemetryMap,enviro
     if(!telemetryObject(step) || typeof step.id!=='string' || !step.id || seen[step.id])return;
     seen[step.id]=true;
     var narrowed=trackingStepProofTickets(diagram,step,page);
-    steps.push(Object.assign({id:step.id,carriers:liveStatusStepCarriers(diagram,step,true).map(function(carrier){return carrier.id;})},narrowed?{tickets:narrowed}:{}));
+    steps.push(Object.assign({id:step.id,carriers:liveStatusStepCarriers(diagram,step,true).map(function(carrier){return carrier.id;})},narrowed?{tickets:narrowed,missingWork:trackingStepProofMissingWork(diagram,step,page)}:{}));
   });});
   return {carriers:carriers,jiraMap:jiraMap || {},telemetryMap:telemetryMap || {},steps:steps};
 }

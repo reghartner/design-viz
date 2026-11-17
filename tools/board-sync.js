@@ -83,7 +83,7 @@ function inventory(raw){
     if(map.has(key)){ambiguous.add(key);map.delete(key);return;}
     if(ambiguous.has(key))return;
     const entries=isObject(obj) && Array.isArray(obj.tickets)?obj.tickets:[];
-    map.set(key,Object.assign({key,chain,path,entries,tickets:entries.map(ticketKey).filter(Boolean),missingWork:isObject(obj) && obj.missingWork===true},info));
+    map.set(key,Object.assign({key,chain,path,entries,tickets:entries.map(ticketKey).filter(Boolean),missingWork:isObject(obj) && Object.prototype.hasOwnProperty.call(obj,'missingWork')?JSON.parse(JSON.stringify(obj.missingWork)):null},info));
   }
   C.specSectionPaths(raw).forEach(record=>{
     const diagram=C.specValueAt(raw,record.diagram);if(!isObject(diagram))return;
@@ -220,14 +220,14 @@ function applyTargets(text,raw,targets){
     const carrier=target.carrier;
     if(carrier.kind!=='overlay'){
       if(target.tickets)text=setField(text,carrier.path,'tickets',target.tickets.length?JSON.stringify(target.tickets):null);
-      if(target.missingWork!==undefined)text=setField(text,carrier.path,'missingWork',target.missingWork?'true':null);
+      if(target.missingWork!==undefined)text=setField(text,carrier.path,'missingWork',target.missingWork===null?null:JSON.stringify(target.missingWork));
       return;
     }
     const importPath=carrier.path.slice(0,-2),field=carrier.path[carrier.path.length-2],rel=carrier.path[carrier.path.length-1],id=JSON.stringify([importPath,field]);
     if(!overlays.has(id)){const current=C.specValueAt(raw,importPath.concat([field]));overlays.set(id,{importPath,field,map:isObject(current)?JSON.parse(JSON.stringify(current)):{}});}
     const map=overlays.get(id).map,value=isObject(map[rel])?map[rel]:{};
     if(target.tickets){if(target.tickets.length)value.tickets=target.tickets;else delete value.tickets;}
-    if(target.missingWork!==undefined){if(target.missingWork)value.missingWork=true;else delete value.missingWork;}
+    if(target.missingWork!==undefined){if(target.missingWork!==null)value.missingWork=target.missingWork;else delete value.missingWork;}
     if(Object.keys(value).length)map[rel]=value;else delete map[rel];
   });
   overlays.forEach(({importPath,field,map})=>{text=setField(text,importPath,field,Object.keys(map).length?JSON.stringify(map):null);});
@@ -255,7 +255,8 @@ function pull(localText,liveText,options){
       if(key===null){unplaced.push(who(entry)+' '+when(entry.at)+': '+describe({changes:[change]}).join('; '));return;}
       if(!base.has(key)){const chain=JSON.parse(key);base.set(key,{key,chain,path:change.path,kind:isOverlayChain(chain)?'overlay':'unknown',label:changeLabel(change),tickets:[],missingWork:false});}
       const carrier=base.get(key);
-      if(change.op==='clear-missing-work'){carrier.missingWork=true;return;}
+      if(change.op==='clear-missing-work'){carrier.missingWork=Object.prototype.hasOwnProperty.call(change,'missingWorkBefore')?change.missingWorkBefore:true;return;}
+      if(change.coveredMissingWork || change.restoredMissingWork)carrier.missingWork=change.missingWorkBefore===undefined?true:change.missingWorkBefore;
       if(typeof change.ticket!=='string')return;
       if(!touched.has(change.ticket))touched.set(change.ticket,entry);
       if(change.op==='add')carrier.tickets=carrier.tickets.filter(ticket=>ticket!==change.ticket);
@@ -383,6 +384,24 @@ function pull(localText,liveText,options){
     if(!importAt && isOverlayChain(chain)){const at=overlayAt(path);importAt={path:path.slice(0,at+2),field:path[at+2],rel:path[at+3]};}
     spanWrites.push({path,importAt,key:sp.key,span:board,unhide:hidden});
   });
+  // A covered placeholder's filters travel with its ticket/marker change. A
+  // concurrent authored filter edit is a conflict, never silently overwritten.
+  const filterWrites=[],filterChanges=new Map();
+  sortedByTime(fresh).forEach(entry=>(entry.changes || []).forEach(change=>(change.filterReplacements || []).forEach(replacement=>{
+    const key=JSON.stringify(replacement.chain),prior=filterChanges.get(key);
+    filterChanges.set(key,{...replacement,before:prior?prior.before:replacement.before,entry});
+  })));
+  filterChanges.forEach(replacement=>{
+    const paths=C.boardEditResolveChain(localRaw,replacement.chain || []),path=paths.length===1 && paths[0][paths[0].length-2]==='steps'?paths[0]:null,value=path && C.specValueAt(localRaw,path),current=value && value.ticketFilter || null;
+    if(canonical(current)===canonical(replacement.after))return;
+    if(!path || canonical(current)!==canonical(replacement.before)){conflicts.push({kind:'filter-changed',message:'The step filter changed while '+who(replacement.entry)+' replaced missing work on '+when(replacement.entry.at)+'. Reconcile the filter before pulling this replacement.'});return;}
+    filterWrites.push({path,value:replacement.after});
+  });
+  base.forEach((carrier,key)=>{
+    const liveCarrier=live.map.get(key),mineCarrier=mine.get(key),liveWork=liveCarrier?liveCarrier.missingWork:null;
+    if(!mineCarrier || canonical(carrier.missingWork)===canonical(liveWork) || canonical(mineCarrier.missingWork)===canonical(liveWork) || canonical(mineCarrier.missingWork)===canonical(carrier.missingWork))return;
+    conflicts.push({kind:'missing-work-changed',message:'Missing work on '+(mineCarrier.label || key)+' changed locally while the board replaced or cleared it. Reconcile its items before pulling this replacement.'});
+  });
   if(conflicts.length)return {status:'conflict',text:localText,edits,conflicts,unplaced};
 
   const targets=new Map();
@@ -399,12 +418,14 @@ function pull(localText,liveText,options){
   });
   // Missing work: the board can only clear a marker; take the live value where the base differs.
   base.forEach((carrier,key)=>{
-    const now=live.map.get(key),cleared=now?now.missingWork:false;
-    if(carrier.missingWork===cleared)return;
-    const mineCarrier=mine.get(key);if(!mineCarrier || mineCarrier.missingWork===cleared)return;
+    const now=live.map.get(key),cleared=now?now.missingWork:null;
+    if(canonical(carrier.missingWork)===canonical(cleared))return;
+    const mineCarrier=mine.get(key);if(mineCarrier && canonical(mineCarrier.missingWork)===canonical(cleared))return;
+    if(mineCarrier && canonical(mineCarrier.missingWork)!==canonical(carrier.missingWork))return;
     target(key).missingWork=cleared;
   });
   let text=applyTargets(localText,localRaw,[...targets.values()]);
+  filterWrites.forEach(write=>{text=setField(text,write.path,'ticketFilter',write.value===null?null:JSON.stringify(write.value));});
   stepWrites.forEach(write=>{text=setField(text,write.path,'traceMatch',JSON.stringify(write.value));if(write.dropScope)text=setField(text,write.path,'traceScope',null);});
   spanWrites.forEach(write=>{
     // Re-read: ticket and overlay writes above may have created, emptied or moved the carrier's entry.
@@ -479,8 +500,8 @@ function log(localText,liveText,options){
     o.filter(key=>!l.includes(key)).forEach(key=>changes.push(changeFor('add',ticket,mine.get(key))));
   });
   const markers={cleared:0,set:0};
-  live.map.forEach((carrier,key)=>{const now=mine.get(key);if(carrier.missingWork && now && !now.missingWork){markers.cleared++;changes.push(changeFor('clear-missing-work',null,now));}});
-  mine.forEach((carrier,key)=>{const was=live.map.get(key);if(carrier.missingWork && !(was && was.missingWork))markers.set++;});
+  live.map.forEach((carrier,key)=>{const now=mine.get(key);if(C.trackingHasMissingWork(carrier) && now && !C.trackingHasMissingWork(now)){markers.cleared++;changes.push(changeFor('clear-missing-work',null,now));}});
+  mine.forEach((carrier,key)=>{const was=live.map.get(key);if(C.trackingHasMissingWork(carrier) && !C.trackingHasMissingWork(was))markers.set++;});
   // #1078: step mappings (traceMatch) added, changed or removed, a deleted mapped step included.
   const liveSteps=stepInventory(liveRaw),localSteps=stepInventory(localRaw),mappings={added:0,changed:0,removed:0};
   liveSteps.forEach((step,key)=>{const now=localSteps.get(key);if(!step.traceMatch)return;if(!now || !now.traceMatch)mappings.removed++;else if(canonical(now.traceMatch)!==canonical(step.traceMatch))mappings.changed++;});

@@ -99,7 +99,7 @@ function linksTicketModel(text,raw,context){
   });
   var byKey=Object.create(null);
   elements.forEach(function(el){
-    var keys=el.kind==='step'?el.shown:el.keys;
+    var keys=el.kind==='step'?el.shown.filter(function(key){return elements.some(function(carrier){return carrier.kind!=='step' && carrier.keys.indexOf(key)>=0;});}):el.keys;
     keys.forEach(function(key){
       var row=byKey[key] || (byKey[key]={key:key,ref:null,links:[]});
       if(!row.ref && el.refs && el.refs[key])row.ref=el.refs[key];
@@ -263,4 +263,19 @@ function planLinksTicketRename(text,raw,oldKey,newRef,context,merge){
    (null when offered). No plan runs here; a picked target runs the real plan. */
 function linksMoveTargets(model,from,key,copy){
   return model.elements.map(function(e){return {element:e,refusal:linksDropRefusal(from || null,e,key,!!copy)};});
+}
+
+/* Semantic additions are detected at the Workbench's single commit boundary,
+   so Inspect, preview drops, Links moves/copies and future add surfaces agree. */
+function linksMissingWorkAdditions(before,after,context){
+  var old=linksResolve(before,context),next=linksResolve(after,context),paths=specSectionPaths(next),previous=specSectionPaths(old),out=[];
+  paths.forEach(function(rec,section){
+    var d=specValueAt(next,rec.diagram),prior=previous[section] && specValueAt(old,previous[section].diagram);if(!d || !prior)return;
+    function compare(value,was,link){
+      if(!was)return;var items=trackingMissingWork(was).filter(function(item){return trackingMissingWork(value).some(function(now){return now.id===item.id && now.title===item.title;});});if(!items.length)return;
+      trackingRefs(value).tickets.forEach(function(key){if(trackingRefs(was).tickets.indexOf(key)<0)out.push({link:link,ticket:key,items:items});});
+    }
+    Object.keys(d.nodes || {}).forEach(function(id){if(!isTextBoxNode(d.nodes[id]))compare(d.nodes[id],(prior.nodes || {})[id],{kind:'node',section:section,id:id});});
+    (d.edges || []).forEach(function(edge,index){compare(edge,(prior.edges || []).find(function(was){return builderEdgeKey(was)===builderEdgeKey(edge);}),{kind:'edge',section:section,index:index});});
+  });return out;
 }

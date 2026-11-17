@@ -5,29 +5,28 @@ description: Author Flowview specs, ledgers and pages from stories, HLDs or Hone
 
 # HLD to page: packet first
 
-Read source; for edits also inspect spec, ledger, inherited state and nearby
-steps. Preserve facts, icons, animations and outcomes; do not re-ask settled facts.
+Read source; edits also need spec, ledger, inherited state and nearby steps.
+Preserve facts, icons, animations and outcomes; do not re-ask settled facts.
 
 ## Generate the entry packet
 
-VIZ is the checkout or `authoring/` kit. Select planned panels/features; edits
-infer these from the spec plus new source requirements:
+VIZ is the checkout or `authoring/` kit. Select panels/features from spec and source:
 
 ```sh
 python3 tools/authoring-packet.py --panel state --feature steps --out <scratch>/packet.md
 python3 tools/authoring-packet.py --spec <candidate.spec.json> --mode edit --out <scratch>/packet.md
 ```
 
-Repeat `--panel` / `--feature`; list panels with `python3 tools/widget_doc.py --list`;
+Repeat flags; list panels: `python3 tools/widget_doc.py --list`;
 [feature options](../../../docs/authoring-packets.md).
-Selections combine with inference. New/changed stories use `--mode new` (also
+New/changed stories use `--mode new` (also
 with `--spec`) for source, question and worksheet phases before JSON. Fully
 specified scoped edits need no new questions or worksheet.
 Follow packet routes; do not preload the contract, cookbook or examples.
 
-Follow packet story, fidelity, state, placement and verification rules, including
-visible-beat ledger evidence and visibility/value/icon checks. Report fit, occlusion and legibility unverified until a Workbench preview
-or authorized rendered evidence supplies them. File-only kits need no browser,
+Follow packet story, fidelity, state, placement and verification rules, ledger
+evidence and visibility/value/icon checks. Fit, occlusion and legibility remain
+unverified until Workbench preview or authorized rendered evidence. File-only kits need no browser,
 server, install or additional agent.
 
 Layout: `tools/compose-page-layout.cjs`, then `tools/size-section-layout.cjs`.
@@ -63,8 +62,7 @@ Table `showChange:false`; contract `fieldLabel`: [columns](../../../cookbook/sof
   conversation surface; no separate QUESTIONS.md, OUT folder or HTML.
 - **Local loopback:** read the supplied scratch `README.md` for its live
   source/revision and atomic proposal/result protocol. Keep worksheet notes
-  and questions in chat. Read [session details](../../../docs/local-agent-session.md)
-  only for protocol uncertainty or recovery.
+  and questions in chat. [Protocol help](../../../docs/local-agent-session.md).
 - **Pilot:** read [pilot capture](references/pilot-capture.md) before capture;
   helper inspection is allowed. OFF overrides saved consent: after prepare run
   metadata-only `--disable`; no checkpoints/native reads or asking for consent
@@ -77,7 +75,7 @@ Table `showChange:false`; contract `fieldLabel`: [columns](../../../cookbook/sof
   continue authoring.
 - **Source checkout:** run `python3 tools/build.py` before validators. Commit
   authored inputs only; HTML/runtime outputs are ignored. An extracted kit
-  includes its backend and needs no source checkout or build.
+  includes its backend; no checkout/build.
 - **Canon/topology:** `--feature topology`; keep or create ([when](references/recipe-routing.md#creating-imports-and-exports)) imports/exports/providers.
   Merge `export:["a","b"]`; nest via re-exported IDs. [Overlays](../../../docs/shared-topology.md).
   Repo preview: consumer `folder-agent.py refresh-sources --source-repo /repo`. No cloud disk refresh.
@@ -90,6 +88,9 @@ Table `showChange:false`; contract `fieldLabel`: [columns](../../../cookbook/sof
   `live-status-board` when requested; its Metrics chapter is conditional.
   Metrics chapter: Jira/PR discovery, env variables, named values/query links,
   provider semantics. Desktop; imported too. Count each included Jira story once.
+  [Named missing work](../../../cookbook/missing-work.md): `missingWork:[{id,title}]`
+  and `ticketFilter` IDs; unique IDs, keyless rows, replacement across all filters,
+  imported consumer overrides. `true` stays unnamed.
 
 Deliver spec/ledger together. Ask unresolved story decisions and needed
 Mixed/Engineering access after relevant checks. HTML needs an explicit

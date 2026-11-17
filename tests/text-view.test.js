@@ -520,3 +520,10 @@ test('a bad ticketFilter entry is a problem line', () => {
   assert.ok(all.includes('step happy/1 problem ticketFilter[1]: not a ticket key "not a key"'), all.join('\n'));
   assert.ok(all.includes('step happy/1 ticketFilter AB-3'));
 });
+
+test('named missing work retains identities and titles in text projections without turning them into Jira tickets',()=>{
+ const raw={nodes:{a:{title:'MCU',missingWork:[{id:'MISSING-1',title:'Set thermal issue bits'}],tickets:['EX-1']}},rows:[['a']],steps:[{id:'set',nodes:['a'],text:'Set bits',ticketFilter:['MISSING-1']}]};
+ const model=C.textViewModel(C.normalize(raw)),flat=C.textViewFlat(model),elements=C.textViewElements(model);
+ assert.match(flat,/MISSING-1/);assert.match(flat,/Set thermal issue bits/);assert.match(flat,/ticketFilter MISSING-1/);assert.match(elements,/- Missing work: MISSING-1 — Set thermal issue bits/);
+ assert.doesNotMatch(flat,/tickets MISSING-1/);assert.doesNotMatch(elements,/Problem: missingWork/);
+});

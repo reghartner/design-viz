@@ -715,8 +715,13 @@ entries, appended one per Save by the board's Edit mode (#828) or hand-written, 
 shown by the `edit-history` panel. `at`, a non-empty `changes` array and each change's `op`
 and carrier are required, and add/remove changes also require `ticket`; `by`, `by.id`,
 `by.name`, `path` and `label` are optional. A change `{"op": "clear-missing-work", "node" | "edge", "path"?, "label"?}`
-records a Missing work marker cleared in Edit mode (#855); it names only its carrier
-and must not carry a `ticket`. A change `{"op": "trace-match", "step", "traceMatch": {"serviceName", "operation", "nodeId"?}, "replaces"?, "path"?, "label"?}`
+records a Missing work marker cleared in Edit mode (#855); it names its carrier
+and must not carry a `ticket`. Covered adds carry `coveredMissingWork: {id,title}`;
+named clears carry `clearedMissingWork`, and reversing removes may carry `restoredMissingWork`.
+These operations also store `missingWorkBefore` (boolean, array, or null for inherited/absent)
+and `filterReplacements: [{chain,before,after}]` for atomic conflict replay and board-sync;
+chains identify sections/steps stably and `after:null` removes a filter. Legacy boolean clear
+records remain valid without these fields. A change `{"op": "trace-match", "step", "traceMatch": {"serviceName", "operation", "nodeId"?}, "replaces"?, "path"?, "label"?}`
 records a span mapped to a step in Edit mode (#1078), `replaces` the `{serviceName, operation, nodeId?}` it
 replaced (#1180); it names the step, no `ticket`, `node` or `edge`. Any other `op` is malformed. `at` is an ISO-8601 date-time with seconds, an optional fraction
 of any length and `Z` or a `±hh:mm` offset (`2026-10-30T16:23:15.987Z`).
@@ -2708,9 +2713,17 @@ it rather than author coordinates. This is saved geometry, not reader zoom.
 
 ### Authored missing work
 
-Ordinary diagram nodes and connections may store `missingWork: true` to flag additional work
-without a linked ticket. This is coverage intent, not persisted Jira evidence.
-Declare `flow.missing-work` and `flow.live-status`. Desktop Inspect → Tracking
+Ordinary diagram nodes and connections may store `missingWork: true` (one unnamed item)
+or `missingWork: [{"id":"MISSING-1","title":"Set thermal issue bits"}]` to flag additional work
+without a linked ticket. Named IDs start with a letter and use letters, digits, `_`, `.`, `:`, or `-`;
+keep them unique across the document and distinct from actual Jira keys. Titles are nonempty.
+A step `ticketFilter` may select named placeholders alongside Jira keys. Its marker and the
+Missing work paint on its directly lit nodes/edges reflect only included items; no filter includes all work.
+Boolean `true` is unnamed and omitted by a valid explicit filter. Placeholders produce keyless Tickets
+rows and are never Jira provider inputs. Every UI ticket addition asks which item it covers; Clear
+replaces that ID in every step filter and removes only the selected item, atomically with the add.
+Keep/dismiss preserves items and filters. IDs that collide or repeat warn and cannot be replaced. This is coverage intent, not persisted Jira evidence.
+Declare `flow.missing-work` and `flow.live-status`; named items and consumer suppression also require `flow.missing-work-items`. Desktop Inspect → Tracking
 provides the Missing work checkbox with ordinary Undo/Redo/save behavior. The
 flag overrides no-change, todo, active and done presentation, even on a ticketed
 node or connection; blocked Jira evidence still wins. Clear the flag once the work is covered.
@@ -2718,8 +2731,10 @@ A marked connection uses the communication-break glyph and suppresses packet
 traffic while Live is enabled, even with no provider or when all its tickets are
 Done. Labels and break glyphs retain ticket popovers; unlabeled breaks provide a
 keyboard trigger. Clear/disable/destroy restores authored communication effects.
-Imported `nodeTracking` and `edgeTracking` accept the marker with inherited
-read-only intent; resolved JSON snapshots edit their consumer-owned annotation.
+Imported `nodeTracking` and `edgeTracking` accept the same boolean/array. Omission inherits
+provider work; an explicit value overrides it (`false` or `[]` suppresses it). Replacement writes
+remaining effective items into the consumer only. Undo restores the ticket, filters and inheritance.
+These rules apply equally to local nodes/edges, provider items and consumer overlay items.
 An unlinked, unmarked node is automatically No change needed when live evidence
 is applied. Linked tickets awaiting evidence remain unknown. No-change is neutral
 in mixed step rollups and never creates a Jira ticket or increments its counts.

@@ -74,9 +74,9 @@ var TEXT_VIEW_LAYOUT=['fromPort','toPort','curveControls','curvePoints','coinOff
   'x','y','w','h','width','height','position','color','tint','icon','textStyle'];
 /* Known fields and the type each must have; a value of another type is listed as a problem. */
 var TEXT_VIEW_NODE_FIELDS={title:'string',sub:'string',label:'string',tickets:'array',prs:'array',telemetry:'object',binding:'object',codeRefs:'array',
-  delta:'boolean',deltaText:'string',deltaLinks:'array',existsWhen:'string',missingWork:'boolean',link:'string',presentation:'string'};
+  delta:'boolean',deltaText:'string',deltaLinks:'array',existsWhen:'string',missingWork:'missingWork',link:'string',presentation:'string'};
 var TEXT_VIEW_EDGE_FIELDS={from:'string',to:'string',title:'string',label:'string',kind:'string',tickets:'array',prs:'array',telemetry:'object',codeRefs:'array',
-  delta:'boolean',deltaText:'string',deltaLinks:'array',existsWhen:'string',missingWork:'boolean',link:'string',presentation:'string'};
+  delta:'boolean',deltaText:'string',deltaLinks:'array',existsWhen:'string',missingWork:'missingWork',link:'string',presentation:'string'};
 var TEXT_VIEW_STEP_FIELDS={id:'string',text:'string',time:'string',edge:'string',edges:'array',nodes:'array',failures:'object',panels:'object',patch:'object',
   panelVisibility:'object',traceMatch:'objects',conditions:'array',codeRefs:'array',delta:'boolean',deltaText:'string',deltaLinks:'array',link:'string',
   ticketFilter:'array',tone:'object'};
@@ -108,6 +108,7 @@ function textViewOtherFields(value,handled){
   return out;
 }
 function textViewTyped(v,type){
+  if(type==='missingWork')return typeof v==='boolean' || Array.isArray(v);
   if(type==='array')return Array.isArray(v);
   if(type==='object')return specObject(v);
   if(type==='objects')return specObject(v) || Array.isArray(v);
@@ -175,7 +176,7 @@ function textViewCarrier(d,kind,id,value,templates,ordinal){
     binding:kind==='node' && specObject(value.binding)?textViewClone(value.binding):null,codeRefs:textViewCodeRefs(value),
     delta:textViewDelta(value),
     existsWhen:typeof value.existsWhen==='string'?{value:value.existsWhen,active:trackingExistsWhen(value)===value.existsWhen}:null,
-    missingWork:value.missingWork===true,link:typeof value.link==='string'?value.link:null,
+    missingWork:trackingHasMissingWork(value),missingWorkItems:trackingMissingWork(value),link:typeof value.link==='string'?value.link:null,
     presentation:typeof value.presentation==='string'?value.presentation:null,
     fields:textViewOtherFields(value,kind==='node'?TEXT_VIEW_NODE_FIELDS:TEXT_VIEW_EDGE_FIELDS),
     problems:problems,steps:[],traceRules:[]};
@@ -399,7 +400,7 @@ function textViewFlat(model){
         el.tickets.forEach(function(k){add(kind,owner,'ticket',k+(el.ticketUrls[k]?' '+el.ticketUrls[k]:''));});
         el.prs.forEach(function(u){add(kind,owner,'pr',u);});
         if(el.existsWhen)add(kind,owner,'existsWhen',el.existsWhen.value+(el.existsWhen.active?'':' (inactive: needs a valid ticket)'));
-        if(el.missingWork)add(kind,owner,'missingWork','true');
+        if(el.missingWork)add(kind,owner,'missingWork',el.missingWorkItems.some(function(item){return item.id!==null;})?textViewStable(el.missingWorkItems):'true');
         if(el.presentation)add(kind,owner,'presentation',el.presentation);
         if(el.telemetryKind)add(kind,owner,'telemetry.kind',el.telemetryKind);
         if(el.use)add(kind,owner,'telemetry.use',el.use);
@@ -611,7 +612,7 @@ function textViewElements(model){
         if(el.tickets.length)out.push('- Tickets: '+el.tickets.map(function(k){return k+(el.ticketUrls[k]?' ('+el.ticketUrls[k]+')':'');}).join(', '));
         if(el.prs.length)out.push('- Pull requests: '+el.prs.join(', '));
         if(el.existsWhen)out.push('- Exists when: '+el.existsWhen.value+(el.existsWhen.active?'':' (inactive: needs a valid ticket)'));
-        if(el.missingWork)out.push('- Missing work: yes');
+        if(el.missingWork)out.push('- Missing work: '+el.missingWorkItems.map(function(item){return item.id?item.id+' — '+item.title:'yes';}).join('; '));
         if(el.link)out.push('- Link: '+el.link);
         if(el.presentation)out.push('- Presentation: '+el.presentation);
         if(el.binding)out.push('- Binding: '+textViewLeaves(el.binding,'').map(function(leaf){return leaf[0]+' '+leaf[1];}).join(' · '));

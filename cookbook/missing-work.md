@@ -6,18 +6,80 @@ to local and imported nodes and edges.
 
 ```json
 {
-  "nodes": {
-    "mcu": {
-      "title": "MCU",
-      "tickets": ["EX-1"],
-      "missingWork": [{"id": "MISSING-1", "title": "Set thermal issue bits"}]
-    }
-  },
-  "rows": [["mcu"]],
-  "steps": [
-    {"id": "set-bits", "nodes": ["mcu"], "text": "Set thermal bits", "ticketFilter": ["MISSING-1"]},
-    {"id": "report", "nodes": ["mcu"], "text": "Report existing state", "ticketFilter": ["EX-1"]}
-  ]
+  "page": {
+    "title": "MCU thermal work",
+    "contract": "1",
+    "flowview": {
+      "authoredWith": "0.2.0",
+      "minVersion": "0.2.0",
+      "features": [
+        "flow.live-status",
+        "flow.missing-work",
+        "flow.missing-work-items",
+        "flow.step-ticket-filter"
+      ]
+    },
+    "tracking": {
+      "jira": {
+        "site": "https://example.atlassian.net"
+      }
+    },
+    "sections": [
+      {
+        "heading": "Set thermal bits and report state",
+        "diagram": {
+          "nodes": {
+            "mcu": {
+              "title": "MCU",
+              "tickets": [
+                "EX-1"
+              ],
+              "missingWork": [
+                {
+                  "id": "MISSING-1",
+                  "title": "Set thermal issue bits"
+                }
+              ]
+            }
+          },
+          "rows": [
+            [
+              "mcu"
+            ]
+          ],
+          "steps": [
+            {
+              "id": "set-bits",
+              "nodes": [
+                "mcu"
+              ],
+              "text": "Set thermal bits",
+              "ticketFilter": [
+                "MISSING-1"
+              ]
+            },
+            {
+              "id": "report",
+              "nodes": [
+                "mcu"
+              ],
+              "text": "Report existing state",
+              "ticketFilter": [
+                "EX-1"
+              ]
+            }
+          ],
+          "panels": [
+            {
+              "id": "status",
+              "type": "live-status",
+              "title": "Thermal work"
+            }
+          ]
+        }
+      }
+    ]
+  }
 }
 ```
 

@@ -199,7 +199,7 @@ test('H14 the contract and the live-status docs describe the clear-missing-work 
  const docs=fs.readFileSync('docs/live-status.md','utf8'),history=docs.slice(docs.indexOf('\n## Edit history\n'),docs.indexOf('\n## Story mode\n'));
  assert.ok(history.includes('"clear-missing-work"'),'Edit history docs name the change kind');assert.ok(history.includes('Missing work cleared from'),'Edit history docs show the row prose');
  const edit=docs.slice(docs.indexOf('\n### Edit mode on the shared board'),docs.indexOf('\n## Pull requests from GitHub\n'));
- assert.ok(edit.includes('Clear Missing work'),'Edit mode docs name the control');assert.ok(edit.includes('source diagram'),'Edit mode docs explain inherited markers');
+ assert.ok(edit.includes('Clear Missing work'),'Edit mode docs name the control');assert.ok(edit.includes('consumer tracking overlay'),'Edit mode docs explain consumer-owned imported marker edits');assert.ok(edit.includes('never to the provider source'),'Edit mode docs preserve provider source');
 });
 /* #974 agent entries. Contract source: #974 "What changes" item 2 and Chuck's ruling 2026-11-04
    (history row: editor name, agent tag, time, summary). §0 ruling: extend this file.

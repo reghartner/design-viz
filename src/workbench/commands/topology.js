@@ -195,7 +195,7 @@ function topologyTrackingTarget(text,raw,section,kind,id,context,index){
   if(!t.owner)return {error:'Choose a node or connection in an authored topology import.'};
   t.field=kind==='node'?'nodeTracking':'edgeTracking';
   var local=(t.got.d.topologyImports[t.index][t.field] || {})[t.relative];
-  t.local=trackingStoredRefs(local);if(local && local.missingWork===true)t.local.missingWork=true;if(local && local.existsWhen==='tickets-done')t.local.existsWhen=local.existsWhen;
+  t.local=trackingStoredRefs(local);if(local && Object.prototype.hasOwnProperty.call(local,'missingWork'))t.local.missingWork=builderClone(local.missingWork);if(local && local.existsWhen==='tickets-done')t.local.existsWhen=local.existsWhen;
   // A consumer telemetry binding rides the same overlay entry; ticket edits keep it as authored.
   if(local && Object.prototype.hasOwnProperty.call(local,'telemetry'))t.local.telemetry=builderClone(local.telemetry);
   // #1290: so does the consumer's trace span overlay.
@@ -207,7 +207,7 @@ function topologyTrackingTarget(text,raw,section,kind,id,context,index){
   try{
     var resolved=FlowTopology.resolveSource(base,context),d=specValueAt(resolved,t.got.path);
     var inherited=kind==='node'?d.nodes[id]:d.edges.find(function(edge){return builderEdgeKey(edge)===id;});
-    t.inherited=trackingRefs(inherited);if(inherited.missingWork===true)t.inherited.missingWork=true;if(inherited.existsWhen==='tickets-done')t.inherited.existsWhen=inherited.existsWhen;
+    t.inherited=trackingRefs(inherited);if(Object.prototype.hasOwnProperty.call(inherited,'missingWork'))t.inherited.missingWork=builderClone(inherited.missingWork);if(inherited.existsWhen==='tickets-done')t.inherited.existsWhen=inherited.existsWhen;
     // The provider binding, already expanded by the provider's templates; a consumer binding replaces it whole.
     if(Object.prototype.hasOwnProperty.call(inherited,'telemetry'))t.inherited.telemetry=builderClone(inherited.telemetry);
   }catch(ex){return {error:ex.message};}
@@ -232,9 +232,8 @@ function planTopologyTracking(text,raw,section,kind,id,field,ref,remove,context,
   }
   if(field==='missingWork'){
     var marker=topologyTrackingTarget(text,raw,section,kind,id,context,index);if(marker.error)return marker;
-    if(marker.inherited.missingWork)return {error:'Missing work is inherited from the provider.'};
-    if(!remove && ref!==true)return {error:'missingWork must be true.'};
-    if(remove)delete marker.local.missingWork;else marker.local.missingWork=true;
+    if(!remove){var invalid=false;trackingMissingWork({missingWork:ref},function(){invalid=true;});if(invalid)return {error:'Use a boolean or unique missing-work items with id and title.'};}
+    if(remove && !trackingHasMissingWork(marker.inherited))delete marker.local.missingWork;else marker.local.missingWork=remove?false:builderClone(ref);
     return topologyTrackingPlan(text,raw,marker,context);
   }
   if(field==='existsWhen'){
@@ -256,7 +255,7 @@ function planTopologyTracking(text,raw,section,kind,id,field,ref,remove,context,
 }
 function topologyTrackingPlan(text,raw,t,context){
   var value={};['tickets','prs'].forEach(function(key){if(t.local[key].length)value[key]=t.local[key];});
-  if(t.local.missingWork)value.missingWork=true;
+  if(Object.prototype.hasOwnProperty.call(t.local,'missingWork'))value.missingWork=builderClone(t.local.missingWork);
   if(t.local.existsWhen)value.existsWhen=t.local.existsWhen;
   if(Object.prototype.hasOwnProperty.call(t.local,'telemetry'))value.telemetry=t.local.telemetry;
   if(Object.prototype.hasOwnProperty.call(t.local,'trace'))value.trace=t.local.trace;

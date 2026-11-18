@@ -330,10 +330,10 @@ var proofVerdicts = (function(){
         verdict: verdict, label: proofLabel(verdict), failing: judged ? judged.failing : [], counted: counted,
         since: {doneAt: null, firstTrafficAt: judged ? proofISO(proofFirstTraffic(judged, null)) : null}};
     }
-    function judge(carrier, list){
+    function judge(carrier, list, missing){
       if (endToEnd) return judgeEndToEnd(carrier);
       var tickets = (Array.isArray(list) ? list : []).filter(function(key){ return typeof key === 'string'; });
-      var jira = proofJira(tickets, jiraMap), doneAt = jira === 'done' ? proofDoneAt(tickets, jiraMap) : null;
+      var jira = (missing===undefined?carrier.missingWork:missing)?'missing':proofJira(tickets, jiraMap), doneAt = jira === 'done' ? proofDoneAt(tickets, jiraMap) : null;
       var judged = proofTelemetry(carrier, proofOwn(telemetryMap, carrier.id));
       var verdict = judged ? proofCell(jira, judged.state) : null;
       if(verdict === 'done' && !judged.minimumObserved)verdict = 'done-traffic-unmeasured';
@@ -356,7 +356,7 @@ var proofVerdicts = (function(){
       });
       var narrowed = !endToEnd && proofObject(step.tickets) ? step.tickets : null;
       var results = ids.map(function(id){
-        return narrowed && Object.prototype.hasOwnProperty.call(narrowed, id) ? judge(inputs[id], narrowed[id]) : carriers[id];
+        return narrowed && Object.prototype.hasOwnProperty.call(narrowed, id) ? judge(inputs[id], narrowed[id],step.missingWork && step.missingWork[id] || false) : carriers[id];
       });
       var verdict = endToEnd ? proofEndToEndStep(results) : proofStepVerdict(results);
       steps[step.id] = {verdict: verdict, label: proofLabel(verdict)};

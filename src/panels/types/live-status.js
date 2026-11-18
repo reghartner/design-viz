@@ -886,7 +886,7 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
       if(hasData){countRow.setAttribute('role','region');countRow.setAttribute('aria-label','Status counts');}else{countRow.removeAttribute('role');countRow.removeAttribute('aria-label');}
       var missingWork=value && value.missingWork || {count:0,painted:false};
       var missingCount=el(countRow,'span','count-missing-work','dv-live-count'+(hasData && missingWork.count && missingWork.painted?' dv-live-missing':''),'Missing work '+missingWork.count);
-      missingCount.setAttribute('data-live-count','missing-work');missingCount.setAttribute('title','Authored nodes and connections marked as missing work; each occurrence counts.');missingCount.hidden=!hasData || !missingWork.count;
+      missingCount.setAttribute('data-live-count','missing-work');missingCount.setAttribute('title','Unlinked work items on nodes and connections; each occurrence counts.');missingCount.hidden=!hasData || !missingWork.count;
       states.forEach(function(state){var count=el(countRow,'span','count-'+state,'dv-live-count'+(hasData && value && value.enabled && value.counts[state]?' dv-live-'+state:''),state+' '+(value?value.counts[state]:0));count.setAttribute('data-live-count',state);count.hidden=!hasData || !value.counts[state];});
       var metrics=value && value.metrics || {available:false,enabled:false},proof=metrics.proof;
       // #1371: while a Status controls panel is shown, the connector lines are there, not here.
@@ -918,7 +918,7 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
         el(offline,'p','note','dv-live-offline-note','Live ticket status needs a host with a Jira connector (claude.ai).').setAttribute('role','note');
         if(!hasData){
           var listed=[];el(offline,'h3','tickets-heading','','Tickets');var authored=el(offline,'ul','tickets','dv-live-offline-tickets');authored.setAttribute('aria-label','Tickets');
-          value.tickets.forEach(function(item){var row=el(authored,'li',item.key,'dv-live-offline-ticket');link(row,'key',item.key,item.url);item.urls.forEach(function(url){listed.push(url);prLink(row,url);});});
+          value.tickets.forEach(function(item){var row=el(authored,'li',item.rowId || item.key,'dv-live-offline-ticket');if(item.key)link(row,'key',item.key,item.url);else el(row,'span','missing','',item.title+' · Missing work');item.urls.forEach(function(url){listed.push(url);prLink(row,url);});});
           var otherPRs=value.noProvider.prs.filter(function(url){return listed.indexOf(url)<0;});
           if(otherPRs.length){el(offline,'h3','prs-heading','','Pull requests');var prList=el(offline,'ul','prs','dv-live-offline-tickets');otherPRs.forEach(function(url){prLink(el(prList,'li',url,'dv-live-offline-ticket'),url);});}
         }
@@ -963,21 +963,21 @@ var liveStatusPanelMount=null,liveStatusPanelVisibility=null;
           }else th.textContent=label;
         });
         var tbody=el(table,'tbody','tbody','');sortedTickets(value.tickets,sort).forEach(function(item){
-          var dragging=editing || !!value.ticketDrag;
-          var row=el(tbody,'tr',item.key,'dv-live-ticket-row'+(item.tag?' dv-live-ticket-with-tag':'')+(dragging?' dv-live-draggable':''));row.setAttribute('data-live-ticket',item.key);
+          var dragging=!!item.key && (editing || !!value.ticketDrag),rowId=item.rowId || item.key;
+          var row=el(tbody,'tr',rowId,'dv-live-ticket-row'+(item.tag?' dv-live-ticket-with-tag':'')+(dragging?' dv-live-draggable':''));if(item.key)row.setAttribute('data-live-ticket',item.key);else{row.removeAttribute('data-live-ticket');row.setAttribute('data-missing-work',item.placeholderId || 'unnamed');}
           // Edit mode and the desktop Workbench (#1241): a row drags its key onto a node or an edge (the board adds it there; drag only, #825).
           if(dragging){row.setAttribute('draggable','true');if(value.ticketDrag)row.setAttribute('title','Drag onto a node or connection to attach '+item.key+'. Undo removes it.');else row.removeAttribute('title');}
           else{row.removeAttribute('draggable');row.removeAttribute('title');}
           if(!row._liveDrag){row._liveDrag=function(ev){if(row.getAttribute('draggable')!=='true' || !ev.dataTransfer)return;var key=row.getAttribute('data-live-ticket');ev.dataTransfer.setData('application/x-flowview-ticket',key);ev.dataTransfer.setData('text/plain',key);ev.dataTransfer.effectAllowed='copy';};row.addEventListener('dragstart',row._liveDrag);}if(item.laneColor)row.style.setProperty('--dv-live-lane-color',item.laneColor);else row.style.removeProperty('--dv-live-lane-color');
           // The keyed renderer keeps data rows and controls in order, with a companion row only for an informational tag.
-          var keyCell=el(row,'td','key','dv-live-ticket-key');keyCell.setAttribute('tabindex','-1');link(keyCell,'link',item.key,item.url);if(item.epicLabel)el(keyCell,'div','epic','dv-live-ticket-epic',item.epicLabel);el(row,'td','title','dv-live-ticket-title',item.title);
+          var keyCell=el(row,'td','key','dv-live-ticket-key');keyCell.setAttribute('tabindex','-1');if(item.key)link(keyCell,'link',item.key,item.url);else el(keyCell,'span','blank','','—');if(item.epicLabel)el(keyCell,'div','epic','dv-live-ticket-epic',item.epicLabel);el(row,'td','title','dv-live-ticket-title',item.title);
           el(el(row,'td','state',''),'span','pill','dv-live-state-pill'+(value.enabled && states.indexOf(item.state)>=0?' dv-live-'+item.state:''),item.state);
           var ownerCell=el(row,'td','owner','dv-live-ticket-owner');if(item.ownerUrl)link(ownerCell,'link',item.owner,item.ownerUrl);else el(ownerCell,'span','text','',item.owner);var depends=el(row,'td','depends','dv-live-ticket-depends');(item.dependsOn || []).forEach(function(dep){depButton(depends,dep.key,dep);});
           var prs=el(row,'td','prs','dv-live-ticket-prs'),links=item.prs && item.prs.links || [],covered=links.map(function(pr){return pr.url;});
           links.forEach(function(pr){prLink(prs,pr);});item.urls.forEach(function(url){if(covered.indexOf(url)<0)prLink(prs,url);});
           // Jira's Development count stays informational; it is shown only when it says more than the icons do.
           if(item.prs && item.prs.count>links.length){var summary=el(prs,'span','summary','dv-live-pr-summary',item.prs.count+' '+item.prs.state);summary.setAttribute('title','Jira Development field: '+item.prs.count+' '+item.prs.state+' pull request'+(item.prs.count===1?'':'s')+'. Jira does not expose the link.');}
-          if(item.tag){var coverageRow=el(tbody,'tr',item.key+'/coverage','dv-live-coverage-row');coverageRow.setAttribute('data-live-coverage-for',item.key);if(item.laneColor)coverageRow.style.setProperty('--dv-live-lane-color',item.laneColor);else coverageRow.style.removeProperty('--dv-live-lane-color');
+          if(item.tag){var coverageRow=el(tbody,'tr',rowId+'/coverage','dv-live-coverage-row');coverageRow.setAttribute('data-live-coverage-for',rowId);if(item.laneColor)coverageRow.style.setProperty('--dv-live-lane-color',item.laneColor);else coverageRow.style.removeProperty('--dv-live-lane-color');
             var coverageCell=el(coverageRow,'td','cell','dv-live-coverage-cell');coverageCell.setAttribute('colspan','6');var coverage=el(coverageCell,'div','coverage','dv-live-coverage');el(coverage,'span','tag','dv-live-coverage-tag',item.tag);}
         });
         }

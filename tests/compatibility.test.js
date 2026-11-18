@@ -472,3 +472,12 @@ test('imported detail overrides and suppressions require their own capability an
   const older={...C.features};delete older['flow.imported-details'];assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:older}).missingFeatures.includes('flow.imported-details'));
  }
 });
+
+test('named missing work and consumer suppression require a capability older viewers can reject',()=>{
+ for(const carrier of [{missingWork:[{id:'MISSING-1',title:'Set bits'}]},{missingWork:false},{missingWork:[]}]){
+  for(const diagram of [{nodes:{a:carrier}},{edges:[{from:'a',to:'b',...carrier}]},{topologyImports:[{nodeTracking:{a:carrier},edgeTracking:{'a->b':carrier}}]}]){
+   const raw={page:{sections:[{diagram}]}},older={...C.features};delete older['flow.missing-work-items'];
+   assert.ok(C.detect(raw).includes('flow.missing-work-items'));assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:older}).missingFeatures.includes('flow.missing-work-items'));
+  }
+ }
+});

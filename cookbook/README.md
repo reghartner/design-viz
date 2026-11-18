@@ -44,6 +44,7 @@ Never edit a built HTML page — they are generated (`tools/build.py` +
 | canary promotion, traffic rollback, firmware trial/confirmation, or held rollout waves | `rollout-decisions.md` |
 | a Honeycomb trace turned into an editable diagram | [`../docs/trace-import.md`](../docs/trace-import.md) (input and CLI guide) |
 | a temperature readout with warning / shutdown thresholds | `temperature.md` |
+| unlinked work that belongs to selected steps on a shared node | [missing-work.md](missing-work.md) — placeholders, filters, ticket replacement and imported overrides |
 | a hot or frozen Home device, charging pause, camera unavailability and thermal recovery | [thermal-protection.md](thermal-protection.md) — complete interactive teaching flow |
 | a battery / charge level that drains and raises a low event | `battery-level.md` |
 | clocks, dates and battery drain that follow the story's time (overnight, a weekend) | [battery-level.md](battery-level.md#drain-from-story-time-instead-of-typing-every-charge) and [story time](../docs/step-time.md) |

@@ -125,8 +125,7 @@ function carrierTraceMatchWarning(value, d, kind, id, path, warnings){
   warnings.push(path+'.traceMatch: traceMatch is read only from steps; this value on '+kind+' '+id+' is ignored. Put it on the step that lights this '+kind+', or declare it under trace.spans.');
 }
 function trackingWarnings(value, path, warnings){
-  if(value && Object.prototype.hasOwnProperty.call(value,'missingWork') && typeof value.missingWork!=='boolean')
-    warnings.push(path+'.missingWork: must be true or false — ignored');
+  trackingMissingWork(value,function(index){warnings.push(path+'.missingWork'+(index===null?'':'['+index+']')+': use a boolean or unique items with a stable id and nonempty title — invalid entry ignored');});
   if(value && Object.prototype.hasOwnProperty.call(value,'existsWhen')){
     if(value.existsWhen!=='tickets-done')warnings.push(path+'.existsWhen: expected "tickets-done" — ignored');
     else if(isTextBoxNode(value))warnings.push(path+'.existsWhen: text boxes do not support availability — ignored');
@@ -145,16 +144,22 @@ function trackingWarnings(value, path, warnings){
    a key no lit carrier has warns and is ignored; it never stops a spec from
    validating or resolving. Malformed filters are errors. */
 function validateStepTicketFilters(page, errors, warnings){
+  var ids=Object.create(null),tickets=Object.create(null);
+  sectionRecords(page).forEach(function(record){var d=record.section.diagram || {};Object.values(d.nodes || {}).concat(d.edges || []).forEach(function(value){
+    trackingRefs(value).tickets.forEach(function(key){tickets[key]=true;});trackingMissingWork(value).forEach(function(item){if(item.id!==null)ids[item.id]=(ids[item.id] || 0)+1;});
+  });});
+  Object.keys(ids).forEach(function(id){if(ids[id]>1 || tickets[id])warnings.push('missingWork: '+id+' must be unique across the document and distinct from Jira keys; rename it before replacing it with a ticket');});
+
   sectionRecords(page).forEach(function(record){
     var d = record.section.diagram;
     (d && Array.isArray(d.steps) ? d.steps : []).forEach(function(st, ti){
       if (!st || !Object.prototype.hasOwnProperty.call(st, 'ticketFilter')) return;
       var TF = record.path + '.diagram.steps[' + ti + '].ticketFilter', lit = trackingStepLitTickets(d, st, page);
       trackingStepFilter(st, function(index){
-        errors.push(index === null ? TF + ': expected a nonempty array of Jira keys from the nodes and edges this step lights; remove it to show every ticket' : TF + '[' + index + ']: use a Jira key like HW-123');
+        errors.push(index === null ? TF + ': expected a nonempty array of Jira keys or missing-work IDs from the nodes and edges this step lights; remove it to show every ticket' : TF + '[' + index + ']: use a Jira key or missing-work ID');
       });
       if (Array.isArray(st.ticketFilter)) st.ticketFilter.forEach(function(key, index){
-        if (typeof key === 'string' && trackingKeyPattern.test(key) && lit.indexOf(key) < 0) warnings.push(TF + '[' + index + ']: "' + key + '" is not on a node or edge this step lights — ignored');
+        if (typeof key === 'string' && trackingWorkIdPattern.test(key) && lit.indexOf(key) < 0) warnings.push(TF + '[' + index + ']: "' + key + '" is not on a node or edge this step lights — ignored');
       });
       if (trackingStepFilter(st) && !trackingStepTicketFilter(d, st, page)) warnings.push(TF + ': no key is on a node or edge this step lights — the step shows every ticket');
     });
@@ -745,6 +750,12 @@ function editHistoryEntryProblem(entry){
       // #1290: the traceScope a mapping replaced (board Edit removes it).
       if(Object.prototype.hasOwnProperty.call(change,'replacesScope') && !specObject(change.replacesScope))return at+'.replacesScope: must be the traceScope object the mapping replaced';
       continue;
+    }
+    if(Object.prototype.hasOwnProperty.call(change,'coveredMissingWork') || Object.prototype.hasOwnProperty.call(change,'clearedMissingWork') || Object.prototype.hasOwnProperty.call(change,'restoredMissingWork')){
+      var work=change.coveredMissingWork || change.clearedMissingWork || change.restoredMissingWork;
+      if(change.coveredMissingWork && change.op!=='add' || change.clearedMissingWork && change.op!=='clear-missing-work' || change.restoredMissingWork && change.op!=='remove')return at+': a missing-work replacement belongs to an add, clear, or reversing remove change';
+      if(!specObject(work) || !(work.id===null || typeof work.id==='string' && trackingWorkIdPattern.test(work.id)) || typeof work.title!=='string' || !work.title.trim())return at+': missing work needs an id (null for unnamed) and title';
+      if(!Array.isArray(change.filterReplacements) || change.filterReplacements.some(function(replacement){return !specObject(replacement) || !Array.isArray(replacement.chain) || replacement.chain[replacement.chain.length-2]!=='steps' || !Array.isArray(replacement.before) || replacement.after!==null && !Array.isArray(replacement.after);}))return at+'.filterReplacements: expected step filter replacements';
     }
     // #855: clearing a Missing work marker names only its carrier.
     if(change.op==='clear-missing-work' || change.op==='trace-span'){if(change.op==='clear-missing-work' && Object.prototype.hasOwnProperty.call(change,'ticket'))return at+'.ticket: a "clear-missing-work" change has no ticket';}

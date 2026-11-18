@@ -4107,6 +4107,12 @@ g.node.dv-edit-target,path.edge.dv-edit-target{cursor:copy;}
 /* #1177: a step button or coin under a dragged trace span. */
 .docview .schip.dv-edit-over[data-step-source]{outline:3px solid var(--dink,currentColor);outline-offset:2px;}
 .docview g.coin.dv-edit-over[data-dv-step] circle{stroke:var(--dink,currentColor)!important;stroke-width:3px!important;}
+.dv-missing-work-dialog{box-sizing:border-box;width:520px;max-width:calc(100vw - 48px);padding:24px;border:1px solid var(--line,#cbd3dc);border-radius:12px;background:var(--bg,#fff);color:var(--ink,#24344a);box-shadow:0 20px 80px #0004;font:14px/1.5 sans-serif;}
+.dv-missing-work-dialog::backdrop{background:#14244266;}
+.dv-missing-work-dialog .dv-missing-work-question{margin:0 0 16px;font-weight:600;font-size:16px;overflow-wrap:anywhere;}
+.dv-missing-work-dialog label{display:block;margin-bottom:20px;}
+.dv-missing-work-dialog select{display:block;width:100%;margin-top:8px;padding:8px;font:inherit;color:inherit;background:var(--bg,#fff);}
+.dv-missing-work-dialog button{margin-right:8px;padding:7px 16px;}
 .dv-live-popover{inset:auto;margin:0;flex-direction:column;align-items:stretch;padding:12px;font-size:11px;font-weight:400;max-width:min(420px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;}
 .dv-live-popover .node-link-title{padding-right:28px;}
 /* #1165: the popover is capped to the diagram frame and its body scrolls; Close stays in its top right corner. */

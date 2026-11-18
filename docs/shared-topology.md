@@ -499,7 +499,7 @@ Inherited references are read-only. Removal applies only to consumer
 additions; each edit is one Undo/Redo. Duplicates do nothing.
 
 `nodeTracking` and `edgeTracking` values accept `tickets` and `prs` arrays,
-optional `existsWhen: "tickets-done"`, and `trace` (change, add or hide one provider
+optional `existsWhen: "tickets-done"`, `missingWork`, and `trace` (change, add or hide one provider
 [span declaration](provider-traces.md#trace-spans-declared-on-nodes-and-connections-1290)). An import's
 `variables` fill its metrics' `${name}`. Existence needs every resolved
 ticket Done, inherited and local. Provider rules survive imports, read-only in the
@@ -508,6 +508,12 @@ edits and layout resets keep it. No valid resolved tickets warns and ignores the
 [planned availability](live-status.md#planned-nodes-and-connections).
 Jira keys or browse URLs, and PR URLs, follow the [tracking parser](live-status.md#fields); invalid
 entries, unknown fields, and missing/deselected identities fail validation.
+Missing work applies equally to imported nodes and edges. Omission inherits the
+provider's boolean or named-item array; an explicit consumer `missingWork` value
+overrides it, and `false` or `[]` suppresses it. Covering an item with a ticket
+stores the remaining effective items in the consumer and rewrites every matching
+step filter in one edit. The provider is unchanged. Named items and suppression
+require `flow.missing-work-items`; see [missing-work authoring](../cookbook/missing-work.md).
 Nested imports use complete provider-relative keys such as `inner::api` and
 `inner::api->inner::store`. Local references follow inherited ones, deduplicated
 by Jira key (first wins). Provider refreshes keep local

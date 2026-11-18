@@ -598,8 +598,8 @@ function planDeleteNode(text, raw, sectionIdx, id, resolve){
   if (got.error) return got;
   if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
     return {error: 'node "' + id + '" not found'};
-  var removedTickets = trackingRefs(got.d.nodes[id]).tickets;
-  (got.d.edges || []).forEach(function(e){ if (e && (e.from === id || e.to === id)) removedTickets = removedTickets.concat(trackingRefs(e).tickets); });
+  var removedTickets = trackingCarrierStepTickets(null,got.d.nodes[id]);
+  (got.d.edges || []).forEach(function(e){ if (e && (e.from === id || e.to === id)) removedTickets = removedTickets.concat(trackingCarrierStepTickets(null,e)); });
   var plan=builderRewrite(text, raw, got.path, function(d){
     delete d.nodes[id];
     var panelNodes=Object.create(null);panelNodes[id]=null;
@@ -657,7 +657,7 @@ function planDeleteEdge(text, raw, sectionIdx, edgeIdx, resolve){
     d.edges.splice(edgeIdx, 1);
     var stillThere = d.edges.some(function(o){ return o && builderEdgeKey(o) === key; });
     if (!stillThere) builderRetargetStepKeys(d.steps, key, null);
-  }), sectionIdx, trackingRefs(e).tickets, resolve);
+  }), sectionIdx, trackingCarrierStepTickets(null,e), resolve);
 }
 
 function planDeletePanel(text, raw, sectionIdx, panelIdx){

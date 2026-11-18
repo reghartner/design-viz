@@ -242,7 +242,7 @@ test('unresolved opening never trusts error wording or bypasses malformed declar
  const invalid=structuredClone(h.inputs.consumer);invalid.page.sections[0].diagram.topologyImports[0].export=[];
  await assert.rejects(h.ctx.prepareLocalFolderTopology(JSON.stringify(invalid),{},null),/nonempty array/);
  invalid.page.sections[0].diagram.topologyImports[0].export='future';invalid.page.sections[0].diagram.topologyImports[0].nodeTracking={api:{missingWork:'yes'}};
- await assert.rejects(h.ctx.prepareLocalFolderTopology(JSON.stringify(invalid),{},null),/missingWork must be true or false/);
+ await assert.rejects(h.ctx.prepareLocalFolderTopology(JSON.stringify(invalid),{},null),/missingWork must be a boolean or an array of/);
  const previous=h.ctx.unresolvedLocalTopology(h.inputs.consumer);invalid.page.sections[0].diagram.topologyImports={};
  await assert.rejects(h.ctx.prepareLocalFolderTopology(JSON.stringify(invalid),{},previous),/topologyImports must be an array/);
 });

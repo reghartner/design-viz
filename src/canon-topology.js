@@ -93,7 +93,7 @@ var FlowTopology = (function(){
     // telemetry content is warning-only (validator); the resolver only carries it.
     shape(value,['tickets','prs','existsWhen','missingWork','telemetry','trace'],at);
     if(own(value,'trace'))validateTraceOverlay(value.trace,at+' trace');
-    if(Object.prototype.hasOwnProperty.call(value,'missingWork') && typeof value.missingWork!=='boolean')fail(at,'missingWork must be true or false');
+    trackingMissingWork(value,function(index){fail(at,'missingWork must be a boolean or an array of unique {id, title} items'+(index===null?'':' (entry '+index+')'));});
     if(Object.prototype.hasOwnProperty.call(value,'existsWhen') && value.existsWhen!=='tickets-done')fail(at,'existsWhen must be tickets-done');
     trackingRefs(value,function(field,index){fail(at,'invalid '+field+(index===null?' array':' entry '+index));});
   }
@@ -293,7 +293,7 @@ var FlowTopology = (function(){
   }
   function applyTracking(value,addition,note,carrier,templates){
     if(!addition)return;
-    if(addition.missingWork===true)value.missingWork=true;
+    if(own(addition,'missingWork'))value.missingWork=clone(addition.missingWork);
     if(addition.existsWhen==='tickets-done')value.existsWhen=addition.existsWhen;
     var inherited=trackingStoredRefs(value),local=trackingStoredRefs(addition);
     var merged=trackingStoredRefs({tickets:inherited.tickets.concat(local.tickets),prs:inherited.prs.concat(local.prs)});

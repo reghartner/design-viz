@@ -56,3 +56,33 @@ test('T2 a key already there writes nothing; a text box and a bad target are ref
   assert.match(s.plan({section:0,kind:'node',id:'note'},'EX-1').error,/Text boxes do not carry tickets/);
   assert.match(s.plan({section:0,kind:'step',id:'x'},'EX-1').error,/node or connection/);
 });
+
+test('covering one named placeholder rewrites every filter atomically, local and imported provider/consumer node and edge work',()=>{
+ for(const origin of ['local','provider-node','provider-edge','overlay-node','overlay-edge']){
+  const f=imported(),item={id:'MISSING-1',title:'Set thermal issue bits'},other={id:'MISSING-2',title:'Report issue bits'};
+  let ref={section:0,kind:'node',id:'local'},carrier=d(f.source).nodes.local;
+  if(origin.includes('node')){ref={section:0,kind:'node',id:'canon::api'};carrier=d(f.provider).nodes.api;}
+  if(origin.includes('edge')){ref={section:0,kind:'edge',index:0};carrier=d(f.provider).edges[0];}
+  if(origin==='overlay-node'){d(f.source).topologyImports[0].nodeTracking={api:{}};carrier=d(f.source).topologyImports[0].nodeTracking.api;}
+  if(origin==='overlay-edge'){d(f.source).topologyImports[0].edgeTracking={'api->store':{}};carrier=d(f.source).topologyImports[0].edgeTracking['api->store'];}
+  carrier.missingWork=[item,other];
+  const lit=ref.kind==='edge'?{edge:'canon::api->canon::store'}:{nodes:[ref.id]};
+  d(f.source).steps=[{id:'one',text:'First',...lit,ticketFilter:['MISSING-1']},{id:'two',text:'Second',...lit,ticketFilter:['MISSING-2','MISSING-1']},{id:'three',text:'Other',...lit,ticketFilter:['MISSING-2']}];
+  const beforeProvider=JSON.stringify(f.provider),s=session(f),before=s.text,added=s.plan(ref,'EX-1');assert.equal(added.error,undefined,origin);
+  const questions=plain(s.C.linksMissingWorkAdditions(s.raw,JSON.parse(added.text),f.context));assert.equal(questions.length,1,origin);assert.deepEqual(questions[0].items,[item,other]);
+  // Keep preserves marker identities and all filters.
+  const keep=s.C.linksCoverPlan(added,ref,undefined,'EX-1',f.context);assert.deepEqual(d(JSON.parse(keep.text)).steps,d(s.raw).steps);
+  const cover=s.C.linksCoverPlan(added,ref,item,'EX-1',f.context);assert.equal(cover.error,undefined,cover.error);
+  assert.deepEqual(d(JSON.parse(cover.text)).steps.map(st=>st.ticketFilter),[['EX-1'],['MISSING-2','EX-1'],['MISSING-2']],origin);
+  const effective=s.C.linksCarrierValue(JSON.parse(cover.text),ref,f.context);assert.deepEqual(plain(effective.missingWork),[other],origin);assert.ok(plain(effective.tickets).includes('EX-1'));
+  s.h.session.accept(cover,{snapshot:s.h.session.snapshot()});assert.equal(s.h.session.undo(),true);assert.equal(s.text,before,'one Undo restores all fields for '+origin);assert.equal(s.h.session.canUndo(),false);
+  assert.equal(JSON.stringify(f.provider),beforeProvider,'provider is never mutated');
+ }
+});
+
+test('last inherited item becomes explicit consumer suppression; ambiguous IDs cannot replace unrelated work',()=>{
+ const f=imported(),item={id:'MISSING-1',title:'Set bits'};d(f.provider).nodes.api.missingWork=[item];const s=session(f),ref={section:0,kind:'node',id:'canon::api'};
+ const added=s.plan(ref,'EX-1'),cover=s.C.linksCoverPlan(added,ref,item,'EX-1',f.context);assert.equal(cover.error,undefined);
+ assert.equal(d(JSON.parse(cover.text)).topologyImports[0].nodeTracking.api.missingWork,false);assert.deepEqual(plain(s.C.trackingMissingWork(s.C.linksCarrierValue(JSON.parse(cover.text),ref,f.context))),[]);
+ d(f.source).nodes.local.missingWork=[item];const duplicate=session(f),bad=duplicate.C.linksCoverPlan(duplicate.plan(ref,'EX-1'),ref,item,'EX-1',f.context);assert.match(bad.error,/unique across the document/);
+});

@@ -2274,17 +2274,16 @@ mode:
   it back where it was) cancels that pending change when the carrier's tickets are then as
   they were; otherwise both changes stay recorded (#1253). A ticket authored as a Jira
   browse URL is removed like one authored as a key.
-- **Clear Missing work** (#855): a node or edge marked `missingWork: true` shows
-  **Clear Missing work** in its popover. Clicking it removes the marker (one
-  pending change) and the carrier repaints from its tickets alone. A drop that
-  adds a ticket to a marked carrier opens that carrier's popover asking "Does
-  EX-1 cover the missing work?" with **Clear Missing work** and **Keep**; Keep,
-  Escape, × or a click outside leave the marker. Nothing clears automatically,
-  and the board never sets a marker (that stays a Workbench step). A marker an
-  imported carrier inherits from its source diagram (the provider sets it, even
-  if the consumer overlay repeats it) shows "Missing work comes from the source
-  diagram "<spec>" and must be cleared there." instead, with no Clear and no
-  post-drop question.
+- **Clear Missing work**: adding a ticket to a marked node or edge opens the
+  shared coverage question, in both desktop Workbench (Inspect, drops, Links)
+  and board Edit mode. For a named item it asks “Does EX-1 cover: Set thermal
+  issue bits?” Multiple items offer a chooser. **Clear** removes only that item
+  and replaces its ID with the Jira key in every step filter that names it.
+  **Keep**, Escape and outside dismissal attach the ticket while preserving all
+  placeholders and filters. The add, replacement and filter rewrites are one
+  Undo/pending change. Boolean `true` remains one unnamed item and asks “Does
+  EX-1 cover the missing work?” Imported provider work is equally editable:
+  writes go to the consumer tracking overlay, never to the provider source.
 - **Map a span to a step** (#1078): Edit, Save, Discard and Done also show in the
   Trace view. With a loaded trace, a focused span that no step maps offers **Map
   this span to a step**: pick one of the diagram's steps that has no `traceMatch`
@@ -2320,7 +2319,7 @@ mode:
   not unique when it was made (two identical unlabeled parallel edges), is dropped
   and listed as "could not be (carrier moved, removed or ambiguous)". A change whose carrier
   is there but cannot take it is named with its own reason: a clear whose carrier no longer
-  has a Missing work marker set on this board, a span mapping whose step their version maps
+  has the selected Missing work item, a span mapping whose step their version maps
   to another span or gave a trace scope (or changed the one the mapping replaced), a declared span whose key their version uses for a different span
   ("drop the span again to declare it; it gets a new name"), a ticket the provider of an imported node or
   connection now carries. Each such change is its own sentence. A declared span their version
@@ -2373,6 +2372,11 @@ them in is mechanical; the agent asks the author only about a real conflict.
      `span:<carrier>/<span key>` (the node id, or `from->to` for a connection, so quote it:
      `--resolve 'span:api->worker/send=live'`; plain `span:<span key>` works only while the
      board's new declarations use that key on one node or connection).
+   - A named missing-work replacement also carries every affected step filter.
+     Sequential replacements are folded from their earliest filter to their final
+     filter. A concurrent local change to those items or filters stops the whole
+     pull without writing anything; reconcile those fields before pulling again.
+     Consumer suppression and named arrays remain intact, including imported work.
    - Exit 3, nothing written: the live board was republished by an agent from another
      copy, so its structure may differ. Start again from `live.json`: copy it over the
      local file and redo the requested change. If the local file has changes of its own
@@ -2554,7 +2558,13 @@ non-empty `changes` array
 whose items carry `op` (`"add"` or `"remove"`), `ticket` (a Jira key) and the
 carrier (`node` id, or `edge: [from, to]`). A `"clear-missing-work"` change
 records a Missing work marker cleared in Edit mode (#855): it carries only the
-carrier (and the optional `path` and `label`), never a `ticket`. A `"trace-match"`
+carrier (and the optional `path` and `label`), never a `ticket`. A covered `"add"` carries
+`coveredMissingWork: {id, title}`, a named clear carries `clearedMissingWork`, and
+an inverse remove may carry `restoredMissingWork`. These changes retain
+`missingWorkBefore` (the prior authored value, or `null` for inheritance/absence)
+and `filterReplacements: [{chain, before, after}]` for atomic replay and board-sync.
+The filter chain uses stable section/step identities; a removed filter has `after:null`.
+Legacy plain boolean clears need no extra fields. A `"trace-match"`
 change records a span mapped to a step in Edit mode (#1078): it carries `step` (the
 step id) and `traceMatch` (`serviceName` and `operation` strings, plus the resulting `nodeId` when the step has one after the mapping), the optional
 `path` and `label` (the step text), `replaces` (the `serviceName`, `operation` and any `nodeId` it
@@ -2880,7 +2890,7 @@ All story features work with `#live=demo`; pages without tickets or epics show t
 ### Step ticket filters
 
 A node can carry many stories while a step is about a few of them. The step's
-`ticketFilter` lists the Jira keys it shows, chosen from the tickets the step
+`ticketFilter` lists the Jira keys and named missing-work IDs it shows, chosen from the work the step
 lights: those on the nodes and edges it lights directly (imported carriers
 included, with their merged provider and `nodeTracking` tickets) and, for a lit
 node whose `detail` is a section of the same page, the tickets of that section's
@@ -2895,25 +2905,26 @@ validator and Workbench and does not change when the remote detail loads.
 With a filter, the step's coin and chip state, its caption (including the ticket
 count and "waiting on"), its ticket list, playback pauses, First blocker, its place
 in a blocker's downstream step count and the step's proof verdict (in the caption
-and in `verdicts().steps`) use only the listed tickets. A carrier's `missingWork`
-and unavailable detail stay on that carrier. Node and edge colors, carrier
-verdicts, the Tickets table, lane rollups, readiness and coverage still use every
-ticket. Without `ticketFilter` a step shows every ticket on its lit carriers. The
+and in `verdicts().steps`) use only the listed work. In Step mode, a directly lit
+node or edge shows Missing work only for its included placeholders. Its global
+work, Tickets table rows, readiness and coverage remain intact. Unavailable
+detail remains a carrier annotation. Without `ticketFilter` a step shows every
+ticket and missing-work item on its lit carriers. The
 capability is `flow.step-ticket-filter`.
 
-An empty or non-array filter, or an entry that is not a Jira key, is a validation
+An empty or non-array filter, or an entry that is not a valid work ID, is a validation
 error with its field path. Tickets churn, so a key the step does not light
 (endpoint nodes of its edges count only when they are in `nodes`) is a warning
 with its field path and is ignored; when no listed key is lit, the step shows
 every ticket. A provider dropping a filtered ticket therefore never stops a
 consumer from resolving. In the desktop Workbench, the step's Inspect lists the
-lit tickets as **Tickets on this step** checkboxes, and every box checked removes
+lit tickets and named placeholders as **Tickets on this step** checkboxes, and every box checked removes
 the filter. Removing a hop or node from the step drops every key the step no
 longer lights. Deleting a node or edge, or removing a ticket from a carrier
 (local, or an imported carrier's consumer overlay), drops the removed keys from
 every step filter on the page that no longer lights them, in the same Undo step.
-Board Edit mode on the live board does not change step filters; a ticket it
-removes is ignored by the filter as above.
+Board Edit mode rewrites filters when a placeholder is covered by an added ticket.
+A ticket removed independently is ignored by the filter as above.
 
 ## Delivery boards over imported Canon topology
 
@@ -2953,6 +2964,33 @@ node or connection. This is authored coverage intent, not a Jira status. For exa
 {"title":"Audit logging","tickets":["AUDIT-42"],"missingWork":true}
 ```
 
+For work that belongs to particular steps, use named items (capability `flow.missing-work-items`, alongside `flow.missing-work` and `flow.live-status`):
+
+```json
+{"title":"MCU","missingWork":[{"id":"MISSING-1","title":"Set thermal issue bits"}]}
+```
+
+A step can select that work with `"ticketFilter":["MISSING-1"]`, alongside Jira
+keys. IDs start with a letter and contain letters, digits, `_`, `.`, `:`, or `-`.
+Use one stable ID per item, unique across the document and distinct from actual
+Jira keys. Duplicate IDs or collisions warn and block replacement until renamed.
+Titles must be nonempty. IDs such as `MISSING-1` are placeholders even though they
+look like Jira keys; they never become provider lookups or issue links.
+`true` remains one unnamed item: an unfiltered step includes it, while a valid
+explicit filter omits it. An absent filter includes all work; the existing
+all-stale-filter fallback still shows all work with a warning.
+
+The Tickets table has a separate row per placeholder occurrence, with its title,
+Missing state and an empty Jira key (`—`). These rows cannot be dragged as Jira
+tickets. Named items may be authored in JSON; the desktop step checklist lists
+them under **Tickets on this step**.
+
+For imported nodes and edges, omitting `missingWork` from `nodeTracking` or
+`edgeTracking` inherits the provider value. An explicit boolean or array overrides
+that value in the consumer; `false` or `[]` suppresses it. Clearing one inherited
+item stores the remaining effective items in the consumer. The provider remains
+unchanged, and Undo restores inheritance along with the ticket and filters.
+
 The marker says additional unlinked work remains, even if AUDIT-42 is Done. Clear
 it when that work is covered: here, or on a shared board in Edit mode
 (**Clear Missing work**, see "Edit mode on the shared board"). Blocked ticket evidence takes precedence over the
@@ -2960,7 +2998,7 @@ marker; the marker takes precedence over active, testing, done and todo. It part
 in step appearance and readiness without inventing a ticket or increasing Jira counts.
 
 The Live status header shows a separate **Missing work** count with the shared
-missing-work appearance. It counts marked node and connection occurrences across
+missing-work appearance. It counts missing-work item occurrences (boolean `true` counts as one) across
 local and imported diagrams, nested sections and loaded details; text boxes do
 not count. It appears even without tickets or a connector and hides when no
 markers remain. The count stays separate from the `missing` Jira-ticket total.
@@ -2977,7 +3015,7 @@ buttons. Clearing the marker removes that live break unless blocked evidence or
 availability still requires it. Disabling/clearing Live restores the authored
 connection and any independently authored communication failure. Local,
 imported, nested and resolved-snapshot connections follow the same behavior;
-a provider-inherited marker stays read-only in authored import overlays.
+a provider-inherited marker can be suppressed or replaced in the consumer overlay.
 
 With Live status data applied on a board with ticket references, nodes with no linked
 tickets and no missing-work marker automatically show **No change needed** (green, faint fill, solid outline, no

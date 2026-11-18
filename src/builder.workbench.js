@@ -1036,6 +1036,24 @@ function initWorkbenchBuilder(opts){
   function applyPlan(plan, opt, snapshot){
     if (!plan || plan.error){ formError(plan ? plan.error : 'edit failed'); return false; }
     formError('');
+    if(!(opt && opt.coverageAnswered)){
+      var snap=snapshot || session.snapshot(),ctx=session.topologyContext(),questions=[];
+      try{if(!snap.error)questions=linksMissingWorkAdditions(snap.raw,JSON.parse(plan.text),ctx);}catch(ex){formError(ex.message);return false;}
+      if(questions.length){
+        var targetKey=JSON.stringify(session.target && {kind:session.target.kind,section:session.target.section,id:session.target.id,index:session.target.index}),contextKey=JSON.stringify(ctx);
+        function valid(){var now=session.snapshot();return !now.error && now.text===snap.text && now.project===snap.project && JSON.stringify(session.topologyContext())===contextKey && JSON.stringify(session.target && {kind:session.target.kind,section:session.target.section,id:session.target.id,index:session.target.index})===targetKey;}
+        function ask(index){
+          if(!valid())return;
+          if(index===questions.length){applyPlan(plan,Object.assign({},opt || {},{coverageAnswered:true}),snap);return;}
+          var q=questions[index],effective=linksCarrierValue(JSON.parse(plan.text),q.link,ctx),remaining=trackingMissingWork(effective);
+          if(!remaining.length){ask(index+1);return;}
+          trackingMissingWorkPrompt(remaining,q.ticket,function(item){
+            var covered=linksCoverPlan(plan,q.link,item,q.ticket,ctx);if(covered.error){formError(covered.error);return;}plan=covered;ask(index+1);
+          },{document:document,valid:valid,own:function(retire){life.own(retire);}});
+        }
+        ask(0);return true;
+      }
+    }
     return session.accept(plan,{
       snapshot:snapshot,editError:opt && opt.editError,
       retention:{multi:true,addMode:!!interactions.adding(),exploreLayout:opt && opt.exploreLayout},

@@ -77,7 +77,7 @@ function boardEditSamePrefix(path,prefix){return prefix.every(function(part,i){r
 
 function createBoardEditor(options){
   var win=options.win || window,text=options.text,base=text,context=options.context || null,fallback=options.fallback || null;
-  var ops=[],active=false,saving=false,readOnly=false,reloading=false,canEdit=false,artifact=null,user=null,notice=null,listeners=[],lastMap=null,question=null,carriedTrace=null,carriedFocus=null;
+  var sourceRevision=0,ops=[],active=false,saving=false,readOnly=false,reloading=false,canEdit=false,artifact=null,user=null,notice=null,listeners=[],lastMap=null,question=null,carriedTrace=null,carriedFocus=null;
   var stashKey='flowview-board-edit:'+String(win.location && win.location.pathname || '')+':'+(options.specFile || 'flowspec.json');
 
   function changed(){listeners.slice().forEach(function(fn){try{fn();}catch(ex){}});}
@@ -135,21 +135,39 @@ function createBoardEditor(options){
      local carrier, or the consumer overlay of an imported one); a marker the
      provider also sets is inherited, as in the Workbench, and names its source. */
   function marker(t){
-    if(!t)return null;
-    if(!t.imported)return t.local && t.local.missingWork===true?{clearable:true}:null;
-    var m=topologyTrackingTarget(text,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,context,t.index);if(m.error)return null;
-    if(m.inherited.missingWork)return {clearable:false,source:m.got.d.topologyImports[m.index].spec};
-    return m.local.missingWork?{clearable:true}:null;
+    if(!t)return null;var value=linksCarrierValue(t.raw,t.ref,context),items=trackingMissingWork(value);
+    return items.length?{clearable:true,items:items}:null;
   }
+
   // The new text, or the same text when the operation changes nothing.
   // `restore` {at, item}: an add that undoes a pending remove puts the removed entry back where it was (#1253).
   function splice(source,t,op,ticket,match,restore){
+    if(op==='remove' && match && match.restoredMissingWork){
+      var removedTicket=splice(source,t,op,ticket,null,restore);if(removedTicket==null)return null;
+      var current=trackingMissingWork(linksCarrierValue(parsed(removedTicket),t.ref,context)),item=match.restoredMissingWork;
+      if(!current.some(function(work){return work.id===item.id;}))current.push(item);
+      var restoredValue=item.id===null?true:current,restored=t.imported?planTopologyTracking(removedTicket,parsed(removedTicket),t.section,t.kind,t.kind==='node'?t.node:t.id,'missingWork',restoredValue,false,context,t.index):planSetField(removedTicket,parsed(removedTicket),t.path,'missingWork',JSON.stringify(restoredValue));
+      if(restored.error)return null;removedTicket=restored.text;
+      var refused=false;(match.filterReplacements || []).forEach(function(change){
+        var paths=boardEditResolveChain(parsed(removedTicket),change.chain),path=paths.length===1?paths[0]:null,st=path && specValueAt(parsed(removedTicket),path),filter=st && st.ticketFilter || null;
+        if(JSON.stringify(filter)===JSON.stringify(change.after))return;
+        if(!path || JSON.stringify(filter)!==JSON.stringify(change.before)){refused=true;return;}
+        var edit=jsonSetField(removedTicket,path,'ticketFilter',change.after===null?null:JSON.stringify(change.after));if(edit)removedTicket=edit.text;else refused=true;
+      });return refused?null:removedTicket;
+    }
+    if(op==='add' && match && match.coveredMissingWork){
+      var added=splice(source,t,op,ticket,null,restore);if(added==null)return null;
+      var covered=planCoverMissingWork(added,parsed(added),t.ref,match.coveredMissingWork,ticket,context);
+      return covered.error?null:covered.text;
+    }
+
     // #1180: a replacement swaps serviceName and operation and keeps the step's other traceMatch fields.
     if(op==='trace-match'){var written=Object.assign({},t.previous || {},{serviceName:match.serviceName,operation:match.operation},typeof match.nodeId==='string' && match.nodeId?{nodeId:match.nodeId}:{}),set=jsonSetField(source,t.path,'traceMatch',JSON.stringify(written));
       // #1290: a step has traceMatch or traceScope, never both: the mapping replaces the scope.
       if(set && t.local && Object.prototype.hasOwnProperty.call(t.local,'traceScope'))set=jsonSetField(set.text,t.path,'traceScope',null);
       return set?set.text:null;}
     if(op==='clear-missing-work'){
+      if(match && match.clearedMissingWork){var clearedItem=planCoverMissingWork(source,t.raw,t.ref,match.clearedMissingWork,null,context);return clearedItem.error?null:clearedItem.text;}
       if(t.imported){var cleared=planTopologyTracking(source,t.raw,t.section,t.kind,t.kind==='node'?t.node:t.id,'missingWork',true,true,context,t.index);return cleared.error?null:cleared.text;}
       var removed=jsonSetField(source,t.path,'missingWork',null);
       return removed?removed.text:null;
@@ -169,7 +187,7 @@ function createBoardEditor(options){
     return result?result.text:null;
   }
   function record(t,op,ticket,match){
-    var entry={op:op};if(ticket!=null)entry.ticket=ticket;entry.path=t.path.slice();entry.label=t.label;
+    var entry={op:op};if(match && match.clearedMissingWork)entry.clearedMissingWork=builderClone(match.clearedMissingWork);if(match && match.coveredMissingWork)entry.coveredMissingWork=builderClone(match.coveredMissingWork);if(ticket!=null)entry.ticket=ticket;entry.path=t.path.slice();entry.label=t.label;
     if(t.kind==='step'){entry.step=t.step;entry.traceMatch={serviceName:match.serviceName,operation:match.operation};
       // The change describes the full span mapping that results: a nodeId written now or kept from the step (#1192).
       var nodeId=typeof match.nodeId==='string' && match.nodeId?match.nodeId:t.previous && !Array.isArray(t.previous) && typeof t.previous.nodeId==='string' && t.previous.nodeId?t.previous.nodeId:null;if(nodeId)entry.traceMatch.nodeId=nodeId;if(t.previous){entry.replaces={serviceName:t.previous.serviceName,operation:t.previous.operation};if(typeof t.previous.nodeId==='string' && t.previous.nodeId)entry.replaces.nodeId=t.previous.nodeId;}
@@ -199,15 +217,27 @@ function createBoardEditor(options){
     // `before` text only while that text holds no cancelled op, so a mapping made after the cancelled op forgets it.
     var path=JSON.stringify(t.path),inverse=op!=='add' && op!=='remove'?-1:ops.findIndex(function(o){return (o.entry.op==='add' || o.entry.op==='remove') && o.entry.op!==op && o.entry.ticket===ticket && JSON.stringify(o.entry.path)===path;});
     var next=splice(text,t,op,ticket,match,inverse>=0 && ops[inverse].removed || null),before=text;
+    if(next!=null && inverse>=0 && ops[inverse].entry.coveredMissingWork && ops[inverse].before){next=restoreCovered(next,t,ops[inverse]);}
     if(next==null || next===text)return false;
     // The pending list changes before the render, so the re-rendered board shows the new count at once (#1253);
     // a refused render puts it back.
     var entry=record(t,op,ticket,match),chain=boardEditChain(t.raw,t.path),kept=ops.slice(),befores=ops.map(function(o){return o.before;});
+    if(inverse>=0 && ops[inverse].entry.coveredMissingWork)entry.restoredMissingWork=builderClone(ops[inverse].entry.coveredMissingWork);
+    if(entry.coveredMissingWork || entry.clearedMissingWork || entry.restoredMissingWork){
+      entry.missingWorkBefore=t.local && Object.prototype.hasOwnProperty.call(t.local,'missingWork')?builderClone(t.local.missingWork):null;
+      entry.filterReplacements=[];var afterRaw=parsed(next);
+      specSectionPaths(t.raw).forEach(function(rec){var d=specValueAt(t.raw,rec.diagram);
+        (d && d.steps || []).forEach(function(st,index){var path=rec.diagram.concat(['steps',index]),after=specValueAt(afterRaw,path);
+          if(st && Array.isArray(st.ticketFilter) && after && JSON.stringify(st.ticketFilter)!==JSON.stringify(after.ticketFilter))entry.filterReplacements.push({chain:boardEditChain(t.raw,path),before:st.ticketFilter.slice(),after:Array.isArray(after.ticketFilter)?after.ticketFilter.slice():null});
+        });
+      });
+    }
+
     // Every exact-text snapshot taken after the cancelled op still holds it: drop them all, so no Undo brings it
     // back (#1290 whole-branch review M1: a swap's restore text and its swapped mapping's before).
     if(inverse>=0 && carrierTickets(next,t.path)===ops[inverse].tickets){ops.splice(inverse,1);ops.slice(inverse).forEach(function(o){o.before=undefined;o.restore=undefined;if(o.swapped)o.swapped.before=undefined;});}
     else{
-      var made={entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,previous:op==='trace-match'?t.previous:undefined,before:op==='trace-match'?before:undefined};
+      var made={entry:entry,chain:chain,replayable:boardEditResolveChain(t.raw,chain).length===1,kind:t.kind,previous:op==='trace-match'?t.previous:undefined,before:op==='trace-match' || match && match.coveredMissingWork?before:undefined};
       // #1290: the traceScope a mapping replaced, so its Undo can put it back in any edit order.
       if(op==='trace-match' && t.local && Object.prototype.hasOwnProperty.call(t.local,'traceScope'))made.scope=JSON.parse(JSON.stringify(t.local.traceScope));
       if(op==='add' || op==='remove')made.tickets=carrierTickets(text,t.path);
@@ -218,12 +248,32 @@ function createBoardEditor(options){
     question=ask || null;
     changed();return true;
   }
+  function restoreCovered(source,t,op){
+    var was=parsed(op.before),value=specValueAt(was,op.entry.path),item=op.entry.coveredMissingWork;
+    var prior=trackingMissingWork(linksCarrierValue(was,t.ref,context)),current=trackingMissingWork(linksCarrierValue(parsed(source),t.ref,context)),remaining=prior.filter(function(work){return work.id!==item.id;});
+    var field=value && Object.prototype.hasOwnProperty.call(value,'missingWork')?JSON.stringify(value.missingWork):null;
+    if(JSON.stringify(current)!==JSON.stringify(remaining)){
+      if(!current.some(function(work){return work.id===item.id;}))current.splice(Math.min(prior.findIndex(function(work){return work.id===item.id;}),current.length),0,item);
+      field=JSON.stringify(current.length===1 && current[0].id===null?true:current);
+    }
+    var edit=jsonSetField(source,t.path,'missingWork',field);if(!edit)return source;source=edit.text;
+    if(item.id===null)return source;
+    specSectionPaths(was).forEach(function(rec){var d=specValueAt(was,rec.diagram);
+      (d && d.steps || []).forEach(function(st,index){
+        if(!st || !Array.isArray(st.ticketFilter) || st.ticketFilter.indexOf(item.id)<0)return;
+        var path=rec.diagram.concat(['steps',index]),now=specValueAt(parsed(source),path);if(!now || !Array.isArray(now.ticketFilter))return;
+        var filter=now.ticketFilter.slice(),at=filter.indexOf(op.entry.ticket);
+        if(at>=0){if(st.ticketFilter.indexOf(op.entry.ticket)<0)filter[at]=item.id;else if(filter.indexOf(item.id)<0)filter.splice(Math.min(st.ticketFilter.indexOf(item.id),filter.length),0,item.id);}
+        var set=jsonSetField(source,path,'ticketFilter',JSON.stringify(filter));if(set)source=set.text;
+      });
+    });return source;
+  }
   // The carrier's authored tickets value as JSON (the overlay entry's for an imported carrier), for cancel checks.
   function carrierTickets(source,path){var value=specValueAt(parsed(source),path);return JSON.stringify(value && typeof value==='object' && value.tickets!==undefined?value.tickets:null);}
   function render(next){
     var error=options.render(next);
     if(error){if(win.console)console.warn('flowspec: board edit refused: '+error);return false;}
-    text=next;return true;
+    text=next;sourceRevision++;return true;
   }
   // The text from before a mapping (for its Undo) stays out of the stash, and so does a replaced
   // traceScope: replaying a mapping reads it again from the step it is applied to.
@@ -262,6 +312,10 @@ function createBoardEditor(options){
       if(!ref){dropped.push(describe);return;}
       active=true;
       var before=text;
+      if(entry.coveredMissingWork || entry.clearedMissingWork){
+        var selected=entry.coveredMissingWork || entry.clearedMissingWork,currentWork=trackingMissingWork(linksCarrierValue(raw,ref,context));
+        if(currentWork.some(function(item){return item.id===selected.id && item.title!==selected.title;})){refuse('their version changed the selected missing-work item; choose it again');return;}
+      }
       // #1290 PR 9: a declaration the winner already has (same key, service and operation) needs nothing.
       if(entry.op==='trace-span'){
         var tt=null;try{tt=target(text,ref);}catch(ex){tt=null;}var have=tt && shownCarrier(tt),theirs=have && have.trace && have.trace.spans && have.trace.spans[entry.span.key];
@@ -287,7 +341,7 @@ function createBoardEditor(options){
         if(theirScope!==undefined && (!op.hadScope || boardEditCanonical(theirScope)!==boardEditCanonical(op.scope))){
           refuse(op.hadScope?'their version changed that step\'s trace scope; edit it in Inspect':'their version gives that step a trace scope; edit it in Inspect');return;}
       }
-      if(!apply(entry.op,ref,entry.ticket,null,entry.traceMatch,op.previous) && text===before){
+      if(!apply(entry.op,ref,entry.ticket,null,entry.traceMatch || (entry.coveredMissingWork?{coveredMissingWork:entry.coveredMissingWork}:entry.clearedMissingWork?{clearedMissingWork:entry.clearedMissingWork}:entry.restoredMissingWork?{restoredMissingWork:entry.restoredMissingWork,filterReplacements:entry.filterReplacements}:null),op.previous) && text===before){
         // A clear with no marker of this board's left to clear is dropped (#855), saying why.
         if(entry.op==='clear-missing-work'){var mk=null;try{mk=marker(target(text,ref));}catch(ex){mk=null;}
           refuse(mk && !mk.clearable?'the Missing work marker on '+where+' comes from '+mk.source+' in their version':'their version has no Missing work marker on '+where+' to clear');return;}
@@ -466,16 +520,16 @@ function createBoardEditor(options){
   var api={
     state:function(){
       return {editable:canEdit && !!artifact && !readOnly,blocked:fallback?"Editing is off: this board couldn't load its latest version, so saving would overwrite newer changes.":'',
-        active:active && !readOnly,pending:ops.length,saving:saving,readOnly:readOnly,notice:notice?{kind:notice.kind,text:notice.text}:null,mapped:mapped(),declared:declared(),lastTrace:lastTrace()};
+        active:active && !readOnly,revision:sourceRevision,pending:ops.length,saving:saving,readOnly:readOnly,notice:notice?{kind:notice.kind,text:notice.text}:null,mapped:mapped(),declared:declared(),lastTrace:lastTrace()};
     },
     onChange:function(fn){listeners.push(fn);return function(){var i=listeners.indexOf(fn);if(i>=0)listeners.splice(i,1);};},
     start:function(){if(!canEdit || !artifact || fallback || readOnly || active)return;active=true;notice=null;changed();},
     done:function(){if(!active || ops.length || saving)return;active=false;question=null;changed();},
     /* A drop that adds a ticket to a carrier with a clearable Missing work marker
        asks whether the ticket covers it (#855); the answer is never automatic. */
-    add:function(ref,ticket){var m=null;try{m=marker(target(text,ref));}catch(ex){m=null;}return apply('add',ref,ticket,m && m.clearable?{ref:ref,ticket:ticket}:null);},
+    add:function(ref,ticket,covered){var m=null;try{m=marker(target(text,ref));}catch(ex){m=null;}return apply('add',ref,ticket,covered===undefined && m?{ref:ref,ticket:ticket}:null,covered?{coveredMissingWork:covered}:null);},
     remove:function(ref,ticket){return apply('remove',ref,ticket);},
-    clearMissingWork:function(ref){return apply('clear-missing-work',ref);},
+    clearMissingWork:function(ref,item){return apply('clear-missing-work',ref,null,null,item?{clearedMissingWork:item}:null);},
     // #1078: write traceMatch {serviceName, operation} on a step of ref.section. A step that has one is
     // replaced only when `previous` names it (#1177).
     mapSpan:function(ref,match,previous){return apply('trace-match',ref,null,null,match,previous || null);},
@@ -486,7 +540,7 @@ function createBoardEditor(options){
     declarePreview:function(ref,span){var t=null;try{t=target(text,ref);}catch(ex){t=null;}if(!t)return {error:'That node or connection is not on this board.'};var d=declaration(t,span,null);return d.error?{error:d.error}:{key:d.key};},
     undoDeclare:undoDeclare,
     // {clearable:true} for a marker set on this board, {clearable:false, source} for a provider-inherited one, else null.
-    missingWork:function(ref){if(!active || readOnly)return null;try{return marker(target(text,ref));}catch(ex){return null;}},
+    missingWork:function(ref,ticket){if(!active || readOnly)return null;try{var t=target(text,ref);if(ticket && trackingRefs(linksCarrierValue(t.raw,ref,context)).tickets.indexOf(ticket)>=0)return null;return marker(t);}catch(ex){return null;}},
     question:function(){return active && !readOnly && question?{ref:question.ref,ticket:question.ticket}:null;},
     endQuestion:function(){question=null;},
     // Tickets authored on this carrier itself: local tickets, or the consumer

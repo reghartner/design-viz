@@ -864,11 +864,11 @@ function trackingControls(val,overlay){
     }
     var refs=trackingRefs(val),textBox=overlay?overlay.textBox:isTextBoxNode(val);
     if(session.target && (session.target.kind==='node' || session.target.kind==='edge') && !textBox){
-      var inheritedMissing=overlay && overlay.inherited.missingWork===true;
-      var missingControl=checkboxControl(inheritedMissing || val.missingWork===true,function(checked){return overlay?overlay.update('missingWork',true,!checked):commitSimple('missingWork',checked?'true':null);});
-      missingControl.querySelector('input').disabled=!!inheritedMissing;
+      var effectiveMissing=overlay && !Object.prototype.hasOwnProperty.call(val,'missingWork')?overlay.inherited:val,missingItems=trackingMissingWork(effectiveMissing);
+      var missingControl=checkboxControl(missingItems.length>0,function(checked){return overlay?overlay.update('missingWork',true,!checked):commitSimple('missingWork',checked?'true':null);});
       box.appendChild(frow('Missing work',missingControl));
-      var missingHelp=document.createElement('p');missingHelp.className='fnote';missingHelp.textContent=(inheritedMissing?'Inherited from the provider. ':'')+'Additional work has no linked ticket. This stays visible in Live status, even with linked tickets, until cleared. With no tickets or marker, no change is needed.';box.appendChild(missingHelp);
+      missingItems.forEach(function(item){if(item.id){var row=document.createElement('p');row.className='fnote';row.textContent=item.id+' — '+item.title;box.appendChild(row);}});
+      var missingHelp=document.createElement('p');missingHelp.className='fnote';missingHelp.textContent='Additional work has no linked ticket. Adding a ticket asks which item it covers. Imported work can be cleared in this consumer without changing its provider.';box.appendChild(missingHelp);
     }
     if(!textBox){
       var inheritedRule=overlay && overlay.inherited.existsWhen==='tickets-done';
@@ -1563,7 +1563,9 @@ function stepTicketFilterControl(val, ctx, t){
     var help=document.createElement('p');help.className='fnote';
     help.textContent='Uncheck tickets this step should not show. Its circle, caption and ticket list use the checked tickets; the nodes and edges keep all of theirs.';
     box.appendChild(help);
+    var missingItems=[];trackingStepCarriers(ctx.diagram,val,true).forEach(function(carrier){missingItems=missingItems.concat(trackingCarrierStepWork(ctx.resolvedPage,carrier.value));});
     keys.forEach(function(key){
+      var placeholder=missingItems.find(function(item){return item.id===key;});
       var control=checkboxControl(lit.indexOf(key)<0 || !shown || shown.indexOf(key)>=0,function(){
         var next=entries.filter(function(entry){return entry.input.checked;}).map(function(entry){return entry.key;});
         if(lit.length && !next.some(function(k){return lit.indexOf(k)>=0;})){formError('Keep at least one ticket on this step. Check every ticket to show them all.');return false;}
@@ -1575,7 +1577,7 @@ function stepTicketFilterControl(val, ctx, t){
         },{after:refreshFormSoon});
       });
       entries.push({key:key,input:control.firstChild});
-      box.appendChild(frow(lit.indexOf(key)<0?key+' (not on a lit node or edge)':key,control));
+      box.appendChild(frow(lit.indexOf(key)<0?key+' (not on a lit node or edge)':placeholder?placeholder.title+' ('+key+', missing work)':key,control));
     });
     return box;
   }
